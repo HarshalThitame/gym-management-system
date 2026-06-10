@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   }
 
   const userId = context.userId;
-  const rateLimit = checkRateLimit(`pwa-sync:${userId}`, 30, 60_000);
+  const rateLimit = await checkRateLimit(`pwa-sync:${userId}`, 30, 60_000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many sync requests." } }, { status: 429 });
   }

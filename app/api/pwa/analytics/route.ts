@@ -9,7 +9,7 @@ import type { Json } from "@/types/database";
 export async function POST(request: Request) {
   const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ip = forwardedFor || "local";
-  const rateLimit = checkRateLimit(`pwa-analytics:${ip}`, 60, 60_000);
+  const rateLimit = await checkRateLimit(`pwa-analytics:${ip}`, 60, 60_000);
 
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many mobile analytics events." } }, { status: 429 });

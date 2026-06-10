@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in to enable push notifications." } }, { status: 401 });
   }
 
-  const rateLimit = checkRateLimit(`pwa-push:${context.userId}`, 12, 60_000);
+  const rateLimit = await checkRateLimit(`pwa-push:${context.userId}`, 12, 60_000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many push subscription requests." } }, { status: 429 });
   }

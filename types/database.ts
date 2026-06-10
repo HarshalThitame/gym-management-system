@@ -4898,6 +4898,10 @@ export type Database = {
         Args: { target_branch_id: string };
         Returns: boolean;
       };
+      check_api_rate_limit: {
+        Args: { bucket_key: string; max_requests: number; window_seconds: number };
+        Returns: Array<{ allowed: boolean; remaining: number; reset_at: string }>;
+      };
       generate_member_code: {
         Args: { target_gym_id: string | null };
         Returns: string;

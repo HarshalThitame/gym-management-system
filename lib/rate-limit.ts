@@ -1,24 +1,49 @@
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+
 type Bucket = {
   count: number;
   resetAt: number;
 };
 
-const buckets = new Map<string, Bucket>();
+const fallbackBuckets = new Map<string, Bucket>();
 
-export function checkRateLimit(key: string, limit: number, windowMs: number) {
+export async function checkRateLimit(key: string, limit: number, windowMs: number) {
+  const supabase = getSupabaseAdminClient();
+
+  if (supabase) {
+    const { data, error } = await supabase.rpc("check_api_rate_limit", {
+      bucket_key: key,
+      max_requests: limit,
+      window_seconds: Math.max(1, Math.ceil(windowMs / 1000))
+    });
+    const result = data?.[0];
+
+    if (!error && result) {
+      return {
+        allowed: result.allowed,
+        remaining: result.remaining,
+        resetAt: new Date(result.reset_at).getTime()
+      };
+    }
+  }
+
+  return checkFallbackRateLimit(key, limit, windowMs);
+}
+
+function checkFallbackRateLimit(key: string, limit: number, windowMs: number) {
   const now = Date.now();
-  const current = buckets.get(key);
+  const current = fallbackBuckets.get(key);
 
   if (!current || current.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, remaining: limit - 1 };
+    const resetAt = now + windowMs;
+    fallbackBuckets.set(key, { count: 1, resetAt });
+    return { allowed: true, remaining: limit - 1, resetAt };
   }
 
   if (current.count >= limit) {
-    return { allowed: false, remaining: 0 };
+    return { allowed: false, remaining: 0, resetAt: current.resetAt };
   }
 
   current.count += 1;
-  return { allowed: true, remaining: limit - current.count };
+  return { allowed: true, remaining: limit - current.count, resetAt: current.resetAt };
 }
-

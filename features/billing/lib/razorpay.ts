@@ -64,6 +64,17 @@ export async function createRazorpayRefund(paymentId: string, amount: number, no
   return { ok: true, refund } as const;
 }
 
+export async function fetchRazorpayPayment(paymentId: string) {
+  const client = getRazorpayClient();
+
+  if (!client) {
+    return { ok: false, message: "Razorpay is not configured." } as const;
+  }
+
+  const payment = await client.payments.fetch(paymentId);
+  return { ok: true, payment } as const;
+}
+
 export function verifyRazorpayCheckoutSignature(input: {
   orderId: string;
   paymentId: string;

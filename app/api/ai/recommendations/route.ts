@@ -10,7 +10,7 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in to generate AI recommendations." } }, { status: 401 });
   }
 
-  const rateLimit = checkRateLimit(`ai-recommendations:${context.userId}`, 5, 60_000);
+  const rateLimit = await checkRateLimit(`ai-recommendations:${context.userId}`, 5, 60_000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Please wait before refreshing AI recommendations again." } }, { status: 429 });
   }

@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in to use the AI coach." } }, { status: 401 });
   }
 
-  const rateLimit = checkRateLimit(`ai-chat:${context.userId}`, 20, 60_000);
+  const rateLimit = await checkRateLimit(`ai-chat:${context.userId}`, 20, 60_000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many AI coach messages. Please wait a minute." } }, { status: 429 });
   }

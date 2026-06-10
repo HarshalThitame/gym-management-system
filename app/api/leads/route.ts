@@ -6,7 +6,7 @@ import { insertLead } from "@/lib/supabase/admin";
 export async function POST(request: Request) {
   const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ip = forwardedFor || "local";
-  const rateLimit = checkRateLimit(`lead:${ip}`, 8, 60_000);
+  const rateLimit = await checkRateLimit(`lead:${ip}`, 8, 60_000);
 
   if (!rateLimit.allowed) {
     return NextResponse.json(
