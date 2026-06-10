@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Activity, CalendarCheck, CalendarDays, CreditCard, Dumbbell, MessageSquare, Target, TrendingUp, UsersRound } from "lucide-react";
+import { Activity, Brain, CalendarCheck, CalendarDays, CreditCard, Dumbbell, MessageSquare, Target, TrendingUp, UsersRound } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export default async function AdminDashboardPage() {
         <StatCard detail={`${classes.metrics.activeBookings} active class bookings`} icon={<CalendarDays className="size-5" />} label="Class Sessions" value={String(classes.metrics.upcomingSessions)} />
         <StatCard detail={`${fitness.metrics.completedWorkouts30Days} workouts in 30 days`} icon={<Target className="size-5" />} label="Fitness Goals" value={String(fitness.metrics.activeGoals)} />
         <StatCard detail={`${communications.metrics.emailsToday} emails and ${communications.metrics.whatsappToday} WhatsApp queued today`} icon={<MessageSquare className="size-5" />} label="Communications" value={String(communications.metrics.unreadNotifications)} />
+        <StatCard detail="Predictive insights and supervised AI operations" icon={<Brain className="size-5" />} label="AI Intelligence" value="Ready" />
         <StatCard detail="Payment records and invoices are tracked" icon={<CreditCard className="size-5" />} label="Revenue" value="Tracked" />
         <StatCard detail="Trainer profiles available for assignments" icon={<Dumbbell className="size-5" />} label="Trainers" value={String(trainers.length)} />
       </div>
@@ -57,6 +58,7 @@ export default async function AdminDashboardPage() {
           <ButtonLink href="/admin/fitness" variant="secondary">Fitness Tracking</ButtonLink>
           <ButtonLink href="/admin/trainers" variant="secondary">Manage Trainers</ButtonLink>
           <ButtonLink href="/admin/communications" variant="secondary">Communication Hub</ButtonLink>
+          <ButtonLink href="/admin/ai" variant="secondary">AI Intelligence</ButtonLink>
           <ButtonLink href="/admin/reports" variant="secondary">Analytics Center</ButtonLink>
           <ButtonLink href="/admin/settings" variant="secondary">Enterprise Settings</ButtonLink>
           <ButtonLink href="/admin/staff" variant="secondary">Manage Staff</ButtonLink>

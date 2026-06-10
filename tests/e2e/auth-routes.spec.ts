@@ -32,6 +32,22 @@ test("protected enterprise settings route redirects anonymous visitors", async (
   await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fsettings/);
 });
 
+test("protected AI routes redirect anonymous visitors", async ({ page, request }) => {
+  await page.goto("/admin/ai");
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fai/);
+
+  await page.goto("/member/ai-coach");
+  await expect(page).toHaveURL(/\/login\?next=%2Fmember%2Fai-coach/);
+
+  await page.goto("/trainer/ai");
+  await expect(page).toHaveURL(/\/login\?next=%2Ftrainer%2Fai/);
+
+  const response = await request.post("/api/ai/chat", {
+    data: { message: "What should I train today?" }
+  });
+  expect(response.status()).toBe(401);
+});
+
 test("PWA assets and offline fallback are available", async ({ page, request }) => {
   const manifest = await request.get("/manifest.webmanifest");
   expect(manifest.ok()).toBeTruthy();

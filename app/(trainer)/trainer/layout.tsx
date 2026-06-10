@@ -1,4 +1,4 @@
-import { Activity, CalendarCheck, CalendarDays, Dumbbell, Gauge, MessageSquare, UsersRound } from "lucide-react";
+import { Activity, Brain, CalendarCheck, CalendarDays, Dumbbell, Gauge, MessageSquare, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalShell } from "@/components/layout/portal-shell";
 import { requireRole } from "@/lib/auth/guards";
@@ -11,6 +11,7 @@ const trainerNav = [
   { href: "/trainer/sessions", label: "Sessions", icon: CalendarCheck },
   { href: "/trainer/programs", label: "Programs", icon: Dumbbell },
   { href: "/trainer/progress", label: "Progress", icon: Activity },
+  { href: "/trainer/ai", label: "AI Assistant", icon: Brain },
   { href: "/trainer/communications", label: "Communications", icon: MessageSquare }
 ];
 

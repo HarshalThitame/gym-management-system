@@ -1,4 +1,4 @@
-import { Activity, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, MessageSquare, Settings, Tags, UserRoundPlus, UsersRound } from "lucide-react";
+import { Activity, BarChart3, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, MessageSquare, Settings, Tags, UserRoundPlus, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalShell } from "@/components/layout/portal-shell";
 import { requireRole } from "@/lib/auth/guards";
@@ -13,6 +13,7 @@ const adminNav = [
   { href: "/admin/membership-plans", label: "Plans", icon: Tags },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
   { href: "/admin/communications", label: "Communications", icon: MessageSquare },
+  { href: "/admin/ai", label: "AI Intelligence", icon: Brain },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
   { href: "/admin/staff", label: "Staff", icon: BriefcaseBusiness },
   { href: "/admin/members", label: "Create User", icon: UserRoundPlus },
