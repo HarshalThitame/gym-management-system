@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { requireAuth } from "@/lib/auth/guards";
+import { validateAllowedFile } from "@/lib/security/file-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { UpdateEmailSchema, UpdateProfileSchema } from "../schemas/profile";
@@ -84,11 +85,16 @@ async function uploadAvatar(
     return { ok: false, message: "Avatar must be under 2 MB." };
   }
 
-  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const validation = await validateAllowedFile(file, avatarMimeTypes, "Upload a valid JPG, PNG, or WebP avatar.");
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const extension = validation.extension;
   const path = `${userId}/avatar.${extension}`;
   const { error } = await supabase.storage.from("avatars").upload(path, file, {
     cacheControl: "3600",
-    contentType: file.type,
+    contentType: validation.mimeType,
     upsert: true
   });
 

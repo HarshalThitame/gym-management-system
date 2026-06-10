@@ -13,7 +13,7 @@ type LoginPageProps = {
 
 export const metadata: Metadata = createMetadata({
   title: "Sign In",
-  description: "Secure member, trainer, and admin sign in for Apex Performance Club.",
+  description: "Secure member, trainer, receptionist, and admin sign in for the Apex Performance Club gym management and member portal.",
   path: "/login"
 });
 

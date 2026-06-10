@@ -59,7 +59,7 @@ test("PWA assets and offline fallback are available", async ({ page, request }) 
 
   const serviceWorker = await request.get("/sw.js");
   expect(serviceWorker.ok()).toBeTruthy();
-  await expect(serviceWorker.text()).resolves.toContain("apex-pwa-v16");
+  await expect(serviceWorker.text()).resolves.toContain("apex-pwa-v17");
 
   const icon = await request.get("/icons/apex-maskable.svg");
   expect(icon.ok()).toBeTruthy();

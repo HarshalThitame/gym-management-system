@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { PwaProvider } from "@/components/pwa/pwa-provider";
+import { LazyPwaProvider } from "@/components/pwa/lazy-pwa-provider";
 import { siteConfig } from "@/data/site";
 import { absoluteUrl } from "@/lib/utils";
 
@@ -63,7 +63,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
-        <PwaProvider />
+        <LazyPwaProvider />
       </body>
     </html>
   );

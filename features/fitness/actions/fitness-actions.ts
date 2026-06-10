@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
+import { validateAllowedFile } from "@/lib/security/file-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
@@ -801,12 +802,17 @@ async function uploadProgressPhoto(supabase: AppSupabase, input: { memberId: str
     return { ok: false, message: "Progress photo must be 10MB or smaller." };
   }
 
-  const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const validation = await validateAllowedFile(input.file, progressPhotoMimeTypes, "Progress photos must be valid JPG, PNG, or WebP files.");
+  if (!validation.ok) {
+    return { ok: false, message: validation.message };
+  }
+
+  const extension = validation.extension;
   const filePath = `${input.memberId}/${Date.now()}-${input.viewType}.${extension}`;
   const { error } = await supabase.storage.from("progress-photos").upload(filePath, input.file, {
     cacheControl: "31536000",
     upsert: false,
-    contentType: input.file.type
+    contentType: validation.mimeType
   });
 
   if (error) {

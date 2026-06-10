@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAuthContext } from "@/lib/auth/session";
-import { hasRequiredRole } from "@/lib/rbac";
+import { canAny } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { analyticsRowsToCsv, analyticsRowsToExcel, analyticsRowsToPdf } from "@/features/analytics/lib/report-export";
 import { analyticsReportKeys, reportFormats, type AnalyticsReportFormat, type AnalyticsReportKey } from "@/types/analytics";
@@ -10,7 +10,7 @@ import type { Json } from "@/types/database";
 export async function GET(request: NextRequest) {
   const context = await getAuthContext();
 
-  if (!context.isAuthenticated || !hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"])) {
+  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

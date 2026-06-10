@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAuthContext } from "@/lib/auth/session";
-import { hasRequiredRole } from "@/lib/rbac";
+import { canAny } from "@/lib/rbac";
 import { membershipRowsToCsv } from "@/features/memberships/lib/csv";
 import { getMembershipReportRows } from "@/features/memberships/services/membership-service";
 
@@ -9,7 +9,7 @@ const reportTypes = ["active", "expired", "upcoming", "revenue", "growth"] as co
 export async function GET(request: NextRequest) {
   const context = await getAuthContext();
 
-  if (!context.isAuthenticated || !hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"])) {
+  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

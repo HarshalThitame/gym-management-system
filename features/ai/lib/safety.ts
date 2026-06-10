@@ -5,7 +5,14 @@ export const aiSafetyDisclaimer =
 
 const blockedPatterns = [
   /ignore\s+(all\s+)?previous\s+instructions/i,
+  /disregard\s+(all\s+)?(previous|system|developer|safety)\s+instructions/i,
   /reveal\s+(the\s+)?system\s+prompt/i,
+  /\b(system|developer)\s+prompt\b/i,
+  /\bprint\b.*\b(prompt|instructions|hidden\s+policy)\b/i,
+  /\b(jailbreak|dan\s+mode|developer\s+mode)\b/i,
+  /\bexfiltrat(e|ion)\b/i,
+  /\btool\s*call\b/i,
+  /\braw\s+(sql|database|secret|token|key)s?\b/i,
   /medical\s+diagnosis/i,
   /prescribe\s+(medication|drugs)/i,
   /guarantee\s+(weight\s+loss|results|revenue)/i,

@@ -1,3 +1,6 @@
+import { unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   BranchPerformancePoint,
@@ -19,7 +22,28 @@ type TenantUsageRow = Database["public"]["Views"]["enterprise_tenant_usage_summa
 type HealthCheckRow = Database["public"]["Tables"]["system_health_checks"]["Row"];
 
 export async function getEnterpriseDashboard(): Promise<EnterpriseDashboard> {
+  if (getSupabaseAdminClient()) {
+    return getCachedEnterpriseDashboard();
+  }
+
   const supabase = await createSupabaseServerClient();
+  return buildEnterpriseDashboard(supabase);
+}
+
+const getCachedEnterpriseDashboard = unstable_cache(
+  async () => {
+    const supabase = getSupabaseAdminClient();
+    if (!supabase) {
+      throw new Error("Supabase admin client is required for cached enterprise dashboards.");
+    }
+
+    return buildEnterpriseDashboard(supabase);
+  },
+  ["enterprise-dashboard"],
+  { revalidate: 60 }
+);
+
+async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Promise<EnterpriseDashboard> {
 
   const [
     organizationsResult,

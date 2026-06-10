@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
+import { validateAllowedFile } from "@/lib/security/file-validation";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
@@ -32,6 +34,9 @@ import {
 
 const memberDocumentMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const maxMemberDocumentBytes = 10 * 1024 * 1024;
+
+type BillingEventType = Database["public"]["Tables"]["billing_events"]["Insert"]["event_type"];
+type PaymentType = Database["public"]["Tables"]["payments"]["Insert"]["payment_type"];
 
 export async function saveMembershipPlanAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const context = await requireRole(["super_admin", "gym_admin"], "/admin/membership-plans");
@@ -357,7 +362,8 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
   }
 
   const previousEndDate = membership.end_date;
-  const { error } = await supabase
+  const renewalDiscountAmount = normalizeMembershipDiscount(parsed.data.paymentStatus, parsed.data.discountAmount, plan.price_amount);
+  const { data: updatedMembership, error } = await supabase
     .from("memberships")
     .update({
       membership_plan_id: plan.id,
@@ -366,16 +372,33 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
       end_date: endDate,
       price_amount: plan.price_amount,
       joining_fee_amount: 0,
-      discount_amount: parsed.data.discountAmount,
+      discount_amount: renewalDiscountAmount,
       payment_status: parsed.data.paymentStatus,
       renewal_of_membership_id: membership.id,
       updated_by: context.userId,
       notes: parsed.data.notes || membership.notes
     })
-    .eq("id", membership.id);
+    .eq("id", membership.id)
+    .select("*")
+    .maybeSingle();
 
-  if (error) {
-    return { status: "error", message: error.message };
+  if (error || !updatedMembership) {
+    return { status: "error", message: error?.message ?? "Membership renewal failed." };
+  }
+
+  const billing = await createMembershipBillingRecords({
+    supabase,
+    gymId: membership.gym_id,
+    memberId: membership.member_id,
+    membership: updatedMembership,
+    planName: plan.name,
+    actorId: context.userId,
+    paymentType: "membership_renewal",
+    billingEventType: "membership_renewed"
+  });
+
+  if (!billing.ok) {
+    return { status: "error", message: billing.message };
   }
 
   await Promise.all([
@@ -706,7 +729,15 @@ async function createMembershipRecord(input: {
   status: MembershipStatus;
   source: MembershipRow["source"];
   notes: string | null;
+  paymentType?: PaymentType;
+  billingEventType?: BillingEventType;
 }) {
+  const discountAmount = normalizeMembershipDiscount(
+    input.paymentStatus,
+    input.discountAmount,
+    input.plan.price_amount + input.plan.joining_fee_amount
+  );
+
   const { data, error } = await input.supabase
     .from("memberships")
     .insert({
@@ -720,7 +751,7 @@ async function createMembershipRecord(input: {
       source: input.source,
       price_amount: input.plan.price_amount,
       joining_fee_amount: input.plan.joining_fee_amount,
-      discount_amount: input.discountAmount,
+      discount_amount: discountAmount,
       payment_status: input.paymentStatus,
       invoice_number: generateInvoiceNumber(),
       notes: input.notes,
@@ -736,6 +767,21 @@ async function createMembershipRecord(input: {
     }
 
     return { ok: false, message: error?.message ?? "Membership assignment failed." } as const;
+  }
+
+  const billing = await createMembershipBillingRecords({
+    supabase: input.supabase,
+    gymId: input.gymId,
+    memberId: input.memberId,
+    membership: data,
+    planName: input.plan.name,
+    actorId: input.actorId,
+    paymentType: input.paymentType ?? "membership_purchase",
+    billingEventType: input.billingEventType ?? "membership_created"
+  });
+
+  if (!billing.ok) {
+    return { ok: false, message: billing.message } as const;
   }
 
   await Promise.all([
@@ -772,6 +818,177 @@ async function createMembershipRecord(input: {
   ]);
 
   return { ok: true, membership: data } as const;
+}
+
+async function createMembershipBillingRecords(input: {
+  supabase: SupabaseClient<Database>;
+  gymId: string | null;
+  memberId: string;
+  membership: MembershipRow;
+  planName: string;
+  actorId: string | null;
+  paymentType: PaymentType;
+  billingEventType: BillingEventType;
+}) {
+  const billingClient = getSupabaseAdminClient() ?? input.supabase;
+  const subtotalAmount = input.membership.price_amount + input.membership.joining_fee_amount;
+  const discountAmount = Math.min(input.membership.discount_amount, subtotalAmount);
+  const totalAmount = Math.max(subtotalAmount - discountAmount, 0);
+  const now = new Date().toISOString();
+  const invoiceNumber = await generateBillingInvoiceNumber(billingClient, input.gymId);
+  const isSettled = input.membership.payment_status === "paid" || input.membership.payment_status === "waived" || totalAmount === 0;
+  const invoiceStatus = isSettled ? "paid" : "issued";
+
+  const { data: invoice, error: invoiceError } = await billingClient
+    .from("invoices")
+    .insert({
+      gym_id: input.gymId,
+      member_id: input.memberId,
+      membership_id: input.membership.id,
+      invoice_number: invoiceNumber,
+      status: invoiceStatus,
+      currency: "INR",
+      subtotal_amount: subtotalAmount,
+      discount_amount: discountAmount,
+      tax_amount: 0,
+      amount_paid: isSettled ? totalAmount : 0,
+      issued_at: now,
+      paid_at: isSettled ? now : null,
+      notes: `${input.planName} membership ${input.paymentType === "membership_renewal" ? "renewal" : "purchase"}.`,
+      created_by: input.actorId
+    })
+    .select("*")
+    .maybeSingle();
+
+  if (invoiceError || !invoice) {
+    return { ok: false, message: invoiceError?.message ?? "Invoice generation failed." } as const;
+  }
+
+  const { error: itemError } = await billingClient.from("invoice_items").insert({
+    invoice_id: invoice.id,
+    item_type: "membership",
+    description: `${input.planName} membership`,
+    quantity: 1,
+    unit_amount: subtotalAmount,
+    discount_amount: discountAmount,
+    tax_amount: 0,
+    metadata: {
+      membershipId: input.membership.id,
+      planId: input.membership.membership_plan_id,
+      joiningFeeAmount: input.membership.joining_fee_amount
+    } as Json
+  });
+
+  if (itemError) {
+    return { ok: false, message: itemError.message } as const;
+  }
+
+  await input.supabase
+    .from("memberships")
+    .update({ invoice_number: invoiceNumber, updated_by: input.actorId })
+    .eq("id", input.membership.id);
+
+  await billingClient.from("transactions").insert({
+    gym_id: input.gymId,
+    member_id: input.memberId,
+    invoice_id: invoice.id,
+    transaction_type: "invoice_created",
+    direction: "debit",
+    amount: totalAmount,
+    currency: "INR",
+    description: `Invoice ${invoiceNumber} generated for ${input.planName}.`,
+    metadata: { membershipId: input.membership.id, paymentType: input.paymentType } as Json,
+    created_by: input.actorId
+  });
+
+  await billingClient.from("billing_events").insert({
+    gym_id: input.gymId,
+    event_type: "invoice_generated",
+    entity_type: "invoice",
+    entity_id: invoice.id,
+    status: "recorded",
+    metadata: {
+      membershipId: input.membership.id,
+      invoiceNumber,
+      billingEventType: input.billingEventType
+    } as Json
+  });
+
+  await billingClient.from("billing_events").insert({
+    gym_id: input.gymId,
+    event_type: input.billingEventType,
+    entity_type: "membership",
+    entity_id: input.membership.id,
+    status: "recorded",
+    metadata: { invoiceId: invoice.id, invoiceNumber, totalAmount } as Json
+  });
+
+  if (totalAmount <= 0 || input.membership.payment_status === "waived") {
+    return { ok: true, invoiceId: invoice.id, paymentId: null } as const;
+  }
+
+  const isPaid = input.membership.payment_status === "paid";
+  const paymentNumber = await generatePaymentNumber(billingClient, input.gymId);
+  const { data: payment, error: paymentError } = await billingClient
+    .from("payments")
+    .insert({
+      gym_id: input.gymId,
+      member_id: input.memberId,
+      membership_id: input.membership.id,
+      invoice_id: invoice.id,
+      payment_number: paymentNumber,
+      payment_type: input.paymentType,
+      status: isPaid ? "paid" : "pending",
+      method: isPaid ? "cash" : "razorpay",
+      provider: isPaid ? "manual" : "razorpay",
+      amount: totalAmount,
+      currency: "INR",
+      discount_amount: discountAmount,
+      tax_amount: 0,
+      receipt_number: isPaid ? `RCPT-${paymentNumber.replace(/^PAY-/, "")}` : null,
+      collected_at: isPaid ? now : null,
+      paid_at: isPaid ? now : null,
+      metadata: {
+        membershipId: input.membership.id,
+        invoiceId: invoice.id,
+        source: isPaid ? "manual_membership_collection" : "membership_online_payment"
+      } as Json,
+      created_by: input.actorId
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (paymentError || !payment) {
+    return { ok: false, message: paymentError?.message ?? "Payment record generation failed." } as const;
+  }
+
+  if (isPaid) {
+    await Promise.all([
+      billingClient.from("transactions").insert({
+        gym_id: input.gymId,
+        member_id: input.memberId,
+        invoice_id: invoice.id,
+        payment_id: payment.id,
+        transaction_type: "payment_collected",
+        direction: "credit",
+        amount: totalAmount,
+        currency: "INR",
+        description: `Payment collected for invoice ${invoiceNumber}.`,
+        metadata: { membershipId: input.membership.id, method: "cash" } as Json,
+        created_by: input.actorId
+      }),
+      billingClient.from("billing_events").insert({
+        gym_id: input.gymId,
+        event_type: "payment_completed",
+        entity_type: "payment",
+        entity_id: payment.id,
+        status: "recorded",
+        metadata: { invoiceId: invoice.id, membershipId: input.membership.id } as Json
+      })
+    ]);
+  }
+
+  return { ok: true, invoiceId: invoice.id, paymentId: payment.id } as const;
 }
 
 async function loadPlan(supabase: SupabaseClient<Database>, planId: string) {
@@ -832,11 +1049,16 @@ async function uploadMemberDocumentFile(
     return { ok: false, message: "Document must be under 10 MB." } as const;
   }
 
-  const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "bin";
+  const validation = await validateAllowedFile(input.file, memberDocumentMimeTypes, "Upload a valid JPG, PNG, WebP, or PDF document.");
+  if (!validation.ok) {
+    return { ok: false, message: validation.message } as const;
+  }
+
+  const extension = validation.extension;
   const path = `${input.memberId}/${input.documentType}-${Date.now()}.${extension}`;
   const { error: uploadError } = await supabase.storage.from("member-documents").upload(path, input.file, {
     cacheControl: "3600",
-    contentType: input.file.type,
+    contentType: validation.mimeType,
     upsert: true
   });
 
@@ -853,7 +1075,7 @@ async function uploadMemberDocumentFile(
       file_name: input.file.name,
       file_path: path,
       file_url: path,
-      mime_type: input.file.type,
+      mime_type: validation.mimeType,
       file_size: input.file.size,
       uploaded_by: input.actorId
     })
@@ -972,6 +1194,34 @@ function statusToEvent(status: MembershipStatus): MembershipEvent {
   }
 
   return "expired";
+}
+
+function normalizeMembershipDiscount(paymentStatus: MembershipRow["payment_status"], discountAmount: number, subtotalAmount: number) {
+  if (paymentStatus === "waived") {
+    return Math.max(subtotalAmount, 0);
+  }
+
+  return Math.min(Math.max(discountAmount, 0), Math.max(subtotalAmount, 0));
+}
+
+async function generateBillingInvoiceNumber(supabase: SupabaseClient<Database>, gymId: string | null) {
+  const { data, error } = await supabase.rpc("generate_invoice_number", { target_gym_id: gymId });
+
+  if (error || !data) {
+    return generateInvoiceNumber();
+  }
+
+  return data;
+}
+
+async function generatePaymentNumber(supabase: SupabaseClient<Database>, gymId: string | null) {
+  const { data, error } = await supabase.rpc("generate_payment_number", { target_gym_id: gymId });
+
+  if (error || !data) {
+    return `PAY-${formatISO(new Date(), { representation: "date" }).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`;
+  }
+
+  return data;
 }
 
 function generateInvoiceNumber() {

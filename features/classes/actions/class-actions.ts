@@ -353,28 +353,45 @@ export async function bookClassAction(_previousState: AuthActionState, formData:
 
   const seats = getAvailableSeats(bundle.session);
   if (seats > 0) {
-    const { data: booking, error } = await supabase.from("class_bookings").insert({
-      gym_id: bundle.session.gym_id,
-      session_id: bundle.session.id,
-      class_id: bundle.classRow.id,
-      member_id: member.id,
-      booking_source: isStaff ? "reception" : "member_portal",
-      created_by: context.userId,
-      metadata: { eligibility: eligibility.reasonCode } as Json
-    }).select("*").maybeSingle();
+    const maxBookedCount = bundle.session.capacity - bundle.session.reserved_capacity - 1;
+    const { data: claimedSession, error: claimError } = await supabase
+      .from("class_sessions")
+      .update({ booked_count: bundle.session.booked_count + 1 })
+      .eq("id", bundle.session.id)
+      .eq("booked_count", bundle.session.booked_count)
+      .lte("booked_count", maxBookedCount)
+      .select("id")
+      .maybeSingle();
 
-    if (error || !booking) {
-      return { status: "error", message: error?.message ?? "Class booking failed." };
+    if (claimError) {
+      return { status: "error", message: claimError.message };
     }
 
-    await Promise.all([
-      supabase.rpc("recalculate_class_session_counts", { target_session_id: bundle.session.id }),
-      createClassNotification(supabase, "booking_confirmed", { context, session: bundle.session, classRow: bundle.classRow, member, bookingId: booking.id }),
-      logClassSession(supabase, context, bundle.session, "booking_created", null, null, `Booked ${member.full_name}`),
-      writeClassAudit(context, "class.booking_created", "class_booking", booking.id, { sessionId: bundle.session.id, memberId: member.id })
-    ]);
-    revalidateClassPaths();
-    return { status: "success", message: "Class booked successfully." };
+    if (claimedSession) {
+      const { data: booking, error } = await supabase.from("class_bookings").insert({
+        gym_id: bundle.session.gym_id,
+        session_id: bundle.session.id,
+        class_id: bundle.classRow.id,
+        member_id: member.id,
+        booking_source: isStaff ? "reception" : "member_portal",
+        created_by: context.userId,
+        metadata: { eligibility: eligibility.reasonCode } as Json
+      }).select("*").maybeSingle();
+
+      if (error || !booking) {
+        await supabase.rpc("recalculate_class_session_counts", { target_session_id: bundle.session.id });
+        return { status: "error", message: error?.message ?? "Class booking failed." };
+      }
+
+      await Promise.all([
+        supabase.rpc("recalculate_class_session_counts", { target_session_id: bundle.session.id }),
+        createClassNotification(supabase, "booking_confirmed", { context, session: bundle.session, classRow: bundle.classRow, member, bookingId: booking.id }),
+        logClassSession(supabase, context, bundle.session, "booking_created", null, null, `Booked ${member.full_name}`),
+        writeClassAudit(context, "class.booking_created", "class_booking", booking.id, { sessionId: bundle.session.id, memberId: member.id })
+      ]);
+      revalidateClassPaths();
+      return { status: "success", message: "Class booked successfully." };
+    }
   }
 
   const position = await getNextWaitlistPosition(supabase, bundle.session.id);

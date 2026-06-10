@@ -1,4 +1,4 @@
-import { Activity, Bell, Bot, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, Settings, UserRound } from "lucide-react";
+import { Activity, Bell, Bot, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, ReceiptText, Settings, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalShell } from "@/components/layout/portal-shell";
 import { requireRole } from "@/lib/auth/guards";
@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth/guards";
 const memberNav = [
   { href: "/member", label: "Dashboard", icon: Gauge },
   { href: "/member/membership", label: "Membership", icon: CreditCard },
+  { href: "/member/payments", label: "Payments", icon: ReceiptText },
   { href: "/member/attendance", label: "Attendance", icon: CalendarCheck },
   { href: "/member/classes", label: "Classes", icon: CalendarDays },
   { href: "/member/workouts", label: "Workouts", icon: Dumbbell },

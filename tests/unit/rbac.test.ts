@@ -10,6 +10,8 @@ describe("RBAC permission matrix", () => {
 
   it("prevents reception staff from sensitive exports and settings updates", () => {
     expect(can("reception_staff", "payments", "export")).toBe(false);
+    expect(canAny(["reception_staff"], "reports", "export")).toBe(false);
+    expect(canAny(["gym_admin"], "reports", "export")).toBe(true);
     expect(can("reception_staff", "settings", "update")).toBe(false);
     expect(can("reception_staff", "leads", "update")).toBe(true);
   });

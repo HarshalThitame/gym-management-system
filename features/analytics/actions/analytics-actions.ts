@@ -17,7 +17,7 @@ import {
   SavedReportSchema
 } from "../schemas/analytics";
 
-const staffRoles = ["super_admin", "gym_admin", "reception_staff"] as const;
+const reportManagerRoles = ["super_admin", "gym_admin"] as const;
 
 export async function saveDashboardConfigAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
@@ -72,7 +72,7 @@ export async function saveDashboardConfigAction(_previousState: AuthActionState,
 
 export async function saveSavedReportAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/reports");
+  const context = await requireRole(reportManagerRoles, "/admin/reports");
   const parsed = SavedReportSchema.safeParse({
     savedReportId: formData.get("savedReportId") ?? "",
     name: formData.get("name"),
@@ -126,7 +126,7 @@ export async function saveSavedReportAction(_previousState: AuthActionState, for
 
 export async function queueReportExportAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/reports");
+  const context = await requireRole(reportManagerRoles, "/admin/reports");
   const parsed = ReportExportSchema.safeParse({
     savedReportId: formData.get("savedReportId") ?? "",
     reportKey: formData.get("reportKey"),
@@ -221,7 +221,7 @@ export async function saveForecastModelAction(_previousState: AuthActionState, f
 
 export async function updateInsightStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/reports");
+  const context = await requireRole(reportManagerRoles, "/admin/reports");
   const parsed = InsightStatusSchema.safeParse({
     insightId: formData.get("insightId"),
     status: formData.get("status") ?? "acknowledged"

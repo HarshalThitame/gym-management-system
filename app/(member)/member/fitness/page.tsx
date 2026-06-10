@@ -3,7 +3,7 @@ import { Activity, Apple, Camera, Dumbbell, Flame, Scale, Target, Trophy } from 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { FitnessStatusBadge } from "@/features/fitness/components/fitness-status-badge";
-import { NutritionMacroChart, WeightTrendChart, WorkoutAdherenceChart } from "@/features/fitness/components/fitness-charts";
+import { NutritionMacroChart, WeightTrendChart, WorkoutAdherenceChart } from "@/features/fitness/components/lazy-fitness-charts";
 import { BodyMeasurementForm, FitnessGoalForm, GoalStatusForm, MealEntryForm, ProgressPhotoForm, WorkoutSessionExerciseLogPanel, WorkoutSessionForm } from "@/features/fitness/components/fitness-forms";
 import { calculateGoalProgress, formatFitnessLabel } from "@/features/fitness/lib/business-rules";
 import { getMemberFitnessPortal, listExercises } from "@/features/fitness/services/fitness-service";

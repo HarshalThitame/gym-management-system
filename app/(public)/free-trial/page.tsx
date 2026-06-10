@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { CalendarCheck, CheckCircle2, Dumbbell, MessageCircle, type LucideIcon } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LeadForm } from "@/features/public/components/lead-form";
+import { LazyLeadForm } from "@/features/public/components/lazy-lead-form";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { programs, siteConfig } from "@/data/site";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -34,7 +34,7 @@ export default function FreeTrialPage() {
             <h2 className="text-2xl font-black text-foreground">Reserve your trial</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">Our team will confirm your session time and help you prepare for your first visit.</p>
             <div className="mt-6">
-              <LeadForm compact type="free_trial" />
+              <LazyLeadForm compact type="free_trial" />
             </div>
           </Card>
         </div>

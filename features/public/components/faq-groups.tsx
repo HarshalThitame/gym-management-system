@@ -1,8 +1,3 @@
-"use client";
-
-import * as Accordion from "@radix-ui/react-accordion";
-import { ChevronDown } from "lucide-react";
-import { useState } from "react";
 import type { FaqItem } from "@/types/content";
 
 type FaqGroupsProps = {
@@ -10,38 +5,40 @@ type FaqGroupsProps = {
 };
 
 export function FaqGroups({ faqs }: FaqGroupsProps) {
-  const [category, setCategory] = useState<FaqItem["category"] | "All">("All");
-  const categories = ["All", ...Array.from(new Set(faqs.map((faq) => faq.category)))] as Array<FaqItem["category"] | "All">;
-  const filtered = category === "All" ? faqs : faqs.filter((faq) => faq.category === category);
+  const groups = Array.from(
+    faqs.reduce((itemsByCategory, faq) => {
+      const items = itemsByCategory.get(faq.category) ?? [];
+      items.push(faq);
+      itemsByCategory.set(faq.category, items);
+      return itemsByCategory;
+    }, new Map<FaqItem["category"], FaqItem[]>())
+  );
 
   return (
-    <div>
-      <div className="flex flex-wrap gap-2">
-        {categories.map((item) => (
-          <button
-            className={`rounded-full border px-3 py-2 text-sm font-bold transition ${category === item ? "border-ink bg-ink text-white" : "border-border bg-surface text-foreground hover:border-border-strong"}`}
-            key={item}
-            onClick={() => setCategory(item)}
-            type="button"
-          >
-            {item}
-          </button>
+    <div className="grid gap-8">
+      <div className="flex flex-wrap gap-2" aria-label="FAQ categories">
+        {groups.map(([category]) => (
+          <a className="rounded-full border border-border bg-surface px-3 py-2 text-sm font-bold text-foreground transition hover:border-border-strong" href={`#faq-${category.toLowerCase().replaceAll(" ", "-")}`} key={category}>
+            {category}
+          </a>
         ))}
       </div>
-      <Accordion.Root className="mt-8 grid gap-3" type="multiple">
-        {filtered.map((faq) => (
-          <Accordion.Item className="rounded-lg border border-border bg-surface" key={faq.question} value={faq.question}>
-            <Accordion.Header>
-              <Accordion.Trigger className="flex w-full items-center justify-between gap-4 p-5 text-left font-black">
-                {faq.question}
-                <ChevronDown aria-hidden="true" className="shrink-0 transition data-[state=open]:rotate-180" size={18} />
-              </Accordion.Trigger>
-            </Accordion.Header>
-            <Accordion.Content className="px-5 pb-5 text-sm leading-6 text-muted-foreground">{faq.answer}</Accordion.Content>
-          </Accordion.Item>
-        ))}
-      </Accordion.Root>
+      {groups.map(([category, items]) => (
+        <section id={`faq-${category.toLowerCase().replaceAll(" ", "-")}`} key={category}>
+          <h2 className="text-2xl font-black">{category}</h2>
+          <div className="mt-4 grid gap-3">
+            {items.map((faq) => (
+              <details className="group rounded-lg border border-border bg-surface p-5" key={faq.question}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-black [&::-webkit-details-marker]:hidden">
+                  {faq.question}
+                  <span aria-hidden="true" className="text-xl leading-none text-muted-foreground transition group-open:rotate-45">+</span>
+                </summary>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
-

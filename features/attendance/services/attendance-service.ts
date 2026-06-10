@@ -1,5 +1,6 @@
 import { addDays, differenceInCalendarDays, formatISO, startOfMonth, startOfWeek, subDays } from "date-fns";
 import QRCode from "qrcode";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AttendanceDashboardData, MemberAttendancePortal, QrTokenRow, TrainerAttendanceView } from "@/types/attendance";
 import type { MemberRow, MembershipRow } from "@/types/membership";
@@ -20,6 +21,8 @@ type AttendanceReportFilter = {
   from?: string | undefined;
   to?: string | undefined;
 };
+
+const SYNC_ATTENDANCE_REPORT_ROW_LIMIT = 2_000;
 
 export async function listAccessDevices(gymId: string | null) {
   const supabase = await createSupabaseServerClient();
@@ -283,7 +286,7 @@ export async function getAttendanceReportRows(filter: AttendanceReportFilter) {
   const now = new Date();
 
   if (filter.type === "exceptions") {
-    let query = supabase.from("access_logs").select("*").eq("decision", "denied").order("occurred_at", { ascending: false }).limit(2000);
+    let query = supabase.from("access_logs").select("*").eq("decision", "denied").order("occurred_at", { ascending: false }).limit(SYNC_ATTENDANCE_REPORT_ROW_LIMIT);
     if (filter.gymId) {
       query = query.eq("gym_id", filter.gymId);
     }
@@ -294,7 +297,7 @@ export async function getAttendanceReportRows(filter: AttendanceReportFilter) {
     return { type: "exceptions" as const, rows: data ?? [] };
   }
 
-  let query = supabase.from("attendance_sessions").select("*").order("check_in_at", { ascending: false }).limit(5000);
+  let query = supabase.from("attendance_sessions").select("*").order("check_in_at", { ascending: false }).limit(SYNC_ATTENDANCE_REPORT_ROW_LIMIT);
   if (filter.gymId) {
     query = query.eq("gym_id", filter.gymId);
   }
@@ -324,6 +327,7 @@ export async function getAttendanceReportRows(filter: AttendanceReportFilter) {
 
 export async function ensureActiveQrToken(member: MemberRow, actorId: string | null): Promise<QrTokenRow | null> {
   const supabase = await createSupabaseServerClient();
+  const writeClient = getSupabaseAdminClient() ?? supabase;
   const now = new Date().toISOString();
   const { data: existing, error: existingError } = await supabase
     .from("qr_tokens")
@@ -342,7 +346,7 @@ export async function ensureActiveQrToken(member: MemberRow, actorId: string | n
     return existing;
   }
 
-  await supabase
+  await writeClient
     .from("qr_tokens")
     .update({ status: "expired" })
     .eq("member_id", member.id)
@@ -350,7 +354,7 @@ export async function ensureActiveQrToken(member: MemberRow, actorId: string | n
     .eq("status", "active");
 
   const tokenValue = generateQrTokenValue();
-  const { data, error } = await supabase
+  const { data, error } = await writeClient
     .from("qr_tokens")
     .insert({
       gym_id: member.gym_id,

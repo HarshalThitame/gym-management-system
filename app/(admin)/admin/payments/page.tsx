@@ -1,23 +1,180 @@
 import type { Metadata } from "next";
+import { CreditCard, ReceiptText, RefreshCcw, WalletCards } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
+import { PaymentRefundForm } from "@/features/billing/components/payment-refund-form";
+import { formatCurrency } from "@/features/billing/lib/money";
+import { hasRequiredRole } from "@/lib/rbac";
+import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 
 export const metadata: Metadata = createMetadata({
   title: "Admin Payments",
-  description: "Protected admin payment management foundation.",
+  description: "Payment operations, invoices, online collections, and financial reconciliation for gym staff.",
   path: "/admin/payments"
 });
 
-export default function AdminPaymentsPage() {
+type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
+type RefundRow = Database["public"]["Tables"]["refunds"]["Row"];
+
+export default async function AdminPaymentsPage() {
+  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/payments");
+  const supabase = await createSupabaseServerClient();
+  let query = supabase.from("payments").select("*").order("created_at", { ascending: false }).limit(50);
+
+  if (context.profile?.gym_id) {
+    query = query.eq("gym_id", context.profile.gym_id);
+  }
+
+  const { data, error } = await query;
+  const payments = data ?? [];
+  const paymentIds = payments.map((payment) => payment.id);
+  const { data: refunds } = paymentIds.length > 0
+    ? await supabase
+        .from("refunds")
+        .select("*")
+        .in("payment_id", paymentIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as RefundRow[] };
+  const refundTotalsByPaymentId = new Map<string, number>();
+  const refundsByPaymentId = new Map<string, RefundRow[]>();
+
+  for (const refund of refunds ?? []) {
+    const existingRefunds = refundsByPaymentId.get(refund.payment_id) ?? [];
+    refundsByPaymentId.set(refund.payment_id, [...existingRefunds, refund]);
+
+    if (["requested", "approved", "processing", "processed"].includes(refund.status)) {
+      refundTotalsByPaymentId.set(refund.payment_id, (refundTotalsByPaymentId.get(refund.payment_id) ?? 0) + refund.amount);
+    }
+  }
+
+  const canManageRefunds = hasRequiredRole(context.roles, ["super_admin", "gym_admin"]);
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const paidPayments = payments.filter((payment) => payment.status === "paid");
+  const pendingPayments = payments.filter((payment) => payment.status === "pending" || payment.status === "processing" || payment.status === "failed");
+  const todayRevenue = paidPayments
+    .filter((payment) => (payment.paid_at ?? payment.collected_at ?? payment.created_at).startsWith(todayKey))
+    .reduce((total, payment) => total + payment.amount, 0);
+  const collectedRevenue = paidPayments.reduce((total, payment) => total + payment.amount, 0);
+  const outstanding = pendingPayments.reduce((total, payment) => total + payment.amount, 0);
+
   return (
-    <Card>
-      <CardHeader>
-        <h2 className="text-2xl font-black">Payments</h2>
-        <p className="text-sm leading-6 text-muted-foreground">Payment operations are reserved for authorized staff and will be connected to Razorpay and offline collections.</p>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No payment records connected yet.</div>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <section>
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Financial Operations</p>
+        <h2 className="mt-2 text-3xl font-black">Payments, collections, and reconciliation</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          Review recent membership payment records, collect pending Razorpay payments, and reconcile paid, failed, and manual collections.
+        </p>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard detail="Paid payments recorded today" icon={<CreditCard className="size-5" />} label="Today" value={formatCurrency(todayRevenue)} />
+        <StatCard detail="Paid rows in the recent payment window" icon={<WalletCards className="size-5" />} label="Collected" value={formatCurrency(collectedRevenue)} />
+        <StatCard detail={`${pendingPayments.length} pending or failed payments`} icon={<RefreshCcw className="size-5" />} label="Outstanding" value={formatCurrency(outstanding)} />
+        <StatCard detail="Recent payment records loaded" icon={<ReceiptText className="size-5" />} label="Records" value={String(payments.length)} />
+      </section>
+
+      <Card>
+        <CardHeader>
+          <h3 className="text-2xl font-black">Recent Payments</h3>
+          <p className="text-sm leading-6 text-muted-foreground">Pending Razorpay rows are generated by membership assignment and renewal workflows.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {error ? <EmptyState text={error.message} /> : null}
+          {payments.map((payment) => (
+            <PaymentRowItem
+              canManageRefunds={canManageRefunds}
+              key={payment.id}
+              payment={payment}
+              refundedAmount={refundTotalsByPaymentId.get(payment.id) ?? 0}
+              refunds={refundsByPaymentId.get(payment.id) ?? []}
+            />
+          ))}
+          {!error && payments.length === 0 ? <EmptyState text="No payment records have been generated yet." /> : null}
+        </CardContent>
+      </Card>
+    </div>
   );
+}
+
+function PaymentRowItem({
+  canManageRefunds,
+  payment,
+  refundedAmount,
+  refunds
+}: {
+  canManageRefunds: boolean;
+  payment: PaymentRow;
+  refundedAmount: number;
+  refunds: RefundRow[];
+}) {
+  const canCheckout = payment.provider === "razorpay" && (payment.status === "pending" || payment.status === "processing" || payment.status === "failed");
+  const refundableAmount = Math.max(payment.amount - refundedAmount, 0);
+  const canRefund = canManageRefunds
+    && payment.provider === "razorpay"
+    && Boolean(payment.provider_payment_id)
+    && (payment.status === "paid" || payment.status === "partially_refunded")
+    && refundableAmount > 0;
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-surface-muted p-4">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-black">{payment.payment_number}</p>
+            <PaymentStatusBadge status={payment.status} />
+            <Badge variant="neutral">{payment.method}</Badge>
+          </div>
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
+            {payment.payment_type.replace(/_/g, " ")} · {new Date(payment.created_at).toLocaleString("en-IN")}
+          </p>
+        </div>
+        <p className="text-lg font-black">{formatCurrency(payment.amount, payment.currency)}</p>
+        {canCheckout ? (
+          <PaymentCheckoutButton amount={payment.amount} paymentId={payment.id} />
+        ) : (
+          <p className="text-xs font-bold text-muted-foreground">{payment.paid_at ? `Paid ${new Date(payment.paid_at).toLocaleDateString("en-IN")}` : "No action"}</p>
+        )}
+      </div>
+
+      {refundedAmount > 0 || refunds.length > 0 ? (
+        <div className="rounded-md border border-border bg-surface p-3 text-xs font-semibold text-muted-foreground">
+          Refunded or reserved: {formatCurrency(refundedAmount, payment.currency)}
+          {refunds[0] ? ` · latest ${refunds[0].status.replace(/_/g, " ")} on ${new Date(refunds[0].created_at).toLocaleDateString("en-IN")}` : ""}
+        </div>
+      ) : null}
+
+      {canRefund ? (
+        <PaymentRefundForm maxRefundableAmount={refundableAmount} paymentId={payment.id} />
+      ) : null}
+      {!canRefund && canManageRefunds && payment.provider === "razorpay" && payment.status === "paid" && !payment.provider_payment_id ? (
+        <p className="text-xs font-semibold text-muted-foreground">Refund requires a verified Razorpay provider payment ID.</p>
+      ) : null}
+    </div>
+  );
+}
+
+function PaymentStatusBadge({ status }: { status: PaymentRow["status"] }) {
+  if (status === "paid") {
+    return <Badge variant="success">paid</Badge>;
+  }
+
+  if (status === "failed" || status === "cancelled" || status === "refunded") {
+    return <Badge variant="error">{status.replace(/_/g, " ")}</Badge>;
+  }
+
+  if (status === "pending" || status === "processing") {
+    return <Badge variant="warning">{status}</Badge>;
+  }
+
+  return <Badge variant="neutral">{status.replace(/_/g, " ")}</Badge>;
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">{text}</div>;
 }

@@ -1,11 +1,14 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { welcomeEmail, passwordChangedEmail } from "@/emails/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { getRoleRedirect } from "@/lib/rbac";
 import { sanitizeRedirectPath } from "@/lib/auth/redirects";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/security/request";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { absoluteUrl } from "@/lib/utils";
 import { sendEmail } from "@/services/email/resend";
@@ -30,6 +33,11 @@ export async function signInAction(_previousState: AuthActionState, formData: Fo
 
   if (!parsed.success) {
     return validationState(parsed.error);
+  }
+
+  const rateLimit = await checkAuthRateLimit("signin", parsed.data.email, 8);
+  if (!rateLimit.allowed) {
+    return errorState("Too many sign-in attempts. Wait a minute and try again.");
   }
 
   const supabase = await createAuthClientOrNull();
@@ -76,6 +84,11 @@ export async function signUpAction(_previousState: AuthActionState, formData: Fo
 
   if (!parsed.success) {
     return validationState(parsed.error);
+  }
+
+  const rateLimit = await checkAuthRateLimit("signup", parsed.data.email, 5);
+  if (!rateLimit.allowed) {
+    return errorState("Too many registration attempts. Wait a minute and try again.");
   }
 
   const supabase = await createAuthClientOrNull();
@@ -125,6 +138,11 @@ export async function forgotPasswordAction(_previousState: AuthActionState, form
 
   if (!parsed.success) {
     return validationState(parsed.error);
+  }
+
+  const rateLimit = await checkAuthRateLimit("forgot-password", parsed.data.email, 4);
+  if (!rateLimit.allowed) {
+    return successState("If an account exists for that email, a password reset link has been sent.");
   }
 
   const supabase = await createAuthClientOrNull();
@@ -226,6 +244,11 @@ export async function resendVerificationAction(_previousState: AuthActionState, 
     return validationState(parsed.error);
   }
 
+  const rateLimit = await checkAuthRateLimit("resend-verification", parsed.data.email, 4);
+  if (!rateLimit.allowed) {
+    return successState("If the account is pending verification, a new verification email has been sent.");
+  }
+
   const supabase = await createAuthClientOrNull();
 
   if (!supabase) {
@@ -286,6 +309,12 @@ async function createAuthClientOrNull() {
   } catch {
     return null;
   }
+}
+
+async function checkAuthRateLimit(action: string, identifier: string, limit: number) {
+  const requestHeaders = await headers();
+  const ip = getClientIpFromHeaders(requestHeaders);
+  return checkRateLimit(`auth:${action}:${ip}:${identifier.toLowerCase()}`, limit, 60_000);
 }
 
 function validationState(error: { flatten: () => { fieldErrors: Record<string, string[]> } }): AuthActionState {

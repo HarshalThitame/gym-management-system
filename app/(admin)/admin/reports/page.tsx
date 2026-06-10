@@ -22,7 +22,7 @@ import {
   MembershipTrendChart,
   RevenueTrendChart,
   TrainerUtilizationChart
-} from "@/features/analytics/components/analytics-charts";
+} from "@/features/analytics/components/lazy-analytics-charts";
 import {
   DashboardConfigForm,
   ForecastModelForm,
@@ -34,6 +34,7 @@ import { AnalyticsStatusBadge, KpiStatusBadge } from "@/features/analytics/compo
 import { formatAnalyticsLabel, formatCurrency } from "@/features/analytics/lib/business-rules";
 import { getExecutiveAnalyticsDashboard } from "@/features/analytics/services/analytics-service";
 import { requireRole } from "@/lib/auth/guards";
+import { canAny } from "@/lib/rbac";
 import { createMetadata } from "@/lib/seo/metadata";
 import type { KpiCard } from "@/types/analytics";
 
@@ -54,6 +55,7 @@ const legacyReports = [
 export default async function AdminReportsPage() {
   const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/reports");
   const gymId = context.profile?.gym_id ?? null;
+  const canExportReports = canAny(context.roles, "reports", "export");
   const dashboard = await getExecutiveAnalyticsDashboard(gymId);
 
   return (
@@ -66,7 +68,7 @@ export default async function AdminReportsPage() {
             Monitor revenue, memberships, attendance, trainers, classes, fitness outcomes, retention risk, sales conversion, forecasting baselines, and audit-ready exports from one management workspace.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {canExportReports ? <div className="flex flex-wrap gap-2">
           <ButtonLink href="/api/analytics/reports?key=executive_kpi_snapshot&format=csv" variant="secondary">
             <Download className="size-4" />
             KPI CSV
@@ -79,7 +81,7 @@ export default async function AdminReportsPage() {
             <BarChart3 className="size-4" />
             Sales PDF
           </ButtonLink>
-        </div>
+        </div> : null}
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -94,7 +96,7 @@ export default async function AdminReportsPage() {
                 <h3 className="text-2xl font-black">Revenue Analytics</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">Daily revenue split by memberships, renewals, personal training, and class fees.</p>
               </div>
-              <ButtonLink href="/api/analytics/reports?key=revenue_sources&format=csv" size="sm" variant="secondary">Export</ButtonLink>
+              {canExportReports ? <ButtonLink href="/api/analytics/reports?key=revenue_sources&format=csv" size="sm" variant="secondary">Export</ButtonLink> : null}
             </div>
           </CardHeader>
           <CardContent><RevenueTrendChart data={dashboard.revenueTrend} /></CardContent>
@@ -131,7 +133,7 @@ export default async function AdminReportsPage() {
                 <h3 className="text-2xl font-black">Membership Analytics</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">New members, renewals, and expiries across the last 30 days.</p>
               </div>
-              <ButtonLink href="/api/analytics/reports?key=membership_retention&format=csv" size="sm" variant="secondary">Export</ButtonLink>
+              {canExportReports ? <ButtonLink href="/api/analytics/reports?key=membership_retention&format=csv" size="sm" variant="secondary">Export</ButtonLink> : null}
             </div>
           </CardHeader>
           <CardContent><MembershipTrendChart data={dashboard.membershipTrend} /></CardContent>
@@ -169,7 +171,7 @@ export default async function AdminReportsPage() {
                 <h3 className="text-2xl font-black">Sales Funnel</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">Lead source and status conversion signals for marketing decisions.</p>
               </div>
-              <ButtonLink href="/api/analytics/reports?key=sales_funnel&format=csv" size="sm" variant="secondary">Export</ButtonLink>
+              {canExportReports ? <ButtonLink href="/api/analytics/reports?key=sales_funnel&format=csv" size="sm" variant="secondary">Export</ButtonLink> : null}
             </div>
           </CardHeader>
           <CardContent className="grid gap-5 lg:grid-cols-[0.9fr_1fr]">
@@ -198,7 +200,7 @@ export default async function AdminReportsPage() {
                 <h3 className="text-2xl font-black">Trainer Performance</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">Assigned members, completed sessions, PT revenue, ratings, and utilization.</p>
               </div>
-              <ButtonLink href="/api/analytics/reports?key=trainer_scorecard&format=csv" size="sm" variant="secondary">Export</ButtonLink>
+              {canExportReports ? <ButtonLink href="/api/analytics/reports?key=trainer_scorecard&format=csv" size="sm" variant="secondary">Export</ButtonLink> : null}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -226,7 +228,7 @@ export default async function AdminReportsPage() {
                 <h3 className="text-2xl font-black">Class Utilization</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">Fill rate, bookings, capacity, and waitlist pressure across group sessions.</p>
               </div>
-              <ButtonLink href="/api/analytics/reports?key=class_utilization&format=csv" size="sm" variant="secondary">Export</ButtonLink>
+              {canExportReports ? <ButtonLink href="/api/analytics/reports?key=class_utilization&format=csv" size="sm" variant="secondary">Export</ButtonLink> : null}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -255,7 +257,7 @@ export default async function AdminReportsPage() {
                 <h3 className="text-2xl font-black">Fitness Outcomes</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">Goal completion, workout adherence, nutrition compliance, and progress engagement.</p>
               </div>
-              <ButtonLink href="/api/analytics/reports?key=fitness_outcomes&format=csv" size="sm" variant="secondary">Export</ButtonLink>
+              {canExportReports ? <ButtonLink href="/api/analytics/reports?key=fitness_outcomes&format=csv" size="sm" variant="secondary">Export</ButtonLink> : null}
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -305,9 +307,11 @@ export default async function AdminReportsPage() {
                   </div>
                   <div className="text-sm font-black text-foreground">{formatAnalyticsLabel(insight.insight_type)}</div>
                 </div>
-                <div className="mt-3">
-                  <InsightStatusForm insight={insight} />
-                </div>
+                {canExportReports ? (
+                  <div className="mt-3">
+                    <InsightStatusForm insight={insight} />
+                  </div>
+                ) : null}
               </div>
             ))}
             {dashboard.insights.length === 0 ? <EmptyState text="No open business insights need attention." /> : null}
@@ -352,11 +356,11 @@ export default async function AdminReportsPage() {
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">{report.description ?? "Reusable analytics report template."}</p>
                   <p className="mt-1 text-xs font-semibold text-muted-foreground">Last run: {report.last_run_at ? new Date(report.last_run_at).toLocaleString("en-IN") : "Not run yet"}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                {canExportReports ? <div className="flex flex-wrap gap-2">
                   <ButtonLink href={`/api/analytics/reports?key=${report.report_key}&format=csv`} size="sm" variant="secondary">CSV</ButtonLink>
                   <ButtonLink href={`/api/analytics/reports?key=${report.report_key}&format=excel`} size="sm" variant="secondary">Excel</ButtonLink>
                   <ButtonLink href={`/api/analytics/reports?key=${report.report_key}&format=pdf`} size="sm" variant="ghost">PDF</ButtonLink>
-                </div>
+                </div> : null}
               </div>
             ))}
             {dashboard.savedReports.length === 0 ? <EmptyState text="No saved report templates are active yet." /> : null}
@@ -376,7 +380,7 @@ export default async function AdminReportsPage() {
                     <p className="font-black">{report.label}</p>
                     <p className="mt-1 text-xs font-semibold text-muted-foreground">{report.detail}</p>
                   </div>
-                  <ButtonLink href={report.href} size="sm" variant="secondary">CSV</ButtonLink>
+                  {canExportReports ? <ButtonLink href={report.href} size="sm" variant="secondary">CSV</ButtonLink> : null}
                 </div>
               </div>
             ))}
@@ -384,23 +388,25 @@ export default async function AdminReportsPage() {
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Saved Report Builder</h3>
-            <p className="text-sm leading-6 text-muted-foreground">Create reusable report templates with default filters, visible columns, category, and sharing scope.</p>
-          </CardHeader>
-          <CardContent><SavedReportForm reports={dashboard.savedReports} /></CardContent>
-        </Card>
+      {canExportReports ? (
+        <section className="grid gap-5 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Saved Report Builder</h3>
+              <p className="text-sm leading-6 text-muted-foreground">Create reusable report templates with default filters, visible columns, category, and sharing scope.</p>
+            </CardHeader>
+            <CardContent><SavedReportForm reports={dashboard.savedReports} /></CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Export Queue</h3>
-            <p className="text-sm leading-6 text-muted-foreground">Queue auditable exports and download generated analytics in CSV, Excel-compatible HTML, or PDF format.</p>
-          </CardHeader>
-          <CardContent><ReportExportForm reports={dashboard.savedReports} /></CardContent>
-        </Card>
-      </section>
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Export Queue</h3>
+              <p className="text-sm leading-6 text-muted-foreground">Queue auditable exports and download generated analytics in CSV, Excel-compatible HTML, or PDF format.</p>
+            </CardHeader>
+            <CardContent><ReportExportForm reports={dashboard.savedReports} /></CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <Card>
@@ -411,13 +417,13 @@ export default async function AdminReportsPage() {
           <CardContent><DashboardConfigForm configs={dashboard.dashboardConfigs} /></CardContent>
         </Card>
 
-        <Card>
+        {canExportReports ? <Card>
           <CardHeader>
             <h3 className="text-2xl font-black">Forecast Model Registry</h3>
             <p className="text-sm leading-6 text-muted-foreground">Register moving average, linear trend, seasonal baseline, or manual forecast models with training windows and parameters.</p>
           </CardHeader>
           <CardContent><ForecastModelForm models={dashboard.forecastModels} /></CardContent>
-        </Card>
+        </Card> : null}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_0.8fr]">

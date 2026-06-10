@@ -3,14 +3,14 @@ import { fitnessRowsToCsv, type FitnessReportType } from "@/features/fitness/lib
 import { fitnessReportFormats, fitnessRowsToExcel, fitnessRowsToPdf, type FitnessReportFormat } from "@/features/fitness/lib/report-export";
 import { getFitnessReportRows } from "@/features/fitness/services/fitness-service";
 import { getAuthContext } from "@/lib/auth/session";
-import { hasRequiredRole } from "@/lib/rbac";
+import { canAny } from "@/lib/rbac";
 
 const reportTypes = ["goal_progress", "workout_adherence", "measurement_changes", "nutrition_compliance"] as const;
 
 export async function GET(request: Request) {
   const context = await getAuthContext();
 
-  if (!context.isAuthenticated || !hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"])) {
+  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

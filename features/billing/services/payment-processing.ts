@@ -376,36 +376,52 @@ async function markPaymentPaid(admin: AppSupabase, payment: PaymentRow, razorpay
   }
 
   const paidAt = new Date().toISOString();
-  const { error: paymentError } = await admin.from("payments").update({
-    status: "paid",
-    provider_payment_id: razorpayPayment.id,
-    provider_signature: signature,
-    paid_at: paidAt,
-    collected_at: paidAt,
-    failed_at: null,
-    failure_reason: null,
-    metadata: mergeMetadata(payment.metadata, {
-      razorpayPaymentStatus: razorpayPayment.status,
-      razorpayMethod: razorpayPayment.method
+  const { data: updatedPayment, error: paymentError } = await admin
+    .from("payments")
+    .update({
+      status: "paid",
+      provider_payment_id: razorpayPayment.id,
+      provider_signature: signature,
+      paid_at: paidAt,
+      collected_at: paidAt,
+      failed_at: null,
+      failure_reason: null,
+      metadata: mergeMetadata(payment.metadata, {
+        razorpayPaymentStatus: razorpayPayment.status,
+        razorpayMethod: razorpayPayment.method
+      })
     })
-  }).eq("id", payment.id);
+    .eq("id", payment.id)
+    .in("status", ["pending", "processing", "failed"])
+    .select("*")
+    .maybeSingle();
 
   if (paymentError) {
     return { ok: false, status: 500, code: "PAYMENT_CAPTURE_SAVE_FAILED", message: "Payment capture could not be saved." };
   }
 
-  if (payment.invoice_id) {
-    await updateInvoicePaidAmount(admin, payment.invoice_id, payment.amount, paidAt);
+  if (!updatedPayment) {
+    const { data: currentPayment } = await admin.from("payments").select("*").eq("id", payment.id).maybeSingle();
+
+    if (currentPayment?.status === "paid" && currentPayment.provider_payment_id === razorpayPayment.id) {
+      return { ok: true, data: { status: "paid" } };
+    }
+
+    return { ok: false, status: 409, code: "PAYMENT_ALREADY_FINALIZED", message: "Payment was already finalized and cannot be captured again." };
   }
 
-  await insertPaymentAttempt(admin, payment, {
+  if (updatedPayment.invoice_id) {
+    await updateInvoicePaidAmount(admin, updatedPayment.invoice_id, updatedPayment.amount, paidAt);
+  }
+
+  await insertPaymentAttempt(admin, updatedPayment, {
     status: "verified",
     providerOrderId: razorpayPayment.orderId,
     providerPaymentId: razorpayPayment.id,
     responsePayload: razorpayPayment
   });
-  await insertTransactionOnce(admin, payment, actorId, "payment_collected", "credit", payment.amount, "Payment collected through Razorpay", { providerPaymentId: razorpayPayment.id });
-  await insertBillingEvent(admin, payment.gym_id, "payment_completed", "payment", payment.id, { providerPaymentId: razorpayPayment.id });
+  await insertTransactionOnce(admin, updatedPayment, actorId, "payment_collected", "credit", updatedPayment.amount, "Payment collected through Razorpay", { providerPaymentId: razorpayPayment.id });
+  await insertBillingEvent(admin, updatedPayment.gym_id, "payment_completed", "payment", updatedPayment.id, { providerPaymentId: razorpayPayment.id });
 
   return { ok: true, data: { status: "paid" } };
 }
@@ -545,7 +561,7 @@ async function insertTransactionOnce(admin: AppSupabase, payment: PaymentRow, ac
     return;
   }
 
-  await admin.from("transactions").insert({
+  const { error } = await admin.from("transactions").insert({
     gym_id: payment.gym_id,
     member_id: payment.member_id,
     invoice_id: payment.invoice_id,
@@ -558,6 +574,10 @@ async function insertTransactionOnce(admin: AppSupabase, payment: PaymentRow, ac
     metadata,
     created_by: actorId
   });
+
+  if (error && error.code !== "23505") {
+    console.error("Payment transaction insert failed", { paymentId: payment.id, transactionType, message: error.message });
+  }
 }
 
 async function insertBillingEvent(admin: AppSupabase, gymId: string | null, eventType: BillingEventType, entityType: string, entityId: string | null, metadata: Record<string, Json>) {

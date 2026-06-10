@@ -3,7 +3,7 @@ import { attendanceRowsToCsv } from "@/features/attendance/lib/csv";
 import { attendanceReportFormats, attendanceRowsToExcel, attendanceRowsToPdf, type AttendanceReportFormat } from "@/features/attendance/lib/report-export";
 import { getAttendanceReportRows } from "@/features/attendance/services/attendance-service";
 import { getAuthContext } from "@/lib/auth/session";
-import { hasRequiredRole } from "@/lib/rbac";
+import { canAny } from "@/lib/rbac";
 
 const reportTypes = ["daily", "weekly", "monthly", "custom", "exceptions"] as const;
 type ReportType = (typeof reportTypes)[number];
@@ -11,7 +11,7 @@ type ReportType = (typeof reportTypes)[number];
 export async function GET(request: Request) {
   const context = await getAuthContext();
 
-  if (!context.isAuthenticated || !hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"])) {
+  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

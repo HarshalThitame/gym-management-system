@@ -2,17 +2,18 @@ import type { Metadata } from "next";
 import { Activity, AlertTriangle, Clock, DoorOpen, QrCode, UsersRound } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/stat-card";
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { AccessDeviceForm, CheckOutForm, ManualCheckInForm, QrScanForm, SyncInactivityAlertsForm } from "@/features/attendance/components/attendance-forms";
 import { AttendanceStatusBadge } from "@/features/attendance/components/attendance-status-badge";
-import { DailyAttendanceChart, HourlyTrafficChart } from "@/features/attendance/components/attendance-charts";
+import { DailyAttendanceChart, HourlyTrafficChart } from "@/features/attendance/components/lazy-attendance-charts";
 import { getAttendanceDashboard, listAccessDevices } from "@/features/attendance/services/attendance-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 type AdminAttendancePageProps = {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ memberQuery?: string; token?: string }>;
 };
 
 export const metadata: Metadata = createMetadata({
@@ -25,9 +26,10 @@ export default async function AdminAttendancePage({ searchParams }: AdminAttenda
   const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/attendance");
   const params = await searchParams;
   const gymId = context.profile?.gym_id ?? null;
+  const memberQuery = params.memberQuery?.trim() ?? "";
   const [dashboard, membersResult, devices] = await Promise.all([
     getAttendanceDashboard(gymId),
-    listMembers({ gymId, pageSize: 150 }),
+    listMembers({ gymId, pageSize: 100, query: memberQuery || undefined }),
     listAccessDevices(gymId)
   ]);
 
@@ -60,7 +62,22 @@ export default async function AdminAttendancePage({ searchParams }: AdminAttenda
             <h3 className="text-2xl font-black">Reception Check-In</h3>
             <p className="text-sm leading-6 text-muted-foreground">Search-driven manual entry with membership validation, duplicate protection, and audit logging.</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <form action="/admin/attendance" className="grid gap-3 md:grid-cols-[1fr_auto]">
+              {params.token ? <input name="token" type="hidden" value={params.token} /> : null}
+              <Input
+                aria-label="Search the full member directory"
+                defaultValue={memberQuery}
+                name="memberQuery"
+                placeholder="Search all members by name, phone, email, or member ID"
+              />
+              <button className="h-11 rounded-md border border-border bg-surface px-4 text-sm font-bold hover:bg-surface-muted" type="submit">
+                Search Members
+              </button>
+            </form>
+            <p className="text-xs font-semibold text-muted-foreground">
+              Showing {membersResult.members.length} of {membersResult.total} matching members for front-desk entry.
+            </p>
             <ManualCheckInForm devices={devices} members={membersResult.members} />
           </CardContent>
         </Card>

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { LeadSchema } from "@/features/public/schemas/lead";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/security/request";
 import { insertLead } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwardedFor || "local";
+  const ip = getClientIpFromHeaders(request.headers);
   const rateLimit = await checkRateLimit(`lead:${ip}`, 8, 60_000);
 
   if (!rateLimit.allowed) {

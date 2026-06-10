@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LeadForm } from "@/features/public/components/lead-form";
+import { LazyLeadForm } from "@/features/public/components/lazy-lead-form";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { siteConfig } from "@/data/site";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -45,7 +45,7 @@ export default function ContactPage() {
             <h2 className="text-2xl font-black">Send an inquiry</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">The Apex team will contact you with the next step.</p>
             <div className="mt-6">
-              <LeadForm type="contact" />
+              <LazyLeadForm type="contact" />
             </div>
           </Card>
         </div>

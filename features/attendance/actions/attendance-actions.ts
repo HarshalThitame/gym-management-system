@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
@@ -247,6 +248,7 @@ export async function regenerateQrTokenAction(_previousState: AuthActionState, f
     return { status: "error", message: "You can only regenerate your own attendance QR." };
   }
 
+  const writeClient = getSupabaseAdminClient() ?? supabase;
   const { data: previousToken } = await supabase
     .from("qr_tokens")
     .select("*")
@@ -256,11 +258,11 @@ export async function regenerateQrTokenAction(_previousState: AuthActionState, f
     .maybeSingle();
 
   if (previousToken) {
-    await supabase.from("qr_tokens").update({ status: "revoked" }).eq("id", previousToken.id);
+    await writeClient.from("qr_tokens").update({ status: "revoked" }).eq("id", previousToken.id);
   }
 
   const tokenValue = generateQrTokenValue();
-  const { data: token, error } = await supabase
+  const { data: token, error } = await writeClient
     .from("qr_tokens")
     .insert({
       gym_id: member.gym_id,
@@ -279,7 +281,7 @@ export async function regenerateQrTokenAction(_previousState: AuthActionState, f
   }
 
   await Promise.all([
-    supabase.from("attendance_logs").insert({
+    writeClient.from("attendance_logs").insert({
       gym_id: member.gym_id,
       member_id: member.id,
       qr_token_id: token.id,

@@ -1,10 +1,6 @@
-"use client";
-
-import * as Dialog from "@radix-ui/react-dialog";
-import { Menu, X } from "lucide-react";
 import Link from "next/link";
-import { navItems, siteConfig } from "@/data/site";
 import { ButtonLink } from "@/components/ui/button";
+import { navItems, siteConfig } from "@/data/site";
 
 export function Header() {
   const whatsappHref = `https://wa.me/${siteConfig.whatsapp}?text=${encodeURIComponent("Hi Apex, I want to book a free trial.")}`;
@@ -34,48 +30,43 @@ export function Header() {
           </ButtonLink>
         </div>
 
-        <Dialog.Root>
-          <Dialog.Trigger className="inline-flex size-10 items-center justify-center rounded-md border border-white/20 text-white lg:hidden" aria-label="Open menu">
-            <Menu aria-hidden="true" size={20} />
-          </Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-            <Dialog.Content className="fixed right-0 top-0 z-50 flex h-full w-[min(88vw,380px)] flex-col bg-obsidian p-6 text-white shadow-2xl">
-              <div className="flex items-center justify-between">
-                <Dialog.Title className="text-base font-bold">{siteConfig.shortName}</Dialog.Title>
-                <Dialog.Close className="grid size-10 place-items-center rounded-md border border-white/15" aria-label="Close menu">
-                  <X aria-hidden="true" size={20} />
-                </Dialog.Close>
-              </div>
-              <nav className="mt-8 grid gap-1" aria-label="Mobile navigation">
-                {navItems.map((item) => (
-                  <Dialog.Close asChild key={item.href}>
-                    <Link className="rounded-md px-3 py-3 text-lg font-semibold text-white/86 hover:bg-white/10 hover:text-white" href={item.href}>
-                      {item.label}
-                    </Link>
-                  </Dialog.Close>
-                ))}
-              </nav>
-              <div className="mt-auto grid gap-3 border-t border-white/10 pt-6">
-                <Dialog.Close asChild>
-                  <ButtonLink href="/free-trial" variant="accent">
-                    Book Free Trial
-                  </ButtonLink>
-                </Dialog.Close>
-                <Dialog.Close asChild>
-                  <ButtonLink href="/membership-plans" variant="outline">
-                    View Memberships
-                  </ButtonLink>
-                </Dialog.Close>
-                <a className="text-sm text-white/70 underline-offset-4 hover:underline" href={whatsappHref} rel="noreferrer" target="_blank">
-                  WhatsApp the front desk
-                </a>
-              </div>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
+        <details className="group relative lg:hidden">
+          <summary
+            aria-label="Toggle mobile menu"
+            className="inline-flex size-10 cursor-pointer list-none items-center justify-center rounded-md border border-white/20 text-white transition hover:bg-white/10 [&::-webkit-details-marker]:hidden"
+          >
+            <span aria-hidden="true" className="grid w-5 gap-1">
+              <span className="h-0.5 rounded-full bg-white transition group-open:translate-y-1.5 group-open:rotate-45" />
+              <span className="h-0.5 rounded-full bg-white transition group-open:opacity-0" />
+              <span className="h-0.5 rounded-full bg-white transition group-open:-translate-y-1.5 group-open:-rotate-45" />
+            </span>
+          </summary>
+          <div className="fixed right-4 top-20 z-50 grid w-[min(calc(100vw-2rem),380px)] gap-5 rounded-lg border border-white/12 bg-obsidian p-5 text-white shadow-2xl">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/48">{siteConfig.shortName}</p>
+              <p className="mt-1 text-base font-bold">Mobile navigation</p>
+            </div>
+            <nav className="grid gap-1" aria-label="Mobile navigation">
+              {navItems.map((item) => (
+                <Link className="rounded-md px-3 py-3 text-lg font-semibold text-white/86 hover:bg-white/10 hover:text-white" href={item.href} key={item.href}>
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="grid gap-3 border-t border-white/10 pt-5">
+              <ButtonLink href="/free-trial" variant="accent">
+                Book Free Trial
+              </ButtonLink>
+              <ButtonLink href="/membership-plans" variant="outline">
+                View Memberships
+              </ButtonLink>
+              <a className="text-sm text-white/70 underline-offset-4 hover:underline" href={whatsappHref} rel="noreferrer" target="_blank">
+                WhatsApp the front desk
+              </a>
+            </div>
+          </div>
+        </details>
       </div>
     </header>
   );
 }
-

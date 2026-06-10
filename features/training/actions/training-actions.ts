@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
+import { validateAllowedFile } from "@/lib/security/file-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
@@ -1155,10 +1156,15 @@ async function uploadCertificateFile(
     return { ok: false, message: "Certificate file cannot exceed 10 MB." };
   }
 
-  const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "file";
+  const validation = await validateAllowedFile(input.file, certificateMimeTypes, "Certificate must be a valid image or PDF.");
+  if (!validation.ok) {
+    return { ok: false, message: validation.message };
+  }
+
+  const extension = validation.extension;
   const filePath = `${input.trainerId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from("trainer-certificates").upload(filePath, input.file, {
-    contentType: input.file.type,
+    contentType: validation.mimeType,
     upsert: false
   });
 

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { listActiveTrainers } from "@/features/training/services/training-service";
-import { CampaignPerformanceChart, ChannelVolumeChart } from "@/features/communications/components/communication-charts";
+import { CampaignPerformanceChart, ChannelVolumeChart } from "@/features/communications/components/lazy-communication-charts";
 import {
   AnnouncementForm,
   AutomationRuleForm,
@@ -19,6 +19,7 @@ import { CommunicationStatusBadge } from "@/features/communications/components/c
 import { formatCommunicationLabel } from "@/features/communications/lib/business-rules";
 import { getCommunicationDashboard } from "@/features/communications/services/communication-service";
 import { requireRole } from "@/lib/auth/guards";
+import { hasRequiredRole } from "@/lib/rbac";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -30,6 +31,7 @@ export const metadata: Metadata = createMetadata({
 export default async function AdminCommunicationsPage() {
   const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/communications");
   const gymId = context.profile?.gym_id ?? null;
+  const canManageCommunications = hasRequiredRole(context.roles, ["super_admin", "gym_admin"]);
   const [dashboard, membersResult, trainers] = await Promise.all([
     getCommunicationDashboard(gymId),
     listMembers({ gymId, pageSize: 120 }),
@@ -68,107 +70,113 @@ export default async function AdminCommunicationsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Campaign Management</h3>
-            <p className="text-sm leading-6 text-muted-foreground">Create email, WhatsApp, SMS, or multi-channel campaigns against dynamic member segments.</p>
-          </CardHeader>
-          <CardContent><CampaignForm campaigns={dashboard.campaigns} segments={dashboard.segments} templates={dashboard.templates} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Send className="size-5" />
-              <h3 className="text-2xl font-black">Dispatch Queue</h3>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {dashboard.campaigns.slice(0, 8).map((campaign) => (
-              <div className="rounded-lg border border-border bg-surface-muted p-4" key={campaign.id}>
-                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-black">{campaign.name}</p>
-                      <CommunicationStatusBadge status={campaign.status} />
-                    </div>
-                    <p className="mt-1 text-xs font-semibold text-muted-foreground">{formatCommunicationLabel(campaign.campaign_type)} · {formatCommunicationLabel(campaign.category)} · {campaign.segment_key}</p>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <CampaignDispatchForm campaign={campaign} />
-                </div>
+      {canManageCommunications ? (
+        <div className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Campaign Management</h3>
+              <p className="text-sm leading-6 text-muted-foreground">Create email, WhatsApp, SMS, or multi-channel campaigns against dynamic member segments.</p>
+            </CardHeader>
+            <CardContent><CampaignForm campaigns={dashboard.campaigns} segments={dashboard.segments} templates={dashboard.templates} /></CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Send className="size-5" />
+                <h3 className="text-2xl font-black">Dispatch Queue</h3>
               </div>
-            ))}
-            {dashboard.campaigns.length === 0 ? <EmptyState text="No campaigns created yet." /> : null}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Template Engine</h3>
-            <p className="text-sm leading-6 text-muted-foreground">Templates support variable placeholders, channel-specific content, and active/draft/archive lifecycle states.</p>
-          </CardHeader>
-          <CardContent><NotificationTemplateForm templates={dashboard.templates} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Announcement System</h3>
-            <p className="text-sm leading-6 text-muted-foreground">Publish gym notices, holiday hours, maintenance updates, events, and promotions with segment targeting.</p>
-          </CardHeader>
-          <CardContent><AnnouncementForm announcements={dashboard.announcements} segments={dashboard.segments} /></CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[0.85fr_1fr]">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <UsersRound className="size-5" />
-              <h3 className="text-2xl font-black">Member Segments</h3>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <CommunicationSegmentForm segments={dashboard.segments} />
-            <div className="grid gap-2 sm:grid-cols-2">
-              {dashboard.segments.slice(0, 8).map((segment) => (
-                <div className="rounded-md border border-border bg-surface-muted p-3" key={segment.id}>
-                  <p className="font-bold">{segment.name}</p>
-                  <p className="mt-1 text-xs font-semibold text-muted-foreground">{segment.segment_key}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Workflow className="size-5" />
-              <h3 className="text-2xl font-black">Retention Automation</h3>
-            </div>
-            <p className="text-sm leading-6 text-muted-foreground">Queue renewal reminders, attendance nudges, class reminders, PT session reminders, workout streak recovery, and achievement messages.</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <AutomationRuleForm rules={dashboard.automationRules} segments={dashboard.segments} templates={dashboard.templates} />
-            <div className="space-y-3">
-              {dashboard.automationRules.slice(0, 6).map((rule) => (
-                <div className="rounded-md border border-border bg-surface-muted p-3" key={rule.id}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-bold">{rule.name}</p>
-                    <CommunicationStatusBadge status={rule.status} />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {dashboard.campaigns.slice(0, 8).map((campaign) => (
+                <div className="rounded-lg border border-border bg-surface-muted p-4" key={campaign.id}>
+                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-black">{campaign.name}</p>
+                        <CommunicationStatusBadge status={campaign.status} />
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-muted-foreground">{formatCommunicationLabel(campaign.campaign_type)} · {formatCommunicationLabel(campaign.category)} · {campaign.segment_key}</p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs font-semibold text-muted-foreground">{formatCommunicationLabel(rule.trigger_key)} · {formatCommunicationLabel(rule.channel)} · {rule.segment_key}</p>
                   <div className="mt-3">
-                    <AutomationRunForm rule={rule} />
+                    <CampaignDispatchForm campaign={campaign} />
                   </div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              {dashboard.campaigns.length === 0 ? <EmptyState text="No campaigns created yet." /> : null}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {canManageCommunications ? (
+        <div className="grid gap-5 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Template Engine</h3>
+              <p className="text-sm leading-6 text-muted-foreground">Templates support variable placeholders, channel-specific content, and active/draft/archive lifecycle states.</p>
+            </CardHeader>
+            <CardContent><NotificationTemplateForm templates={dashboard.templates} /></CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Announcement System</h3>
+              <p className="text-sm leading-6 text-muted-foreground">Publish gym notices, holiday hours, maintenance updates, events, and promotions with segment targeting.</p>
+            </CardHeader>
+            <CardContent><AnnouncementForm announcements={dashboard.announcements} segments={dashboard.segments} /></CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {canManageCommunications ? (
+        <div className="grid gap-5 xl:grid-cols-[0.85fr_1fr]">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <UsersRound className="size-5" />
+                <h3 className="text-2xl font-black">Member Segments</h3>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <CommunicationSegmentForm segments={dashboard.segments} />
+              <div className="grid gap-2 sm:grid-cols-2">
+                {dashboard.segments.slice(0, 8).map((segment) => (
+                  <div className="rounded-md border border-border bg-surface-muted p-3" key={segment.id}>
+                    <p className="font-bold">{segment.name}</p>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">{segment.segment_key}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Workflow className="size-5" />
+                <h3 className="text-2xl font-black">Retention Automation</h3>
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">Queue renewal reminders, attendance nudges, class reminders, PT session reminders, workout streak recovery, and achievement messages.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <AutomationRuleForm rules={dashboard.automationRules} segments={dashboard.segments} templates={dashboard.templates} />
+              <div className="space-y-3">
+                {dashboard.automationRules.slice(0, 6).map((rule) => (
+                  <div className="rounded-md border border-border bg-surface-muted p-3" key={rule.id}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold">{rule.name}</p>
+                      <CommunicationStatusBadge status={rule.status} />
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">{formatCommunicationLabel(rule.trigger_key)} · {formatCommunicationLabel(rule.channel)} · {rule.segment_key}</p>
+                    <div className="mt-3">
+                      <AutomationRunForm rule={rule} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1fr]">
         <Card>

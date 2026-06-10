@@ -45,11 +45,12 @@ type CommunicationHistoryInsert = Database["public"]["Tables"]["communication_hi
 type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
 
 const staffRoles = ["super_admin", "gym_admin", "reception_staff"] as const;
+const communicationManagerRoles = ["super_admin", "gym_admin"] as const;
 const communicatorRoles = ["super_admin", "gym_admin", "reception_staff", "trainer"] as const;
 
 export async function saveNotificationTemplateAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/communications");
+  const context = await requireRole(communicationManagerRoles, "/admin/communications");
   const parsed = NotificationTemplateSchema.safeParse({
     templateId: formData.get("templateId") ?? "",
     name: formData.get("name"),
@@ -204,7 +205,7 @@ export async function updateNotificationStateAction(_previousState: AuthActionSt
 
 export async function saveAnnouncementAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/communications");
+  const context = await requireRole(communicationManagerRoles, "/admin/communications");
   const parsed = AnnouncementSchema.safeParse({
     announcementId: formData.get("announcementId") ?? "",
     title: formData.get("title"),
@@ -256,7 +257,7 @@ export async function saveAnnouncementAction(_previousState: AuthActionState, fo
 
 export async function saveCommunicationSegmentAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/communications");
+  const context = await requireRole(communicationManagerRoles, "/admin/communications");
   const parsed = CommunicationSegmentSchema.safeParse({
     segmentId: formData.get("segmentId") ?? "",
     name: formData.get("name"),
@@ -303,7 +304,7 @@ export async function saveCommunicationSegmentAction(_previousState: AuthActionS
 
 export async function saveCampaignAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/communications");
+  const context = await requireRole(communicationManagerRoles, "/admin/communications");
   const parsed = CampaignSchema.safeParse({
     campaignId: formData.get("campaignId") ?? "",
     name: formData.get("name"),
@@ -354,7 +355,7 @@ export async function saveCampaignAction(_previousState: AuthActionState, formDa
 
 export async function dispatchCampaignAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/communications");
+  const context = await requireRole(communicationManagerRoles, "/admin/communications");
   const parsed = CampaignDispatchSchema.safeParse({
     campaignId: formData.get("campaignId"),
     mode: formData.get("mode") ?? "queue"
@@ -422,7 +423,7 @@ export async function dispatchCampaignAction(_previousState: AuthActionState, fo
 
 export async function saveAutomationRuleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/communications");
+  const context = await requireRole(communicationManagerRoles, "/admin/communications");
   const parsed = AutomationRuleSchema.safeParse({
     automationRuleId: formData.get("automationRuleId") ?? "",
     name: formData.get("name"),
@@ -469,7 +470,7 @@ export async function saveAutomationRuleAction(_previousState: AuthActionState, 
 
 export async function runAutomationRuleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/communications");
+  const context = await requireRole(communicationManagerRoles, "/admin/communications");
   const ruleId = String(formData.get("automationRuleId") ?? "");
   if (!ruleId) {
     return { status: "error", message: "Choose an automation rule." };

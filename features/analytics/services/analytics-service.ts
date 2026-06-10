@@ -1,4 +1,7 @@
 import { addDays, differenceInCalendarDays, formatISO, startOfMonth, subDays } from "date-fns";
+import { unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AnalyticsInsightRow,
@@ -45,15 +48,38 @@ type FitnessProgressSummaryRow = Database["public"]["Views"]["fitness_member_pro
 type AttendanceMemberFrequencyRow = Database["public"]["Views"]["attendance_member_frequency"]["Row"];
 
 const ANALYTICS_LIMITS = {
-  shortWindowRows: 2_000,
-  mediumWindowRows: 3_000,
-  memberships: 5_000,
-  trainers: 750,
+  shortWindowRows: 1_000,
+  mediumWindowRows: 1_500,
+  memberships: 2_500,
+  trainers: 500,
   systemRows: 80
 } as const;
 
+const PLATFORM_ANALYTICS_SCOPE = "__platform__";
+
 export async function getExecutiveAnalyticsDashboard(gymId: string | null): Promise<ExecutiveAnalyticsDashboard> {
+  if (getSupabaseAdminClient()) {
+    return getCachedExecutiveAnalyticsDashboard(gymId ?? PLATFORM_ANALYTICS_SCOPE);
+  }
+
   const supabase = await createSupabaseServerClient();
+  return buildExecutiveAnalyticsDashboard(supabase, gymId);
+}
+
+const getCachedExecutiveAnalyticsDashboard = unstable_cache(
+  async (gymScope: string) => {
+    const supabase = getSupabaseAdminClient();
+    if (!supabase) {
+      throw new Error("Supabase admin client is required for cached analytics dashboards.");
+    }
+
+    return buildExecutiveAnalyticsDashboard(supabase, gymScope === PLATFORM_ANALYTICS_SCOPE ? null : gymScope);
+  },
+  ["executive-analytics-dashboard"],
+  { revalidate: 60 }
+);
+
+async function buildExecutiveAnalyticsDashboard(supabase: SupabaseClient<Database>, gymId: string | null): Promise<ExecutiveAnalyticsDashboard> {
   const today = todayDate();
   const monthStart = formatISO(startOfMonth(new Date()), { representation: "date" });
   const previousMonthStart = formatISO(startOfMonth(subDays(new Date(monthStart), 1)), { representation: "date" });

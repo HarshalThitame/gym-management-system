@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
+import type { QueueableOfflineActionType } from "@/features/pwa/lib/business-rules";
 import { OfflineSyncSchema } from "@/features/pwa/schemas/pwa";
 import { getAuthContext } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/types/database";
+
+const allowedOfflineTargets: Record<QueueableOfflineActionType, { methods: Set<string>; prefixes: string[] }> = {
+  workout_log: { methods: new Set(["POST", "PUT", "PATCH"]), prefixes: ["/member/workouts", "/member/fitness"] },
+  nutrition_log: { methods: new Set(["POST", "PUT", "PATCH"]), prefixes: ["/member/fitness", "/member/nutrition"] },
+  profile_update: { methods: new Set(["POST", "PUT", "PATCH"]), prefixes: ["/member/profile", "/member/settings"] },
+  attendance_check_in: { methods: new Set(["POST"]), prefixes: ["/member/attendance", "/admin/attendance"] },
+  attendance_check_out: { methods: new Set(["POST"]), prefixes: ["/member/attendance", "/admin/attendance"] },
+  class_booking_request: { methods: new Set(["POST", "DELETE"]), prefixes: ["/member/classes"] }
+};
 
 export async function POST(request: Request) {
   const context = await getAuthContext();
@@ -29,6 +39,20 @@ export async function POST(request: Request) {
           code: "VALIDATION_ERROR",
           message: "Offline sync payload is invalid.",
           fieldErrors: parsed.error.flatten().fieldErrors
+        }
+      },
+      { status: 400 }
+    );
+  }
+
+  const invalidAction = parsed.data.actions.find((action) => !isAllowedOfflineAction(action));
+  if (invalidAction) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "OFFLINE_ACTION_NOT_ALLOWED",
+          message: "Offline sync contains an action that is not allowed for background processing."
         }
       },
       { status: 400 }
@@ -79,4 +103,9 @@ export async function POST(request: Request) {
 
 function toJson(value: unknown): Json {
   return JSON.parse(JSON.stringify(value)) as Json;
+}
+
+function isAllowedOfflineAction(action: { type: QueueableOfflineActionType; endpoint: string; method: string }) {
+  const target = allowedOfflineTargets[action.type];
+  return target.methods.has(action.method) && target.prefixes.some((prefix) => action.endpoint === prefix || action.endpoint.startsWith(`${prefix}/`));
 }

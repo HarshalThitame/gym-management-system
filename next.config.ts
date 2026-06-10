@@ -1,21 +1,5 @@
 import type { NextConfig } from "next";
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
-  "font-src 'self' data:",
-  "connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://api.resend.com",
-  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
-  "worker-src 'self' blob:",
-  "upgrade-insecure-requests"
-].join("; ");
-
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
@@ -45,15 +29,11 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(self), payment=(self)"
+            value: "camera=(self), microphone=(), geolocation=(self), payment=(self)"
           },
           {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains"
-          },
-          {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy
           },
           {
             key: "Cross-Origin-Opener-Policy",

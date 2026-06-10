@@ -20,7 +20,7 @@ import {
   saveLatestMemberAiProfile
 } from "../services/ai-service";
 
-const staffRoles = ["super_admin", "gym_admin", "reception_staff"] as const;
+const staffRoles = ["super_admin", "gym_admin"] as const;
 const trainerRoles = ["super_admin", "gym_admin", "trainer"] as const;
 
 export async function generateMyAiProfileAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {

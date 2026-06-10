@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Activity, Clock, UsersRound } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
-import { HourlyTrafficChart } from "@/features/attendance/components/attendance-charts";
+import { HourlyTrafficChart } from "@/features/attendance/components/lazy-attendance-charts";
 import { getTrainerAttendanceView } from "@/features/attendance/services/attendance-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";

@@ -3,7 +3,7 @@ import { BarChart3, CalendarDays, Dumbbell, ListChecks, UsersRound } from "lucid
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
-import { ClassBookingTrendChart, ClassUtilizationChart } from "@/features/classes/components/class-charts";
+import { ClassBookingTrendChart, ClassUtilizationChart } from "@/features/classes/components/lazy-class-charts";
 import { ClassCategoryForm, ClassForm, ClassScheduleForm, ClassSessionForm } from "@/features/classes/components/class-forms";
 import { ClassStatusBadge } from "@/features/classes/components/class-status-badge";
 import { formatClassLabel } from "@/features/classes/lib/business-rules";

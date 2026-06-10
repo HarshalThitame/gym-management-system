@@ -69,6 +69,7 @@ export default async function MemberDashboardPage() {
           <div className="flex flex-wrap gap-3">
             <ButtonLink href="/member/profile" variant="primary">Complete Profile</ButtonLink>
             <ButtonLink href="/member/membership" variant="secondary">View Membership</ButtonLink>
+            <ButtonLink href="/member/payments" variant="secondary">Payments and Invoices</ButtonLink>
             <ButtonLink href="/member/attendance" variant="secondary">Attendance QR</ButtonLink>
             <ButtonLink href="/member/classes" variant="secondary">Book Classes</ButtonLink>
             <ButtonLink href="/member/workouts" variant="secondary">View Workouts</ButtonLink>

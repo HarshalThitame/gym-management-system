@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { processRazorpayWebhook } from "@/features/billing/services/payment-processing";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/security/request";
 
 export async function POST(request: Request) {
   const signature = request.headers.get("x-razorpay-signature");
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const rateLimit = await checkRateLimit(`razorpay-webhook:${forwardedFor}`, 120, 60_000);
+  const ip = getClientIpFromHeaders(request.headers, "unknown");
+  const rateLimit = await checkRateLimit(`razorpay-webhook:${ip}`, 120, 60_000);
 
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many webhook requests." } }, { status: 429 });

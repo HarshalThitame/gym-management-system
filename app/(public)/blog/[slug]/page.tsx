@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -35,6 +36,7 @@ export async function generateMetadata({ params }: BlogDetailProps): Promise<Met
 }
 
 export default async function BlogDetailPage({ params }: BlogDetailProps) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const { slug } = await params;
   const post = blogPosts.find((item) => item.slug === slug);
 
@@ -57,7 +59,7 @@ export default async function BlogDetailPage({ params }: BlogDetailProps) {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
+      <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
       <article className="bg-background">
         <section className="bg-obsidian py-16 text-white md:py-24">
           <div className="container-page max-w-4xl">
@@ -86,4 +88,3 @@ export default async function BlogDetailPage({ params }: BlogDetailProps) {
     </>
   );
 }
-

@@ -6,6 +6,8 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
 const DEFAULT_TEXT_MODEL = "gpt-5.4-mini";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+const AI_TEXT_TIMEOUT_MS = 20_000;
+const AI_EMBEDDING_TIMEOUT_MS = 12_000;
 
 type GenerateTextInput = {
   featureKey: string;
@@ -99,6 +101,7 @@ export async function generateAiText(input: GenerateTextInput): Promise<Generate
         authorization: `Bearer ${apiKey}`,
         "content-type": "application/json"
       },
+      signal: AbortSignal.timeout(AI_TEXT_TIMEOUT_MS),
       body: JSON.stringify({
         model,
         input: safety.sanitizedText,
@@ -166,11 +169,12 @@ export async function generateEmbedding(input: string) {
 
   const response = await fetch(OPENAI_EMBEDDINGS_URL, {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json"
+      },
+      signal: AbortSignal.timeout(AI_EMBEDDING_TIMEOUT_MS),
+      body: JSON.stringify({
       model: process.env.OPENAI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL,
       input: input.slice(0, 8000)
     })

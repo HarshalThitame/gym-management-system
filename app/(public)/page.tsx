@@ -322,7 +322,8 @@ function TestimonialsPreview() {
           {testimonials.slice(0, 3).map((item, index) => (
             <Reveal delay={index * 0.06} key={item.name}>
               <Card className="h-full p-6">
-                <div className="flex gap-1 text-amber-500" aria-label={`${item.rating} star review`}>
+                <span className="sr-only">{item.rating} star review</span>
+                <div aria-hidden="true" className="flex gap-1 text-amber-500">
                   {Array.from({ length: item.rating }).map((_, starIndex) => (
                     <Star aria-hidden="true" fill="currentColor" key={starIndex} size={16} />
                   ))}

@@ -24,6 +24,7 @@ type ListClassesInput = {
 };
 
 type ClassReportType = "attendance" | "bookings" | "no_shows" | "waitlists" | "trainer_sessions";
+const SYNC_CLASS_REPORT_ROW_LIMIT = 2_000;
 
 export async function listClassCategories(gymId: string | null) {
   const supabase = await createSupabaseServerClient();
@@ -267,27 +268,27 @@ export async function getTrainerClassesPortal(userId: string, gymId: string | nu
 export async function getClassReportRows(gymId: string | null, type: ClassReportType) {
   const supabase = await createSupabaseServerClient();
   if (type === "attendance") {
-    const result = await queryByGym(supabase.from("class_attendance").select("*").order("marked_at", { ascending: false }).limit(5000), gymId);
+    const result = await queryByGym(supabase.from("class_attendance").select("*").order("marked_at", { ascending: false }).limit(SYNC_CLASS_REPORT_ROW_LIMIT), gymId);
     if (result.error) throw new Error(result.error.message);
     return { type, rows: result.data ?? [] };
   }
   if (type === "waitlists") {
-    const result = await queryByGym(supabase.from("class_waitlists").select("*").order("joined_at", { ascending: false }).limit(5000), gymId);
+    const result = await queryByGym(supabase.from("class_waitlists").select("*").order("joined_at", { ascending: false }).limit(SYNC_CLASS_REPORT_ROW_LIMIT), gymId);
     if (result.error) throw new Error(result.error.message);
     return { type, rows: result.data ?? [] };
   }
   if (type === "trainer_sessions") {
-    const result = await queryByGym(supabase.from("class_trainer_summary").select("*").order("session_count", { ascending: false }).limit(2000), gymId);
+    const result = await queryByGym(supabase.from("class_trainer_summary").select("*").order("session_count", { ascending: false }).limit(SYNC_CLASS_REPORT_ROW_LIMIT), gymId);
     if (result.error) throw new Error(result.error.message);
     return { type, rows: result.data ?? [] };
   }
   if (type === "no_shows") {
-    const result = await queryByGym(supabase.from("class_bookings").select("*").in("status", ["absent", "no_show"]).order("booked_at", { ascending: false }).limit(5000), gymId);
+    const result = await queryByGym(supabase.from("class_bookings").select("*").in("status", ["absent", "no_show"]).order("booked_at", { ascending: false }).limit(SYNC_CLASS_REPORT_ROW_LIMIT), gymId);
     if (result.error) throw new Error(result.error.message);
     return { type, rows: result.data ?? [] };
   }
 
-  const result = await queryByGym(supabase.from("class_bookings").select("*").order("booked_at", { ascending: false }).limit(5000), gymId);
+  const result = await queryByGym(supabase.from("class_bookings").select("*").order("booked_at", { ascending: false }).limit(SYNC_CLASS_REPORT_ROW_LIMIT), gymId);
   if (result.error) throw new Error(result.error.message);
   return { type: "bookings" as const, rows: result.data ?? [] };
 }

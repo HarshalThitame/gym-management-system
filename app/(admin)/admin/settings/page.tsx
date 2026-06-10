@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Activity, AlertTriangle, Building2, DatabaseBackup, FileText, Flag, Gauge, Globe2, LockKeyhole, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
-import { BranchPerformanceChart, TenantUsageChart } from "@/features/enterprise/components/enterprise-charts";
+import { BranchPerformanceChart, TenantUsageChart } from "@/features/enterprise/components/lazy-enterprise-charts";
 import {
   BackupJobForm,
   BranchForm,

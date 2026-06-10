@@ -605,46 +605,214 @@ with check (
 drop policy if exists "trainer dependent records visible in trainer scope" on public.trainer_specializations;
 create policy "trainer dependent records visible in trainer scope"
 on public.trainer_specializations for select to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_specializations.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin', 'reception_staff', 'trainer', 'member')))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_specializations.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin', 'reception_staff', 'trainer', 'member'])
+        )
+      )
+  )
+);
 
 drop policy if exists "trainer dependent records manageable in trainer scope" on public.trainer_specializations;
 create policy "trainer dependent records manageable in trainer scope"
 on public.trainer_specializations for all to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_specializations.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))))
-with check (exists (select 1 from public.trainers t where t.id = trainer_specializations.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_specializations.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_specializations.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+);
 
 drop policy if exists "trainer certifications visible in scope" on public.trainer_certifications;
 create policy "trainer certifications visible in scope"
 on public.trainer_certifications for select to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_certifications.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin', 'reception_staff', 'trainer'])))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_certifications.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin', 'reception_staff', 'trainer'])
+        )
+      )
+  )
+);
 
 drop policy if exists "trainer certifications manageable in scope" on public.trainer_certifications;
 create policy "trainer certifications manageable in scope"
 on public.trainer_certifications for all to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_certifications.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))))
-with check (exists (select 1 from public.trainers t where t.id = trainer_certifications.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_certifications.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_certifications.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+);
 
 drop policy if exists "trainer availability visible in scope" on public.trainer_availability;
 create policy "trainer availability visible in scope"
 on public.trainer_availability for select to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_availability.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin', 'reception_staff', 'trainer', 'member')))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_availability.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin', 'reception_staff', 'trainer', 'member'])
+        )
+      )
+  )
+);
 
 drop policy if exists "trainer availability manageable in scope" on public.trainer_availability;
 create policy "trainer availability manageable in scope"
 on public.trainer_availability for all to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_availability.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))))
-with check (exists (select 1 from public.trainers t where t.id = trainer_availability.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_availability.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_availability.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+);
 
 drop policy if exists "trainer time off visible in scope" on public.trainer_time_off;
 create policy "trainer time off visible in scope"
 on public.trainer_time_off for select to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_time_off.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin', 'reception_staff'])))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_time_off.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin', 'reception_staff'])
+        )
+      )
+  )
+);
 
 drop policy if exists "trainer time off manageable in scope" on public.trainer_time_off;
 create policy "trainer time off manageable in scope"
 on public.trainer_time_off for all to authenticated
-using (exists (select 1 from public.trainers t where t.id = trainer_time_off.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))))
-with check (exists (select 1 from public.trainers t where t.id = trainer_time_off.trainer_id and (t.user_id = (select auth.uid()) or public.is_super_admin() or (t.gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))));
+using (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_time_off.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.trainers t
+    where t.id = trainer_time_off.trainer_id
+      and (
+        t.user_id = (select auth.uid())
+        or public.is_super_admin()
+        or (
+          t.gym_id = public.current_user_gym_id()
+          and public.has_any_role(array['gym_admin'])
+        )
+      )
+  )
+);
 
 drop policy if exists "assignments visible to staff trainers and members" on public.trainer_assignments;
 create policy "assignments visible to staff trainers and members"

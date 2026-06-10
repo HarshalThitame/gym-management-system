@@ -1,4 +1,4 @@
-import { addDays, formatISO } from "date-fns";
+import { addDays, formatISO, startOfMonth } from "date-fns";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   MemberDirectoryItem,
@@ -8,7 +8,6 @@ import type {
   MembershipPlanRow,
   MembershipRow
 } from "@/types/membership";
-import { getExpiryBucket, isCurrentMonth } from "../lib/business-rules";
 
 type ListMembersInput = {
   gymId: string | null;
@@ -83,39 +82,71 @@ export async function getMembershipPlan(planId: string) {
 
 export async function getMembershipMetrics(gymId: string | null): Promise<MembershipMetrics> {
   const supabase = await createSupabaseServerClient();
-  const membersQuery = supabase.from("members").select("id,status,joined_at");
-  const membershipsQuery = supabase.from("memberships").select("id,status,end_date,created_at");
+  const today = todayDate();
+  const weekEnd = formatISO(addDays(new Date(), 7), { representation: "date" });
+  const monthEnd = formatISO(addDays(new Date(), 30), { representation: "date" });
+  const monthStart = formatISO(startOfMonth(new Date()), { representation: "date" });
+  const membersCountQuery = () => {
+    let query = supabase.from("members").select("id", { count: "exact", head: true });
+    if (gymId) {
+      query = query.eq("gym_id", gymId);
+    }
+    return query;
+  };
+  const membershipsCountQuery = () => {
+    let query = supabase.from("memberships").select("id", { count: "exact", head: true });
+    if (gymId) {
+      query = query.eq("gym_id", gymId);
+    }
+    return query;
+  };
 
-  if (gymId) {
-    membersQuery.eq("gym_id", gymId);
-    membershipsQuery.eq("gym_id", gymId);
-  }
-
-  const [membersResult, membershipsResult] = await Promise.all([
-    membersQuery,
-    membershipsQuery
+  const [
+    totalMembersResult,
+    activeMembersResult,
+    expiredStatusResult,
+    expiredDateResult,
+    expiringTodayResult,
+    expiringWeekResult,
+    expiringMonthResult,
+    renewalsThisMonthResult,
+    newMembersThisMonthResult
+  ] = await Promise.all([
+    membersCountQuery(),
+    membershipsCountQuery().eq("status", "active"),
+    membershipsCountQuery().eq("status", "expired"),
+    membershipsCountQuery().neq("status", "expired").lt("end_date", today),
+    membershipsCountQuery().in("status", ["active", "frozen"]).eq("end_date", today),
+    membershipsCountQuery().in("status", ["active", "frozen"]).gte("end_date", today).lte("end_date", weekEnd),
+    membershipsCountQuery().in("status", ["active", "frozen"]).gte("end_date", today).lte("end_date", monthEnd),
+    membershipsCountQuery().not("renewal_of_membership_id", "is", null).gte("created_at", `${monthStart}T00:00:00.000Z`),
+    membersCountQuery().gte("joined_at", monthStart).lte("joined_at", today)
   ]);
 
-  if (membersResult.error) {
-    throw new Error(membersResult.error.message);
+  const firstError = [
+    totalMembersResult,
+    activeMembersResult,
+    expiredStatusResult,
+    expiredDateResult,
+    expiringTodayResult,
+    expiringWeekResult,
+    expiringMonthResult,
+    renewalsThisMonthResult,
+    newMembersThisMonthResult
+  ].find((result) => result.error)?.error;
+  if (firstError) {
+    throw new Error(firstError.message);
   }
-
-  if (membershipsResult.error) {
-    throw new Error(membershipsResult.error.message);
-  }
-
-  const members: Pick<MemberRow, "id" | "status" | "joined_at">[] = membersResult.data ?? [];
-  const memberships: Pick<MembershipRow, "id" | "status" | "end_date" | "created_at">[] = membershipsResult.data ?? [];
 
   return {
-    totalMembers: members.length,
-    activeMembers: memberships.filter((membership) => membership.status === "active").length,
-    expiredMembers: memberships.filter((membership) => membership.status === "expired" || getExpiryBucket(membership.end_date, membership.status) === "expired").length,
-    expiringToday: memberships.filter((membership) => getExpiryBucket(membership.end_date, membership.status) === "today").length,
-    expiringThisWeek: memberships.filter((membership) => getExpiryBucket(membership.end_date, membership.status) === "this_week").length,
-    expiringThisMonth: memberships.filter((membership) => getExpiryBucket(membership.end_date, membership.status) === "this_month").length,
-    renewalsThisMonth: memberships.filter((membership) => membership.created_at && isCurrentMonth(membership.created_at)).length,
-    newMembersThisMonth: members.filter((member) => member.joined_at && isCurrentMonth(member.joined_at)).length
+    totalMembers: totalMembersResult.count ?? 0,
+    activeMembers: activeMembersResult.count ?? 0,
+    expiredMembers: (expiredStatusResult.count ?? 0) + (expiredDateResult.count ?? 0),
+    expiringToday: expiringTodayResult.count ?? 0,
+    expiringThisWeek: expiringWeekResult.count ?? 0,
+    expiringThisMonth: expiringMonthResult.count ?? 0,
+    renewalsThisMonth: renewalsThisMonthResult.count ?? 0,
+    newMembersThisMonth: newMembersThisMonthResult.count ?? 0
   };
 }
 

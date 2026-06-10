@@ -3,12 +3,12 @@ import { getInstallPlatform } from "@/features/pwa/lib/business-rules";
 import { PwaMetricSchema } from "@/features/pwa/schemas/pwa";
 import { getAuthContext } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIpFromHeaders } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/types/database";
 
 export async function POST(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwardedFor || "local";
+  const ip = getClientIpFromHeaders(request.headers);
   const rateLimit = await checkRateLimit(`pwa-analytics:${ip}`, 60, 60_000);
 
   if (!rateLimit.allowed) {
@@ -33,6 +33,11 @@ export async function POST(request: Request) {
   }
 
   const context = await getAuthContext();
+
+  if (!context.isAuthenticated || !context.userId) {
+    return NextResponse.json({ ok: true, data: { stored: false, anonymous: true } });
+  }
+
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {

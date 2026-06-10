@@ -5,7 +5,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { LeadForm } from "@/features/public/components/lead-form";
+import { LazyLeadForm } from "@/features/public/components/lazy-lead-form";
 import { faqs, membershipPlans } from "@/data/site";
 import { createMetadata } from "@/lib/seo/metadata";
 
@@ -66,7 +66,7 @@ export default function MembershipPlansPage() {
               <CreditCard className="text-secondary" />
               <h2 className="text-2xl font-black">Membership Inquiry</h2>
             </div>
-            <LeadForm defaultInterest="Membership plans" type="membership_inquiry" />
+            <LazyLeadForm defaultInterest="Membership plans" type="membership_inquiry" />
           </Card>
         </div>
       </section>
@@ -86,4 +86,3 @@ export default function MembershipPlansPage() {
     </>
   );
 }
-

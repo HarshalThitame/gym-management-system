@@ -27,6 +27,18 @@ export async function assignUserRoleAction(_previousState: AuthActionState, form
     return { status: "error", message: "Only Super Admins can assign the Super Admin role." };
   }
 
+  if (actor.primaryRole !== "super_admin") {
+    const actorGymId = actor.profile?.gym_id ?? null;
+
+    if (!actorGymId) {
+      return { status: "error", message: "Your account is not connected to a gym." };
+    }
+
+    if (parsed.data.gymId && parsed.data.gymId !== actorGymId) {
+      return { status: "error", message: "Gym Admins can only assign roles inside their own gym." };
+    }
+  }
+
   const adminClient = getSupabaseAdminClient();
 
   if (!adminClient) {
@@ -43,7 +55,9 @@ export async function assignUserRoleAction(_previousState: AuthActionState, form
     return { status: "error", message: "Role does not exist." };
   }
 
-  const gymId = parsed.data.gymId || actor.profile?.gym_id || null;
+  const gymId = actor.primaryRole === "super_admin"
+    ? parsed.data.gymId || actor.profile?.gym_id || null
+    : actor.profile?.gym_id ?? null;
   const { error } = await adminClient.from("user_roles").insert({
     user_id: parsed.data.userId,
     role_id: role.id,
