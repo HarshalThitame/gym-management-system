@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Apex Performance Club</title>
+  <desc id="desc">Premium Apex app icon with an angular fitness monogram.</desc>
+  <rect width="512" height="512" rx="96" fill="#070809"/>
+  <path d="M96 385 218 102h82l116 283h-76l-24-62H198l-25 62H96Z" fill="#c8f24a"/>
+  <path d="M222 260h70l-34-88-36 88Z" fill="#070809"/>
+  <path d="M166 416h180" stroke="#22d3ee" stroke-width="24" stroke-linecap="round"/>
+</svg>

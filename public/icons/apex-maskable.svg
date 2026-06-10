@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Apex Performance Club Maskable Icon</title>
+  <desc id="desc">Maskable Apex app icon with protected safe area.</desc>
+  <rect width="512" height="512" fill="#070809"/>
+  <circle cx="256" cy="256" r="232" fill="#111214"/>
+  <path d="M92 390 219 98h78l123 292h-76l-26-64H193l-27 64H92Z" fill="#c8f24a"/>
+  <path d="M222 263h68l-34-87-34 87Z" fill="#111214"/>
+  <path d="M156 420h200" stroke="#22d3ee" stroke-width="26" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" role="img" aria-labelledby="title">
+  <title id="title">Apex mobile dashboard screenshot</title>
+  <rect width="390" height="844" fill="#070809"/>
+  <rect x="22" y="48" width="164" height="14" rx="7" fill="#c8f24a"/>
+  <rect x="22" y="78" width="294" height="38" rx="12" fill="#f8f7f2"/>
+  <rect x="22" y="142" width="346" height="148" rx="18" fill="#111214" stroke="#30343b"/>
+  <rect x="46" y="170" width="118" height="16" rx="8" fill="#f8f7f2"/>
+  <rect x="46" y="204" width="246" height="12" rx="6" fill="#737780"/>
+  <rect x="46" y="230" width="188" height="12" rx="6" fill="#737780"/>
+  <rect x="274" y="172" width="58" height="58" rx="18" fill="#c8f24a"/>
+  <rect x="22" y="314" width="164" height="120" rx="18" fill="#111214" stroke="#30343b"/>
+  <rect x="204" y="314" width="164" height="120" rx="18" fill="#111214" stroke="#30343b"/>
+  <rect x="22" y="456" width="346" height="206" rx="18" fill="#111214" stroke="#30343b"/>
+  <path d="M54 612c34-84 76-28 112-82 30-45 64 16 106-38 23-30 43-20 64-6" fill="none" stroke="#22d3ee" stroke-width="8" stroke-linecap="round"/>
+  <rect x="18" y="746" width="354" height="74" rx="28" fill="#111214" stroke="#30343b"/>
+  <circle cx="64" cy="783" r="18" fill="#c8f24a"/>
+  <circle cx="151" cy="783" r="18" fill="#24272d"/>
+  <circle cx="239" cy="783" r="18" fill="#24272d"/>
+  <circle cx="326" cy="783" r="18" fill="#24272d"/>
+</svg>

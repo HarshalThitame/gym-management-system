@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1024" viewBox="0 0 1440 1024" role="img" aria-labelledby="title">
+  <title id="title">Apex operations dashboard screenshot</title>
+  <rect width="1440" height="1024" fill="#f8f7f2"/>
+  <rect width="292" height="1024" fill="#111214"/>
+  <rect x="40" y="52" width="82" height="18" rx="9" fill="#c8f24a"/>
+  <rect x="40" y="124" width="198" height="46" rx="12" fill="#24272d"/>
+  <rect x="40" y="190" width="198" height="46" rx="12" fill="#24272d"/>
+  <rect x="40" y="256" width="198" height="46" rx="12" fill="#24272d"/>
+  <rect x="338" y="50" width="480" height="48" rx="16" fill="#111214"/>
+  <rect x="338" y="142" width="238" height="148" rx="18" fill="#ffffff" stroke="#d7dbd0"/>
+  <rect x="606" y="142" width="238" height="148" rx="18" fill="#ffffff" stroke="#d7dbd0"/>
+  <rect x="874" y="142" width="238" height="148" rx="18" fill="#ffffff" stroke="#d7dbd0"/>
+  <rect x="1142" y="142" width="238" height="148" rx="18" fill="#ffffff" stroke="#d7dbd0"/>
+  <rect x="338" y="330" width="636" height="344" rx="22" fill="#ffffff" stroke="#d7dbd0"/>
+  <path d="M382 596c94-204 162-64 256-174 78-91 160 52 286-86" fill="none" stroke="#22d3ee" stroke-width="14" stroke-linecap="round"/>
+  <rect x="1014" y="330" width="366" height="344" rx="22" fill="#111214"/>
+  <circle cx="1197" cy="502" r="102" fill="none" stroke="#30343b" stroke-width="30"/>
+  <path d="M1197 400a102 102 0 0 1 84 160" fill="none" stroke="#c8f24a" stroke-width="30" stroke-linecap="round"/>
+  <rect x="338" y="718" width="1042" height="232" rx="22" fill="#ffffff" stroke="#d7dbd0"/>
+  <rect x="382" y="766" width="898" height="20" rx="10" fill="#e4e7dd"/>
+  <rect x="382" y="828" width="752" height="20" rx="10" fill="#e4e7dd"/>
+  <rect x="382" y="890" width="830" height="20" rx="10" fill="#e4e7dd"/>
+</svg>
