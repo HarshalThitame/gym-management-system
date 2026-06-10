@@ -44,6 +44,14 @@ type ClassUtilizationRow = Database["public"]["Views"]["class_session_utilizatio
 type FitnessProgressSummaryRow = Database["public"]["Views"]["fitness_member_progress_summary"]["Row"];
 type AttendanceMemberFrequencyRow = Database["public"]["Views"]["attendance_member_frequency"]["Row"];
 
+const ANALYTICS_LIMITS = {
+  shortWindowRows: 2_000,
+  mediumWindowRows: 3_000,
+  memberships: 5_000,
+  trainers: 750,
+  systemRows: 80
+} as const;
+
 export async function getExecutiveAnalyticsDashboard(gymId: string | null): Promise<ExecutiveAnalyticsDashboard> {
   const supabase = await createSupabaseServerClient();
   const today = todayDate();
@@ -80,25 +88,25 @@ export async function getExecutiveAnalyticsDashboard(gymId: string | null): Prom
     metricsResult,
     insightsResult
   ] = await Promise.all([
-    queryByGym(supabase.from("payments").select("*").gte("created_at", `${last365}T00:00:00.000Z`).order("created_at", { ascending: false }).limit(5000), gymId),
-    queryByGym(supabase.from("members").select("*").gte("created_at", `${last365}T00:00:00.000Z`).order("created_at", { ascending: false }).limit(5000), gymId),
-    queryByGym(supabase.from("memberships").select("*").order("created_at", { ascending: false }).limit(8000), gymId),
+    queryByGym(supabase.from("payments").select("*").gte("created_at", `${previousMonthStart}T00:00:00.000Z`).order("created_at", { ascending: false }).limit(ANALYTICS_LIMITS.mediumWindowRows), gymId),
+    queryByGym(supabase.from("members").select("*").gte("created_at", `${last90}T00:00:00.000Z`).order("created_at", { ascending: false }).limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("memberships").select("*").order("created_at", { ascending: false }).limit(ANALYTICS_LIMITS.memberships), gymId),
     queryByGym(supabase.from("membership_plans").select("*").order("display_order", { ascending: true }), gymId),
     queryByGym(supabase.from("attendance_daily_summary").select("*").gte("attendance_date", last90).order("attendance_date", { ascending: true }), gymId),
-    queryByGym(supabase.from("attendance_sessions").select("*").gte("check_in_at", `${last90}T00:00:00.000Z`).order("check_in_at", { ascending: false }).limit(10000), gymId),
-    queryByGym(supabase.from("attendance_member_frequency").select("*").limit(5000), gymId),
-    queryByGym(supabase.from("trainers").select("*").neq("status", "archived").order("display_name", { ascending: true }).limit(1000), gymId),
-    queryByGym(supabase.from("trainer_sessions").select("*").gte("session_date", last90).order("session_date", { ascending: false }).limit(5000), gymId),
-    queryByGym(supabase.from("member_pt_packages").select("*").gte("created_at", `${last365}T00:00:00.000Z`).order("created_at", { ascending: false }).limit(5000), gymId),
-    queryByGym(supabase.from("trainer_feedback").select("*").neq("status", "hidden").gte("created_at", `${last365}T00:00:00.000Z`).limit(5000), gymId),
-    queryByGym(supabase.from("class_session_utilization").select("*").gte("session_date", last90).order("session_date", { ascending: false }).limit(5000), gymId),
-    queryByGym(supabase.from("class_waitlists").select("*").gte("joined_at", `${last90}T00:00:00.000Z`).limit(5000), gymId),
-    queryByGym(supabase.from("fitness_member_progress_summary").select("*").limit(5000), gymId),
-    queryByGym(supabase.from("fitness_goals").select("*").gte("created_at", `${last365}T00:00:00.000Z`).limit(5000), gymId),
-    queryByGym(supabase.from("workout_sessions").select("*").gte("session_date", last90).limit(10000), gymId),
-    queryByGym(supabase.from("meal_entries").select("*").gte("entry_date", last30).limit(10000), gymId),
-    queryByGym(supabase.from("leads").select("*").gte("created_at", `${last365}T00:00:00.000Z`).limit(5000), gymId),
-    scopedSystemQuery(supabase.from("saved_reports").select("*").eq("status", "active").order("category", { ascending: true }).order("name", { ascending: true }).limit(80), gymId),
+    queryByGym(supabase.from("attendance_sessions").select("*").gte("check_in_at", `${last90}T00:00:00.000Z`).order("check_in_at", { ascending: false }).limit(ANALYTICS_LIMITS.mediumWindowRows), gymId),
+    queryByGym(supabase.from("attendance_member_frequency").select("*").limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("trainers").select("*").neq("status", "archived").order("display_name", { ascending: true }).limit(ANALYTICS_LIMITS.trainers), gymId),
+    queryByGym(supabase.from("trainer_sessions").select("*").gte("session_date", last90).order("session_date", { ascending: false }).limit(ANALYTICS_LIMITS.mediumWindowRows), gymId),
+    queryByGym(supabase.from("member_pt_packages").select("*").gte("created_at", `${last365}T00:00:00.000Z`).order("created_at", { ascending: false }).limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("trainer_feedback").select("*").neq("status", "hidden").gte("created_at", `${last365}T00:00:00.000Z`).limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("class_session_utilization").select("*").gte("session_date", last90).order("session_date", { ascending: false }).limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("class_waitlists").select("*").gte("joined_at", `${last90}T00:00:00.000Z`).limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("fitness_member_progress_summary").select("*").limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("fitness_goals").select("*").gte("created_at", `${last365}T00:00:00.000Z`).limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    queryByGym(supabase.from("workout_sessions").select("*").gte("session_date", last90).limit(ANALYTICS_LIMITS.mediumWindowRows), gymId),
+    queryByGym(supabase.from("meal_entries").select("*").gte("entry_date", last30).limit(ANALYTICS_LIMITS.mediumWindowRows), gymId),
+    queryByGym(supabase.from("leads").select("*").gte("created_at", `${last365}T00:00:00.000Z`).limit(ANALYTICS_LIMITS.shortWindowRows), gymId),
+    scopedSystemQuery(supabase.from("saved_reports").select("*").eq("status", "active").order("category", { ascending: true }).order("name", { ascending: true }).limit(ANALYTICS_LIMITS.systemRows), gymId),
     queryByGym(supabase.from("report_exports").select("*").order("created_at", { ascending: false }).limit(30), gymId),
     scopedSystemQuery(supabase.from("dashboard_configs").select("*").order("is_default", { ascending: false }).order("updated_at", { ascending: false }).limit(30), gymId),
     scopedSystemQuery(supabase.from("forecast_models").select("*").neq("status", "archived").order("created_at", { ascending: false }).limit(20), gymId),
