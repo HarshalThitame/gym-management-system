@@ -1,15 +1,16 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { MobileBottomNav } from "@/components/pwa/mobile-bottom-nav";
+import { MobileBottomNav, type MobilePortalIconKey } from "@/components/pwa/mobile-bottom-nav";
 import { SignOutButton } from "@/components/pwa/sign-out-button";
 import { signOutAction } from "@/features/auth/actions/auth-actions";
 import type { AuthContext } from "@/types/auth";
 
-type PortalNavItem = {
+export type PortalNavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  iconKey: MobilePortalIconKey;
 };
 
 type PortalShellProps = {
@@ -22,6 +23,7 @@ type PortalShellProps = {
 
 export function PortalShell({ context, title, eyebrow, navItems, children }: PortalShellProps) {
   const displayName = context.profile?.full_name || context.email || "Apex User";
+  const mobileNavItems = navItems.map(({ href, label, iconKey }) => ({ href, label, iconKey }));
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -71,7 +73,7 @@ export function PortalShell({ context, title, eyebrow, navItems, children }: Por
         </header>
         <div className="container-page pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-6 md:pb-10 md:pt-10">{children}</div>
       </div>
-      <MobileBottomNav items={navItems} />
+      <MobileBottomNav items={mobileNavItems} />
     </main>
   );
 }

@@ -2,15 +2,55 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
-import { MoreHorizontal, X } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  Bot,
+  Brain,
+  BriefcaseBusiness,
+  CalendarCheck,
+  CalendarDays,
+  CreditCard,
+  Dumbbell,
+  Gauge,
+  MessageSquare,
+  MoreHorizontal,
+  ReceiptText,
+  Settings,
+  Tags,
+  UserRound,
+  UserRoundPlus,
+  UsersRound,
+  X
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+
+export type MobilePortalIconKey =
+  | "activity"
+  | "bar-chart"
+  | "bell"
+  | "bot"
+  | "brain"
+  | "briefcase"
+  | "calendar-check"
+  | "calendar-days"
+  | "credit-card"
+  | "dumbbell"
+  | "gauge"
+  | "message-square"
+  | "receipt"
+  | "settings"
+  | "tags"
+  | "user"
+  | "user-plus"
+  | "users";
 
 export type MobilePortalNavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
+  iconKey: MobilePortalIconKey;
 };
 
 type MobileBottomNavProps = {
@@ -41,6 +81,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
           <div className="grid grid-cols-2 gap-2">
             {overflowItems.map((item) => {
               const active = isActivePath(pathname, item.href);
+              const Icon = getPortalIcon(item.iconKey);
 
               return (
                 <Link
@@ -55,7 +96,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
                   key={`${item.href}-${item.label}`}
                   onClick={() => setIsOpen(false)}
                 >
-                  <item.icon aria-hidden="true" className="size-4 shrink-0" />
+                  <Icon aria-hidden="true" className="size-4 shrink-0" />
                   <span className="min-w-0 truncate">{item.label}</span>
                 </Link>
               );
@@ -71,6 +112,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
         <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
           {primaryItems.map((item) => {
             const active = isActivePath(pathname, item.href);
+            const Icon = getPortalIcon(item.iconKey);
 
             return (
               <Link
@@ -82,7 +124,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
                 href={item.href}
                 key={`${item.href}-${item.label}`}
               >
-                <item.icon aria-hidden="true" className="size-5" />
+                <Icon aria-hidden="true" className="size-5" />
                 <span className="max-w-full truncate">{item.label}</span>
               </Link>
             );
@@ -108,4 +150,46 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
 
 function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function getPortalIcon(iconKey: MobilePortalIconKey) {
+  switch (iconKey) {
+    case "activity":
+      return Activity;
+    case "bar-chart":
+      return BarChart3;
+    case "bell":
+      return Bell;
+    case "bot":
+      return Bot;
+    case "brain":
+      return Brain;
+    case "briefcase":
+      return BriefcaseBusiness;
+    case "calendar-check":
+      return CalendarCheck;
+    case "calendar-days":
+      return CalendarDays;
+    case "credit-card":
+      return CreditCard;
+    case "dumbbell":
+      return Dumbbell;
+    case "message-square":
+      return MessageSquare;
+    case "receipt":
+      return ReceiptText;
+    case "settings":
+      return Settings;
+    case "tags":
+      return Tags;
+    case "user":
+      return UserRound;
+    case "user-plus":
+      return UserRoundPlus;
+    case "users":
+      return UsersRound;
+    case "gauge":
+    default:
+      return Gauge;
+  }
 }
