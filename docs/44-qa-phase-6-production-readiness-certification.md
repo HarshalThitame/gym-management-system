@@ -2,13 +2,13 @@
 
 Date: 2026-06-10  
 Project: Gym Management SaaS Platform  
-Result: NO GO for public production launch
+Result: GO WITH RISKS for limited production launch; NO GO for full feature launch
 
 ## Executive Summary
 
-The release candidate code builds and passes local validation, but the production environment cannot be certified yet. Production systems were not modified during this assessment.
+The release candidate code builds, passes local validation, has been deployed to Vercel production, and the linked Supabase database is up to date with the available migrations.
 
-The platform is suitable for staging deployment and final environment validation. Unrestricted public production launch should wait until the launch blockers in this report are closed.
+The platform is suitable for a limited launch that excludes unavailable provider-dependent capabilities such as Razorpay online payments, Resend email delivery, push notifications, AI features, and external monitoring. Full unrestricted launch should wait until the remaining operational gates in this report are closed.
 
 ## Validation Passed
 
@@ -20,21 +20,31 @@ The platform is suitable for staging deployment and final environment validation
 | Unit and business-rule tests | Passed with `npm run test`; 77/77 tests passed |
 | Playwright smoke tests | Passed with `npm run test:e2e`; 14/14 tests passed across desktop and mobile Chromium |
 | Production build | Passed with `npm run build`; 80 routes generated |
+| Vercel production deployment | Passed; live at `https://apexgymmanagementsystem.vercel.app` |
+| Supabase project link | Passed; remote project is linked and reachable |
+| Supabase migrations | Passed; `npx supabase db push --dry-run` reports remote database is up to date |
+| Production smoke - public routes | `/` and `/membership-plans` returned 200 on production |
+| Production smoke - protected routes | `/member` and `/admin/settings` redirected to login on production |
+| Production PWA assets | `/manifest.webmanifest`, `/offline`, and `/sw.js` returned 200 on production |
+| Production security headers | Passed; CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, and Permissions-Policy observed |
 | Local production smoke - public routes | `/`, `/membership-plans`, and `/contact` returned 200 |
 | Local production smoke - protected routes | `/member`, `/admin/settings`, and `/trainer` redirected to login |
 | PWA assets | `/manifest.webmanifest`, `/offline`, and `/sw.js` returned 200 |
 
-## Launch Blockers
+## Remaining Launch Gates
 
-| Area | Status | Blocker |
+| Area | Status | Remaining Gate |
 | --- | --- | --- |
-| Release governance | Blocked | Dirty working tree with many modified and untracked files. The RC is not an immutable tagged commit. |
-| Vercel readiness | Blocked | No `.vercel/project.json`, no `vercel.json`; production project, domain, SSL, and environment variables are not verifiable. |
-| Supabase readiness | Blocked | No `supabase/config.toml`; production migration, RLS, and backup configuration are not verifiable from a linked project. |
-| Environment parity | Blocked | `SUPABASE_POOLER_URL` exists in `.env.example` but is missing from `.env.local`. |
-| Mobile QR readiness | Blocked | `next.config.ts` sets `Permissions-Policy: camera=()`, which blocks QR camera scanning. |
+| Release governance | Conditional pass | Working tree is clean and latest commit is deployed. Tag the release candidate for immutable release tracking. |
+| Vercel readiness | Pass | Production project, deployment, domain, SSL, and production smoke tests are validated. Preview environment variables still need branch-specific setup. |
+| Supabase readiness | Conditional pass | Project is linked and migrations are applied. Backup restore drill and production role/RLS scenario tests still need evidence. |
+| Environment parity | Conditional pass | Production app envs are configured for Supabase and site URL. `DATABASE_URL`, `SUPABASE_POOLER_URL`, and provider keys remain missing where applicable. |
+| Mobile QR readiness | Pass | Camera permission policy now allows `camera=(self)` and is deployed. |
 | Monitoring | Blocked | No confirmed Sentry, Datadog, Logtail, Vercel alert routing, or equivalent production monitoring integration. |
-| Payment go-live | Blocked | Razorpay live/test webhook delivery, refund reconciliation, and production keys were not validated. |
+| Payment go-live | Deferred | Razorpay keys and webhook validation are not available. Do not enable online payments until Razorpay is configured and tested. |
+| Email go-live | Blocked | Resend API key and sender/domain verification are not configured. |
+| Push go-live | Blocked | VAPID public/private keys are not configured. |
+| AI go-live | Blocked | OpenAI API key, model limits, cost controls, and production validation are not configured. |
 | Disaster recovery | Blocked | No backup restore drill evidence is available. |
 
 ## Production Readiness Assessment
@@ -42,36 +52,42 @@ The platform is suitable for staging deployment and final environment validation
 | Category | Assessment |
 | --- | --- |
 | Code and build readiness | Pass |
-| Security posture | Conditional pass; no local critical/high evidence found, but production RLS and deployed headers must be verified after deployment |
-| Performance posture | Local build pass; production Lighthouse and load tests were not executed in this phase |
-| Operational readiness | Not certified |
-| Deployment readiness | Not certified |
-| Rollback readiness | Not certified until the Vercel project and database rollback plan are validated |
+| Security posture | Conditional pass; deployed headers and protected-route smoke tests passed, but production RLS role-matrix testing and provider security validation remain open |
+| Performance posture | Local build pass; production route smoke passed; production Lighthouse/load tests were not executed in this phase |
+| Operational readiness | Conditional; core app is live, but monitoring, backup restore, provider readiness, and runbooks remain incomplete |
+| Deployment readiness | Pass for Vercel production deployment |
+| Rollback readiness | Conditional; Vercel rollback is available, but database restore drill is not complete |
 
 ## Deployment Readiness Report
 
-The application can produce a successful production build locally. However, deployment readiness is blocked because the repository is not linked to a Vercel project, no Vercel production configuration was available for validation, and the current working tree contains uncommitted release changes.
+The application can produce a successful production build locally and has been deployed to Vercel production.
+
+Validated deployment details:
+
+- Production URL: `https://apexgymmanagementsystem.vercel.app`
+- Deployment status: Ready
+- Deployment ID: `dpl_DtNmRfqP9tR6rya3jhkwsTUeW9iu`
+- Vercel project: `gym-management-system`
+- Production site URL envs: `NEXT_PUBLIC_SITE_URL` and `APP_URL`
 
 Required before production:
 
-1. Commit all release candidate changes.
-2. Tag the release candidate.
-3. Link the Vercel project.
-4. Pull and verify production environment variables.
-5. Validate production domain and SSL.
-6. Run preview deployment smoke tests before promotion.
+1. Tag the release candidate.
+2. Configure preview branch environment variables for branch-based preview deployments.
+3. Configure remaining provider secrets only when those services are ready.
+4. Run final production Lighthouse and role-based smoke tests.
+5. Keep rollback steps available during launch.
 
 ## Infrastructure Readiness Report
 
-Vercel and Supabase production infrastructure could not be fully certified from the local workspace.
+Vercel and Supabase production infrastructure are linked and partially certified.
 
 Open infrastructure gates:
 
-- Vercel project link missing.
-- Supabase project link/config missing.
-- Production Supabase migrations not verified from a linked project.
+- Preview environment variable setup needs the correct preview branch.
 - Supabase backups and restore procedures not demonstrated.
 - Monitoring and alert routing not demonstrated.
+- Provider integrations remain unconfigured for Razorpay, Resend, web push, and OpenAI.
 
 ## Backup and Recovery Report
 
@@ -132,10 +148,9 @@ Open production gates:
 
 - Production RLS validation for every role.
 - Multi-tenant data isolation validation.
-- Production CSP/header validation after deploy.
 - File upload bucket policy validation.
 - Razorpay webhook replay/idempotency validation.
-- Camera permission policy correction before QR scan go-live.
+- Resend, OpenAI, and push notification secret validation.
 
 ## Payment Go-Live Report
 
@@ -157,14 +172,14 @@ Required before accepting production payments:
 
 | Item | Status |
 | --- | --- |
-| RC committed and tagged | Not complete |
-| Vercel project linked | Not complete |
-| Production env vars configured | Not verified |
-| Production domain configured | Not verified |
-| SSL active | Not verified |
-| Supabase project linked | Not complete |
+| RC committed and tagged | Partially complete; clean commit exists, tag still needed |
+| Vercel project linked | Complete |
+| Production env vars configured | Partially complete; core Supabase/site vars present, provider vars missing |
+| Production domain configured | Complete |
+| SSL active | Complete |
+| Supabase project linked | Complete |
 | Migrations applied to staging | Not verified |
-| Migrations applied to production | Not verified |
+| Migrations applied to production | Complete; remote database is up to date |
 | RLS role tests passed on staging | Not verified |
 | Razorpay webhook tested | Not verified |
 | Resend sender domain verified | Not verified |
@@ -172,8 +187,8 @@ Required before accepting production payments:
 | OpenAI key/rate limits verified | Not verified |
 | Monitoring and alerting active | Not complete |
 | Backup restore drill completed | Not complete |
-| Rollback plan rehearsed | Not complete |
-| Production smoke tests completed | Not complete |
+| Rollback plan rehearsed | Partially complete; Vercel rollback path exists, database restore drill not complete |
+| Production smoke tests completed | Complete for public/protected/PWA route health |
 
 ## Rollback Plan
 
@@ -198,17 +213,17 @@ Provider rollback:
 
 ## Launch Day Runbook
 
-1. Commit all RC changes and tag the release, for example `rc-qa6`.
-2. Link the Vercel project and configure production/preview environment variables.
-3. Apply Supabase migrations to staging first.
-4. Run staging smoke tests and role-based RLS checks.
-5. Complete Razorpay webhook/payment/refund validation in test mode.
-6. Verify Resend sender domain and transactional email delivery.
-7. Fix camera permissions policy before mobile QR go-live.
+1. Tag the deployed RC commit, for example `rc-qa6`.
+2. Configure preview environment variables once the preview branch is confirmed.
+3. Run staging smoke tests and role-based RLS checks.
+4. Complete Razorpay webhook/payment/refund validation in test mode before enabling online payments.
+5. Verify Resend sender domain and transactional email delivery before enabling email automation.
+6. Configure VAPID keys before enabling push notifications.
+7. Configure OpenAI keys, limits, and fallback policy before enabling AI features.
 8. Enable production monitoring and alert routing.
 9. Take a final database backup or confirm latest PITR point.
-10. Deploy production during an approved release window.
-11. Run production smoke tests.
+10. Complete at least one restore drill to staging or a recovery project.
+11. Run final production smoke tests.
 12. Monitor for at least 24 hours after launch.
 
 ## Post-Launch Monitoring Plan
@@ -224,17 +239,16 @@ Provider rollback:
 
 | Risk | Severity | Mitigation |
 | --- | --- | --- |
-| Production deployment cannot be certified without Vercel link | Critical | Link Vercel project and validate preview/production deployment settings |
-| Supabase production state cannot be certified without project link/config | Critical | Link Supabase project, validate migrations, RLS, storage, and backups |
-| Dirty working tree prevents immutable release approval | High | Commit, tag, and build from clean release commit |
-| Camera permission policy blocks QR scanner | High | Change production permissions policy to allow camera where required |
-| Razorpay production flow unverified | High | Run test-mode payment, webhook, failure, and refund validation |
 | Monitoring not connected | High | Configure error tracking, uptime checks, and alert routing |
 | Backup restore not drilled | High | Complete restore drill before public launch |
+| Razorpay production flow unverified | High | Run test-mode payment, webhook, failure, and refund validation |
+| Resend production delivery unverified | High | Configure sender domain and send transactional email smoke tests |
+| AI provider configuration missing | Medium | Keep AI features disabled or in fallback mode until OpenAI envs and cost controls are configured |
+| Push notification configuration missing | Medium | Keep web push disabled until VAPID keys and opt-in flow are validated |
+| Preview env branch not configured | Medium | Add preview env vars for the correct non-production branch |
 
 ## Go-Live Certification
 
-Final recommendation: NO GO for unrestricted production launch.
+Final recommendation: GO WITH RISKS for limited launch; NO GO for unrestricted full-feature launch.
 
-The release candidate is code-valid and suitable for staging deployment. It is not yet certified for public production launch because deployment, environment, Supabase, monitoring, payment, disaster recovery, and release-governance blockers remain open.
-
+The release candidate is code-valid, deployed to production, and connected to Supabase. It can support a limited operational launch if the business accepts disabled/deferred Razorpay, email automation, push notifications, AI, monitoring, and disaster-recovery evidence. Full enterprise launch remains blocked until those provider and operations gates are closed.
