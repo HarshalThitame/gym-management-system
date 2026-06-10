@@ -52,10 +52,10 @@ export function MobileReadinessPanel() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 md:grid-cols-4">
-          <StatusTile icon={Smartphone} label="Install" value="Home screen" />
-          <StatusTile icon={isOnline ? Wifi : WifiOff} label="Network" value={isOnline ? "Connected" : "Offline mode"} />
-          <StatusTile icon={RefreshCw} label="Sync queue" value={`${queuedCount} pending`} />
-          <StatusTile icon={ShieldCheck} label="Privacy" value="Local-first drafts" />
+          <StatusTile icon="install" label="Install" value="Home screen" />
+          <StatusTile icon={isOnline ? "online" : "offline"} label="Network" value={isOnline ? "Connected" : "Offline mode"} />
+          <StatusTile icon="sync" label="Sync queue" value={`${queuedCount} pending`} />
+          <StatusTile icon="privacy" label="Privacy" value="Local-first drafts" />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -97,12 +97,14 @@ export function MobileReadinessPanel() {
 }
 
 type StatusTileProps = {
-  icon: typeof Smartphone;
+  icon: "install" | "online" | "offline" | "sync" | "privacy";
   label: string;
   value: string;
 };
 
-function StatusTile({ icon: Icon, label, value }: StatusTileProps) {
+function StatusTile({ icon, label, value }: StatusTileProps) {
+  const Icon = getStatusIcon(icon);
+
   return (
     <div className="rounded-md border border-white/12 bg-white/8 p-4">
       <Icon aria-hidden="true" className="size-5 text-accent" />
@@ -110,4 +112,24 @@ function StatusTile({ icon: Icon, label, value }: StatusTileProps) {
       <p className="mt-1 font-black">{value}</p>
     </div>
   );
+}
+
+function getStatusIcon(icon: StatusTileProps["icon"]) {
+  if (icon === "online") {
+    return Wifi;
+  }
+
+  if (icon === "offline") {
+    return WifiOff;
+  }
+
+  if (icon === "sync") {
+    return RefreshCw;
+  }
+
+  if (icon === "privacy") {
+    return ShieldCheck;
+  }
+
+  return Smartphone;
 }
