@@ -147,6 +147,10 @@ export function hasRequiredRole(roles: readonly RoleName[], allowedRoles: readon
 export function getRoleRedirect(roles: readonly RoleName[]) {
   const primaryRole = getPrimaryRole(roles);
 
+  if (!primaryRole) {
+    return "/unauthorized";
+  }
+
   if (primaryRole === "super_admin" || primaryRole === "gym_admin" || primaryRole === "reception_staff") {
     return "/admin";
   }

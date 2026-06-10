@@ -55,7 +55,7 @@ export async function updateSession(request: NextRequest) {
     return redirectToLogin(request, contentSecurityPolicy);
   }
 
-  if (isAuthPath(pathname) && isAuthenticated) {
+  if (isAuthPath(pathname) && isAuthenticated && request.nextUrl.searchParams.get("error") !== "inactive") {
     const redirectResponse = NextResponse.redirect(new URL("/member", request.url));
     redirectResponse.headers.set("Content-Security-Policy", contentSecurityPolicy);
     return redirectResponse;

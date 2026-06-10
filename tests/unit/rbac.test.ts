@@ -27,6 +27,11 @@ describe("RBAC permission matrix", () => {
     expect(hasRequiredRole(["member"], ["gym_admin", "member"])).toBe(true);
   });
 
+  it("redirects authenticated users without roles away from protected portal loops", () => {
+    expect(getPrimaryRole([])).toBeNull();
+    expect(getRoleRedirect([])).toBe("/unauthorized");
+  });
+
   it("separates enterprise administration permissions by role", () => {
     expect(can("super_admin", "organizations", "delete")).toBe(true);
     expect(can("gym_admin", "branches", "create")).toBe(true);

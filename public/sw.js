@@ -1,4 +1,4 @@
-const APP_VERSION = "apex-pwa-v17-20260610";
+const APP_VERSION = "apex-pwa-v17-20260610-auth-fix";
 const STATIC_CACHE = `${APP_VERSION}-static`;
 const RUNTIME_CACHE = `${APP_VERSION}-runtime`;
 const OFFLINE_URL = "/offline";
