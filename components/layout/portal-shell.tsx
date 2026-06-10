@@ -1,9 +1,8 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { MobileBottomNav } from "@/components/pwa/mobile-bottom-nav";
-import { Button } from "@/components/ui/button";
+import { SignOutButton } from "@/components/pwa/sign-out-button";
 import { signOutAction } from "@/features/auth/actions/auth-actions";
 import type { AuthContext } from "@/types/auth";
 
@@ -47,10 +46,7 @@ export function PortalShell({ context, title, eyebrow, navItems, children }: Por
             ))}
           </nav>
           <form action={signOutAction} className="border-t border-border p-3">
-            <Button className="w-full justify-start" type="submit" variant="ghost">
-              <LogOut aria-hidden="true" className="size-4" />
-              Sign out
-            </Button>
+            <SignOutButton />
           </form>
         </div>
       </aside>
@@ -68,9 +64,7 @@ export function PortalShell({ context, title, eyebrow, navItems, children }: Por
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{context.primaryRole?.replace("_", " ") ?? "authenticated"}</p>
               </div>
               <form action={signOutAction} className="lg:hidden">
-                <Button aria-label="Sign out" size="icon" type="submit" variant="secondary">
-                  <LogOut aria-hidden="true" className="size-4" />
-                </Button>
+                <SignOutButton compact />
               </form>
             </div>
           </div>

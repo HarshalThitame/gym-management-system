@@ -1,7 +1,6 @@
-const APP_VERSION = "apex-pwa-v16-20260610";
+const APP_VERSION = "apex-pwa-v17-20260610";
 const STATIC_CACHE = `${APP_VERSION}-static`;
 const RUNTIME_CACHE = `${APP_VERSION}-runtime`;
-const API_CACHE = `${APP_VERSION}-api`;
 const OFFLINE_URL = "/offline";
 const DB_NAME = "apex-pwa-store";
 const DB_VERSION = 1;
@@ -18,6 +17,8 @@ const APP_SHELL_URLS = [
   "/icons/shortcut-classes.svg",
   "/icons/shortcut-workout.svg"
 ];
+
+const PROTECTED_ROUTE_PREFIXES = ["/admin", "/member", "/trainer", "/auth", "/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -51,6 +52,10 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "QUEUE_OFFLINE_ACTION" && event.data.payload) {
     event.waitUntil(queueOfflineAction(event.data.payload));
   }
+
+  if (event.data?.type === "CLEAR_PRIVATE_CACHES") {
+    event.waitUntil(clearPrivateCaches());
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -62,7 +67,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(handleNavigation(request));
+    event.respondWith(handleNavigation(request, url));
     return;
   }
 
@@ -71,7 +76,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(networkFirst(request, API_CACHE));
+    event.respondWith(networkOnlyJson(request));
     return;
   }
 
@@ -129,7 +134,15 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-async function handleNavigation(request) {
+async function handleNavigation(request, url) {
+  if (isProtectedRoute(url.pathname)) {
+    try {
+      return await fetch(request);
+    } catch {
+      return caches.match(OFFLINE_URL);
+    }
+  }
+
   try {
     const response = await fetch(request);
     const cache = await caches.open(RUNTIME_CACHE);
@@ -141,22 +154,23 @@ async function handleNavigation(request) {
   }
 }
 
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-
+async function networkOnlyJson(request) {
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      cache.put(request, response.clone());
-    }
-    return response;
+    return await fetch(request);
   } catch {
-    const cached = await cache.match(request);
-    return cached || new Response(JSON.stringify({ ok: false, error: { code: "OFFLINE", message: "This request is not available offline." } }), {
+    return new Response(JSON.stringify({ ok: false, error: { code: "OFFLINE", message: "This request is not available offline." } }), {
       status: 503,
       headers: { "content-type": "application/json" }
     });
   }
+}
+
+async function clearPrivateCaches() {
+  await caches.delete(RUNTIME_CACHE);
+}
+
+function isProtectedRoute(pathname) {
+  return PROTECTED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 async function cacheFirst(request, cacheName) {
