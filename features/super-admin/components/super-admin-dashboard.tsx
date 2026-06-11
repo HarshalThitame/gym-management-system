@@ -3,33 +3,42 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Building2,
+  CalendarDays,
   CheckCircle2,
+  Clock3,
   CreditCard,
   DatabaseBackup,
+  Download,
+  FileText,
   Gauge,
   Globe2,
   Landmark,
   LifeBuoy,
+  ReceiptText,
   Server,
   ShieldAlert,
   TrendingUp,
+  UserCog,
   UsersRound,
   XCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { BranchPerformanceChart, TenantUsageChart } from "@/features/enterprise/components/lazy-enterprise-charts";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { latestHealthByComponent } from "@/features/enterprise/services/enterprise-service";
 import type { EnterpriseDashboard, EnterpriseKpi } from "@/types/enterprise";
+import { scheduleDashboardSummaryEmailAction, updateDashboardSecurityEventAction } from "../actions/dashboard-actions";
+import type { DashboardThresholds, SuperAdminDashboardOperations } from "../services/dashboard-service";
 import type { OrgSubscriptionSummary, SubscriptionStatus } from "../services/subscription-service";
 import { PackageBadge } from "./subscriptions/PackageBadge";
 import { superAdminModules } from "../lib/super-admin-modules";
 
 type SuperAdminDashboardProps = {
   dashboard: EnterpriseDashboard;
+  operations: SuperAdminDashboardOperations;
   orgSubscriptions: OrgSubscriptionSummary[];
 };
 
@@ -70,6 +79,7 @@ type DashboardInsights = {
   overdueComplianceRequests: number;
   pendingDomains: number;
   readinessScore: number;
+  reconciliationIssues: number;
   restrictedSubscriptions: number;
   suspendedOrganizations: number;
   totalActiveBranches: number;
@@ -106,8 +116,8 @@ const postureClasses: Record<EnterpriseKpi["status"], string> = {
   risk: "border-red-200 bg-red-50 text-red-700"
 };
 
-export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminDashboardProps) {
-  const insights = buildDashboardInsights(dashboard, orgSubscriptions);
+export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }: SuperAdminDashboardProps) {
+  const insights = buildDashboardInsights(dashboard, operations, orgSubscriptions);
   const recentHealth = latestHealthByComponent(dashboard.healthChecks).slice(0, 8);
   const openSecurityEvents = dashboard.securityEvents
     .filter((event) => event.status === "open" || event.status === "investigating")
@@ -121,6 +131,8 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
   const metrics = buildExecutiveMetrics(dashboard, insights);
   const packageMix = buildPackageMix(orgSubscriptions);
   const subscriptionStatusMix = buildSubscriptionStatusMix(orgSubscriptions);
+  const returnTo = dashboardReturnHref(operations);
+  const readinessPosture = readinessStatus(insights.readinessScore, operations.thresholds);
   const planCoveragePercent = orgSubscriptions.length > 0
     ? Math.round(((orgSubscriptions.length - insights.unassignedSubscriptions) / orgSubscriptions.length) * 100)
     : 0;
@@ -132,6 +144,8 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
 
   return (
     <div className="space-y-8">
+      <DashboardFilterBar operations={operations} />
+
       <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
         <Card>
           <CardContent className="p-6 md:p-8">
@@ -139,11 +153,11 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className="border-cyan-200 bg-cyan-50 text-cyan-800">Global SaaS Command</Badge>
-                  <EnterpriseStatusBadge status={readinessStatus(insights.readinessScore)} />
+                  <EnterpriseStatusBadge status={readinessPosture} />
                 </div>
                 <h2 className="mt-4 max-w-3xl text-3xl font-black leading-tight md:text-5xl">Enterprise Platform Dashboard</h2>
                 <p className="mt-4 max-w-3xl text-base leading-8 text-muted-foreground">
-                  Monitor tenant growth, subscription coverage, operational health, security exposure, and recovery readiness from one Super Admin control center.
+                  Monitor tenant growth, finance-grade revenue, subscription coverage, SLO posture, security exposure, and recovery readiness from one Super Admin control center.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <ButtonLink href="/super-admin/security" variant="primary">
@@ -161,7 +175,7 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
                 </div>
               </div>
 
-              <ReadinessScoreCard insights={insights} />
+              <ReadinessScoreCard insights={insights} thresholds={operations.thresholds} />
             </div>
           </CardContent>
         </Card>
@@ -184,10 +198,18 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
         </Card>
       </section>
 
+      <FreshnessStrip sources={operations.freshness} />
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
           <ExecutiveMetricCard key={metric.label} metric={metric} />
         ))}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-3">
+        <FinanceIntegrityCard finance={operations.finance} />
+        <SloMonitoringCard slo={operations.slo} thresholds={operations.thresholds} />
+        <RoleActivityIntelligenceCard roleRisk={operations.roleRisk} />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
@@ -237,7 +259,7 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
                   </div>
                   <p className="text-sm font-black">{formatCompactNumber(item.count)}</p>
                 </div>
-              )) : <EmptyState text="No package assignments are available yet." />}
+              )) : <EmptyState actionHref="/super-admin/subscriptions" actionLabel="Assign Packages" text="No package assignments are available yet." />}
             </div>
           </CardContent>
         </Card>
@@ -264,15 +286,15 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
                       {formatCompactNumber(tenant.activeMembers)} active members · {formatCompactNumber(tenant.branches)} branches
                     </p>
                   </div>
-                  <EnterpriseStatusBadge status={usageStatus(maxUsagePercent(tenant))} />
+                  <EnterpriseStatusBadge status={usageStatus(maxUsagePercent(tenant), operations.thresholds)} />
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <InlineUsage label="Members" value={tenant.memberPercent} />
-                  <InlineUsage label="Branches" value={tenant.branchPercent} />
-                  <InlineUsage label="Storage" value={tenant.storagePercent} />
+                  <InlineUsage label="Members" thresholds={operations.thresholds} value={tenant.memberPercent} />
+                  <InlineUsage label="Branches" thresholds={operations.thresholds} value={tenant.branchPercent} />
+                  <InlineUsage label="Storage" thresholds={operations.thresholds} value={tenant.storagePercent} />
                 </div>
               </div>
-            )) : <EmptyState text="Tenant usage will appear after limits and metrics are configured." />}
+            )) : <EmptyState actionHref="/super-admin/subscriptions" actionLabel="Review Limits" text="Tenant usage will appear after limits and metrics are configured." />}
           </CardContent>
         </Card>
       </section>
@@ -280,13 +302,13 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
       <section className="grid gap-5 xl:grid-cols-2">
         <ChartPanel
           actionHref="/super-admin/analytics"
-          description="Revenue and active member leaders from the latest branch metric snapshots."
+          description="Branch leaders for the selected period. Finance totals above come from payments, invoices, refunds, and provider events."
           title="Top Branch Performance"
         >
           {dashboard.branchPerformance.length > 0 ? (
             <BranchPerformanceChart data={dashboard.branchPerformance} />
           ) : (
-            <EmptyState text="Branch performance appears after branch metrics are recorded." />
+            <EmptyState actionHref="/super-admin/analytics" actionLabel="Open Analytics" text="Branch performance appears after branch metrics are recorded." />
           )}
         </ChartPanel>
 
@@ -298,7 +320,7 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
           {dashboard.tenantUsagePoints.length > 0 ? (
             <TenantUsageChart data={dashboard.tenantUsagePoints} />
           ) : (
-            <EmptyState text="Tenant usage appears after organizations and subscriptions are configured." />
+            <EmptyState actionHref="/super-admin/subscriptions" actionLabel="Assign Packages" text="Tenant usage appears after organizations and subscriptions are configured." />
           )}
         </ChartPanel>
       </section>
@@ -329,7 +351,7 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
                   </p>
                 </div>
               </div>
-            )) : <EmptyState text="No health checks have been recorded yet." />}
+            )) : <EmptyState actionHref="/super-admin/monitoring" actionLabel="Configure Health Checks" text="No health checks have been recorded yet." />}
           </CardContent>
         </Card>
 
@@ -401,8 +423,9 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
                   <p className="text-xs font-semibold text-muted-foreground">{formatDateTime(event.created_at)}</p>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{event.description ?? "Security event needs review."}</p>
+                <SecurityWorkflowActions eventId={event.id} returnTo={returnTo} severity={event.severity} />
               </div>
-            )) : <EmptyState text="No open or investigating security alerts." />}
+            )) : <EmptyState actionHref="/super-admin/security" actionLabel="Open Security Center" text="No open or investigating security alerts." />}
           </CardContent>
         </Card>
 
@@ -432,7 +455,7 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
                   {formatEnterpriseLabel(event.entity_type)} · {event.entity_id ?? "No entity"} · {event.actor_id ?? "System actor"}
                 </p>
               </div>
-            )) : <EmptyState text="No recent platform activity is available." />}
+            )) : <EmptyState actionHref="/super-admin/audit-logs" actionLabel="Open Audit Logs" text="No recent platform activity is available." />}
           </CardContent>
         </Card>
       </section>
@@ -457,11 +480,11 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
                   <p className="text-sm font-black">{formatCurrency(branch.revenue)}</p>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <InlineUsage label="Trainer utilization" value={branch.trainerUtilization} />
-                  <InlineUsage label="Class utilization" value={branch.classUtilization} />
+                  <InlineUsage label="Trainer utilization" thresholds={operations.thresholds} value={branch.trainerUtilization} />
+                  <InlineUsage label="Class utilization" thresholds={operations.thresholds} value={branch.classUtilization} />
                 </div>
               </div>
-            )) : <EmptyState text="Top branch data appears after branch metrics are recorded." />}
+            )) : <EmptyState actionHref="/super-admin/analytics" actionLabel="Open Analytics" text="Top branch data appears after branch metrics are recorded." />}
           </CardContent>
         </Card>
 
@@ -500,10 +523,198 @@ export function SuperAdminDashboard({ dashboard, orgSubscriptions }: SuperAdminD
   );
 }
 
-function buildDashboardInsights(dashboard: EnterpriseDashboard, orgSubscriptions: OrgSubscriptionSummary[]): DashboardInsights {
+function DashboardFilterBar({ operations }: { operations: SuperAdminDashboardOperations }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 p-4 xl:flex-row xl:items-end xl:justify-between md:p-5">
+        <form className="grid gap-3 sm:grid-cols-2 xl:flex xl:items-end" method="get">
+          <div>
+            <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="dashboard-range">Date range</label>
+            <select className="mt-2 h-11 rounded-md border border-border bg-background px-3 text-sm font-semibold" defaultValue={operations.dateRange.key} id="dashboard-range" name="range">
+              <option value="today">Today</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="month">This month</option>
+              <option value="quarter">This quarter</option>
+              <option value="year">This year</option>
+              <option value="custom">Custom range</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="dashboard-from">From</label>
+            <input className="mt-2 h-11 rounded-md border border-border bg-background px-3 text-sm font-semibold" defaultValue={toDateInput(operations.dateRange.from)} id="dashboard-from" name="from" suppressHydrationWarning type="date" />
+          </div>
+          <div>
+            <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="dashboard-to">To</label>
+            <input className="mt-2 h-11 rounded-md border border-border bg-background px-3 text-sm font-semibold" defaultValue={toDateInput(operations.dateRange.to)} id="dashboard-to" name="to" suppressHydrationWarning type="date" />
+          </div>
+          <Button className="md:mb-0" type="submit" variant="secondary">
+            <CalendarDays aria-hidden="true" className="size-4" />
+            Apply
+          </Button>
+        </form>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="info">{operations.dateRange.label}</Badge>
+          <ButtonLink href={operations.exportLinks.csv} size="sm" variant="secondary">
+            <Download aria-hidden="true" className="size-4" />
+            CSV
+          </ButtonLink>
+          <ButtonLink href={operations.exportLinks.pdf} size="sm" variant="secondary">
+            <FileText aria-hidden="true" className="size-4" />
+            PDF
+          </ButtonLink>
+          <form action={scheduleDashboardSummaryEmailAction}>
+            <input name="returnTo" suppressHydrationWarning type="hidden" value={dashboardReturnHref(operations)} />
+            <Button size="sm" type="submit" variant="secondary">
+              <Clock3 aria-hidden="true" className="size-4" />
+              Weekly Email
+            </Button>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FreshnessStrip({ sources }: { sources: SuperAdminDashboardOperations["freshness"] }) {
+  return (
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      {sources.map((source) => (
+        <div className="rounded-md border border-border bg-surface p-4" key={source.label}>
+          <div className="flex items-center justify-between gap-3">
+            <Clock3 aria-hidden="true" className="size-4 text-muted-foreground" />
+            <EnterpriseStatusBadge status={source.status} />
+          </div>
+          <p className="mt-3 text-sm font-black">{source.label}</p>
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">{source.source}</p>
+          <p className="mt-2 text-xs font-black">{source.lastUpdatedAt ? formatDateTime(source.lastUpdatedAt) : "No data"}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function FinanceIntegrityCard({ finance }: { finance: SuperAdminDashboardOperations["finance"] }) {
+  const status = finance.reconciliationIssues > 0 || finance.webhookFailures > 0 || finance.failedPayments > 0 ? "risk" : finance.netRevenue > 0 ? "good" : "watch";
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Finance Integrity</p>
+            <h3 className="mt-2 text-2xl font-black">Revenue Ledger</h3>
+          </div>
+          <ReceiptText aria-hidden="true" className="size-5 text-muted-foreground" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <p className="text-4xl font-black">{formatCurrency(finance.netRevenue)}</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">Net revenue from {finance.sourceLabel}; gross {formatCurrency(finance.grossRevenue)} minus refunds {formatCurrency(finance.refundAmount)}.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MiniMetric label="Outstanding" status={finance.outstandingAmount > 0 ? "watch" : "good"} value={formatCurrency(finance.outstandingAmount)} />
+          <MiniMetric label="Paid Payments" status="good" value={formatCompactNumber(finance.paidPayments)} />
+          <MiniMetric label="Failed Payments" status={finance.failedPayments > 0 ? "risk" : "good"} value={formatCompactNumber(finance.failedPayments)} />
+          <MiniMetric label="Reconciliation" status={status} value={formatCompactNumber(finance.reconciliationIssues)} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SloMonitoringCard({ slo, thresholds }: { slo: SuperAdminDashboardOperations["slo"]; thresholds: DashboardThresholds }) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">SLA / SLO</p>
+            <h3 className="mt-2 text-2xl font-black">Reliability Targets</h3>
+          </div>
+          <Server aria-hidden="true" className="size-5 text-muted-foreground" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <MiniMetric label={`Uptime target ${thresholds.slo.uptimeTargetPercent}%`} status={slo.status} value={`${slo.uptimePercent}%`} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MiniMetric label="Error Rate" status={slo.errorRatePercent > thresholds.slo.errorRateTargetPercent ? "risk" : "good"} value={`${slo.errorRatePercent}%`} />
+          <MiniMetric label="API P95" status={slo.apiP95Ms !== null && slo.apiP95Ms > thresholds.slo.apiP95MsTarget ? "risk" : "good"} value={formatLatency(slo.apiP95Ms)} />
+          <MiniMetric label="DB P95" status={slo.databaseP95Ms !== null && slo.databaseP95Ms > thresholds.slo.databaseP95MsTarget ? "risk" : "good"} value={formatLatency(slo.databaseP95Ms)} />
+          <MiniMetric label="Failed Jobs" status={slo.failedJobs > 0 ? "risk" : "good"} value={formatCompactNumber(slo.failedJobs)} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RoleActivityIntelligenceCard({ roleRisk }: { roleRisk: SuperAdminDashboardOperations["roleRisk"] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Access Intelligence</p>
+            <h3 className="mt-2 text-2xl font-black">Privileged Activity</h3>
+          </div>
+          <UserCog aria-hidden="true" className="size-5 text-muted-foreground" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <MiniMetric label="Privileged Users" status={roleRisk.status} value={formatCompactNumber(roleRisk.privilegedUsers)} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MiniMetric label="Suspended Privileged" status={roleRisk.suspendedPrivilegedUsers > 0 ? "risk" : "good"} value={formatCompactNumber(roleRisk.suspendedPrivilegedUsers)} />
+          <MiniMetric label="Role Changes" status={roleRisk.recentRoleChanges > 0 ? "watch" : "good"} value={formatCompactNumber(roleRisk.recentRoleChanges)} />
+          <MiniMetric label="Failed Login Signals" status={roleRisk.failedLoginSignals > 0 ? "risk" : "good"} value={formatCompactNumber(roleRisk.failedLoginSignals)} />
+          <MiniMetric label="Tenant Access Signals" status={roleRisk.unusualTenantAccessSignals > 0 ? "risk" : "good"} value={formatCompactNumber(roleRisk.unusualTenantAccessSignals)} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniMetric({ label, status, value }: { label: string; status: EnterpriseKpi["status"]; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-background p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+        <EnterpriseStatusBadge status={status} />
+      </div>
+      <p className="mt-2 text-xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function SecurityWorkflowActions({ eventId, returnTo, severity }: { eventId: string; returnTo: string; severity: string }) {
+  const actions: Array<{ action: "acknowledge" | "assign" | "escalate" | "snooze" | "resolve"; label: string; variant: "secondary" | "destructive" }> = [
+    { action: "acknowledge", label: "Acknowledge", variant: "secondary" },
+    { action: "assign", label: "Assign", variant: "secondary" },
+    { action: "snooze", label: "Snooze", variant: "secondary" },
+    { action: "resolve", label: "Resolve", variant: "secondary" }
+  ];
+
+  if (severity === "high" || severity === "critical") {
+    actions.splice(2, 0, { action: "escalate", label: "Escalate", variant: "destructive" });
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      {actions.map((item) => (
+        <form action={updateDashboardSecurityEventAction} key={item.action}>
+          <input name="securityEventId" suppressHydrationWarning type="hidden" value={eventId} />
+          <input name="action" suppressHydrationWarning type="hidden" value={item.action} />
+          <input name="returnTo" suppressHydrationWarning type="hidden" value={returnTo} />
+          <Button size="sm" type="submit" variant={item.variant}>{item.label}</Button>
+        </form>
+      ))}
+    </div>
+  );
+}
+
+function buildDashboardInsights(dashboard: EnterpriseDashboard, operations: SuperAdminDashboardOperations, orgSubscriptions: OrgSubscriptionSummary[]): DashboardInsights {
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonthStart = new Date(currentYear, now.getMonth(), 1);
   const recentHealth = latestHealthByComponent(dashboard.healthChecks);
   const activeSubscriptions = orgSubscriptions.filter((subscription) => subscription.status === "active" || subscription.status === "trial").length;
   const trialSubscriptions = orgSubscriptions.filter((subscription) => subscription.status === "trial").length;
@@ -511,11 +722,6 @@ function buildDashboardInsights(dashboard: EnterpriseDashboard, orgSubscriptions
   const hardBlockedSubscriptions = orgSubscriptions.filter((subscription) => subscription.status === "suspended" || subscription.status === "cancelled").length;
   const unassignedSubscriptions = orgSubscriptions.filter((subscription) => !subscription.subscriptionId).length;
   const restrictedSubscriptions = expiredSubscriptions + hardBlockedSubscriptions;
-  const annualRevenue = dashboard.branchMetrics.reduce((total, row) => {
-    const metricYear = new Date(row.metric_date).getFullYear();
-    return metricYear === currentYear ? total + Number(row.revenue_amount ?? 0) : total;
-  }, 0);
-  const latestRevenue = dashboard.branchLatestMetrics.reduce((total, row) => total + Number(row.revenue_amount ?? 0), 0);
   const criticalSecurityEvents = dashboard.securityEvents.filter((event) =>
     (event.status === "open" || event.status === "investigating") && (event.severity === "critical" || event.severity === "high")
   ).length;
@@ -543,12 +749,13 @@ function buildDashboardInsights(dashboard: EnterpriseDashboard, orgSubscriptions
     failedDomains,
     hardBlockedSubscriptions,
     overdueComplianceRequests,
+    thresholds: operations.thresholds,
     unassignedSubscriptions
   });
 
   return {
     activeSubscriptions,
-    annualRevenue,
+    annualRevenue: operations.finance.grossRevenue,
     criticalSecurityEvents,
     currentYear,
     degradedHealthChecks,
@@ -557,14 +764,15 @@ function buildDashboardInsights(dashboard: EnterpriseDashboard, orgSubscriptions
     failedBackups,
     failedDomains,
     hardBlockedSubscriptions,
-    latestRevenue,
-    monthlyRevenue: latestRevenue,
-    newOrganizationsThisMonth: dashboard.organizations.filter((organization) => new Date(organization.created_at).getTime() >= currentMonthStart.getTime()).length,
+    latestRevenue: operations.finance.netRevenue,
+    monthlyRevenue: operations.finance.netRevenue,
+    newOrganizationsThisMonth: dashboard.organizations.filter((organization) => isInSelectedRange(organization.created_at, operations)).length,
     openComplianceRequests,
     openSecurityEvents,
     overdueComplianceRequests,
     pendingDomains,
     readinessScore,
+    reconciliationIssues: operations.finance.reconciliationIssues,
     restrictedSubscriptions,
     suspendedOrganizations: dashboard.organizations.filter((organization) => organization.status === "suspended" || organization.status === "deactivated").length,
     totalActiveBranches: dashboard.branches.filter((branch) => branch.status === "active").length,
@@ -580,8 +788,8 @@ function buildDashboardInsights(dashboard: EnterpriseDashboard, orgSubscriptions
 function buildExecutiveMetrics(dashboard: EnterpriseDashboard, insights: DashboardInsights): DashboardMetric[] {
   return [
     {
-      detail: `${formatCompactNumber(insights.newOrganizationsThisMonth)} added this month`,
-      href: "/super-admin/organizations",
+      detail: `${formatCompactNumber(insights.newOrganizationsThisMonth)} added in selected range`,
+      href: "/super-admin/organizations?status=active",
       icon: <Landmark className="size-5" />,
       label: "Organizations",
       status: insights.suspendedOrganizations > 0 ? "watch" : "good",
@@ -604,16 +812,16 @@ function buildExecutiveMetrics(dashboard: EnterpriseDashboard, insights: Dashboa
       value: formatCompactNumber(insights.totalActiveMembers)
     },
     {
-      detail: `Current-year revenue ${formatCurrency(insights.annualRevenue)}`,
-      href: "/super-admin/billing",
+      detail: `Gross ledger revenue ${formatCurrency(insights.annualRevenue)}`,
+      href: "/super-admin/billing?source=payments,invoices,refunds",
       icon: <TrendingUp className="size-5" />,
-      label: "Revenue Snapshot",
+      label: "Net Revenue",
       status: insights.latestRevenue > 0 ? "good" : "watch",
       value: formatCurrency(insights.monthlyRevenue)
     },
     {
       detail: `${formatCompactNumber(insights.trialSubscriptions)} trials · ${formatCompactNumber(insights.unassignedSubscriptions)} unassigned`,
-      href: "/super-admin/subscriptions",
+      href: "/super-admin/subscriptions?status=unassigned",
       icon: <CreditCard className="size-5" />,
       label: "Active Packages",
       status: insights.hardBlockedSubscriptions > 0 || insights.unassignedSubscriptions > 0 ? "risk" : insights.trialSubscriptions > 0 ? "watch" : "good",
@@ -621,7 +829,7 @@ function buildExecutiveMetrics(dashboard: EnterpriseDashboard, insights: Dashboa
     },
     {
       detail: `${formatCompactNumber(insights.downHealthChecks)} down · ${formatCompactNumber(insights.degradedHealthChecks)} degraded components`,
-      href: "/super-admin/monitoring",
+      href: "/super-admin/monitoring?status=down,degraded,unknown",
       icon: <Server className="size-5" />,
       label: "System Health",
       status: insights.downHealthChecks > 0 ? "risk" : insights.degradedHealthChecks > 0 ? "watch" : "good",
@@ -629,7 +837,7 @@ function buildExecutiveMetrics(dashboard: EnterpriseDashboard, insights: Dashboa
     },
     {
       detail: `${formatCompactNumber(insights.criticalSecurityEvents)} high or critical open events`,
-      href: "/super-admin/security",
+      href: "/super-admin/security?status=open,investigating&severity=high,critical",
       icon: <ShieldAlert className="size-5" />,
       label: "Security Alerts",
       status: insights.criticalSecurityEvents > 0 ? "risk" : insights.openSecurityEvents > 0 ? "watch" : "good",
@@ -637,7 +845,7 @@ function buildExecutiveMetrics(dashboard: EnterpriseDashboard, insights: Dashboa
     },
     {
       detail: `${formatCompactNumber(insights.failedBackups)} failed backups · ${formatCompactNumber(insights.pendingDomains)} pending domains`,
-      href: "/super-admin/backups",
+      href: "/super-admin/backups?status=failed",
       icon: <DatabaseBackup className="size-5" />,
       label: "Recovery Readiness",
       status: insights.failedBackups > 0 || insights.failedDomains > 0 ? "risk" : insights.pendingDomains > 0 ? "watch" : "good",
@@ -651,7 +859,7 @@ function buildRiskItems(insights: DashboardInsights, tenantUsagePointCount: numb
     {
       count: insights.criticalSecurityEvents,
       detail: "High and critical events that are still open or under investigation.",
-      href: "/super-admin/security",
+      href: "/super-admin/security?status=open,investigating&severity=high,critical",
       key: "security",
       label: "Security incident review",
       status: insights.criticalSecurityEvents > 0 ? "risk" : insights.openSecurityEvents > 0 ? "watch" : "good"
@@ -659,7 +867,7 @@ function buildRiskItems(insights: DashboardInsights, tenantUsagePointCount: numb
     {
       count: insights.downHealthChecks + insights.degradedHealthChecks,
       detail: "Latest component health checks marked down, degraded, or unknown.",
-      href: "/super-admin/monitoring",
+      href: "/super-admin/monitoring?status=down,degraded,unknown",
       key: "health",
       label: "Infrastructure health",
       status: insights.downHealthChecks > 0 ? "risk" : insights.degradedHealthChecks > 0 ? "watch" : "good"
@@ -667,7 +875,7 @@ function buildRiskItems(insights: DashboardInsights, tenantUsagePointCount: numb
     {
       count: insights.hardBlockedSubscriptions + insights.unassignedSubscriptions,
       detail: "Suspended, cancelled, or unassigned organization subscriptions.",
-      href: "/super-admin/subscriptions",
+      href: "/super-admin/subscriptions?status=suspended,cancelled,unassigned",
       key: "subscriptions",
       label: "Subscription governance",
       status: insights.hardBlockedSubscriptions > 0 || insights.unassignedSubscriptions > 0 ? "risk" : insights.expiredSubscriptions > 0 ? "watch" : "good"
@@ -675,7 +883,7 @@ function buildRiskItems(insights: DashboardInsights, tenantUsagePointCount: numb
     {
       count: insights.failedBackups,
       detail: "Failed backup jobs that need recovery evidence or rerun.",
-      href: "/super-admin/backups",
+      href: "/super-admin/backups?status=failed",
       key: "backups",
       label: "Backup failures",
       status: insights.failedBackups > 0 ? "risk" : "good"
@@ -683,7 +891,7 @@ function buildRiskItems(insights: DashboardInsights, tenantUsagePointCount: numb
     {
       count: insights.failedDomains + insights.pendingDomains,
       detail: "Failed or pending custom domain and SSL verification records.",
-      href: "/super-admin/domains",
+      href: "/super-admin/domains?status=failed,pending",
       key: "domains",
       label: "Domain readiness",
       status: insights.failedDomains > 0 ? "risk" : insights.pendingDomains > 0 ? "watch" : "good"
@@ -691,7 +899,7 @@ function buildRiskItems(insights: DashboardInsights, tenantUsagePointCount: numb
     {
       count: insights.overdueComplianceRequests + insights.openComplianceRequests,
       detail: "Open privacy, consent, export, and deletion workflows.",
-      href: "/super-admin/support",
+      href: "/super-admin/support?status=open,in_review",
       key: "compliance",
       label: "Compliance operations",
       status: insights.overdueComplianceRequests > 0 ? "risk" : insights.openComplianceRequests > 0 ? "watch" : "good"
@@ -717,17 +925,19 @@ function calculateReadinessScore(input: {
   failedDomains: number;
   hardBlockedSubscriptions: number;
   overdueComplianceRequests: number;
+  thresholds: DashboardThresholds;
   unassignedSubscriptions: number;
 }) {
+  const thresholds = input.thresholds.readiness;
   const score = 100
-    - Math.min(input.criticalSecurityEvents * 10, 30)
-    - Math.min(input.downHealthChecks * 14, 28)
-    - Math.min(input.degradedHealthChecks * 5, 15)
-    - Math.min(input.failedBackups * 8, 20)
-    - Math.min(input.failedDomains * 6, 18)
-    - Math.min(input.hardBlockedSubscriptions * 5, 20)
-    - Math.min(input.unassignedSubscriptions * 3, 15)
-    - Math.min(input.overdueComplianceRequests * 5, 15);
+    - Math.min(input.criticalSecurityEvents * thresholds.criticalSecurityPenalty, thresholds.criticalSecurityCap)
+    - Math.min(input.downHealthChecks * thresholds.downHealthPenalty, thresholds.downHealthCap)
+    - Math.min(input.degradedHealthChecks * thresholds.degradedHealthPenalty, thresholds.degradedHealthCap)
+    - Math.min(input.failedBackups * thresholds.failedBackupPenalty, thresholds.failedBackupCap)
+    - Math.min(input.failedDomains * thresholds.failedDomainPenalty, thresholds.failedDomainCap)
+    - Math.min(input.hardBlockedSubscriptions * thresholds.hardBlockedSubscriptionPenalty, thresholds.hardBlockedSubscriptionCap)
+    - Math.min(input.unassignedSubscriptions * thresholds.unassignedSubscriptionPenalty, thresholds.unassignedSubscriptionCap)
+    - Math.min(input.overdueComplianceRequests * thresholds.overdueCompliancePenalty, thresholds.overdueComplianceCap);
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -791,8 +1001,8 @@ function ExecutiveMetricCard({ metric }: { metric: DashboardMetric }) {
   );
 }
 
-function ReadinessScoreCard({ insights }: { insights: DashboardInsights }) {
-  const status = readinessStatus(insights.readinessScore);
+function ReadinessScoreCard({ insights, thresholds }: { insights: DashboardInsights; thresholds: DashboardThresholds }) {
+  const status = readinessStatus(insights.readinessScore, thresholds);
 
   return (
     <div className="w-full rounded-md border border-border bg-background p-5 lg:w-72">
@@ -842,8 +1052,8 @@ function StatusIcon({ status }: { status: EnterpriseKpi["status"] }) {
   return <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-green-600" />;
 }
 
-function InlineUsage({ label, value }: { label: string; value: number }) {
-  const status = usageStatus(value);
+function InlineUsage({ label, thresholds, value }: { label: string; thresholds: DashboardThresholds; value: number }) {
+  const status = usageStatus(value, thresholds);
 
   return (
     <div>
@@ -914,8 +1124,18 @@ function ReadinessRow({
   );
 }
 
-function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-border bg-background p-5 text-sm font-semibold text-muted-foreground">{text}</div>;
+function EmptyState({ actionHref, actionLabel, text }: { actionHref?: string; actionLabel?: string; text: string }) {
+  return (
+    <div className="rounded-md border border-border bg-background p-5">
+      <p className="text-sm font-semibold text-muted-foreground">{text}</p>
+      {actionHref && actionLabel ? (
+        <ButtonLink className="mt-4" href={actionHref} size="sm" variant="secondary">
+          {actionLabel}
+          <ArrowUpRight aria-hidden="true" className="size-4" />
+        </ButtonLink>
+      ) : null}
+    </div>
+  );
 }
 
 function latestBackupLabel(dashboard: EnterpriseDashboard) {
@@ -932,24 +1152,24 @@ function latestBackupLabel(dashboard: EnterpriseDashboard) {
   return formatEnterpriseLabel(latestBackup.status);
 }
 
-function readinessStatus(score: number): EnterpriseKpi["status"] {
-  if (score >= 85) {
+function readinessStatus(score: number, thresholds: DashboardThresholds): EnterpriseKpi["status"] {
+  if (score >= thresholds.readiness.good) {
     return "good";
   }
 
-  if (score >= 70) {
+  if (score >= thresholds.readiness.watch) {
     return "watch";
   }
 
   return "risk";
 }
 
-function usageStatus(value: number): EnterpriseKpi["status"] {
-  if (value >= 90) {
+function usageStatus(value: number, thresholds: DashboardThresholds): EnterpriseKpi["status"] {
+  if (value >= thresholds.usage.risk) {
     return "risk";
   }
 
-  if (value >= 70) {
+  if (value >= thresholds.usage.watch) {
     return "watch";
   }
 
@@ -962,6 +1182,34 @@ function maxUsagePercent(row: { branchPercent: number; memberPercent: number; st
 
 function formatPercent(value: number) {
   return `${Math.round(value)}%`;
+}
+
+function formatLatency(value: number | null) {
+  return value === null ? "No data" : `${formatCompactNumber(value)}ms`;
+}
+
+function dashboardReturnHref(operations: SuperAdminDashboardOperations) {
+  const params = new URLSearchParams({ range: operations.dateRange.key });
+
+  if (operations.dateRange.key === "custom") {
+    params.set("from", toDateInput(operations.dateRange.from));
+    params.set("to", toDateInput(operations.dateRange.to));
+  }
+
+  return `/super-admin?${params.toString()}`;
+}
+
+function toDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function isInSelectedRange(value: string | null | undefined, operations: SuperAdminDashboardOperations) {
+  if (!value) {
+    return false;
+  }
+
+  const time = new Date(value).getTime();
+  return !Number.isNaN(time) && time >= operations.dateRange.from.getTime() && time <= operations.dateRange.to.getTime();
 }
 
 function formatDateTime(value: string | null | undefined) {

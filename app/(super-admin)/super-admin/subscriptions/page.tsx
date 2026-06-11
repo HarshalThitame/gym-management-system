@@ -13,7 +13,12 @@ export const metadata: Metadata = createMetadata({
   path: "/super-admin/subscriptions"
 });
 
-export default async function SuperAdminSubscriptionsPage() {
+type SuperAdminSubscriptionsPageProps = {
+  searchParams?: Promise<{ status?: string }>;
+};
+
+export default async function SuperAdminSubscriptionsPage({ searchParams }: SuperAdminSubscriptionsPageProps) {
+  const params = searchParams ? await searchParams : {};
   const context = await requireAuth("/super-admin/subscriptions");
 
   if (!context.roles.includes("super_admin")) {
@@ -26,6 +31,13 @@ export default async function SuperAdminSubscriptionsPage() {
     getAllOrgsWithSubscriptions(),
     getAllPackages()
   ]);
+  const statuses = (params.status ?? "")
+    .split(",")
+    .map((status) => status.trim())
+    .filter(Boolean);
+  const filteredOrganizations = statuses.length > 0
+    ? organizations.filter((organization) => statuses.includes(organization.status ?? "unassigned"))
+    : organizations;
   const assignedOrganizations = organizations.filter((organization) => organization.subscriptionId).length;
   const unassignedOrganizations = organizations.length - assignedOrganizations;
 
@@ -47,7 +59,7 @@ export default async function SuperAdminSubscriptionsPage() {
         <SummaryCard detail="Organizations still blocked by no package" label="Unassigned" value={unassignedOrganizations.toLocaleString("en-IN")} />
       </section>
 
-      <OrgSubscriptionTable organizations={organizations} packages={packages} />
+      <OrgSubscriptionTable organizations={filteredOrganizations} packages={packages} />
     </div>
   );
 }

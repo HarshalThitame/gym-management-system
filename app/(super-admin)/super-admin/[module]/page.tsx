@@ -7,6 +7,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 
 type SuperAdminModuleRouteProps = {
   params: Promise<{ module: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export function generateStaticParams() {
@@ -32,8 +33,9 @@ export async function generateMetadata({ params }: SuperAdminModuleRouteProps): 
   });
 }
 
-export default async function SuperAdminModuleRoute({ params }: SuperAdminModuleRouteProps) {
+export default async function SuperAdminModuleRoute({ params, searchParams }: SuperAdminModuleRouteProps) {
   const { module: slug } = await params;
+  const filters = searchParams ? await searchParams : {};
   const selectedModule = getSuperAdminModule(slug);
 
   if (!selectedModule) {
@@ -42,5 +44,5 @@ export default async function SuperAdminModuleRoute({ params }: SuperAdminModule
 
   const dashboard = await getEnterpriseDashboard();
 
-  return <SuperAdminModuleWorkspace dashboard={dashboard} superModule={selectedModule} />;
+  return <SuperAdminModuleWorkspace dashboard={dashboard} filters={filters} superModule={selectedModule} />;
 }

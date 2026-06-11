@@ -43,6 +43,7 @@ import type { SuperAdminModule } from "../lib/super-admin-modules";
 type SuperAdminModuleWorkspaceProps = {
   superModule: SuperAdminModule;
   dashboard: EnterpriseDashboard;
+  filters?: Record<string, string | string[] | undefined>;
 };
 
 type SummaryStat = {
@@ -52,18 +53,18 @@ type SummaryStat = {
   icon: ReactNode;
 };
 
-export function SuperAdminModuleWorkspace({ superModule, dashboard }: SuperAdminModuleWorkspaceProps) {
+export function SuperAdminModuleWorkspace({ superModule, dashboard, filters = {} }: SuperAdminModuleWorkspaceProps) {
   const context = buildModuleContext(dashboard);
   const stats = getModuleStats(superModule.slug, dashboard, context);
 
   return (
     <ModuleShell stats={stats} superModule={superModule}>
-      {renderModuleBody(superModule, dashboard, context)}
+      {renderModuleBody(superModule, dashboard, context, filters)}
     </ModuleShell>
   );
 }
 
-function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDashboard, context: ModuleContext) {
+function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDashboard, context: ModuleContext, filters: Record<string, string | string[] | undefined>) {
   switch (superModule.slug) {
     case "organizations":
       return (
@@ -141,7 +142,7 @@ function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDa
               <p className="text-sm leading-6 text-muted-foreground">Run provider operations, verify DNS, and manage primary-domain lifecycle.</p>
             </CardHeader>
             <CardContent>
-              <TenantDomainCenter checks={dashboard.tenantDomainChecks} domains={dashboard.tenantDomains} providerEvents={dashboard.tenantDomainProviderEvents} />
+            <TenantDomainCenter checks={dashboard.tenantDomainChecks} domains={filterByStatus(dashboard.tenantDomains, filters)} providerEvents={dashboard.tenantDomainProviderEvents} />
             </CardContent>
           </Card>
         </TwoColumn>
@@ -261,7 +262,7 @@ function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDa
     case "security":
       return (
         <TwoColumn>
-          <SecurityEventList events={dashboard.securityEvents} />
+          <SecurityEventList events={filterSecurityEvents(dashboard.securityEvents, filters)} filters={filters} />
           <RecordPanel
             description="Aggregated security posture by status and severity."
             emptyText="No security summary rows are available."
@@ -296,7 +297,7 @@ function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDa
           <FormPanel description="Record health status for API, database, storage, queue, email, payments, auth, and background jobs." title="Record Health Check">
             <HealthCheckForm branches={dashboard.branches} organizations={dashboard.organizations} />
           </FormPanel>
-          <HealthCheckList dashboard={dashboard} context={context} />
+          <HealthCheckList dashboard={dashboard} context={context} filters={filters} />
         </TwoColumn>
       );
 
@@ -306,7 +307,7 @@ function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDa
           <FormPanel description="Queue database, file, configuration, and full backups for platform, tenant, or branch scope." title="Queue Backup">
             <BackupJobForm branches={dashboard.branches} organizations={dashboard.organizations} />
           </FormPanel>
-          <BackupList dashboard={dashboard} context={context} />
+          <BackupList dashboard={dashboard} context={context} filters={filters} />
         </TwoColumn>
       );
 
@@ -595,12 +596,13 @@ function SubscriptionLedger({ dashboard, context }: { dashboard: EnterpriseDashb
   );
 }
 
-function SecurityEventList({ events }: { events: EnterpriseDashboard["securityEvents"] }) {
+function SecurityEventList({ events, filters }: { events: EnterpriseDashboard["securityEvents"]; filters: Record<string, string | string[] | undefined> }) {
   return (
     <Card>
       <CardHeader>
         <h3 className="text-2xl font-black">Security Events</h3>
         <p className="text-sm leading-6 text-muted-foreground">Review and update open, investigating, resolved, or dismissed security records.</p>
+        <FilterSummary filters={filters} />
       </CardHeader>
       <CardContent className="space-y-3">
         {events.length > 0 ? events.slice(0, 10).map((event) => (
@@ -624,8 +626,8 @@ function SecurityEventList({ events }: { events: EnterpriseDashboard["securityEv
   );
 }
 
-function HealthCheckList({ dashboard, context }: { dashboard: EnterpriseDashboard; context: ModuleContext }) {
-  const healthByComponent = latestHealthByComponent(dashboard.healthChecks);
+function HealthCheckList({ dashboard, context, filters }: { dashboard: EnterpriseDashboard; context: ModuleContext; filters: Record<string, string | string[] | undefined> }) {
+  const healthByComponent = latestHealthByComponent(filterByStatus(dashboard.healthChecks, filters));
 
   return (
     <RecordPanel
@@ -644,12 +646,12 @@ function HealthCheckList({ dashboard, context }: { dashboard: EnterpriseDashboar
   );
 }
 
-function BackupList({ dashboard, context }: { dashboard: EnterpriseDashboard; context: ModuleContext }) {
+function BackupList({ dashboard, context, filters }: { dashboard: EnterpriseDashboard; context: ModuleContext; filters: Record<string, string | string[] | undefined> }) {
   return (
     <RecordPanel
       description="Recent backup queue, execution, and failure records."
       emptyText="No backup jobs have been queued yet."
-      items={dashboard.backupJobs}
+      items={filterByStatus(dashboard.backupJobs, filters)}
       title="Backup Jobs"
       renderItem={(job) => (
         <RecordCard
@@ -721,6 +723,50 @@ function DefaultOperationalNotes({ superModule }: { superModule: SuperAdminModul
       </CardContent>
     </Card>
   );
+}
+
+function FilterSummary({ filters }: { filters: Record<string, string | string[] | undefined> }) {
+  const entries = Object.entries(filters)
+    .map(([key, value]) => [key, filterValues(value).join(", ")] as const)
+    .filter(([, value]) => value.length > 0);
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {entries.map(([key, value]) => (
+        <EnterpriseStatusBadge key={key} status={`${formatEnterpriseLabel(key)}: ${value}`} />
+      ))}
+    </div>
+  );
+}
+
+function filterSecurityEvents(events: EnterpriseDashboard["securityEvents"], filters: Record<string, string | string[] | undefined>) {
+  const statuses = filterValues(filters.status);
+  const severities = filterValues(filters.severity);
+
+  return events.filter((event) => {
+    const statusMatches = statuses.length === 0 || statuses.includes(event.status);
+    const severityMatches = severities.length === 0 || severities.includes(event.severity);
+    return statusMatches && severityMatches;
+  });
+}
+
+function filterByStatus<T extends { status: string }>(items: T[], filters: Record<string, string | string[] | undefined>) {
+  const statuses = filterValues(filters.status);
+
+  if (statuses.length === 0) {
+    return items;
+  }
+
+  return items.filter((item) => statuses.includes(item.status));
+}
+
+function filterValues(value: string | string[] | undefined) {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return values.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean);
 }
 
 function EmptyState({ text }: { text: string }) {
