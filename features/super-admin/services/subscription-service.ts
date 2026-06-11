@@ -51,29 +51,40 @@ export type AssignPackageToOrgInput = {
 };
 
 type SupabaseQueryError = {
+  code?: string;
   message: string;
 };
 
-type OrganizationWithSubscriptionRow = {
+type OrganizationBaseRow = {
   id: string;
   name: string;
   billing_email: string | null;
   primary_domain: string | null;
-  organization_subscriptions: OrganizationSubscriptionJoinRow | OrganizationSubscriptionJoinRow[] | null;
 };
 
-type OrganizationSubscriptionJoinRow = {
+type OrganizationSubscriptionSummaryRow = {
   id: string;
+  organization_id: string;
   package_id: string;
   status: SubscriptionStatus;
   started_at: string;
   expires_at: string | null;
   trial_ends_at: string | null;
-  packages: PackageNameJoinRow | PackageNameJoinRow[] | null;
 };
 
-type PackageNameJoinRow = {
+type PackageSummaryRow = {
+  id: string;
   name: string;
+};
+
+type PlatformSubscriptionFallbackRow = {
+  id: string;
+  organization_id: string;
+  plan_tier: "starter" | "professional" | "enterprise";
+  status: "trial" | "active" | "past_due" | "cancelled" | "suspended";
+  starts_on: string;
+  renews_on: string | null;
+  trial_ends_on: string | null;
 };
 
 type OrganizationSubscriptionRow = {
@@ -105,18 +116,27 @@ type MaybeSingleResult<T> = Promise<{ data: T | null; error: SupabaseQueryError 
 
 type OrganizationQuery = {
   select(columns: string): OrganizationQuery;
-  order(column: "name", options: { ascending: boolean }): QueryResult<OrganizationWithSubscriptionRow>;
+  order(column: "name", options: { ascending: boolean }): QueryResult<OrganizationBaseRow>;
 };
 
 type PackageQuery = {
-  select(columns: string): PackageQuery;
-  eq(column: "is_active", value: boolean): PackageQuery;
+  select(columns: "*"): PackageActiveQuery;
+  select(columns: string): QueryResult<PackageSummaryRow>;
+};
+
+type PackageActiveQuery = {
+  eq(column: "is_active", value: boolean): PackageActiveQuery;
   order(column: "sort_order", options: { ascending: boolean }): QueryResult<PackageRow>;
 };
 
 type OrganizationSubscriptionMutation = {
+  select(columns: string): QueryResult<OrganizationSubscriptionSummaryRow>;
   upsert(payload: OrganizationSubscriptionUpsert, options: { onConflict: "organization_id" }): OrganizationSubscriptionReturningQuery;
   update(payload: Pick<OrganizationSubscriptionRow, "status">): OrganizationSubscriptionFilterQuery;
+};
+
+type PlatformSubscriptionQuery = {
+  select(columns: string): QueryResult<PlatformSubscriptionFallbackRow>;
 };
 
 type OrganizationSubscriptionFilterQuery = {
@@ -135,24 +155,17 @@ type SubscriptionServiceSupabaseClient = {
   from(table: "organizations"): OrganizationQuery;
   from(table: "packages"): PackageQuery;
   from(table: "organization_subscriptions"): OrganizationSubscriptionMutation;
+  from(table: "platform_subscriptions"): PlatformSubscriptionQuery;
 };
 
 const ORGANIZATION_SUBSCRIPTION_SELECT = `
   id,
-  name,
-  billing_email,
-  primary_domain,
-  organization_subscriptions (
-    id,
-    package_id,
-    status,
-    started_at,
-    expires_at,
-    trial_ends_at,
-    packages (
-      name
-    )
-  )
+  organization_id,
+  package_id,
+  status,
+  started_at,
+  expires_at,
+  trial_ends_at
 `;
 
 /**
@@ -161,16 +174,40 @@ const ORGANIZATION_SUBSCRIPTION_SELECT = `
  */
 export async function getAllOrgsWithSubscriptions(): Promise<OrgSubscriptionSummary[]> {
   const supabase = await getSubscriptionServiceClient();
-  const { data, error } = await supabase
-    .from("organizations")
-    .select(ORGANIZATION_SUBSCRIPTION_SELECT)
-    .order("name", { ascending: true });
+  const [organizationsResult, subscriptionsResult, packagesResult] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("id, name, billing_email, primary_domain")
+      .order("name", { ascending: true }),
+    supabase
+      .from("organization_subscriptions")
+      .select(ORGANIZATION_SUBSCRIPTION_SELECT),
+    supabase
+      .from("packages")
+      .select("id, name")
+  ]);
 
-  if (error) {
-    throw new Error(error.message);
+  if (organizationsResult.error) {
+    throw new Error(organizationsResult.error.message);
   }
 
-  return (data ?? []).map(mapOrganizationSubscription);
+  if (isSchemaCacheMissing(subscriptionsResult.error) || isSchemaCacheMissing(packagesResult.error)) {
+    return getAllOrgsWithLegacySubscriptions(supabase, organizationsResult.data ?? []);
+  }
+
+  const firstError = [subscriptionsResult, packagesResult].find((result) => result.error)?.error;
+
+  if (firstError) {
+    throw new Error(firstError.message);
+  }
+
+  const subscriptionsByOrganization = new Map((subscriptionsResult.data ?? []).map((subscription) => [subscription.organization_id, subscription]));
+  const packageNamesById = new Map((packagesResult.data ?? []).map((packageRecord) => [packageRecord.id, packageRecord.name]));
+
+  return (organizationsResult.data ?? []).map((organization) => {
+    const subscription = subscriptionsByOrganization.get(organization.id) ?? null;
+    return mapOrganizationSubscription(organization, subscription, subscription ? packageNamesById.get(subscription.package_id) ?? null : null);
+  });
 }
 
 /**
@@ -185,6 +222,11 @@ export async function getAllPackages(): Promise<PackageRow[]> {
     .order("sort_order", { ascending: true });
 
   if (error) {
+    if (isSchemaCacheMissing(error)) {
+      console.error("[subscription-service] Packages table is not available. Apply the packages migration before assigning plans.");
+      return [];
+    }
+
     throw new Error(error.message);
   }
 
@@ -249,16 +291,13 @@ async function getSubscriptionServiceClient() {
   return await createSupabaseServerClient() as unknown as SubscriptionServiceSupabaseClient;
 }
 
-function mapOrganizationSubscription(row: OrganizationWithSubscriptionRow): OrgSubscriptionSummary {
-  const subscription = firstOrNull(row.organization_subscriptions);
-  const packageRecord = subscription ? firstOrNull(subscription.packages) : null;
-
+function mapOrganizationSubscription(row: OrganizationBaseRow, subscription: OrganizationSubscriptionSummaryRow | null, packageName: string | null): OrgSubscriptionSummary {
   return {
     organizationId: row.id,
     organizationName: row.name,
     organizationContact: row.billing_email ?? row.primary_domain,
     packageId: subscription?.package_id ?? null,
-    packageName: packageRecord?.name ?? null,
+    packageName,
     status: subscription?.status ?? null,
     startedAt: subscription?.started_at ?? null,
     expiresAt: subscription?.expires_at ?? null,
@@ -267,10 +306,65 @@ function mapOrganizationSubscription(row: OrganizationWithSubscriptionRow): OrgS
   };
 }
 
-function firstOrNull<T>(value: T | T[] | null): T | null {
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
+async function getAllOrgsWithLegacySubscriptions(supabase: SubscriptionServiceSupabaseClient, organizations: OrganizationBaseRow[]): Promise<OrgSubscriptionSummary[]> {
+  console.error("[subscription-service] Package subscription tables are not available. Falling back to platform_subscriptions for read-only summaries.");
+
+  const { data, error } = await supabase
+    .from("platform_subscriptions")
+    .select("id, organization_id, plan_tier, status, starts_on, renews_on, trial_ends_on");
+
+  if (error) {
+    console.error("[subscription-service] Legacy subscription fallback failed.", error.message);
+    return organizations.map((organization) => mapLegacyOrganizationSubscription(organization, null));
   }
 
-  return value;
+  const subscriptionsByOrganization = new Map((data ?? []).map((subscription) => [subscription.organization_id, subscription]));
+
+  return organizations.map((organization) => mapLegacyOrganizationSubscription(organization, subscriptionsByOrganization.get(organization.id) ?? null));
+}
+
+function mapLegacyOrganizationSubscription(row: OrganizationBaseRow, subscription: PlatformSubscriptionFallbackRow | null): OrgSubscriptionSummary {
+  return {
+    organizationId: row.id,
+    organizationName: row.name,
+    organizationContact: row.billing_email ?? row.primary_domain,
+    packageId: null,
+    packageName: subscription ? legacyPackageName(subscription.plan_tier) : null,
+    status: subscription ? legacySubscriptionStatus(subscription.status) : null,
+    startedAt: subscription?.starts_on ?? null,
+    expiresAt: subscription?.renews_on ?? null,
+    trialEndsAt: subscription?.trial_ends_on ?? null,
+    subscriptionId: subscription?.id ?? null
+  };
+}
+
+function legacySubscriptionStatus(status: PlatformSubscriptionFallbackRow["status"]): SubscriptionStatus {
+  if (status === "past_due") {
+    return "expired";
+  }
+
+  return status;
+}
+
+function legacyPackageName(planTier: PlatformSubscriptionFallbackRow["plan_tier"]) {
+  if (planTier === "starter") {
+    return "Lite";
+  }
+
+  if (planTier === "professional") {
+    return "Standard";
+  }
+
+  return "Premium";
+}
+
+function isSchemaCacheMissing(error: SupabaseQueryError | null | undefined) {
+  if (!error) {
+    return false;
+  }
+
+  return error.code === "PGRST205"
+    || error.message.includes("schema cache")
+    || error.message.includes("Could not find the table")
+    || error.message.includes("Could not find a relationship");
 }
