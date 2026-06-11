@@ -8,6 +8,7 @@ import {
   complianceRequestTypes,
   complianceStatuses,
   featureFlagStatuses,
+  gymStatuses,
   healthComponents,
   healthStatuses,
   organizationStatuses,
@@ -15,7 +16,9 @@ import {
   planTiers,
   retentionActions,
   retentionCategories,
-  securityStatuses
+  securityStatuses,
+  tenantDomainRoutingModes,
+  tenantDomainTypes
 } from "@/types/enterprise";
 import { roleNames } from "@/types/auth";
 
@@ -32,6 +35,16 @@ export const OrganizationSchema = z.object({
   primaryDomain: z.string().max(160).optional(),
   billingEmail: z.string().email().or(z.literal("")).optional(),
   settings: z.string().optional()
+});
+
+export const GymSchema = z.object({
+  gymId: optionalUuid,
+  organizationId: z.string().uuid(),
+  name: z.string().min(2).max(140),
+  slug: z.string().min(2).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  timezone: z.string().min(2).max(80),
+  currency: z.string().length(3),
+  status: z.enum(gymStatuses)
 });
 
 export const BranchSchema = z.object({
@@ -98,6 +111,32 @@ export const TenantConfigSchema = z.object({
   emailBranding: z.string().optional(),
   limits: z.string().optional(),
   complianceSettings: z.string().optional()
+});
+
+export const TenantDomainSchema = z.object({
+  tenantDomainId: optionalUuid,
+  organizationId: z.string().uuid(),
+  branchId: optionalUuid,
+  gymId: optionalUuid,
+  tenantConfigId: optionalUuid,
+  domain: z.string().trim().min(3).max(253),
+  domainType: z.enum(tenantDomainTypes).refine((value) => value !== "system", "System domains are managed by deployment configuration."),
+  routingMode: z.enum(tenantDomainRoutingModes),
+  status: z.enum(["pending", "disabled"]),
+  isPrimary: z.boolean()
+}).superRefine((value, context) => {
+  if (value.routingMode === "branch" && !value.branchId) {
+    context.addIssue({ code: "custom", message: "Select a branch for branch routing.", path: ["branchId"] });
+  }
+
+  if (value.routingMode === "gym" && !value.gymId) {
+    context.addIssue({ code: "custom", message: "Enter a gym ID for gym routing.", path: ["gymId"] });
+  }
+});
+
+export const TenantDomainLifecycleSchema = z.object({
+  tenantDomainId: z.string().uuid(),
+  action: z.enum(["set_primary", "disable", "restore"])
 });
 
 export const FeatureFlagSchema = z.object({

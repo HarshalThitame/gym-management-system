@@ -3,7 +3,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MemberDirectoryTable } from "@/features/memberships/components/member-directory-table";
 import { listMembers } from "@/features/memberships/services/membership-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 type MembersPageProps = {
@@ -24,11 +24,11 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminMembersPage({ searchParams }: MembersPageProps) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const params = await searchParams;
   const page = Number(params.page ?? "1");
   const result = await listMembers({
-    gymId: context.profile?.gym_id ?? null,
+    gymId: scope.gymId,
     query: params.q,
     memberStatus: params.memberStatus,
     membershipStatus: params.membershipStatus,

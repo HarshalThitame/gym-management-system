@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { MemberOnboardingForm } from "@/features/memberships/components/member-onboarding-form";
 import { listActiveMembershipPlans } from "@/features/memberships/services/membership-service";
-import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -12,8 +12,8 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function NewMemberPage() {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members/new");
-  const plans = await listActiveMembershipPlans(context.profile?.gym_id ?? null);
+  const scope = await requireGymAdminScope("/admin/members/new");
+  const plans = await listActiveMembershipPlans(scope.gymId);
 
   return (
     <Card>

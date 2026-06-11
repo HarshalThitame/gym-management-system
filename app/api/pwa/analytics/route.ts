@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getInstallPlatform } from "@/features/pwa/lib/business-rules";
 import { PwaMetricSchema } from "@/features/pwa/schemas/pwa";
-import { getAuthContext } from "@/lib/auth/session";
+import { getApiTenantBranchId, getApiTenantOrganizationId, getOptionalApiAuth } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIpFromHeaders } from "@/lib/security/request";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -32,9 +32,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const context = await getAuthContext();
+  const auth = await getOptionalApiAuth();
 
-  if (!context.isAuthenticated || !context.userId) {
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  if (!auth.context || !auth.tenant) {
     return NextResponse.json({ ok: true, data: { stored: false, anonymous: true } });
   }
 
@@ -45,9 +49,9 @@ export async function POST(request: Request) {
   }
 
   const { error } = await supabase.from("pwa_install_events").insert({
-    user_id: context.userId,
-    organization_id: null,
-    branch_id: null,
+    user_id: auth.context.userId,
+    organization_id: getApiTenantOrganizationId(auth.context, auth.tenant),
+    branch_id: getApiTenantBranchId(auth.tenant),
     client_event_id: parsed.data.id,
     event_type: parsed.data.eventType,
     route: parsed.data.route,

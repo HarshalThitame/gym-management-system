@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
+import { requireGymFrontDeskScope } from "@/features/reception/lib/access";
 import { validateAllowedFile } from "@/lib/security/file-validation";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isWithinMemberLimit } from "@/lib/tenant";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
+import type { AuthContext } from "@/types/auth";
 import type { MemberDocumentType, MembershipEvent, MembershipPlanRow, MembershipRow, MembershipStatus } from "@/types/membership";
 import {
   calculateEndDate,
@@ -39,7 +42,7 @@ type BillingEventType = Database["public"]["Tables"]["billing_events"]["Insert"]
 type PaymentType = Database["public"]["Tables"]["payments"]["Insert"]["payment_type"];
 
 export async function saveMembershipPlanAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/membership-plans");
+  const scope = await requireGymAdminScope("/admin/membership-plans");
   const parsed = MembershipPlanSchema.safeParse({
     planId: formData.get("planId") ?? "",
     name: formData.get("name"),
@@ -62,7 +65,7 @@ export async function saveMembershipPlanAction(_previousState: AuthActionState, 
   const enabledFeatures = formData.getAll("features").map(String);
   const featureQuantities = readFeatureQuantities(formData);
   const features = buildPlanFeatures(enabledFeatures, featureQuantities);
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const slug = slugifyPlanName(parsed.data.name);
   const payload = {
     gym_id: gymId,
@@ -78,7 +81,7 @@ export async function saveMembershipPlanAction(_previousState: AuthActionState, 
     status: parsed.data.status,
     is_public: parsed.data.isPublic,
     display_order: parsed.data.displayOrder,
-    created_by: context.userId
+    created_by: scope.userId
   };
 
   const planId = parsed.data.planId || null;
@@ -100,7 +103,7 @@ export async function saveMembershipPlanAction(_previousState: AuthActionState, 
   }
 
   await writeAuditLog({
-    actorId: context.userId,
+    actorId: scope.userId,
     gymId,
     action: isEdit ? "membership_plan.updated" : "membership_plan.created",
     entityType: "membership_plan",
@@ -114,7 +117,7 @@ export async function saveMembershipPlanAction(_previousState: AuthActionState, 
 }
 
 export async function updatePlanStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/membership-plans");
+  const scope = await requireGymAdminScope("/admin/membership-plans");
   const planId = String(formData.get("planId") ?? "");
   const status = String(formData.get("status") ?? "");
 
@@ -129,15 +132,16 @@ export async function updatePlanStatusAction(_previousState: AuthActionState, fo
       status: status as MembershipPlanRow["status"],
       archived_at: status === "archived" ? new Date().toISOString() : null
     })
-    .eq("id", planId);
+    .eq("id", planId)
+    .eq("gym_id", scope.gymId);
 
   if (error) {
     return { status: "error", message: error.message };
   }
 
   await writeAuditLog({
-    actorId: context.userId,
-    gymId: context.profile?.gym_id ?? null,
+    actorId: scope.userId,
+    gymId: scope.gymId,
     action: "membership_plan.status_changed",
     entityType: "membership_plan",
     entityId: planId,
@@ -149,7 +153,7 @@ export async function updatePlanStatusAction(_previousState: AuthActionState, fo
 }
 
 export async function onboardMemberAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members/new");
+  const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/register");
   const parsed = MemberOnboardingSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email") ?? "",
@@ -172,10 +176,10 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
   }
 
   const supabase = await createSupabaseServerClient();
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const plan = await loadPlan(supabase, parsed.data.planId);
 
-  if (!plan || plan.status !== "active") {
+  if (!plan || plan.gym_id !== gymId || plan.status !== "active") {
     return { status: "error", message: "Choose an active membership plan." };
   }
 
@@ -184,6 +188,11 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
 
   if (dateError) {
     return { status: "error", message: dateError };
+  }
+
+  const memberLimitError = await requireMemberCapacity(supabase, getContextOrganizationId(scope), gymId);
+  if (memberLimitError) {
+    return memberLimitError;
   }
 
   const memberCode = await generateMemberCode(supabase, gymId);
@@ -202,7 +211,7 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
       emergency_contact_phone: parsed.data.emergencyContactPhone || null,
       assigned_trainer_id: parsed.data.assignedTrainerId || null,
       joined_at: parsed.data.startDate,
-      created_by: context.userId,
+      created_by: scope.userId,
       notes: parsed.data.notes || null
     })
     .select("*")
@@ -217,7 +226,7 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
     gymId,
     memberId: member.id,
     plan,
-    actorId: context.userId,
+    actorId: scope.userId,
     startDate: parsed.data.startDate,
     endDate,
     paymentStatus: parsed.data.paymentStatus,
@@ -236,7 +245,7 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
     const upload = await uploadMemberDocumentFile(supabase, {
       gymId,
       memberId: member.id,
-      actorId: context.userId,
+      actorId: scope.userId,
       documentType: "profile_photo",
       file: profilePhoto
     });
@@ -247,7 +256,7 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
   }
 
   await writeAuditLog({
-    actorId: context.userId,
+    actorId: scope.userId,
     gymId,
     action: "member.onboarded",
     entityType: "member",
@@ -257,11 +266,19 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
 
   revalidatePath("/admin");
   revalidatePath("/admin/members");
+  revalidatePath("/reception");
+  revalidatePath("/reception/members");
+  revalidatePath("/reception/register");
+
+  if (scope.roles.includes("reception_staff") && !scope.roles.includes("gym_admin") && !scope.roles.includes("super_admin")) {
+    redirect(`/reception/members?q=${encodeURIComponent(member.phone)}`);
+  }
+
   redirect(`/admin/members/${member.id}`);
 }
 
 export async function assignMembershipAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const parsed = MembershipAssignmentSchema.safeParse({
     memberId: formData.get("memberId"),
     planId: formData.get("planId"),
@@ -285,7 +302,11 @@ export async function assignMembershipAction(_previousState: AuthActionState, fo
     return { status: "error", message: "Member not found." };
   }
 
-  if (!plan || plan.status !== "active") {
+  if (member.gym_id !== scope.gymId) {
+    return { status: "error", message: "Member does not belong to this gym." };
+  }
+
+  if (!plan || plan.gym_id !== scope.gymId || plan.status !== "active") {
     return { status: "error", message: "Choose an active membership plan." };
   }
 
@@ -301,7 +322,7 @@ export async function assignMembershipAction(_previousState: AuthActionState, fo
     gymId: member.gym_id,
     memberId: member.id,
     plan,
-    actorId: context.userId,
+    actorId: scope.userId,
     startDate: parsed.data.startDate,
     endDate,
     paymentStatus: parsed.data.paymentStatus,
@@ -321,7 +342,7 @@ export async function assignMembershipAction(_previousState: AuthActionState, fo
 }
 
 export async function renewMembershipAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const parsed = RenewalSchema.safeParse({
     membershipId: formData.get("membershipId"),
     planId: formData.get("planId"),
@@ -342,6 +363,10 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
     return { status: "error", message: "Membership not found." };
   }
 
+  if (membership.gym_id !== scope.gymId) {
+    return { status: "error", message: "Membership does not belong to this gym." };
+  }
+
   const renewalError = validateRenewalSource(membership);
   if (renewalError) {
     return { status: "error", message: renewalError };
@@ -349,7 +374,7 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
 
   const plan = await loadPlan(supabase, parsed.data.planId);
 
-  if (!plan || plan.status !== "active") {
+  if (!plan || plan.gym_id !== scope.gymId || plan.status !== "active") {
     return { status: "error", message: "Choose an active renewal plan." };
   }
 
@@ -375,7 +400,7 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
       discount_amount: renewalDiscountAmount,
       payment_status: parsed.data.paymentStatus,
       renewal_of_membership_id: membership.id,
-      updated_by: context.userId,
+      updated_by: scope.userId,
       notes: parsed.data.notes || membership.notes
     })
     .eq("id", membership.id)
@@ -392,7 +417,7 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
     memberId: membership.member_id,
     membership: updatedMembership,
     planName: plan.name,
-    actorId: context.userId,
+    actorId: scope.userId,
     paymentType: "membership_renewal",
     billingEventType: "membership_renewed"
   });
@@ -416,11 +441,11 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
       newStartDate: startDate,
       newEndDate: endDate,
       reason: parsed.data.notes || "Manual renewal",
-      actorId: context.userId
+      actorId: scope.userId
     }),
-    insertStatusLog(supabase, membership, parsed.data.paymentStatus === "pending" ? "pending" : "active", parsed.data.notes || "Renewed", context.userId),
+    insertStatusLog(supabase, membership, parsed.data.paymentStatus === "pending" ? "pending" : "active", parsed.data.notes || "Renewed", scope.userId),
     writeAuditLog({
-      actorId: context.userId,
+      actorId: scope.userId,
       gymId: membership.gym_id,
       action: "membership.renewed",
       entityType: "membership",
@@ -435,7 +460,7 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
 }
 
 export async function changeMembershipPlanAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const parsed = PlanChangeSchema.safeParse({
     membershipId: formData.get("membershipId"),
     planId: formData.get("planId"),
@@ -453,6 +478,10 @@ export async function changeMembershipPlanAction(_previousState: AuthActionState
     return { status: "error", message: "Membership not found." };
   }
 
+  if (membership.gym_id !== scope.gymId) {
+    return { status: "error", message: "Membership does not belong to this gym." };
+  }
+
   if (membership.status === "cancelled" || membership.status === "expired") {
     return { status: "error", message: "Only open memberships can change plan." };
   }
@@ -462,7 +491,7 @@ export async function changeMembershipPlanAction(_previousState: AuthActionState
     loadPlan(supabase, parsed.data.planId)
   ]);
 
-  if (!currentPlan || !nextPlan || nextPlan.status !== "active") {
+  if (!currentPlan || !nextPlan || currentPlan.gym_id !== scope.gymId || nextPlan.gym_id !== scope.gymId || nextPlan.status !== "active") {
     return { status: "error", message: "Plan change requires an active target plan." };
   }
 
@@ -473,7 +502,7 @@ export async function changeMembershipPlanAction(_previousState: AuthActionState
       membership_plan_id: nextPlan.id,
       price_amount: nextPlan.price_amount,
       joining_fee_amount: nextPlan.joining_fee_amount,
-      updated_by: context.userId
+      updated_by: scope.userId
     })
     .eq("id", membership.id);
 
@@ -490,10 +519,10 @@ export async function changeMembershipPlanAction(_previousState: AuthActionState
       fromPlanId: currentPlan.id,
       toPlanId: nextPlan.id,
       reason: parsed.data.reason,
-      actorId: context.userId
+      actorId: scope.userId
     }),
     writeAuditLog({
-      actorId: context.userId,
+      actorId: scope.userId,
       gymId: membership.gym_id,
       action: `membership.${event}`,
       entityType: "membership",
@@ -507,7 +536,7 @@ export async function changeMembershipPlanAction(_previousState: AuthActionState
 }
 
 export async function changeMembershipStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const parsed = StatusChangeSchema.safeParse({
     membershipId: formData.get("membershipId"),
     nextStatus: formData.get("nextStatus"),
@@ -525,6 +554,10 @@ export async function changeMembershipStatusAction(_previousState: AuthActionSta
     return { status: "error", message: "Membership not found." };
   }
 
+  if (membership.gym_id !== scope.gymId) {
+    return { status: "error", message: "Membership does not belong to this gym." };
+  }
+
   const transitionError = validateStatusTransition(membership.status, parsed.data.nextStatus);
   if (transitionError) {
     return { status: "error", message: transitionError };
@@ -535,7 +568,7 @@ export async function changeMembershipStatusAction(_previousState: AuthActionSta
     .from("memberships")
     .update({
       status: parsed.data.nextStatus,
-      updated_by: context.userId,
+      updated_by: scope.userId,
       ...timestampUpdates
     })
     .eq("id", membership.id);
@@ -546,7 +579,7 @@ export async function changeMembershipStatusAction(_previousState: AuthActionSta
 
   const event = statusToEvent(parsed.data.nextStatus);
   await Promise.all([
-    insertStatusLog(supabase, membership, parsed.data.nextStatus, parsed.data.reason, context.userId),
+    insertStatusLog(supabase, membership, parsed.data.nextStatus, parsed.data.reason, scope.userId),
     insertHistory(supabase, {
       gymId: membership.gym_id,
       membershipId: membership.id,
@@ -555,10 +588,10 @@ export async function changeMembershipStatusAction(_previousState: AuthActionSta
       fromStatus: membership.status,
       toStatus: parsed.data.nextStatus,
       reason: parsed.data.reason,
-      actorId: context.userId
+      actorId: scope.userId
     }),
     writeAuditLog({
-      actorId: context.userId,
+      actorId: scope.userId,
       gymId: membership.gym_id,
       action: `membership.${event}`,
       entityType: "membership",
@@ -573,7 +606,7 @@ export async function changeMembershipStatusAction(_previousState: AuthActionSta
 }
 
 export async function uploadMemberDocumentAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const parsed = DocumentUploadSchema.safeParse({
     memberId: formData.get("memberId"),
     documentType: formData.get("documentType")
@@ -596,10 +629,14 @@ export async function uploadMemberDocumentAction(_previousState: AuthActionState
     return { status: "error", message: "Member not found." };
   }
 
+  if (member.gym_id !== scope.gymId) {
+    return { status: "error", message: "Member does not belong to this gym." };
+  }
+
   const upload = await uploadMemberDocumentFile(supabase, {
     gymId: member.gym_id,
     memberId: member.id,
-    actorId: context.userId,
+    actorId: scope.userId,
     documentType: parsed.data.documentType,
     file
   });
@@ -613,7 +650,7 @@ export async function uploadMemberDocumentAction(_previousState: AuthActionState
   }
 
   await writeAuditLog({
-    actorId: context.userId,
+    actorId: scope.userId,
     gymId: member.gym_id,
     action: "member_document.uploaded",
     entityType: "member_document",
@@ -626,7 +663,7 @@ export async function uploadMemberDocumentAction(_previousState: AuthActionState
 }
 
 export async function deleteMemberDocumentAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const documentId = String(formData.get("documentId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
 
@@ -641,6 +678,10 @@ export async function deleteMemberDocumentAction(_previousState: AuthActionState
     return { status: "error", message: "Document not found." };
   }
 
+  if (document.gym_id !== scope.gymId) {
+    return { status: "error", message: "Document does not belong to this gym." };
+  }
+
   await supabase.storage.from("member-documents").remove([document.file_path]);
   const { error } = await supabase.from("member_documents").delete().eq("id", document.id);
 
@@ -649,7 +690,7 @@ export async function deleteMemberDocumentAction(_previousState: AuthActionState
   }
 
   await writeAuditLog({
-    actorId: context.userId,
+    actorId: scope.userId,
     gymId: document.gym_id,
     action: "member_document.deleted",
     entityType: "member_document",
@@ -662,7 +703,7 @@ export async function deleteMemberDocumentAction(_previousState: AuthActionState
 }
 
 export async function expireMembershipsAction(): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin");
+  const scope = await requireGymAdminScope("/admin");
   const supabase = await createSupabaseServerClient();
   const today = formatISO(new Date(), { representation: "date" });
   const query = supabase
@@ -671,9 +712,7 @@ export async function expireMembershipsAction(): Promise<AuthActionState> {
     .eq("status", "active")
     .lt("end_date", today);
 
-  if (context.profile?.gym_id) {
-    query.eq("gym_id", context.profile.gym_id);
-  }
+  query.eq("gym_id", scope.gymId);
 
   const { data: memberships, error } = await query;
 
@@ -684,8 +723,8 @@ export async function expireMembershipsAction(): Promise<AuthActionState> {
   const rows = memberships ?? [];
 
   for (const membership of rows) {
-    await supabase.from("memberships").update({ status: "expired", updated_by: context.userId }).eq("id", membership.id);
-    await insertStatusLog(supabase, membership, "expired", "Automated expiry processing", context.userId);
+    await supabase.from("memberships").update({ status: "expired", updated_by: scope.userId }).eq("id", membership.id);
+    await insertStatusLog(supabase, membership, "expired", "Automated expiry processing", scope.userId);
     await insertHistory(supabase, {
       gymId: membership.gym_id,
       membershipId: membership.id,
@@ -694,13 +733,13 @@ export async function expireMembershipsAction(): Promise<AuthActionState> {
       fromStatus: membership.status,
       toStatus: "expired",
       reason: "Automated expiry processing",
-      actorId: context.userId
+      actorId: scope.userId
     });
   }
 
   await writeAuditLog({
-    actorId: context.userId,
-    gymId: context.profile?.gym_id ?? null,
+    actorId: scope.userId,
+    gymId: scope.gymId,
     action: "membership.expiry_processed",
     entityType: "membership",
     metadata: { count: rows.length }
@@ -1021,6 +1060,65 @@ async function loadMembership(supabase: SupabaseClient<Database>, membershipId: 
   return data;
 }
 
+function getContextOrganizationId(context: AuthContext) {
+  return (context as AuthContext & { scopedOrganizationId?: string | null }).scopedOrganizationId ?? context.organizationId ?? null;
+}
+
+async function requireMemberCapacity(supabase: SupabaseClient<Database>, organizationId: string | null, gymId: string | null): Promise<AuthActionState | null> {
+  try {
+    const resolvedOrganizationId = organizationId ?? await getOrganizationIdForGym(supabase, gymId);
+    if (!resolvedOrganizationId) {
+      return { status: "error", message: "Member limit reached for your current plan. Please upgrade to add more members." };
+    }
+
+    const currentMemberCount = await getActiveMemberCountForOrganization(supabase, resolvedOrganizationId);
+    const withinLimit = await isWithinMemberLimit(resolvedOrganizationId, currentMemberCount);
+    if (!withinLimit) {
+      return { status: "error", message: "Member limit reached for your current plan. Please upgrade to add more members." };
+    }
+
+    return null;
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Member limit reached for your current plan. Please upgrade to add more members." };
+  }
+}
+
+async function getOrganizationIdForGym(supabase: SupabaseClient<Database>, gymId: string | null) {
+  if (!gymId) {
+    return null;
+  }
+
+  const { data, error } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.organization_id ?? null;
+}
+
+async function getActiveMemberCountForOrganization(supabase: SupabaseClient<Database>, organizationId: string) {
+  const { data: gyms, error: gymError } = await supabase.from("gyms").select("id").eq("organization_id", organizationId);
+  if (gymError) {
+    throw new Error(gymError.message);
+  }
+
+  const gymIds = (gyms ?? []).map((gym) => gym.id);
+  if (gymIds.length === 0) {
+    return 0;
+  }
+
+  const { count, error } = await supabase
+    .from("members")
+    .select("id", { count: "exact", head: true })
+    .in("gym_id", gymIds)
+    .eq("status", "active");
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
 async function generateMemberCode(supabase: SupabaseClient<Database>, gymId: string | null) {
   const { data, error } = await supabase.rpc("generate_member_code", { target_gym_id: gymId });
 
@@ -1237,11 +1335,11 @@ function validationState(fieldErrors: Record<string, string[]>): AuthActionState
 }
 
 export async function suggestedRenewalStartDateAction(membershipId: string) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const supabase = await createSupabaseServerClient();
   const membership = await loadMembership(supabase, membershipId);
 
-  if (!membership || (context.profile?.gym_id && membership.gym_id !== context.profile.gym_id)) {
+  if (!membership || membership.gym_id !== scope.gymId) {
     return formatDateInput(new Date());
   }
 

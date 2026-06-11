@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CalendarCheck, Dumbbell, Star, UsersRound } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -9,8 +10,9 @@ import { TrainerAssignmentForm, TrainerForm, PtPurchaseForm } from "@/features/t
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { formatTrainingLabel } from "@/features/training/lib/business-rules";
 import { listActiveTrainers, listPersonalTrainingPackages, listTrainers } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 type AdminTrainersPageProps = {
   searchParams: Promise<{
@@ -28,11 +30,12 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminTrainersPage({ searchParams }: AdminTrainersPageProps) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
   const params = await searchParams;
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const page = Number(params.page ?? "1");
-  const [trainerResult, activeTrainers, memberResult, packages] = await Promise.all([
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const [trainerResult, activeTrainers, memberResult, packages, planContext] = await Promise.all([
     listTrainers({
       gymId,
       query: params.q,
@@ -42,8 +45,10 @@ export default async function AdminTrainersPage({ searchParams }: AdminTrainersP
     }),
     listActiveTrainers(gymId),
     listMembers({ gymId, pageSize: 100 }),
-    listPersonalTrainingPackages(gymId)
+    listPersonalTrainingPackages(gymId),
+    organizationId ? getOrgPlanContext(organizationId) : null
   ]);
+  const trainerAssignmentEnabled = planContext?.features.trainerAssignmentEnabled === true;
   const members = memberResult.members;
   const activeAssignments = trainerResult.trainers.reduce((total, trainer) => total + trainer.activeAssignments, 0);
   const upcomingSessions = trainerResult.trainers.reduce((total, trainer) => total + trainer.upcomingSessions, 0);
@@ -148,7 +153,11 @@ export default async function AdminTrainersPage({ searchParams }: AdminTrainersP
               <h3 className="text-2xl font-black">Assign Trainer</h3>
             </CardHeader>
             <CardContent>
-              <TrainerAssignmentForm members={members} trainers={activeTrainers} />
+              {trainerAssignmentEnabled ? (
+                <TrainerAssignmentForm members={members} trainers={activeTrainers} />
+              ) : (
+                <FeatureLocked compact featureName="Trainer Assignment" requiredPlan="Standard" />
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -156,7 +165,11 @@ export default async function AdminTrainersPage({ searchParams }: AdminTrainersP
               <h3 className="text-2xl font-black">Assign PT Package</h3>
             </CardHeader>
             <CardContent>
-              <PtPurchaseForm members={members} packages={packages.filter((packageRow) => packageRow.status === "active")} trainers={activeTrainers} />
+              {trainerAssignmentEnabled ? (
+                <PtPurchaseForm members={members} packages={packages.filter((packageRow) => packageRow.status === "active")} trainers={activeTrainers} />
+              ) : (
+                <FeatureLocked compact featureName="PT Package Assignment" requiredPlan="Standard" />
+              )}
             </CardContent>
           </Card>
         </div>

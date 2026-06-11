@@ -237,11 +237,18 @@ export async function getTrainerSessionsForUser(userId: string, gymId: string | 
 
 export async function getMemberTrainingPortal(userId: string): Promise<MemberTrainingPortal | null> {
   const supabase = await createSupabaseServerClient();
-  const { data: member, error: memberError } = await supabase.from("members").select("*").eq("user_id", userId).maybeSingle();
+  const { data: members, error: memberError } = await supabase
+    .from("members")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1);
 
   if (memberError) {
     throw new Error(memberError.message);
   }
+
+  const member = members?.[0] ?? null;
 
   if (!member) {
     return null;

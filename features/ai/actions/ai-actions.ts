@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole, requireRole } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import {
@@ -20,12 +20,12 @@ import {
   saveLatestMemberAiProfile
 } from "../services/ai-service";
 
-const staffRoles = ["super_admin", "gym_admin"] as const;
-const trainerRoles = ["super_admin", "gym_admin", "trainer"] as const;
+const adminAiRoles = ["gym_admin"] as const;
+const trainerRoles = ["trainer"] as const;
 
 export async function generateMyAiProfileAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["member", "super_admin"], "/member/ai-coach");
+  const context = await requirePrimaryRole(["member"], "/member/ai-coach");
   const parsed = GenerateAiProfileSchema.safeParse({
     userId: formData.get("userId") ?? context.userId ?? ""
   });
@@ -72,7 +72,7 @@ export async function generateTrainerProgramAction(_previousState: AuthActionSta
 
 export async function generateNutritionGuidanceAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["member", "super_admin"], "/member/ai-coach");
+  const context = await requirePrimaryRole(["member"], "/member/ai-coach");
   const parsed = GenerateNutritionGuidanceSchema.safeParse({
     goal: formData.get("goal") ?? "general fitness"
   });
@@ -88,7 +88,7 @@ export async function generateNutritionGuidanceAction(_previousState: AuthAction
 
 export async function generateAiContentDraftAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/ai");
+  const context = await requireRole(adminAiRoles, "/admin/ai");
   const parsed = AiContentDraftSchema.safeParse({
     draftType: formData.get("draftType") ?? "announcement",
     audience: formData.get("audience"),
@@ -121,7 +121,7 @@ export async function generateAiContentDraftAction(_previousState: AuthActionSta
 
 export async function generateExecutiveInsightAction(_previousState: AuthActionState): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/ai");
+  const context = await requireRole(adminAiRoles, "/admin/ai");
   const content = await generateExecutiveInsightDraft({
     gymId: context.profile?.gym_id ?? null,
     userId: context.userId
@@ -160,7 +160,7 @@ export async function generateExecutiveInsightAction(_previousState: AuthActionS
 
 export async function reviewAiRecommendationAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(staffRoles, "/admin/ai");
+  const context = await requireRole(adminAiRoles, "/admin/ai");
   const parsed = AiRecommendationReviewSchema.safeParse({
     recommendationId: formData.get("recommendationId"),
     status: formData.get("status"),

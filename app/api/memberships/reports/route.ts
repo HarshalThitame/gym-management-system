@@ -1,22 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthContext } from "@/lib/auth/session";
-import { canAny } from "@/lib/rbac";
+import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
 import { membershipRowsToCsv } from "@/features/memberships/lib/csv";
 import { getMembershipReportRows } from "@/features/memberships/services/membership-service";
 
 const reportTypes = ["active", "expired", "upcoming", "revenue", "growth"] as const;
 
 export async function GET(request: NextRequest) {
-  const context = await getAuthContext();
+  const auth = await requireApiPermission("reports", "export");
 
-  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
+  if (!gymScope.ok) {
+    return gymScope.response;
   }
 
   const type = request.nextUrl.searchParams.get("type") ?? "active";
   const reportType = reportTypes.includes(type as (typeof reportTypes)[number]) ? type as (typeof reportTypes)[number] : "active";
   const rows = await getMembershipReportRows({
-    gymId: context.profile?.gym_id ?? null,
+    gymId: gymScope.gymId,
     type: reportType
   });
   const csv = membershipRowsToCsv(rows);

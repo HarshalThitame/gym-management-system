@@ -5,8 +5,9 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { gallery, siteConfig, trainers } from "@/data/site";
+import { gallery, trainers } from "@/data/site";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 export const metadata: Metadata = createMetadata({
   title: "About Apex Performance Club",
@@ -14,23 +15,25 @@ export const metadata: Metadata = createMetadata({
   path: "/about"
 });
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const tenantSite = await getTenantSiteConfig();
+
   return (
     <>
       <section className="bg-obsidian py-20 text-white md:py-28">
         <div className="container-page grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <Reveal>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-accent">About Apex</p>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-accent">About {tenantSite.shortName}</p>
             <h1 className="mt-4 text-balance text-5xl font-black leading-tight md:text-7xl">
               Designed for focused training and long-term consistency.
             </h1>
             <p className="mt-6 text-lg leading-8 text-white/70">
-              Apex combines expert coaching, modern facilities, and clear member support in one polished club experience.
+              {tenantSite.shortName} combines expert coaching, modern facilities, and clear member support in one polished club experience.
             </p>
           </Reveal>
           <Reveal>
             <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
-              <Image alt="Apex premium training facility" className="object-cover" fill priority sizes="(min-width: 1024px) 50vw, 100vw" src={gallery[0]?.image ?? ""} />
+              <Image alt={`${tenantSite.name} premium training facility`} className="object-cover" fill priority sizes="(min-width: 1024px) 50vw, 100vw" src={gallery[0]?.image ?? ""} />
             </div>
           </Reveal>
         </div>
@@ -87,7 +90,7 @@ export default function AboutPage() {
       <section className="bg-background py-20 md:py-28">
         <div className="container-page grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <Reveal>
-            <SectionHeading eyebrow="Facilities and certifications" title="A professional club experience from the front desk to the training floor." body={`${siteConfig.name} is built around modern equipment, hygienic training spaces, qualified coaches, and member support that makes joining straightforward.`} />
+            <SectionHeading eyebrow="Facilities and certifications" title="A professional club experience from the front desk to the training floor." body={`${tenantSite.name} is built around modern equipment, hygienic training spaces, qualified coaches, and member support that makes joining straightforward.`} />
             <ButtonLink className="mt-7" href="/gallery" variant="primary">View Facilities</ButtonLink>
           </Reveal>
           <div className="grid gap-4 sm:grid-cols-2">

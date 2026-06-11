@@ -9,6 +9,7 @@ const anonymousContext: AuthContext = {
   userId: null,
   email: null,
   profile: null,
+  organizationId: null,
   roles: [],
   primaryRole: null,
   isAuthenticated: false,
@@ -51,6 +52,7 @@ export async function getAuthContext(): Promise<AuthContext> {
     .map((role) => role.name)
     .filter(isRoleName);
   const normalizedProfile = profile ? toAuthProfile(profile) : null;
+  const organizationId = await getUserOrganizationId(supabase, userId, normalizedProfile?.gym_id ?? null);
   const primaryRole = getPrimaryRole(roles);
   const isActive = normalizedProfile?.status === "active" || normalizedProfile?.status === "invited";
 
@@ -58,6 +60,7 @@ export async function getAuthContext(): Promise<AuthContext> {
     userId,
     email: normalizedProfile?.email ?? claimsEmail,
     profile: normalizedProfile,
+    organizationId,
     roles,
     primaryRole,
     isAuthenticated: true,
@@ -67,6 +70,27 @@ export async function getAuthContext(): Promise<AuthContext> {
 
 function toAuthProfile(profile: AuthProfile): AuthProfile {
   return profile;
+}
+
+async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, gymId: string | null) {
+  if (gymId) {
+    const { data } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+
+    if (data?.organization_id) {
+      return data.organization_id;
+    }
+  }
+
+  const { data } = await supabase
+    .from("branch_users")
+    .select("organization_id,role_name,access_scope,status")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("role_name", { ascending: false })
+    .limit(10);
+
+  const organizationOwnerAssignment = data?.find((assignment) => assignment.role_name === "organization_owner" && assignment.access_scope === "organization");
+  return organizationOwnerAssignment?.organization_id ?? data?.[0]?.organization_id ?? null;
 }
 
 export function userHasRole(context: AuthContext, allowedRoles: readonly RoleName[]) {

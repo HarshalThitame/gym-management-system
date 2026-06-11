@@ -14,6 +14,7 @@ export type Database = {
       gyms: {
         Row: {
           id: string;
+          organization_id: string | null;
           name: string;
           slug: string;
           timezone: string;
@@ -24,6 +25,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          organization_id?: string | null;
           name: string;
           slug: string;
           timezone?: string;
@@ -165,7 +167,7 @@ export type Database = {
           organization_id: string;
           branch_id: string;
           user_id: string;
-          role_name: "super_admin" | "gym_admin" | "reception_staff" | "trainer" | "member";
+          role_name: "super_admin" | "organization_owner" | "gym_admin" | "reception_staff" | "trainer" | "member";
           branch_role: "owner" | "admin" | "manager" | "staff" | "trainer" | "viewer";
           access_scope: "single_branch" | "multi_branch" | "organization";
           status: "active" | "invited" | "suspended" | "revoked";
@@ -179,7 +181,7 @@ export type Database = {
           organization_id: string;
           branch_id: string;
           user_id: string;
-          role_name: "super_admin" | "gym_admin" | "reception_staff" | "trainer" | "member";
+          role_name: "super_admin" | "organization_owner" | "gym_admin" | "reception_staff" | "trainer" | "member";
           branch_role?: "owner" | "admin" | "manager" | "staff" | "trainer" | "viewer";
           access_scope?: "single_branch" | "multi_branch" | "organization";
           status?: "active" | "invited" | "suspended" | "revoked";
@@ -275,6 +277,140 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["tenant_configs"]["Insert"]>;
+        Relationships: Relationship[];
+      };
+      tenant_domains: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string | null;
+          gym_id: string | null;
+          tenant_config_id: string | null;
+          domain: string;
+          normalized_domain: string | null;
+          domain_type: "custom_domain" | "subdomain" | "system";
+          routing_mode: "organization" | "branch" | "gym";
+          status: "pending" | "verified" | "failed" | "disabled";
+          is_primary: boolean;
+          ssl_status: "pending" | "issued" | "failed" | "managed_by_vercel" | "not_applicable";
+          verification_token: string;
+          verified_at: string | null;
+          last_checked_at: string | null;
+          metadata: Json;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id?: string | null;
+          gym_id?: string | null;
+          tenant_config_id?: string | null;
+          domain: string;
+          normalized_domain?: never;
+          domain_type?: "custom_domain" | "subdomain" | "system";
+          routing_mode?: "organization" | "branch" | "gym";
+          status?: "pending" | "verified" | "failed" | "disabled";
+          is_primary?: boolean;
+          ssl_status?: "pending" | "issued" | "failed" | "managed_by_vercel" | "not_applicable";
+          verification_token?: string;
+          verified_at?: string | null;
+          last_checked_at?: string | null;
+          metadata?: Json;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["tenant_domains"]["Insert"]>;
+        Relationships: Relationship[];
+      };
+      tenant_domain_checks: {
+        Row: {
+          id: string;
+          tenant_domain_id: string;
+          organization_id: string;
+          branch_id: string | null;
+          gym_id: string | null;
+          domain: string;
+          normalized_domain: string | null;
+          provider: "vercel" | "manual";
+          check_status: "passed" | "failed" | "warning" | "skipped";
+          dns_status: "passed" | "failed" | "warning" | "skipped";
+          ownership_status: "passed" | "failed" | "skipped";
+          tls_status: "passed" | "failed" | "pending" | "skipped";
+          expected_records: Json;
+          observed_records: Json;
+          provider_response: Json;
+          error_message: string | null;
+          checked_by: string | null;
+          checked_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_domain_id: string;
+          organization_id: string;
+          branch_id?: string | null;
+          gym_id?: string | null;
+          domain: string;
+          normalized_domain?: never;
+          provider?: "vercel" | "manual";
+          check_status: "passed" | "failed" | "warning" | "skipped";
+          dns_status: "passed" | "failed" | "warning" | "skipped";
+          ownership_status: "passed" | "failed" | "skipped";
+          tls_status: "passed" | "failed" | "pending" | "skipped";
+          expected_records?: Json;
+          observed_records?: Json;
+          provider_response?: Json;
+          error_message?: string | null;
+          checked_by?: string | null;
+          checked_at?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["tenant_domain_checks"]["Insert"]>;
+        Relationships: Relationship[];
+      };
+      tenant_domain_provider_events: {
+        Row: {
+          id: string;
+          tenant_domain_id: string;
+          organization_id: string;
+          branch_id: string | null;
+          gym_id: string | null;
+          domain: string;
+          normalized_domain: string | null;
+          provider: "vercel";
+          operation: "add" | "sync" | "verify" | "remove";
+          operation_status: "pending" | "succeeded" | "failed" | "skipped";
+          provider_project_id: string | null;
+          provider_team_id: string | null;
+          request_payload: Json;
+          response_payload: Json;
+          error_message: string | null;
+          requested_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_domain_id: string;
+          organization_id: string;
+          branch_id?: string | null;
+          gym_id?: string | null;
+          domain: string;
+          normalized_domain?: never;
+          provider?: "vercel";
+          operation: "add" | "sync" | "verify" | "remove";
+          operation_status: "pending" | "succeeded" | "failed" | "skipped";
+          provider_project_id?: string | null;
+          provider_team_id?: string | null;
+          request_payload?: Json;
+          response_payload?: Json;
+          error_message?: string | null;
+          requested_by?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["tenant_domain_provider_events"]["Insert"]>;
         Relationships: Relationship[];
       };
       feature_flags: {
@@ -4238,7 +4374,7 @@ export type Database = {
           id: string;
           gym_id: string | null;
           user_id: string | null;
-          role_name: "super_admin" | "gym_admin" | "reception_staff" | "trainer" | "member";
+          role_name: "super_admin" | "organization_owner" | "gym_admin" | "reception_staff" | "trainer" | "member";
           name: string;
           scope: "private" | "role" | "gym";
           layout: Json;
@@ -4252,7 +4388,7 @@ export type Database = {
           id?: string;
           gym_id?: string | null;
           user_id?: string | null;
-          role_name: "super_admin" | "gym_admin" | "reception_staff" | "trainer" | "member";
+          role_name: "super_admin" | "organization_owner" | "gym_admin" | "reception_staff" | "trainer" | "member";
           name: string;
           scope?: "private" | "role" | "gym";
           layout?: Json;
@@ -4438,14 +4574,14 @@ export type Database = {
       roles: {
         Row: {
           id: string;
-          name: "super_admin" | "gym_admin" | "reception_staff" | "trainer" | "member";
+          name: "super_admin" | "organization_owner" | "gym_admin" | "reception_staff" | "trainer" | "member";
           display_name: string;
           description: string;
           created_at: string;
         };
         Insert: {
           id?: string;
-          name: "super_admin" | "gym_admin" | "reception_staff" | "trainer" | "member";
+          name: "super_admin" | "organization_owner" | "gym_admin" | "reception_staff" | "trainer" | "member";
           display_name: string;
           description?: string;
           created_at?: string;
@@ -4741,6 +4877,52 @@ export type Database = {
         };
         Relationships: Relationship[];
       };
+      tenant_domain_latest_checks: {
+        Row: {
+          id: string | null;
+          tenant_domain_id: string | null;
+          organization_id: string | null;
+          branch_id: string | null;
+          gym_id: string | null;
+          domain: string | null;
+          normalized_domain: string | null;
+          provider: string | null;
+          check_status: string | null;
+          dns_status: string | null;
+          ownership_status: string | null;
+          tls_status: string | null;
+          expected_records: Json | null;
+          observed_records: Json | null;
+          provider_response: Json | null;
+          error_message: string | null;
+          checked_by: string | null;
+          checked_at: string | null;
+          created_at: string | null;
+        };
+        Relationships: Relationship[];
+      };
+      tenant_domain_latest_provider_events: {
+        Row: {
+          id: string | null;
+          tenant_domain_id: string | null;
+          organization_id: string | null;
+          branch_id: string | null;
+          gym_id: string | null;
+          domain: string | null;
+          normalized_domain: string | null;
+          provider: string | null;
+          operation: string | null;
+          operation_status: string | null;
+          provider_project_id: string | null;
+          provider_team_id: string | null;
+          request_payload: Json | null;
+          response_payload: Json | null;
+          error_message: string | null;
+          requested_by: string | null;
+          created_at: string | null;
+        };
+        Relationships: Relationship[];
+      };
       pwa_mobile_engagement_summary: {
         Row: {
           organization_id: string | null;
@@ -4881,6 +5063,54 @@ export type Database = {
       current_user_gym_id: {
         Args: Record<string, never>;
         Returns: string | null;
+      };
+      current_user_organization_id: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
+      normalize_tenant_domain: {
+        Args: { input_domain: string | null };
+        Returns: string | null;
+      };
+      resolve_tenant_by_host: {
+        Args: { request_host: string | null };
+        Returns: Array<{
+          organization_id: string | null;
+          organization_name: string | null;
+          branch_id: string | null;
+          branch_name: string | null;
+          branch_code: string | null;
+          gym_id: string | null;
+          gym_name: string | null;
+          tenant_config_id: string | null;
+          tenant_key: string | null;
+          domain: string | null;
+          domain_type: string | null;
+          routing_mode: string | null;
+          plan_tier: string | null;
+          tenant_status: string | null;
+          organization_status: string | null;
+          branch_status: string | null;
+          brand_name: string | null;
+          logo_url: string | null;
+          favicon_url: string | null;
+          primary_color: string | null;
+          secondary_color: string | null;
+          accent_color: string | null;
+          typography: Json | null;
+          email_branding: Json | null;
+          feature_overrides: Json | null;
+          limits: Json | null;
+          branch_phone: string | null;
+          branch_email: string | null;
+          branch_address: string | null;
+          branch_city: string | null;
+          branch_state: string | null;
+          branch_country: string | null;
+          branch_postal_code: string | null;
+          branch_timezone: string | null;
+          branch_currency: string | null;
+        }>;
       };
       can_access_gym: {
         Args: { target_gym_id: string };

@@ -1,6 +1,4 @@
-import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   BranchPerformancePoint,
@@ -22,36 +20,23 @@ type TenantUsageRow = Database["public"]["Views"]["enterprise_tenant_usage_summa
 type HealthCheckRow = Database["public"]["Tables"]["system_health_checks"]["Row"];
 
 export async function getEnterpriseDashboard(): Promise<EnterpriseDashboard> {
-  if (getSupabaseAdminClient()) {
-    return getCachedEnterpriseDashboard();
-  }
-
   const supabase = await createSupabaseServerClient();
   return buildEnterpriseDashboard(supabase);
 }
-
-const getCachedEnterpriseDashboard = unstable_cache(
-  async () => {
-    const supabase = getSupabaseAdminClient();
-    if (!supabase) {
-      throw new Error("Supabase admin client is required for cached enterprise dashboards.");
-    }
-
-    return buildEnterpriseDashboard(supabase);
-  },
-  ["enterprise-dashboard"],
-  { revalidate: 60 }
-);
 
 async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Promise<EnterpriseDashboard> {
 
   const [
     organizationsResult,
+    gymsResult,
     branchesResult,
     branchSettingsResult,
     branchUsersResult,
     branchMetricsResult,
     tenantConfigsResult,
+    tenantDomainsResult,
+    tenantDomainChecksResult,
+    tenantDomainProviderEventsResult,
     featureFlagsResult,
     subscriptionsResult,
     activityEventsResult,
@@ -66,11 +51,15 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
     securitySummaryResult
   ] = await Promise.all([
     supabase.from("organizations").select("*").order("created_at", { ascending: false }).limit(100),
+    supabase.from("gyms").select("*").order("created_at", { ascending: false }).limit(500),
     supabase.from("branches").select("*").order("created_at", { ascending: false }).limit(500),
     supabase.from("branch_settings").select("*").order("updated_at", { ascending: false }).limit(100),
     supabase.from("branch_users").select("*").order("updated_at", { ascending: false }).limit(500),
     supabase.from("branch_metrics").select("*").order("metric_date", { ascending: false }).limit(1000),
     supabase.from("tenant_configs").select("*").order("updated_at", { ascending: false }).limit(100),
+    supabase.from("tenant_domains").select("*").order("is_primary", { ascending: false }).order("updated_at", { ascending: false }).limit(200),
+    supabase.from("tenant_domain_latest_checks").select("*").order("checked_at", { ascending: false }).limit(200),
+    supabase.from("tenant_domain_latest_provider_events").select("*").order("created_at", { ascending: false }).limit(200),
     supabase.from("feature_flags").select("*").order("updated_at", { ascending: false }).limit(200),
     supabase.from("platform_subscriptions").select("*").order("updated_at", { ascending: false }).limit(100),
     supabase.from("activity_events").select("*").order("created_at", { ascending: false }).limit(80),
@@ -87,11 +76,15 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
 
   const firstError = [
     organizationsResult,
+    gymsResult,
     branchesResult,
     branchSettingsResult,
     branchUsersResult,
     branchMetricsResult,
     tenantConfigsResult,
+    tenantDomainsResult,
+    tenantDomainChecksResult,
+    tenantDomainProviderEventsResult,
     featureFlagsResult,
     subscriptionsResult,
     activityEventsResult,
@@ -111,6 +104,7 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
   }
 
   const organizations = organizationsResult.data ?? [];
+  const gyms = gymsResult.data ?? [];
   const branches = branchesResult.data ?? [];
   const tenantUsage = tenantUsageResult.data ?? [];
   const featureFlags = featureFlagsResult.data ?? [];
@@ -132,6 +126,7 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
   return {
     kpis: [
       kpi("organizations", "Organizations", formatCompactNumber(organizations.length), `${branches.length} branches in scope`, "good"),
+      kpi("gyms", "Gyms", formatCompactNumber(gyms.length), "Gym records across tenant organizations", "good"),
       kpi("active_branches", "Active Branches", formatCompactNumber(branches.filter((branch) => branch.status === "active").length), "Operational branches", "good"),
       kpi("tenant_revenue", "Latest Revenue", formatCurrency(revenue), "Latest branch metric snapshot", "good"),
       kpi("feature_flags", "Enabled Flags", formatCompactNumber(enabledFlags), `${featureFlags.length} total feature controls`, enabledFlags > 0 ? "good" : "watch"),
@@ -142,11 +137,15 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
       kpi("storage", "Storage Risk", `${storageRisk}%`, "Highest tenant storage utilization", enterpriseStatusFromPercent(storageRisk))
     ],
     organizations,
+    gyms,
     branches,
     branchSettings: branchSettingsResult.data ?? [],
     branchUsers: branchUsersResult.data ?? [],
     branchMetrics: branchMetricsResult.data ?? [],
     tenantConfigs: tenantConfigsResult.data ?? [],
+    tenantDomains: tenantDomainsResult.data ?? [],
+    tenantDomainChecks: tenantDomainChecksResult.data ?? [],
+    tenantDomainProviderEvents: tenantDomainProviderEventsResult.data ?? [],
     featureFlags,
     subscriptions: subscriptionsResult.data ?? [],
     activityEvents: activityEventsResult.data ?? [],

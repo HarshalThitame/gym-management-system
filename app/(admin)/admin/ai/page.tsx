@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { Bot, Brain, LineChart, ShieldCheck } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { AiContentDraftForm, AiRecommendationReviewForm, ExecutiveInsightForm } from "@/features/ai/components/ai-forms";
 import { AiReviewBadge, AiRiskBadge, AiSeverityBadge } from "@/features/ai/components/ai-status-badge";
 import { getAdminAiDashboard } from "@/features/ai/services/ai-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 export const metadata: Metadata = createMetadata({
   title: "AI Intelligence",
@@ -15,8 +17,28 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminAiPage() {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/ai");
-  const dashboard = await getAdminAiDashboard(context.profile?.gym_id ?? null);
+  const scope = await requireGymAdminScope("/admin/ai");
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const planContext = organizationId ? await getOrgPlanContext(organizationId) : null;
+
+  if (!planContext?.features.aiEnabled) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">AI Operations</p>
+          <h2 className="mt-2 text-3xl font-black">Predictive intelligence and supervised automation</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Executive insights, churn prediction, revenue forecasting, content generation, and AI observability with human approval controls.</p>
+        </div>
+        <FeatureLocked
+          description="AI insights, content generation, retention recommendations, and supervised automation are available on Premium."
+          featureName="AI Intelligence"
+          requiredPlan="Premium"
+        />
+      </div>
+    );
+  }
+
+  const dashboard = await getAdminAiDashboard(scope.gymId);
 
   return (
     <div className="space-y-8">

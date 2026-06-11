@@ -7,7 +7,7 @@ import { NutritionMacroChart, WeightTrendChart, WorkoutAdherenceChart } from "@/
 import { BodyMeasurementForm, FitnessGoalForm, GoalStatusForm, MealEntryForm, ProgressPhotoForm, WorkoutSessionExerciseLogPanel, WorkoutSessionForm } from "@/features/fitness/components/fitness-forms";
 import { calculateGoalProgress, formatFitnessLabel } from "@/features/fitness/lib/business-rules";
 import { getMemberFitnessPortal, listExercises } from "@/features/fitness/services/fitness-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -17,7 +17,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberFitnessPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/fitness");
+  const context = await requirePrimaryRole(["member"], "/member/fitness");
   const portal = context.userId ? await getMemberFitnessPortal(context.userId) : null;
   const exerciseResult = await listExercises({ gymId: context.profile?.gym_id ?? portal?.member.gym_id ?? null, pageSize: 80 });
 

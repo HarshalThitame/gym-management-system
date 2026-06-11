@@ -5,8 +5,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LazyLeadForm } from "@/features/public/components/lazy-lead-form";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { siteConfig } from "@/data/site";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 export const metadata: Metadata = createMetadata({
   title: "Contact Apex Performance Club",
@@ -14,8 +14,9 @@ export const metadata: Metadata = createMetadata({
   path: "/contact"
 });
 
-export default function ContactPage() {
-  const whatsappHref = `https://wa.me/${siteConfig.whatsapp}?text=${encodeURIComponent("Hi Apex, I want help choosing a membership.")}`;
+export default async function ContactPage() {
+  const tenantSite = await getTenantSiteConfig();
+  const whatsappHref = `https://wa.me/${tenantSite.whatsapp}?text=${encodeURIComponent(`Hi ${tenantSite.shortName}, I want help choosing a membership.`)}`;
 
   return (
     <>
@@ -31,19 +32,19 @@ export default function ContactPage() {
           <div>
             <SectionHeading eyebrow="Reach the team" title="Call, message, visit, or send an inquiry." />
             <div className="mt-8 grid gap-4">
-              <ContactCard icon={<Phone size={20} />} title="Call" text={siteConfig.phone} href={`tel:${siteConfig.phone.replaceAll(" ", "")}`} />
+              <ContactCard icon={<Phone size={20} />} title="Call" text={tenantSite.phone} href={`tel:${tenantSite.phone.replaceAll(" ", "")}`} />
               <ContactCard icon={<MessageCircle size={20} />} title="WhatsApp" text="Message the front desk" href={whatsappHref} external />
-              <ContactCard icon={<Mail size={20} />} title="Email" text={siteConfig.email} href={`mailto:${siteConfig.email}`} />
-              <ContactCard icon={<MapPin size={20} />} title="Location" text={siteConfig.address} href="https://maps.google.com" external />
+              <ContactCard icon={<Mail size={20} />} title="Email" text={tenantSite.email} href={`mailto:${tenantSite.email}`} />
+              <ContactCard icon={<MapPin size={20} />} title="Location" text={tenantSite.address} href="https://maps.google.com" external />
             </div>
             <Card className="mt-6 p-5">
               <h2 className="text-xl font-black">Opening Hours</h2>
-              <p className="mt-2 text-muted-foreground">{siteConfig.hours}</p>
+              <p className="mt-2 text-muted-foreground">{tenantSite.hours}</p>
             </Card>
           </div>
           <Card className="p-6">
             <h2 className="text-2xl font-black">Send an inquiry</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">The Apex team will contact you with the next step.</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">The {tenantSite.shortName} team will contact you with the next step.</p>
             <div className="mt-6">
               <LazyLeadForm type="contact" />
             </div>
@@ -55,8 +56,8 @@ export default function ContactPage() {
           <div className="overflow-hidden rounded-lg border border-border bg-surface">
             <div className="grid min-h-80 place-items-center p-8 text-center">
               <MapPin className="text-secondary" size={34} />
-              <h2 className="mt-4 text-3xl font-black">Find Apex in Pune</h2>
-              <p className="mt-3 max-w-xl text-muted-foreground">{siteConfig.address}. Use the directions link for the latest route and traffic details.</p>
+              <h2 className="mt-4 text-3xl font-black">Find {tenantSite.shortName}{tenantSite.tenant.branch.city ? ` in ${tenantSite.tenant.branch.city}` : ""}</h2>
+              <p className="mt-3 max-w-xl text-muted-foreground">{tenantSite.address}. Use the directions link for the latest route and traffic details.</p>
               <ButtonLink className="mt-6" href="https://maps.google.com" variant="primary">Get Directions</ButtonLink>
             </div>
           </div>

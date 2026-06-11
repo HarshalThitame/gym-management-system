@@ -46,7 +46,7 @@ export function TrainerForm({ trainer, profile }: { trainer?: TrainerRow | null;
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="trainerId" type="hidden" value={trainer?.id ?? ""} />
+      <HiddenInput name="trainerId" value={trainer?.id ?? ""} />
       <div className="grid gap-4 md:grid-cols-2">
         <Field name="displayName" label="Display name" state={state}>
           <Input id="displayName" name="displayName" defaultValue={trainer?.display_name ?? ""} required />
@@ -118,7 +118,7 @@ export function TrainerSpecializationForm({ trainerId }: { trainerId: string }) 
   return (
     <form action={formAction} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
       <FormMessage state={state} />
-      <input name="trainerId" type="hidden" value={trainerId} />
+      <HiddenInput name="trainerId" value={trainerId} />
       <select className={selectClass} name="specialization" defaultValue="strength_training">
         <option value="weight_loss">Weight loss</option>
         <option value="muscle_building">Muscle building</option>
@@ -147,9 +147,9 @@ export function CertificationForm({ trainerId }: { trainerId: string }) {
   const [state, formAction] = useActionState(saveCertificationAction, initialAuthActionState);
 
   return (
-    <form action={formAction} className="space-y-4" encType="multipart/form-data">
+    <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="trainerId" type="hidden" value={trainerId} />
+      <HiddenInput name="trainerId" value={trainerId} />
       <div className="grid gap-4 md:grid-cols-2">
         <Field name="certificationName" label="Certification" state={state}>
           <Input id="certificationName" name="certificationName" placeholder="ACE Personal Trainer" />
@@ -177,7 +177,7 @@ export function AvailabilityForm({ trainerId }: { trainerId: string }) {
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="trainerId" type="hidden" value={trainerId} />
+      <HiddenInput name="trainerId" value={trainerId} />
       <div className="grid gap-4 md:grid-cols-5">
         <select className={selectClass} name="dayOfWeek" defaultValue="1" aria-label="Day of week">
           <option value="0">Sunday</option>
@@ -229,8 +229,8 @@ export function EndAssignmentForm({ assignment }: { assignment: TrainerAssignmen
   return (
     <form action={formAction} className="flex flex-col gap-2 sm:flex-row">
       <FormMessage state={state} />
-      <input name="assignmentId" type="hidden" value={assignment.id} />
-      <input name="memberId" type="hidden" value={assignment.member_id} />
+      <HiddenInput name="assignmentId" value={assignment.id} />
+      <HiddenInput name="memberId" value={assignment.member_id} />
       <Input className="min-w-56" name="reason" placeholder="Reason" required />
       <Button type="submit" variant="destructive">End</Button>
     </form>
@@ -243,7 +243,7 @@ export function PtPackageForm({ packageRow }: { packageRow?: PersonalTrainingPac
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="packageId" type="hidden" value={packageRow?.id ?? ""} />
+      <HiddenInput name="packageId" value={packageRow?.id ?? ""} />
       <div className="grid gap-4 md:grid-cols-2">
         <Field name="name" label="Package name" state={state}>
           <Input id="name" name="name" defaultValue={packageRow?.name ?? ""} />
@@ -355,7 +355,7 @@ export function TrainerSessionStatusForm({ session }: { session: TrainerSessionR
   return (
     <form action={formAction} className="space-y-3">
       <FormMessage state={state} />
-      <input name="sessionId" type="hidden" value={session.id} />
+      <HiddenInput name="sessionId" value={session.id} />
       <select className={selectClass} name="nextStatus" defaultValue="completed" aria-label="Next session status">
         <option value="completed">Complete</option>
         <option value="missed">Missed</option>
@@ -405,7 +405,7 @@ export function WorkoutExerciseForm({ programId }: { programId: string }) {
   return (
     <form action={formAction} className="space-y-3">
       <FormMessage state={state} />
-      <input name="programId" type="hidden" value={programId} />
+      <HiddenInput name="programId" value={programId} />
       <div className="grid gap-3 md:grid-cols-3">
         <Input name="dayNumber" type="number" min={1} max={14} defaultValue={1} aria-label="Day number" />
         <Input name="exerciseName" placeholder="Back squat" aria-label="Exercise name" />
@@ -480,9 +480,9 @@ export function TrainerFeedbackForm({ trainerId, memberId, sessionId = "" }: { t
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-border bg-surface p-5">
       <FormMessage state={state} />
-      <input name="trainerId" type="hidden" value={trainerId} />
-      <input name="memberId" type="hidden" value={memberId} />
-      <input name="sessionId" type="hidden" value={sessionId} />
+      <HiddenInput name="trainerId" value={trainerId} />
+      <HiddenInput name="memberId" value={memberId} />
+      <HiddenInput name="sessionId" value={sessionId} />
       <select className={selectClass} name="rating" defaultValue="5" aria-label="Rating">
         <option value="5">5 stars</option>
         <option value="4">4 stars</option>
@@ -506,7 +506,7 @@ export function StaffProfileForm({ staff }: { staff?: StaffProfileRow | null }) 
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="staffId" type="hidden" value={staff?.id ?? ""} />
+      <HiddenInput name="staffId" value={staff?.id ?? ""} />
       <div className="grid gap-4 md:grid-cols-2">
         <Field name="fullName" label="Full name" state={state}>
           <Input id="fullName" name="fullName" defaultValue={staff?.full_name ?? ""} />
@@ -569,6 +569,10 @@ function Field({ name, label, state, children }: { name: string; label: string; 
       <FieldError message={state.fieldErrors?.[name]?.[0]} />
     </div>
   );
+}
+
+function HiddenInput({ name, value }: { name: string; value: string }) {
+  return <input name={name} suppressHydrationWarning type="hidden" value={value} />;
 }
 
 function moneyInputValue(value?: number | null) {

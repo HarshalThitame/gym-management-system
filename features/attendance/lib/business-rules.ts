@@ -11,7 +11,13 @@ export function hashQrToken(tokenValue: string) {
 }
 
 export function buildQrPayload(tokenValue: string, origin?: string) {
-  const baseUrl = origin?.replace(/\/$/, "") || process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://apex.local";
+  const baseUrl = (
+    origin
+    ?? process.env.NEXT_PUBLIC_SITE_URL
+    ?? process.env.NEXT_PUBLIC_APP_URL
+    ?? process.env.APP_URL
+    ?? "https://apexperformance.club"
+  ).replace(/\/$/, "");
   return `${baseUrl}/admin/attendance?token=${encodeURIComponent(tokenValue)}`;
 }
 

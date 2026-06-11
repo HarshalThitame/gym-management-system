@@ -6,7 +6,7 @@ import { formatMoney } from "@/features/memberships/lib/business-rules";
 import { TrainerFeedbackForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { getMemberTrainingPortal } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -16,7 +16,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberWorkoutsPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/workouts");
+  const context = await requirePrimaryRole(["member"], "/member/workouts");
   const portal = context.userId ? await getMemberTrainingPortal(context.userId) : null;
 
   if (!portal) {

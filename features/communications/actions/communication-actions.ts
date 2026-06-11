@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { assertFeature } from "@/lib/tenant";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
 import type { Database, Json } from "@/types/database";
@@ -44,9 +45,9 @@ type CampaignRecipientStatus = NonNullable<CampaignRecipientInsert["status"]>;
 type CommunicationHistoryInsert = Database["public"]["Tables"]["communication_history"]["Insert"];
 type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
 
-const staffRoles = ["super_admin", "gym_admin", "reception_staff"] as const;
-const communicationManagerRoles = ["super_admin", "gym_admin"] as const;
-const communicatorRoles = ["super_admin", "gym_admin", "reception_staff", "trainer"] as const;
+const staffRoles = ["super_admin", "organization_owner", "gym_admin", "reception_staff"] as const;
+const communicationManagerRoles = ["super_admin", "organization_owner", "gym_admin"] as const;
+const communicatorRoles = ["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"] as const;
 
 export async function saveNotificationTemplateAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
@@ -106,7 +107,7 @@ export async function saveNotificationTemplateAction(_previousState: AuthActionS
 
 export async function saveNotificationPreferencesAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/notifications");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/notifications");
   const parsed = NotificationPreferenceSchema.safeParse({
     emailEnabled: checkbox(formData, "emailEnabled"),
     whatsappEnabled: checkbox(formData, "whatsappEnabled"),
@@ -177,7 +178,7 @@ export async function saveNotificationPreferencesAction(_previousState: AuthActi
 
 export async function updateNotificationStateAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/notifications");
+  await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/notifications");
   const parsed = NotificationStateSchema.safeParse({
     notificationId: formData.get("notificationId"),
     nextStatus: formData.get("nextStatus") ?? "read",
@@ -224,6 +225,10 @@ export async function saveAnnouncementAction(_previousState: AuthActionState, fo
   }
 
   const supabase = await createSupabaseServerClient();
+  const featureError = await requireCommunicationsFeature(supabase, getContextOrganizationId(context), context.profile?.gym_id ?? null);
+  if (featureError) {
+    return featureError;
+  }
   const payload = {
     gym_id: context.profile?.gym_id ?? null,
     title: parsed.data.title,
@@ -277,6 +282,10 @@ export async function saveCommunicationSegmentAction(_previousState: AuthActionS
   }
 
   const supabase = await createSupabaseServerClient();
+  const featureError = await requireCommunicationsFeature(supabase, getContextOrganizationId(context), context.profile?.gym_id ?? null);
+  if (featureError) {
+    return featureError;
+  }
   const payload = {
     gym_id: context.profile?.gym_id ?? null,
     name: parsed.data.name,
@@ -370,12 +379,16 @@ export async function dispatchCampaignAction(_previousState: AuthActionState, fo
     return { status: "error", message: "Select a template before dispatching this campaign." };
   }
 
+  const supabase = await createSupabaseServerClient();
+  const featureError = await requireCommunicationsFeature(supabase, getContextOrganizationId(context), campaign.gym_id);
+  if (featureError) {
+    return featureError;
+  }
   const recipients = await resolveSegmentRecipients(campaign.gym_id, campaign.segment_key);
   if (recipients.length === 0) {
     return { status: "error", message: "No recipients matched this segment." };
   }
 
-  const supabase = await createSupabaseServerClient();
   const channels = getCampaignChannels(campaign.campaign_type);
   const now = new Date().toISOString();
   await supabase.from("campaigns").update({ status: "running", started_at: now }).eq("id", campaign.id);
@@ -483,6 +496,10 @@ export async function runAutomationRuleAction(_previousState: AuthActionState, f
   }
   if (rule.status !== "active") {
     return { status: "error", message: "Only active automation rules can be run." };
+  }
+  const featureError = await requireCommunicationsFeature(supabase, getContextOrganizationId(context), rule.gym_id);
+  if (featureError) {
+    return featureError;
   }
   const { data: template, error: templateError } = rule.template_id
     ? await supabase.from("notification_templates").select("*").eq("id", rule.template_id).maybeSingle()
@@ -1085,6 +1102,45 @@ async function writeCommunicationAudit(context: AuthContext, action: string, ent
     entityId,
     metadata
   });
+}
+
+function getContextOrganizationId(context: AuthContext) {
+  return (context as AuthContext & { scopedOrganizationId?: string | null }).scopedOrganizationId ?? context.organizationId ?? null;
+}
+
+async function requireCommunicationsFeature(
+  supabase: AppSupabase,
+  organizationId: string | null,
+  gymId: string | null
+): Promise<AuthActionState | null> {
+  const resolvedOrganizationId = organizationId ?? await getOrganizationIdForGym(supabase, gymId);
+  if (!resolvedOrganizationId) {
+    return { status: "error", message: "Feature not available on your current plan." };
+  }
+
+  try {
+    await assertFeature(resolvedOrganizationId, "communicationsEnabled");
+    return null;
+  } catch (error) {
+    return { status: "error", message: featureGateMessage(error) };
+  }
+}
+
+async function getOrganizationIdForGym(supabase: AppSupabase, gymId: string | null) {
+  if (!gymId) {
+    return null;
+  }
+
+  const { data, error } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.organization_id ?? null;
+}
+
+function featureGateMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Feature not available on your current plan.";
 }
 
 function revalidateCommunicationPaths() {

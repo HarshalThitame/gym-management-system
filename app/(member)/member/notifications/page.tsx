@@ -6,7 +6,7 @@ import { ArchiveNotificationForm, NotificationPreferencesForm, NotificationState
 import { CommunicationStatusBadge, PriorityBadge } from "@/features/communications/components/communication-status-badge";
 import { formatCommunicationLabel } from "@/features/communications/lib/business-rules";
 import { getMemberNotificationCenter } from "@/features/communications/services/communication-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -16,7 +16,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberNotificationsPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/notifications");
+  const context = await requirePrimaryRole(["member"], "/member/notifications");
   const center = context.userId ? await getMemberNotificationCenter(context.userId) : null;
 
   if (!center) {

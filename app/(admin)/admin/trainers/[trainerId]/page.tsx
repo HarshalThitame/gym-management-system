@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Award, CalendarCheck, Clock, Star, UsersRound } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { formatMoney } from "@/features/memberships/lib/business-rules";
 import {
@@ -22,8 +24,8 @@ import {
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { formatTrainingLabel } from "@/features/training/lib/business-rules";
 import { getTrainerProfileBundle, listActiveTrainers } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 type TrainerProfilePageProps = {
   params: Promise<{ trainerId: string }>;
@@ -39,16 +41,18 @@ export async function generateMetadata({ params }: TrainerProfilePageProps): Pro
 }
 
 export default async function AdminTrainerProfilePage({ params }: TrainerProfilePageProps) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
   const { trainerId } = await params;
-  const gymId = context.profile?.gym_id ?? null;
-  const [bundle, activeTrainers, membersResult] = await Promise.all([
+  const gymId = scope.gymId;
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const [bundle, activeTrainers, membersResult, planContext] = await Promise.all([
     getTrainerProfileBundle(trainerId),
     listActiveTrainers(gymId),
-    listMembers({ gymId, pageSize: 100 })
+    listMembers({ gymId, pageSize: 100 }),
+    organizationId ? getOrgPlanContext(organizationId) : null
   ]);
 
-  if (!bundle) {
+  if (!bundle || bundle.trainer.gym_id !== gymId) {
     notFound();
   }
 
@@ -58,6 +62,7 @@ export default async function AdminTrainerProfilePage({ params }: TrainerProfile
   const averageRating = bundle.feedback.length > 0
     ? bundle.feedback.reduce((total, feedback) => total + feedback.rating, 0) / bundle.feedback.length
     : 0;
+  const trainerAssignmentEnabled = planContext?.features.trainerAssignmentEnabled === true;
 
   return (
     <div className="space-y-8">
@@ -142,7 +147,11 @@ export default async function AdminTrainerProfilePage({ params }: TrainerProfile
             <h3 className="text-2xl font-black">Member Assignments</h3>
           </CardHeader>
           <CardContent className="space-y-4">
-            <TrainerAssignmentForm defaultTrainerId={bundle.trainer.id} members={membersResult.members} trainers={activeTrainers} />
+            {trainerAssignmentEnabled ? (
+              <TrainerAssignmentForm defaultTrainerId={bundle.trainer.id} members={membersResult.members} trainers={activeTrainers} />
+            ) : (
+              <FeatureLocked compact featureName="Trainer Assignment" requiredPlan="Standard" />
+            )}
             {bundle.assignments.map((assignment) => (
               <div className="rounded-md border border-border bg-surface-muted p-3" key={assignment.id}>
                 <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
@@ -164,7 +173,11 @@ export default async function AdminTrainerProfilePage({ params }: TrainerProfile
             <h3 className="text-2xl font-black">Sessions</h3>
           </CardHeader>
           <CardContent className="space-y-4">
-            <TrainerSessionForm defaultTrainerId={bundle.trainer.id} members={membersResult.members} trainers={activeTrainers} />
+            {trainerAssignmentEnabled ? (
+              <TrainerSessionForm defaultTrainerId={bundle.trainer.id} members={membersResult.members} trainers={activeTrainers} />
+            ) : (
+              <FeatureLocked compact featureName="PT Sessions" requiredPlan="Standard" />
+            )}
             {bundle.sessions.slice(0, 8).map((session) => (
               <div className="rounded-md border border-border bg-surface-muted p-3" key={session.id}>
                 <div className="flex flex-col justify-between gap-3 md:flex-row">
@@ -187,8 +200,14 @@ export default async function AdminTrainerProfilePage({ params }: TrainerProfile
             <h3 className="text-2xl font-black">Workout Programs</h3>
           </CardHeader>
           <CardContent className="space-y-4">
-            <WorkoutProgramForm defaultTrainerId={bundle.trainer.id} members={membersResult.members} trainers={activeTrainers} />
-            <WorkoutAssignmentForm members={membersResult.members} programs={bundle.programs} trainers={activeTrainers} />
+            {trainerAssignmentEnabled ? (
+              <>
+                <WorkoutProgramForm defaultTrainerId={bundle.trainer.id} members={membersResult.members} trainers={activeTrainers} />
+                <WorkoutAssignmentForm members={membersResult.members} programs={bundle.programs} trainers={activeTrainers} />
+              </>
+            ) : (
+              <FeatureLocked compact featureName="Workout Program Assignment" requiredPlan="Standard" />
+            )}
             {bundle.programs.map((program) => (
               <div className="rounded-md border border-border bg-surface-muted p-3" key={program.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2">

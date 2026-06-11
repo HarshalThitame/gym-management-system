@@ -1,3 +1,5 @@
+import { absoluteUrl } from "@/lib/utils";
+
 type BrandedEmailInput = {
   title: string;
   preview: string;
@@ -42,7 +44,7 @@ export function welcomeEmail(fullName: string) {
     preview: "Your member portal account has been created.",
     body: `<p>Hi ${displayName}, your member portal account is ready. Verify your email from the Supabase confirmation message, then sign in to manage your profile, membership, attendance, and class bookings.</p>`,
     ctaLabel: "Open Member Portal",
-    ctaUrl: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001"}/login`
+    ctaUrl: absoluteUrl("/login")
   });
 }
 

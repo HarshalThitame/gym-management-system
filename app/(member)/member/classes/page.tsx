@@ -6,7 +6,7 @@ import { BookClassForm, CancelClassBookingForm } from "@/features/classes/compon
 import { ClassStatusBadge } from "@/features/classes/components/class-status-badge";
 import { getAvailableSeats } from "@/features/classes/lib/business-rules";
 import { getMemberClassesPortal } from "@/features/classes/services/class-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -16,7 +16,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberClassesPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/classes");
+  const context = await requirePrimaryRole(["member"], "/member/classes");
   const portal = context.userId ? await getMemberClassesPortal(context.userId) : null;
 
   if (!portal) {

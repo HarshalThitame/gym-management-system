@@ -34,6 +34,32 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionSet> = {
     content: allActions,
     audit_logs: ["read", "export"]
   },
+  organization_owner: {
+    users: readCreateUpdateExport,
+    roles: ["read", "update", "approve"],
+    profiles: readCreateUpdate,
+    members: readCreateUpdateExport,
+    trainers: readCreateUpdateExport,
+    membership_plans: allActions,
+    memberships: readCreateUpdateExport,
+    payments: ["read", "create", "update", "export", "approve"],
+    attendance: readCreateUpdateExport,
+    classes: allActions,
+    class_bookings: readCreateUpdate,
+    leads: readCreateUpdateExport,
+    notifications: readCreateUpdateExport,
+    reports: ["read", "export"],
+    settings: ["read", "update", "approve"],
+    organizations: ["read", "update", "export", "approve"],
+    branches: allActions,
+    feature_flags: ["read", "update", "approve"],
+    licenses: readOnly,
+    compliance: readCreateUpdateExport,
+    backups: ["read", "create", "export"],
+    system_health: readOnly,
+    content: allActions,
+    audit_logs: ["read", "export"]
+  },
   gym_admin: {
     users: readCreateUpdateExport,
     roles: ["read", "update", "approve"],
@@ -126,7 +152,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionSet> = {
   }
 };
 
-export const rolePriority = ["super_admin", "gym_admin", "reception_staff", "trainer", "member"] as const satisfies readonly RoleName[];
+export const rolePriority = ["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"] as const satisfies readonly RoleName[];
 
 export function getPrimaryRole(roles: readonly RoleName[]) {
   return rolePriority.find((role) => roles.includes(role)) ?? null;
@@ -151,8 +177,20 @@ export function getRoleRedirect(roles: readonly RoleName[]) {
     return "/unauthorized";
   }
 
-  if (primaryRole === "super_admin" || primaryRole === "gym_admin" || primaryRole === "reception_staff") {
+  if (primaryRole === "super_admin") {
+    return "/super-admin";
+  }
+
+  if (primaryRole === "organization_owner") {
+    return "/organization";
+  }
+
+  if (primaryRole === "gym_admin") {
     return "/admin";
+  }
+
+  if (primaryRole === "reception_staff") {
+    return "/reception";
   }
 
   if (primaryRole === "trainer") {

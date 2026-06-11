@@ -1,14 +1,14 @@
 "use client";
 
-import { useActionState } from "react";
-import type { ReactNode } from "react";
+import { useActionState, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
-import { initialAuthActionState } from "@/features/auth/actions/action-state";
+import { initialAuthActionState, type AuthActionState } from "@/features/auth/actions/action-state";
 import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { roleNames } from "@/types/auth";
-import type { BranchRow, BranchSettingRow, BranchUserRow, ComplianceRequestRow, FeatureFlagRow, OrganizationRow, PlatformSubscriptionRow, RetentionPolicyRow, SecurityEventRow, TenantConfigRow } from "@/types/enterprise";
+import type { BranchRow, BranchSettingRow, BranchUserRow, ComplianceRequestRow, FeatureFlagRow, GymRow, OrganizationRow, PlatformSubscriptionRow, RetentionPolicyRow, SecurityEventRow, TenantConfigRow, TenantDomainRow } from "@/types/enterprise";
 import {
   backupScopes,
   backupTypes,
@@ -18,6 +18,7 @@ import {
   complianceRequestTypes,
   complianceStatuses,
   featureFlagStatuses,
+  gymStatuses,
   healthComponents,
   healthStatuses,
   organizationStatuses,
@@ -26,7 +27,9 @@ import {
   retentionActions,
   retentionCategories,
   securityStatuses,
-  subscriptionStatuses
+  subscriptionStatuses,
+  tenantDomainRoutingModes,
+  tenantDomainTypes
 } from "@/types/enterprise";
 import {
   queueBackupJobAction,
@@ -36,10 +39,12 @@ import {
   saveBranchUserAction,
   saveComplianceRequestAction,
   saveFeatureFlagAction,
+  saveGymAction,
   saveOrganizationAction,
   saveRetentionPolicyAction,
   saveSubscriptionAction,
   saveTenantConfigAction,
+  saveTenantDomainAction,
   updateSecurityEventStatusAction
 } from "../actions/enterprise-actions";
 import { formatEnterpriseLabel } from "../lib/business-rules";
@@ -48,43 +53,66 @@ const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3
 
 export function OrganizationForm({ organizations }: { organizations: OrganizationRow[] }) {
   const [state, formAction] = useActionState(saveOrganizationAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["settings"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} placeholder="Create new organization" />
       <div className="grid gap-4 md:grid-cols-2">
-        <Field id="org-name" label="Name" name="name" state={state}><Input id="org-name" name="name" placeholder="Apex Fitness Group" /></Field>
-        <Field id="org-slug" label="Slug" name="slug" state={state}><Input id="org-slug" name="slug" placeholder="apex-fitness-group" /></Field>
+        <Field id="org-name" label="Name" name="name" state={formValidation.state}><Input id="org-name" name="name" placeholder="Apex Fitness Group" /></Field>
+        <Field id="org-slug" label="Slug" name="slug" state={formValidation.state}><Input id="org-slug" name="slug" placeholder="apex-fitness-group" /></Field>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <SelectField label="Type" name="organizationType" options={organizationTypes} />
         <SelectField label="Status" name="status" options={organizationStatuses} />
-        <Field id="org-billing" label="Billing email" name="billingEmail" state={state}><Input id="org-billing" name="billingEmail" type="email" placeholder="finance@apexfit.com" /></Field>
+        <Field id="org-billing" label="Billing email" name="billingEmail" state={formValidation.state}><Input id="org-billing" name="billingEmail" type="email" placeholder="finance@apexfit.com" /></Field>
       </div>
-      <Field id="org-domain" label="Primary domain" name="primaryDomain" state={state}><Input id="org-domain" name="primaryDomain" placeholder="apexfit.com" /></Field>
-      <Field id="org-settings" label="Settings JSON" name="settings" state={state}><Textarea id="org-settings" name="settings" defaultValue='{"governance":"standard","release_channel":"stable"}' /></Field>
+      <Field id="org-domain" label="Primary domain" name="primaryDomain" state={formValidation.state}><Input id="org-domain" name="primaryDomain" placeholder="apexfit.com" /></Field>
+      <Field id="org-settings" label="Settings JSON" name="settings" state={formValidation.state}><JsonTextarea id="org-settings" name="settings" initialValue='{"governance":"standard","release_channel":"stable"}' /></Field>
       <AuthSubmitButton>Save Organization</AuthSubmitButton>
+    </form>
+  );
+}
+
+export function GymForm({ gyms, organizations }: { gyms: GymRow[]; organizations: OrganizationRow[] }) {
+  const [state, formAction] = useActionState(saveGymAction, initialAuthActionState);
+  return (
+    <form action={formAction} className="space-y-4">
+      <FormMessage state={state} />
+      <EntitySelect label="Gym" name="gymId" options={gyms.map((item) => ({ label: item.name, value: item.id }))} placeholder="Create new gym" />
+      <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field id="gym-name" label="Name" name="name" state={state}><Input id="gym-name" name="name" placeholder="Apex Fitness Mumbai" /></Field>
+        <Field id="gym-slug" label="Slug" name="slug" state={state}><Input id="gym-slug" name="slug" placeholder="apex-fitness-mumbai" /></Field>
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Field id="gym-timezone" label="Timezone" name="timezone" state={state}><Input id="gym-timezone" name="timezone" defaultValue="Asia/Kolkata" /></Field>
+        <Field id="gym-currency" label="Currency" name="currency" state={state}><Input id="gym-currency" name="currency" defaultValue="INR" /></Field>
+        <SelectField label="Status" name="status" options={gymStatuses} />
+      </div>
+      <AuthSubmitButton>Save Gym</AuthSubmitButton>
     </form>
   );
 }
 
 export function BranchForm({ branches, organizations }: { branches: BranchRow[]; organizations: OrganizationRow[] }) {
   const [state, formAction] = useActionState(saveBranchAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["operatingHours"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <EntitySelect label="Branch" name="branchId" options={branches.map((item) => ({ label: item.name, value: item.id }))} placeholder="Create new branch" />
       <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} />
       <div className="grid gap-4 md:grid-cols-3">
-        <Field id="branch-name" label="Name" name="name" state={state}><Input id="branch-name" name="name" placeholder="Apex Bandra" /></Field>
-        <Field id="branch-slug" label="Slug" name="slug" state={state}><Input id="branch-slug" name="slug" placeholder="apex-bandra" /></Field>
-        <Field id="branch-code" label="Branch code" name="branchCode" state={state}><Input id="branch-code" name="branchCode" placeholder="BND001" /></Field>
+        <Field id="branch-name" label="Name" name="name" state={formValidation.state}><Input id="branch-name" name="name" placeholder="Apex Bandra" /></Field>
+        <Field id="branch-slug" label="Slug" name="slug" state={formValidation.state}><Input id="branch-slug" name="slug" placeholder="apex-bandra" /></Field>
+        <Field id="branch-code" label="Branch code" name="branchCode" state={formValidation.state}><Input id="branch-code" name="branchCode" placeholder="BND001" /></Field>
       </div>
       <div className="grid gap-4 md:grid-cols-4">
         <SelectField label="Status" name="status" options={branchStatuses} />
-        <Field id="branch-timezone" label="Timezone" name="timezone" state={state}><Input id="branch-timezone" name="timezone" defaultValue="Asia/Kolkata" /></Field>
-        <Field id="branch-currency" label="Currency" name="currency" state={state}><Input id="branch-currency" name="currency" defaultValue="INR" /></Field>
-        <Field id="branch-capacity" label="Capacity" name="capacity" state={state}><Input id="branch-capacity" name="capacity" defaultValue="120" type="number" /></Field>
+        <Field id="branch-timezone" label="Timezone" name="timezone" state={formValidation.state}><Input id="branch-timezone" name="timezone" defaultValue="Asia/Kolkata" /></Field>
+        <Field id="branch-currency" label="Currency" name="currency" state={formValidation.state}><Input id="branch-currency" name="currency" defaultValue="INR" /></Field>
+        <Field id="branch-capacity" label="Capacity" name="capacity" state={formValidation.state}><Input id="branch-capacity" name="capacity" defaultValue="120" type="number" /></Field>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <Input name="city" placeholder="City" aria-label="City" />
@@ -98,7 +126,7 @@ export function BranchForm({ branches, organizations }: { branches: BranchRow[];
         <Input name="postalCode" placeholder="Postal code" aria-label="Postal code" />
       </div>
       <Input name="gymId" placeholder="Optional existing gym ID" aria-label="Optional existing gym ID" />
-      <Field id="branch-hours" label="Operating hours JSON" name="operatingHours" state={state}><Textarea id="branch-hours" name="operatingHours" defaultValue='{"mon_fri":"06:00-22:00","sat_sun":"07:00-20:00"}' /></Field>
+      <Field id="branch-hours" label="Operating hours JSON" name="operatingHours" state={formValidation.state}><JsonTextarea id="branch-hours" name="operatingHours" initialValue='{"mon_fri":"06:00-22:00","sat_sun":"07:00-20:00"}' /></Field>
       <AuthSubmitButton>Save Branch</AuthSubmitButton>
     </form>
   );
@@ -106,22 +134,23 @@ export function BranchForm({ branches, organizations }: { branches: BranchRow[];
 
 export function BranchUserForm({ branchUsers, branches, organizations }: { branchUsers: BranchUserRow[]; branches: BranchRow[]; organizations: OrganizationRow[] }) {
   const [state, formAction] = useActionState(saveBranchUserAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["permissions"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <EntitySelect label="Branch user" name="branchUserId" options={branchUsers.map((item) => ({ label: `${item.role_name} · ${item.branch_role}`, value: item.id }))} placeholder="Assign branch user" />
       <div className="grid gap-4 md:grid-cols-2">
         <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} />
         <EntitySelect label="Branch" name="branchId" options={branches.map((item) => ({ label: item.name, value: item.id }))} />
       </div>
-      <Field id="branch-user" label="User ID" name="userId" state={state}><Input id="branch-user" name="userId" placeholder="Supabase auth user ID" /></Field>
+      <Field id="branch-user" label="User ID" name="userId" state={formValidation.state}><Input id="branch-user" name="userId" placeholder="Supabase auth user ID" /></Field>
       <div className="grid gap-4 md:grid-cols-4">
         <SelectField label="System role" name="roleName" options={roleNames} />
         <SelectField label="Branch role" name="branchRole" options={branchRoles} />
         <SelectField label="Access scope" name="accessScope" options={branchAccessScopes} />
         <SelectField label="Status" name="status" options={["active", "invited", "suspended", "revoked"]} />
       </div>
-      <Field id="branch-permissions" label="Permission overrides JSON" name="permissions" state={state}><Textarea id="branch-permissions" name="permissions" defaultValue='{"reports":["read"],"members":["read","update"]}' /></Field>
+      <Field id="branch-permissions" label="Permission overrides JSON" name="permissions" state={formValidation.state}><JsonTextarea id="branch-permissions" name="permissions" initialValue='{"reports":["read"],"members":["read","update"]}' /></Field>
       <AuthSubmitButton>Save Branch Access</AuthSubmitButton>
     </form>
   );
@@ -129,22 +158,23 @@ export function BranchUserForm({ branchUsers, branches, organizations }: { branc
 
 export function BranchSettingsForm({ branches, branchSettings, organizations }: { branches: BranchRow[]; branchSettings: BranchSettingRow[]; organizations: OrganizationRow[] }) {
   const [state, formAction] = useActionState(saveBranchSettingsAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["generalSettings", "membershipSettings", "paymentSettings", "attendanceSettings", "classSettings", "notificationSettings", "securitySettings"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <EntitySelect label="Settings record" name="branchSettingsId" options={branchSettings.map((item) => ({ label: item.branch_id, value: item.id }))} placeholder="Create branch settings" />
       <div className="grid gap-4 md:grid-cols-2">
         <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} />
         <EntitySelect label="Branch" name="branchId" options={branches.map((item) => ({ label: item.name, value: item.id }))} />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <JsonField name="generalSettings" label="General" value='{"timezone":"Asia/Kolkata","capacity_alert":85}' state={state} />
-        <JsonField name="membershipSettings" label="Membership" value='{"cross_branch_access":"premium_only"}' state={state} />
-        <JsonField name="paymentSettings" label="Payments" value='{"tax_mode":"inclusive","razorpay_enabled":true}' state={state} />
-        <JsonField name="attendanceSettings" label="Attendance" value='{"duplicate_checkin_window_minutes":30}' state={state} />
-        <JsonField name="classSettings" label="Classes" value='{"waitlist_auto_promotion":true}' state={state} />
-        <JsonField name="notificationSettings" label="Notifications" value='{"renewal_reminders":[30,15,7,1]}' state={state} />
-        <JsonField name="securitySettings" label="Security" value='{"allowed_ip_ranges":[],"mfa_required_for_admins":true}' state={state} />
+        <JsonField name="generalSettings" label="General" value='{"timezone":"Asia/Kolkata","capacity_alert":85}' state={formValidation.state} />
+        <JsonField name="membershipSettings" label="Membership" value='{"cross_branch_access":"premium_only"}' state={formValidation.state} />
+        <JsonField name="paymentSettings" label="Payments" value='{"tax_mode":"inclusive","razorpay_enabled":true}' state={formValidation.state} />
+        <JsonField name="attendanceSettings" label="Attendance" value='{"duplicate_checkin_window_minutes":30}' state={formValidation.state} />
+        <JsonField name="classSettings" label="Classes" value='{"waitlist_auto_promotion":true}' state={formValidation.state} />
+        <JsonField name="notificationSettings" label="Notifications" value='{"renewal_reminders":[30,15,7,1]}' state={formValidation.state} />
+        <JsonField name="securitySettings" label="Security" value='{"allowed_ip_ranges":[],"mfa_required_for_admins":true}' state={formValidation.state} />
       </div>
       <AuthSubmitButton>Save Branch Settings</AuthSubmitButton>
     </form>
@@ -153,14 +183,15 @@ export function BranchSettingsForm({ branches, branchSettings, organizations }: 
 
 export function TenantConfigForm({ organizations, tenantConfigs }: { organizations: OrganizationRow[]; tenantConfigs: TenantConfigRow[] }) {
   const [state, formAction] = useActionState(saveTenantConfigAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["typography", "emailBranding", "limits", "complianceSettings"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <EntitySelect label="Tenant config" name="tenantConfigId" options={tenantConfigs.map((item) => ({ label: item.brand_name, value: item.id }))} placeholder="Create tenant config" />
       <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} />
       <div className="grid gap-4 md:grid-cols-3">
-        <Field id="tenant-key" label="Tenant key" name="tenantKey" state={state}><Input id="tenant-key" name="tenantKey" placeholder="apex-fitness" /></Field>
-        <Field id="brand-name" label="Brand name" name="brandName" state={state}><Input id="brand-name" name="brandName" placeholder="Apex Performance Club" /></Field>
+        <Field id="tenant-key" label="Tenant key" name="tenantKey" state={formValidation.state}><Input id="tenant-key" name="tenantKey" placeholder="apex-fitness" /></Field>
+        <Field id="brand-name" label="Brand name" name="brandName" state={formValidation.state}><Input id="brand-name" name="brandName" placeholder="Apex Performance Club" /></Field>
         <SelectField label="Plan tier" name="planTier" options={planTiers} />
       </div>
       <div className="grid gap-4 md:grid-cols-4">
@@ -175,38 +206,84 @@ export function TenantConfigForm({ organizations, tenantConfigs }: { organizatio
         <Input name="accentColor" type="color" defaultValue="#d7ff3f" aria-label="Accent color" />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <JsonField name="typography" label="Typography JSON" value='{"heading":"Inter","body":"Inter"}' state={state} />
-        <JsonField name="emailBranding" label="Email Branding JSON" value='{"from_name":"Apex Performance Club"}' state={state} />
-        <JsonField name="limits" label="Limits JSON" value='{"branches":5,"members":5000,"storage_mb":10240}' state={state} />
-        <JsonField name="complianceSettings" label="Compliance JSON" value='{"privacy_contact":"privacy@apexfit.com"}' state={state} />
+        <JsonField name="typography" label="Typography JSON" value='{"heading":"Inter","body":"Inter"}' state={formValidation.state} />
+        <JsonField name="emailBranding" label="Email Branding JSON" value='{"from_name":"Apex Performance Club"}' state={formValidation.state} />
+        <JsonField name="limits" label="Limits JSON" value='{"branches":5,"members":5000,"storage_mb":10240}' state={formValidation.state} />
+        <JsonField name="complianceSettings" label="Compliance JSON" value='{"privacy_contact":"privacy@apexfit.com"}' state={formValidation.state} />
       </div>
       <AuthSubmitButton>Save Tenant Config</AuthSubmitButton>
     </form>
   );
 }
 
-export function FeatureFlagForm({ branches, featureFlags, organizations }: { branches: BranchRow[]; featureFlags: FeatureFlagRow[]; organizations: OrganizationRow[] }) {
-  const [state, formAction] = useActionState(saveFeatureFlagAction, initialAuthActionState);
+export function TenantDomainForm({
+  branches,
+  domains,
+  organizations,
+  tenantConfigs
+}: {
+  branches: BranchRow[];
+  domains: TenantDomainRow[];
+  organizations: OrganizationRow[];
+  tenantConfigs: TenantConfigRow[];
+}) {
+  const [state, formAction] = useActionState(saveTenantDomainAction, initialAuthActionState);
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
+      <EntitySelect
+        label="Tenant domain"
+        name="tenantDomainId"
+        options={domains.map((item) => ({ label: `${item.domain} · ${formatEnterpriseLabel(item.status)}`, value: item.id }))}
+        placeholder="Create new domain"
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} />
+        <EntitySelect label="Tenant config" name="tenantConfigId" options={tenantConfigs.map((item) => ({ label: item.brand_name, value: item.id }))} placeholder="Optional white-label config" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <EntitySelect label="Branch" name="branchId" options={branches.map((item) => ({ label: item.name, value: item.id }))} placeholder="Organization-level domain" />
+        <Field id="domain-gym-id" label="Gym ID" name="gymId" state={state}>
+          <Input id="domain-gym-id" name="gymId" placeholder="Optional gym ID for gym routing" />
+        </Field>
+      </div>
+      <Field id="tenant-domain" label="Domain" name="domain" state={state}>
+        <Input id="tenant-domain" name="domain" placeholder="apexfit.com or bandra.apexfit.com" />
+      </Field>
+      <div className="grid gap-4 md:grid-cols-3">
+        <SelectField label="Domain type" name="domainType" options={tenantDomainTypes.filter((type) => type !== "system")} />
+        <SelectField label="Routing mode" name="routingMode" options={tenantDomainRoutingModes} />
+        <SelectField label="Lifecycle" name="status" options={["pending", "disabled"]} />
+      </div>
+      <label className="flex items-center gap-2 text-sm font-bold"><input name="isPrimary" suppressHydrationWarning type="checkbox" /> Set as primary domain</label>
+      <AuthSubmitButton>Save Tenant Domain</AuthSubmitButton>
+    </form>
+  );
+}
+
+export function FeatureFlagForm({ branches, featureFlags, organizations }: { branches: BranchRow[]; featureFlags: FeatureFlagRow[]; organizations: OrganizationRow[] }) {
+  const [state, formAction] = useActionState(saveFeatureFlagAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["rules"]);
+  return (
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <EntitySelect label="Feature flag" name="featureFlagId" options={featureFlags.map((item) => ({ label: item.name, value: item.id }))} placeholder="Create feature flag" />
       <div className="grid gap-4 md:grid-cols-2">
         <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} placeholder="Global flag" />
         <EntitySelect label="Branch" name="branchId" options={branches.map((item) => ({ label: item.name, value: item.id }))} placeholder="All branches" />
       </div>
       <div className="grid gap-4 md:grid-cols-3">
-        <Field id="flag-key" label="Flag key" name="flagKey" state={state}><Input id="flag-key" name="flagKey" placeholder="custom_domains" /></Field>
-        <Field id="flag-name" label="Name" name="name" state={state}><Input id="flag-name" name="name" placeholder="Custom Domains" /></Field>
+        <Field id="flag-key" label="Flag key" name="flagKey" state={formValidation.state}><Input id="flag-key" name="flagKey" placeholder="custom_domains" /></Field>
+        <Field id="flag-name" label="Name" name="name" state={formValidation.state}><Input id="flag-name" name="name" placeholder="Custom Domains" /></Field>
         <SelectField label="Status" name="status" options={featureFlagStatuses} />
       </div>
       <Textarea name="description" placeholder="Feature description" aria-label="Feature description" />
       <div className="grid gap-4 md:grid-cols-3">
-        <label className="flex items-center gap-2 text-sm font-bold"><input name="enabled" type="checkbox" /> Enabled</label>
+        <label className="flex items-center gap-2 text-sm font-bold"><input name="enabled" suppressHydrationWarning type="checkbox" /> Enabled</label>
         <Input name="rolloutPercentage" type="number" defaultValue="100" aria-label="Rollout percentage" />
         <Input name="targetPlanTiers" defaultValue="starter,professional,enterprise" aria-label="Target plan tiers" />
       </div>
-      <JsonField name="rules" label="Rules JSON" value='{"min_staff_role":"gym_admin"}' state={state} />
+      <JsonField name="rules" label="Rules JSON" value='{"min_staff_role":"gym_admin"}' state={formValidation.state} />
       <AuthSubmitButton>Save Feature Flag</AuthSubmitButton>
     </form>
   );
@@ -250,7 +327,7 @@ export function RetentionPolicyForm({ branches, organizations, policies }: { bra
         <SelectField label="Disposition" name="dispositionAction" options={retentionActions} />
         <SelectField label="Status" name="status" options={["active", "paused", "archived"]} />
       </div>
-      <label className="flex items-center gap-2 text-sm font-bold"><input name="legalHold" type="checkbox" /> Legal hold</label>
+      <label className="flex items-center gap-2 text-sm font-bold"><input name="legalHold" suppressHydrationWarning type="checkbox" /> Legal hold</label>
       <AuthSubmitButton>Save Retention Policy</AuthSubmitButton>
     </form>
   );
@@ -258,9 +335,10 @@ export function RetentionPolicyForm({ branches, organizations, policies }: { bra
 
 export function ComplianceRequestForm({ branches, organizations, requests }: { branches: BranchRow[]; organizations: OrganizationRow[]; requests: ComplianceRequestRow[] }) {
   const [state, formAction] = useActionState(saveComplianceRequestAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["metadata"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <EntitySelect label="Compliance request" name="complianceRequestId" options={requests.map((item) => ({ label: `${item.request_type} · ${item.requester_email}`, value: item.id }))} placeholder="Create request" />
       <div className="grid gap-4 md:grid-cols-2">
         <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} placeholder="Platform request" />
@@ -273,7 +351,7 @@ export function ComplianceRequestForm({ branches, organizations, requests }: { b
         <Input name="dueAt" type="datetime-local" aria-label="Due date" />
       </div>
       <Textarea name="notes" placeholder="Review notes" aria-label="Review notes" />
-      <JsonField name="metadata" label="Metadata JSON" value='{"source":"admin_console"}' state={state} />
+      <JsonField name="metadata" label="Metadata JSON" value='{"source":"admin_console"}' state={formValidation.state} />
       <AuthSubmitButton>Save Compliance Request</AuthSubmitButton>
     </form>
   );
@@ -281,9 +359,10 @@ export function ComplianceRequestForm({ branches, organizations, requests }: { b
 
 export function BackupJobForm({ branches, organizations }: { branches: BranchRow[]; organizations: OrganizationRow[] }) {
   const [state, formAction] = useActionState(queueBackupJobAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["metadata"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <div className="grid gap-4 md:grid-cols-2">
         <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} placeholder="Platform backup" />
         <EntitySelect label="Branch" name="branchId" options={branches.map((item) => ({ label: item.name, value: item.id }))} placeholder="All branches" />
@@ -292,7 +371,7 @@ export function BackupJobForm({ branches, organizations }: { branches: BranchRow
         <SelectField label="Backup type" name="backupType" options={backupTypes} />
         <SelectField label="Scope" name="scope" options={backupScopes} />
       </div>
-      <JsonField name="metadata" label="Metadata JSON" value='{"reason":"scheduled_recovery_point"}' state={state} />
+      <JsonField name="metadata" label="Metadata JSON" value='{"reason":"scheduled_recovery_point"}' state={formValidation.state} />
       <AuthSubmitButton>Queue Backup</AuthSubmitButton>
     </form>
   );
@@ -300,9 +379,10 @@ export function BackupJobForm({ branches, organizations }: { branches: BranchRow
 
 export function HealthCheckForm({ branches, organizations }: { branches: BranchRow[]; organizations: OrganizationRow[] }) {
   const [state, formAction] = useActionState(recordHealthCheckAction, initialAuthActionState);
+  const formValidation = useJsonObjectValidation(state, ["metadata"]);
   return (
-    <form action={formAction} className="space-y-4">
-      <FormMessage state={state} />
+    <form action={formAction} className="space-y-4" onSubmitCapture={formValidation.onSubmitCapture} ref={formValidation.formRef}>
+      <FormMessage state={formValidation.state} />
       <div className="grid gap-4 md:grid-cols-2">
         <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} placeholder="Platform check" />
         <EntitySelect label="Branch" name="branchId" options={branches.map((item) => ({ label: item.name, value: item.id }))} placeholder="All branches" />
@@ -314,7 +394,7 @@ export function HealthCheckForm({ branches, organizations }: { branches: BranchR
         <Input name="latencyMs" type="number" placeholder="Latency ms" aria-label="Latency ms" />
       </div>
       <Textarea name="message" placeholder="Health check message" aria-label="Health check message" />
-      <JsonField name="metadata" label="Metadata JSON" value='{"region":"bom1"}' state={state} />
+      <JsonField name="metadata" label="Metadata JSON" value='{"region":"bom1"}' state={formValidation.state} />
       <AuthSubmitButton>Record Health Check</AuthSubmitButton>
     </form>
   );
@@ -333,12 +413,62 @@ export function SecurityEventStatusForm({ event }: { event: SecurityEventRow }) 
   );
 }
 
+function useJsonObjectValidation(serverState: AuthActionState, fieldNames: string[]) {
+  const [clientState, setClientState] = useState<AuthActionState | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  return {
+    formRef,
+    state: clientState ?? serverState,
+    onSubmitCapture(event: FormEvent<HTMLFormElement>) {
+      const currentFormData = formRef.current ? new FormData(formRef.current) : new FormData(event.currentTarget);
+      const fieldErrors: Record<string, string[]> = {};
+
+      for (const fieldName of fieldNames) {
+        const rawValue = currentFormData.get(fieldName);
+        const value = typeof rawValue === "string" ? rawValue : "";
+
+        if (!value.trim()) {
+          continue;
+        }
+
+        try {
+          const parsed = JSON.parse(value) as unknown;
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            fieldErrors[fieldName] = ["Enter a JSON object."];
+          }
+        } catch {
+          fieldErrors[fieldName] = ["Enter valid JSON."];
+        }
+      }
+
+      const firstError = Object.values(fieldErrors)[0]?.[0];
+      if (firstError) {
+        event.preventDefault();
+        event.stopPropagation();
+        setClientState({
+          status: "error",
+          message: firstError,
+          fieldErrors
+        });
+        return;
+      }
+
+      setClientState(null);
+    }
+  };
+}
+
 function JsonField({ label, name, state, value }: { label: string; name: string; state: { fieldErrors?: Record<string, string[]> }; value: string }) {
   return (
     <Field id={name} label={label} name={name} state={state}>
-      <Textarea id={name} name={name} defaultValue={value} />
+      <JsonTextarea id={name} name={name} initialValue={value} />
     </Field>
   );
+}
+
+function JsonTextarea({ id, initialValue, name }: { id: string; initialValue: string; name: string }) {
+  return <Input className="font-mono text-sm" id={id} name={name} defaultValue={initialValue} />;
 }
 
 function Field({ id, label, name, state, children }: { id: string; label: string; name: string; state: { fieldErrors?: Record<string, string[]> }; children: ReactNode }) {

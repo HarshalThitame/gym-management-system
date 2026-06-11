@@ -5,7 +5,7 @@ describe("RBAC permission matrix", () => {
   it("gives super admin full operational access", () => {
     expect(can("super_admin", "payments", "approve")).toBe(true);
     expect(can("super_admin", "roles", "delete")).toBe(true);
-    expect(getRoleRedirect(["super_admin"])).toBe("/admin");
+    expect(getRoleRedirect(["super_admin"])).toBe("/super-admin");
   });
 
   it("prevents reception staff from sensitive exports and settings updates", () => {
@@ -22,6 +22,7 @@ describe("RBAC permission matrix", () => {
   });
 
   it("supports multi-role checks with deterministic priority", () => {
+    expect(getPrimaryRole(["gym_admin", "organization_owner"])).toBe("organization_owner");
     expect(getPrimaryRole(["member", "trainer"])).toBe("trainer");
     expect(canAny(["member", "trainer"], "classes", "update")).toBe(true);
     expect(hasRequiredRole(["member"], ["gym_admin", "member"])).toBe(true);
@@ -34,8 +35,12 @@ describe("RBAC permission matrix", () => {
 
   it("separates enterprise administration permissions by role", () => {
     expect(can("super_admin", "organizations", "delete")).toBe(true);
+    expect(can("organization_owner", "organizations", "update")).toBe(true);
+    expect(can("organization_owner", "organizations", "delete")).toBe(false);
+    expect(getRoleRedirect(["organization_owner"])).toBe("/organization");
     expect(can("gym_admin", "branches", "create")).toBe(true);
     expect(can("gym_admin", "licenses", "update")).toBe(false);
     expect(can("reception_staff", "feature_flags", "update")).toBe(false);
+    expect(getRoleRedirect(["reception_staff"])).toBe("/reception");
   });
 });

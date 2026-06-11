@@ -2,6 +2,7 @@ import type { Database, Json } from "./database";
 
 export const organizationTypes = ["single_gym", "multi_branch", "franchise"] as const;
 export const organizationStatuses = ["active", "trial", "suspended", "deactivated", "archived"] as const;
+export const gymStatuses = ["active", "suspended", "archived"] as const;
 export const branchStatuses = ["planned", "active", "maintenance", "suspended", "deactivated", "archived"] as const;
 export const branchRoles = ["owner", "admin", "manager", "staff", "trainer", "viewer"] as const;
 export const branchAccessScopes = ["single_branch", "multi_branch", "organization"] as const;
@@ -20,9 +21,16 @@ export const healthStatuses = ["healthy", "degraded", "down", "unknown"] as cons
 export const securitySeverities = ["low", "medium", "high", "critical"] as const;
 export const securityStatuses = ["open", "investigating", "resolved", "dismissed"] as const;
 export const documentationAudiences = ["admin", "trainer", "member", "api", "deployment"] as const;
+export const tenantDomainTypes = ["custom_domain", "subdomain", "system"] as const;
+export const tenantDomainRoutingModes = ["organization", "branch", "gym"] as const;
+export const tenantDomainStatuses = ["pending", "verified", "failed", "disabled"] as const;
+export const tenantDomainSslStatuses = ["pending", "issued", "failed", "managed_by_vercel", "not_applicable"] as const;
+export const tenantDomainProviderOperations = ["add", "sync", "verify", "remove"] as const;
+export const tenantDomainProviderStatuses = ["pending", "succeeded", "failed", "skipped"] as const;
 
 export type OrganizationType = (typeof organizationTypes)[number];
 export type OrganizationStatus = (typeof organizationStatuses)[number];
+export type GymStatus = (typeof gymStatuses)[number];
 export type BranchStatus = (typeof branchStatuses)[number];
 export type BranchRole = (typeof branchRoles)[number];
 export type PlanTier = (typeof planTiers)[number];
@@ -31,13 +39,25 @@ export type ComplianceRequestType = (typeof complianceRequestTypes)[number];
 export type RetentionCategory = (typeof retentionCategories)[number];
 export type BackupType = (typeof backupTypes)[number];
 export type HealthStatus = (typeof healthStatuses)[number];
+export type TenantDomainType = (typeof tenantDomainTypes)[number];
+export type TenantDomainRoutingMode = (typeof tenantDomainRoutingModes)[number];
+export type TenantDomainStatus = (typeof tenantDomainStatuses)[number];
+export type TenantDomainSslStatus = (typeof tenantDomainSslStatuses)[number];
+export type TenantDomainProviderOperation = (typeof tenantDomainProviderOperations)[number];
+export type TenantDomainProviderStatus = (typeof tenantDomainProviderStatuses)[number];
 
 export type OrganizationRow = Database["public"]["Tables"]["organizations"]["Row"];
+export type GymRow = Database["public"]["Tables"]["gyms"]["Row"];
 export type BranchRow = Database["public"]["Tables"]["branches"]["Row"];
 export type BranchSettingRow = Database["public"]["Tables"]["branch_settings"]["Row"];
 export type BranchUserRow = Database["public"]["Tables"]["branch_users"]["Row"];
 export type BranchMetricRow = Database["public"]["Tables"]["branch_metrics"]["Row"];
 export type TenantConfigRow = Database["public"]["Tables"]["tenant_configs"]["Row"];
+export type TenantDomainRow = Database["public"]["Tables"]["tenant_domains"]["Row"];
+export type TenantDomainCheckRow = Database["public"]["Tables"]["tenant_domain_checks"]["Row"];
+export type TenantDomainProviderEventRow = Database["public"]["Tables"]["tenant_domain_provider_events"]["Row"];
+export type TenantDomainLatestCheckRow = Database["public"]["Views"]["tenant_domain_latest_checks"]["Row"];
+export type TenantDomainLatestProviderEventRow = Database["public"]["Views"]["tenant_domain_latest_provider_events"]["Row"];
 export type FeatureFlagRow = Database["public"]["Tables"]["feature_flags"]["Row"];
 export type PlatformSubscriptionRow = Database["public"]["Tables"]["platform_subscriptions"]["Row"];
 export type ActivityEventRow = Database["public"]["Tables"]["activity_events"]["Row"];
@@ -50,6 +70,7 @@ export type DocumentationArticleRow = Database["public"]["Tables"]["documentatio
 export type EnterpriseBranchMetricsLatestRow = Database["public"]["Views"]["enterprise_branch_metrics_latest"]["Row"];
 export type EnterpriseTenantUsageSummaryRow = Database["public"]["Views"]["enterprise_tenant_usage_summary"]["Row"];
 export type EnterpriseSecuritySummaryRow = Database["public"]["Views"]["enterprise_security_summary"]["Row"];
+export type TenantResolutionRow = Database["public"]["Functions"]["resolve_tenant_by_host"]["Returns"][number];
 
 export type EnterpriseKpi = {
   key: string;
@@ -80,11 +101,15 @@ export type TenantUsagePoint = {
 export type EnterpriseDashboard = {
   kpis: EnterpriseKpi[];
   organizations: OrganizationRow[];
+  gyms: GymRow[];
   branches: BranchRow[];
   branchSettings: BranchSettingRow[];
   branchUsers: BranchUserRow[];
   branchMetrics: BranchMetricRow[];
   tenantConfigs: TenantConfigRow[];
+  tenantDomains: TenantDomainRow[];
+  tenantDomainChecks: TenantDomainLatestCheckRow[];
+  tenantDomainProviderEvents: TenantDomainLatestProviderEventRow[];
   featureFlags: FeatureFlagRow[];
   subscriptions: PlatformSubscriptionRow[];
   activityEvents: ActivityEventRow[];

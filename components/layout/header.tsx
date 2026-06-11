@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button";
-import { navItems, siteConfig } from "@/data/site";
+import { navItems } from "@/data/site";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 
-export function Header() {
-  const whatsappHref = `https://wa.me/${siteConfig.whatsapp}?text=${encodeURIComponent("Hi Apex, I want to book a free trial.")}`;
+export async function Header() {
+  const tenantSite = await getTenantSiteConfig();
+  const whatsappHref = `https://wa.me/${tenantSite.whatsapp}?text=${encodeURIComponent(`Hi ${tenantSite.shortName}, I want to book a free trial.`)}`;
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-obsidian/88 text-white backdrop-blur-xl">
       <div className="container-page flex h-16 items-center justify-between">
-        <Link aria-label="Apex Performance Club home" className="flex items-center gap-3" href="/">
-          <span className="grid size-9 place-items-center rounded-md bg-accent text-sm font-black text-accent-foreground">A</span>
-          <span className="hidden text-sm font-bold tracking-wide sm:block">{siteConfig.name}</span>
+        <Link aria-label={`${tenantSite.name} home`} className="flex items-center gap-3" href="/">
+          <span className="grid size-9 place-items-center rounded-md bg-accent text-sm font-black text-accent-foreground">{tenantSite.brandInitial}</span>
+          <span className="hidden text-sm font-bold tracking-wide sm:block">{tenantSite.name}</span>
         </Link>
 
         <nav aria-label="Primary navigation" className="hidden items-center gap-6 lg:flex">
@@ -22,6 +24,9 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
+          <ButtonLink href="/login" size="sm" variant="outline">
+            Sign In
+          </ButtonLink>
           <ButtonLink href="/membership-plans" size="sm" variant="outline">
             Join Now
           </ButtonLink>
@@ -43,7 +48,7 @@ export function Header() {
           </summary>
           <div className="fixed right-4 top-20 z-50 grid w-[min(calc(100vw-2rem),380px)] gap-5 rounded-lg border border-white/12 bg-obsidian p-5 text-white shadow-2xl">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/48">{siteConfig.shortName}</p>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/48">{tenantSite.shortName}</p>
               <p className="mt-1 text-base font-bold">Mobile navigation</p>
             </div>
             <nav className="grid gap-1" aria-label="Mobile navigation">
@@ -54,6 +59,9 @@ export function Header() {
               ))}
             </nav>
             <div className="grid gap-3 border-t border-white/10 pt-5">
+              <ButtonLink href="/login" variant="outline">
+                Sign In
+              </ButtonLink>
               <ButtonLink href="/free-trial" variant="accent">
                 Book Free Trial
               </ButtonLink>

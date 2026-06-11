@@ -14,7 +14,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerAttendancePage() {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer/attendance");
+  const context = await requireRole(["trainer"], "/trainer/attendance");
   const view = await getTrainerAttendanceView(context.userId ?? "", context.profile?.gym_id ?? null);
   const inactiveMembers = view.assignedMembers.filter((member) => member.inactiveDays >= 7);
   const averageDuration = view.assignedMembers.length > 0

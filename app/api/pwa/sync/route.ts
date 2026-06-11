@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { QueueableOfflineActionType } from "@/features/pwa/lib/business-rules";
 import { OfflineSyncSchema } from "@/features/pwa/schemas/pwa";
-import { getAuthContext } from "@/lib/auth/session";
+import { getApiTenantBranchId, getApiTenantOrganizationId, requireApiAuth } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/types/database";
@@ -16,13 +16,13 @@ const allowedOfflineTargets: Record<QueueableOfflineActionType, { methods: Set<s
 };
 
 export async function POST(request: Request) {
-  const context = await getAuthContext();
+  const auth = await requireApiAuth({ unauthenticatedMessage: "Sign in before syncing offline actions." });
 
-  if (!context.isAuthenticated || !context.userId) {
-    return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in before syncing offline actions." } }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
-  const userId = context.userId;
+  const userId = auth.context.userId;
   const rateLimit = await checkRateLimit(`pwa-sync:${userId}`, 30, 60_000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many sync requests." } }, { status: 429 });
@@ -70,10 +70,12 @@ export async function POST(request: Request) {
   }
 
   const receivedAt = new Date().toISOString();
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  const branchId = getApiTenantBranchId(auth.tenant);
   const rows = parsed.data.actions.map((action) => ({
     user_id: userId,
-    organization_id: null,
-    branch_id: null,
+    organization_id: organizationId,
+    branch_id: branchId,
     client_action_id: action.id,
     action_type: action.type,
     endpoint: action.endpoint,

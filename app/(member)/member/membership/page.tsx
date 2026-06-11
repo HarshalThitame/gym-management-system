@@ -5,7 +5,7 @@ import { PaymentCheckoutButton } from "@/features/billing/components/payment-che
 import { MembershipStatusBadge } from "@/features/memberships/components/membership-status-badge";
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
 import { getMemberDashboard } from "@/features/memberships/services/membership-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -17,7 +17,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberMembershipPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/membership");
+  const context = await requirePrimaryRole(["member"], "/member/membership");
   const profile = context.userId ? await getMemberDashboard(context.userId) : null;
   const membership = profile?.currentMembership ?? null;
   const plan = profile?.currentPlan ?? null;

@@ -5,7 +5,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { RegenerateQrForm } from "@/features/attendance/components/attendance-forms";
 import { AttendanceStatusBadge } from "@/features/attendance/components/attendance-status-badge";
 import { getMemberAttendancePortal } from "@/features/attendance/services/attendance-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -15,7 +15,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberAttendancePage() {
-  const context = await requireRole(["member", "super_admin"], "/member/attendance");
+  const context = await requirePrimaryRole(["member"], "/member/attendance");
   const portal = context.userId ? await getMemberAttendancePortal(context.userId) : null;
 
   if (!portal) {

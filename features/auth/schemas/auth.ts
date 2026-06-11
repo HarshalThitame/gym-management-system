@@ -50,7 +50,7 @@ export const ResendVerificationSchema = z.object({
 
 export const RoleAssignmentSchema = z.object({
   userId: z.string().uuid("Select a valid user."),
-  roleName: z.enum(["super_admin", "gym_admin", "reception_staff", "trainer", "member"]),
+  roleName: z.enum(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"]),
   gymId: z.string().uuid("Select a valid gym.").optional().or(z.literal(""))
 });
 

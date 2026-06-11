@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmailSettingsForm, PasswordSettingsForm } from "@/features/profile/components/account-settings-forms";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -11,7 +11,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberSettingsPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/settings");
+  const context = await requirePrimaryRole(["member"], "/member/settings");
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">

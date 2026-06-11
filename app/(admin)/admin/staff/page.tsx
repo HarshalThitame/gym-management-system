@@ -5,7 +5,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { StaffProfileForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { listStaffProfiles } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -15,8 +15,8 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminStaffPage() {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/staff");
-  const staff = await listStaffProfiles(context.profile?.gym_id ?? null);
+  const scope = await requireGymAdminScope("/admin/staff");
+  const staff = await listStaffProfiles(scope.gymId);
   const activeStaff = staff.filter((profile) => profile.status === "active");
   const receptionStaff = staff.filter((profile) => profile.staff_role === "reception");
 

@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
+import { requireGymFrontDeskScope } from "@/features/reception/lib/access";
 import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -30,7 +32,8 @@ type InactivityAlertType = Extract<AttendanceAlertType, "inactive_7_days" | "ina
 const inactivityAlertTypes: InactivityAlertType[] = ["inactive_7_days", "inactive_15_days", "inactive_30_days"];
 
 export async function manualCheckInAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/attendance");
+  const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/attendance");
+  const context = scope;
   const parsed = ManualCheckInSchema.safeParse({
     memberId: formData.get("memberId"),
     deviceId: formData.get("deviceId") ?? "",
@@ -55,7 +58,8 @@ export async function manualCheckInAction(_previousState: AuthActionState, formD
 }
 
 export async function qrCheckInAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/attendance");
+  const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/attendance");
+  const context = scope;
   const parsed = QrCheckInSchema.safeParse({
     tokenValue: normalizeQrToken(String(formData.get("tokenValue") ?? "")),
     deviceId: formData.get("deviceId") ?? ""
@@ -75,7 +79,7 @@ export async function qrCheckInAction(_previousState: AuthActionState, formData:
 
   if (!qrToken || qrToken.status !== "active") {
     await logAccessAttempt(supabase, context, {
-      gymId: context.profile?.gym_id ?? null,
+      gymId: scope.gymId,
       memberId: qrToken?.member_id ?? null,
       membershipId: null,
       sessionId: null,
@@ -89,6 +93,24 @@ export async function qrCheckInAction(_previousState: AuthActionState, formData:
       snapshot: { tokenHash } as Json
     });
     return { status: "error", message: "QR token is invalid or revoked." };
+  }
+
+  if (qrToken.gym_id !== scope.gymId) {
+    await logAccessAttempt(supabase, context, {
+      gymId: scope.gymId,
+      memberId: qrToken.member_id,
+      membershipId: null,
+      sessionId: null,
+      qrTokenId: qrToken.id,
+      deviceId: parsed.data.deviceId || null,
+      direction: "entry",
+      source: "qr",
+      decision: "denied",
+      reasonCode: "wrong_gym",
+      message: "QR token belongs to another gym.",
+      snapshot: { qrGymId: qrToken.gym_id } as Json
+    });
+    return { status: "error", message: "This QR belongs to another gym." };
   }
 
   if (new Date(qrToken.expires_at) <= new Date()) {
@@ -138,7 +160,8 @@ export async function qrCheckInAction(_previousState: AuthActionState, formData:
 }
 
 export async function checkOutAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/attendance");
+  const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/attendance");
+  const context = scope;
   const parsed = CheckOutSchema.safeParse({
     sessionId: formData.get("sessionId") ?? "",
     memberId: formData.get("memberId") ?? "",
@@ -151,7 +174,7 @@ export async function checkOutAction(_previousState: AuthActionState, formData: 
   }
 
   const supabase = await createSupabaseServerClient();
-  const sessionQuery = supabase.from("attendance_sessions").select("*").eq("status", "inside");
+  const sessionQuery = supabase.from("attendance_sessions").select("*").eq("status", "inside").eq("gym_id", scope.gymId);
   const sessionResult = parsed.data.sessionId
     ? await sessionQuery.eq("id", parsed.data.sessionId).maybeSingle()
     : parsed.data.memberId
@@ -173,7 +196,7 @@ export async function checkOutAction(_previousState: AuthActionState, formData: 
       duration_minutes: durationMinutes,
       check_out_source: "reception",
       exit_device_id: parsed.data.deviceId || null,
-      checked_out_by: context.userId,
+      checked_out_by: scope.userId,
       notes: parsed.data.notes || session.notes
     })
     .eq("id", session.id);
@@ -201,7 +224,7 @@ export async function checkOutAction(_previousState: AuthActionState, formData: 
       source: "reception",
       result: "success",
       message: "Member checked out.",
-      actor_id: context.userId,
+      actor_id: scope.userId,
       device_id: parsed.data.deviceId || null,
       metadata: { durationMinutes } as Json
     }),
@@ -228,7 +251,7 @@ export async function checkOutAction(_previousState: AuthActionState, formData: 
 }
 
 export async function regenerateQrTokenAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["member", "super_admin", "gym_admin", "reception_staff"], "/member/attendance");
+  const context = await requireRole(["member", "super_admin", "organization_owner", "gym_admin", "reception_staff"], "/member/attendance");
   const parsed = RegenerateQrSchema.safeParse({
     memberId: formData.get("memberId")
   });
@@ -244,7 +267,13 @@ export async function regenerateQrTokenAction(_previousState: AuthActionState, f
     return { status: "error", message: memberError?.message ?? "Member not found." };
   }
 
-  if (!hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"]) && member.user_id !== context.userId) {
+  const isStaff = hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"]);
+  const contextGymId = getContextGymId(context);
+  if (isStaff && contextGymId && member.gym_id !== contextGymId) {
+    return { status: "error", message: "Member does not belong to this gym." };
+  }
+
+  if (!isStaff && member.user_id !== context.userId) {
     return { status: "error", message: "You can only regenerate your own attendance QR." };
   }
 
@@ -301,9 +330,10 @@ export async function regenerateQrTokenAction(_previousState: AuthActionState, f
 
 export async function syncInactivityAlertsAction(_previousState: AuthActionState): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/attendance");
+  const scope = await requireGymAdminScope("/admin/attendance");
+  const context = scope;
   const supabase = await createSupabaseServerClient();
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   let frequencyQuery = supabase.from("attendance_member_frequency").select("*");
 
   if (gymId) {
@@ -351,7 +381,7 @@ export async function syncInactivityAlertsAction(_previousState: AuthActionState
       alert_type: row.bucket,
       severity: getInactivitySeverity(row.bucket),
       message: buildInactivityMessage(row.full_name, row.member_code, row.last_visit_at, row.bucket),
-      created_by: context.userId,
+      created_by: scope.userId,
       metadata: {
         lastVisitAt: row.last_visit_at,
         visitCount: row.visit_count ?? 0,
@@ -375,7 +405,8 @@ export async function syncInactivityAlertsAction(_previousState: AuthActionState
 }
 
 export async function saveAccessDeviceAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/attendance");
+  const scope = await requireGymAdminScope("/admin/attendance");
+  const context = scope;
   const parsed = AccessDeviceSchema.safeParse({
     deviceId: formData.get("deviceId") ?? "",
     deviceCode: formData.get("deviceCode"),
@@ -391,7 +422,7 @@ export async function saveAccessDeviceAction(_previousState: AuthActionState, fo
 
   const supabase = await createSupabaseServerClient();
   const payload = {
-    gym_id: context.profile?.gym_id ?? null,
+    gym_id: scope.gymId,
     device_code: parsed.data.deviceCode,
     name: parsed.data.name,
     device_type: parsed.data.deviceType,
@@ -422,7 +453,7 @@ async function processCheckIn(input: {
 }): Promise<AuthActionState> {
   const supabase = await createSupabaseServerClient();
   const validation = await validateMemberAccess(input.memberId);
-  const gymId = validation.member?.gym_id ?? input.context.profile?.gym_id ?? null;
+  const gymId = validation.member?.gym_id ?? getContextGymId(input.context);
 
   if (!validation.allowed || !validation.member) {
     await recordDeniedAccess(supabase, input.context, validation, {
@@ -432,6 +463,22 @@ async function processCheckIn(input: {
       source: input.source
     });
     return { status: "error", message: validation.message };
+  }
+
+  const contextGymId = getContextGymId(input.context);
+  if (contextGymId && validation.member.gym_id !== contextGymId) {
+    await recordDeniedAccess(supabase, input.context, {
+      ...validation,
+      allowed: false,
+      reasonCode: "wrong_gym",
+      message: "Member does not belong to this gym."
+    }, {
+      gymId: contextGymId,
+      qrTokenId: input.qrTokenId,
+      deviceId: input.deviceId,
+      source: input.source
+    });
+    return { status: "error", message: "Member does not belong to this gym." };
   }
 
   const { data: existingSession, error: existingError } = await supabase
@@ -784,7 +831,7 @@ function normalizeQrToken(value: string) {
 async function writeAttendanceAudit(context: AuthContext, action: string, entityType: string, entityId: string, metadata: Json = {}) {
   await writeAuditLog({
     actorId: context.userId,
-    gymId: context.profile?.gym_id ?? null,
+    gymId: getContextGymId(context),
     action,
     entityType,
     entityId,
@@ -792,9 +839,15 @@ async function writeAttendanceAudit(context: AuthContext, action: string, entity
   });
 }
 
+function getContextGymId(context: AuthContext) {
+  return (context as AuthContext & { gymId?: string | null }).gymId ?? context.profile?.gym_id ?? null;
+}
+
 function revalidateAttendancePaths(memberId?: string) {
   revalidatePath("/admin");
   revalidatePath("/admin/attendance");
+  revalidatePath("/reception");
+  revalidatePath("/reception/attendance");
   revalidatePath("/member");
   revalidatePath("/member/attendance");
   revalidatePath("/trainer/attendance");

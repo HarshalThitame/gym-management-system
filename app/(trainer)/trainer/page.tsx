@@ -6,7 +6,6 @@ import { StatCard } from "@/components/ui/stat-card";
 import { getTrainerClassesPortal } from "@/features/classes/services/class-service";
 import { getTrainerNotificationCenter } from "@/features/communications/services/communication-service";
 import { getTrainerFitnessPortal } from "@/features/fitness/services/fitness-service";
-import { formatMoney } from "@/features/memberships/lib/business-rules";
 import { TrainerSessionForm, TrainerSessionStatusForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
@@ -20,7 +19,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerDashboardPage() {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer");
+  const context = await requireRole(["trainer"], "/trainer");
   const [dashboard, classPortal, fitnessPortal, communications] = await Promise.all([
     getTrainerDashboard(context.userId ?? "", context.profile?.gym_id ?? null),
     getTrainerClassesPortal(context.userId ?? "", context.profile?.gym_id ?? null),
@@ -28,6 +27,7 @@ export default async function TrainerDashboardPage() {
     getTrainerNotificationCenter(context.userId ?? "", context.profile?.gym_id ?? null)
   ]);
   const trainerList = dashboard.trainer ? [dashboard.trainer] : [];
+  const nutritionComplianceMembers = fitnessPortal.members.filter((member) => member.activeNutritionPlan).length;
 
   return (
     <div className="space-y-8">
@@ -37,14 +37,18 @@ export default async function TrainerDashboardPage() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Manage today&apos;s coaching work, assigned members, upcoming personal training sessions, and performance signals.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <StatCard detail="Scheduled for today" icon={<CalendarDays className="size-5" />} label="Today's PT Sessions" value={String(dashboard.metrics.todaySessions)} />
         <StatCard detail="Active coaching assignments" icon={<UsersRound className="size-5" />} label="Assigned Members" value={String(dashboard.metrics.assignedMembers)} />
-        <StatCard detail="Scheduled for today" icon={<CalendarDays className="size-5" />} label="Today" value={String(dashboard.metrics.todaySessions)} />
-        <StatCard detail="Next 30 days" icon={<Dumbbell className="size-5" />} label="Upcoming" value={String(dashboard.metrics.upcomingSessions)} />
-        <StatCard detail="Assigned group sessions" icon={<CalendarCheck className="size-5" />} label="Classes" value={String(classPortal.sessions.length)} />
-        <StatCard detail={`${fitnessPortal.metrics.membersMissingWorkouts} need follow-up`} icon={<Activity className="size-5" />} label="Progress" value={String(fitnessPortal.metrics.activeGoals)} />
-        <StatCard detail={`${communications?.metrics.priority ?? 0} priority alerts`} icon={<MessageSquare className="size-5" />} label="Messages" value={String(communications?.metrics.unread ?? 0)} />
-        <StatCard detail={`${formatMoney(dashboard.metrics.ptRevenue)} PT package value`} icon={<Star className="size-5" />} label="Rating" value={dashboard.metrics.averageRating.toFixed(1)} />
+        <StatCard detail="Members under active coaching" icon={<UsersRound className="size-5" />} label="Active Clients" value={String(fitnessPortal.metrics.assignedMembers)} />
+        <StatCard detail="Next 30 days" icon={<Dumbbell className="size-5" />} label="Upcoming Appointments" value={String(dashboard.metrics.upcomingSessions)} />
+        <StatCard detail="Assigned group sessions" icon={<CalendarCheck className="size-5" />} label="Assigned Classes" value={String(classPortal.sessions.length)} />
+        <StatCard detail="Members needing a new assessment" icon={<Activity className="size-5" />} label="Pending Assessments" value={String(fitnessPortal.metrics.membersMissingWorkouts)} />
+        <StatCard detail="Active goals to review" icon={<Activity className="size-5" />} label="Pending Reviews" value={String(fitnessPortal.metrics.activeGoals)} />
+        <StatCard detail="Completed workouts in 30 days" icon={<Activity className="size-5" />} label="Workout Compliance" value={String(fitnessPortal.metrics.completedWorkouts30Days)} />
+        <StatCard detail="Members with active nutrition plans" icon={<Star className="size-5" />} label="Nutrition Compliance" value={String(nutritionComplianceMembers)} />
+        <StatCard detail="Members needing coaching follow-up" icon={<Activity className="size-5" />} label="Progress Alerts" value={String(fitnessPortal.metrics.membersMissingWorkouts)} />
+        <StatCard detail={`${communications?.metrics.priority ?? 0} priority alerts`} icon={<MessageSquare className="size-5" />} label="Unread Messages" value={String(communications?.metrics.unread ?? 0)} />
       </div>
 
       {!dashboard.trainer ? (

@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { assertFeature, isWithinBranchLimit } from "@/lib/tenant";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
-import type { Json } from "@/types/database";
-import { normalizeDomain, parseCsvList, parseJsonObject, slugifyEnterpriseName } from "../lib/business-rules";
+import type { Database, Json } from "@/types/database";
+import { isFullTenantDomain, normalizeDomain, parseCsvList, parseJsonObject, slugifyEnterpriseName } from "../lib/business-rules";
+import { isSystemTenantDomain } from "../lib/domain-rules";
 import {
   BackupJobSchema,
   BranchSchema,
@@ -16,14 +19,17 @@ import {
   ComplianceRequestSchema,
   FeatureFlagSchema,
   HealthCheckSchema,
+  GymSchema,
   OrganizationSchema,
   RetentionPolicySchema,
   SecurityEventStatusSchema,
   SubscriptionSchema,
-  TenantConfigSchema
+  TenantConfigSchema,
+  TenantDomainLifecycleSchema,
+  TenantDomainSchema
 } from "../schemas/enterprise";
 
-const enterpriseAdminRoles = ["super_admin", "gym_admin"] as const;
+const enterpriseAdminRoles = ["super_admin", "organization_owner", "gym_admin"] as const;
 const superAdminRoles = ["super_admin"] as const;
 
 export async function saveOrganizationAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -37,7 +43,7 @@ export async function saveOrganizationAction(_previousState: AuthActionState, fo
     status: formData.get("status") ?? "active",
     primaryDomain: formData.get("primaryDomain") ?? "",
     billingEmail: formData.get("billingEmail") ?? "",
-    settings: formData.get("settings") ?? ""
+    settings: latestFormString(formData, "settings")
   });
 
   if (!parsed.success) {
@@ -76,6 +82,54 @@ export async function saveOrganizationAction(_previousState: AuthActionState, fo
   return { status: "success", message: parsed.data.organizationId ? "Organization updated." : "Organization created." };
 }
 
+export async function saveGymAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(superAdminRoles, "/super-admin/gyms");
+  const parsed = GymSchema.safeParse({
+    gymId: formData.get("gymId") ?? "",
+    organizationId: formData.get("organizationId"),
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    timezone: formData.get("timezone") ?? "Asia/Kolkata",
+    currency: formData.get("currency") ?? "INR",
+    status: formData.get("status") ?? "active"
+  });
+
+  if (!parsed.success) {
+    return validationState(parsed.error.flatten().fieldErrors);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!parsed.data.gymId) {
+    const branchLimitError = await requireLocationCapacity(supabase, parsed.data.organizationId, "gyms");
+    if (branchLimitError) {
+      return branchLimitError;
+    }
+  }
+  const payload = {
+    organization_id: parsed.data.organizationId,
+    name: parsed.data.name,
+    slug: parsed.data.slug || slugifyEnterpriseName(parsed.data.name),
+    timezone: parsed.data.timezone,
+    currency: parsed.data.currency.toUpperCase(),
+    status: parsed.data.status
+  };
+  const result = parsed.data.gymId
+    ? await supabase.from("gyms").update(payload).eq("id", parsed.data.gymId).select("*").maybeSingle()
+    : await supabase.from("gyms").insert(payload).select("*").maybeSingle();
+
+  if (result.error || !result.data) {
+    return { status: "error", message: result.error?.message ?? "Gym save failed." };
+  }
+
+  await writeEnterpriseAudit(context, parsed.data.gymId ? "gym.updated" : "gym.created", "gym", result.data.id, {
+    organizationId: parsed.data.organizationId,
+    status: parsed.data.status
+  });
+  revalidateEnterprisePaths();
+  return { status: "success", message: parsed.data.gymId ? "Gym updated." : "Gym created." };
+}
+
 export async function saveBranchAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(enterpriseAdminRoles, "/admin/settings");
@@ -97,7 +151,7 @@ export async function saveBranchAction(_previousState: AuthActionState, formData
     phone: formData.get("phone") ?? "",
     email: formData.get("email") ?? "",
     capacity: formData.get("capacity") ?? "0",
-    operatingHours: formData.get("operatingHours") ?? ""
+    operatingHours: latestFormString(formData, "operatingHours")
   });
 
   if (!parsed.success) {
@@ -110,6 +164,12 @@ export async function saveBranchAction(_previousState: AuthActionState, formData
   }
 
   const supabase = await createSupabaseServerClient();
+  if (!parsed.data.branchId) {
+    const branchLimitError = await requireLocationCapacity(supabase, parsed.data.organizationId, "branches");
+    if (branchLimitError) {
+      return branchLimitError;
+    }
+  }
   const payload = {
     organization_id: parsed.data.organizationId,
     gym_id: parsed.data.gymId || null,
@@ -158,7 +218,7 @@ export async function saveBranchUserAction(_previousState: AuthActionState, form
     branchRole: formData.get("branchRole") ?? "viewer",
     accessScope: formData.get("accessScope") ?? "single_branch",
     status: formData.get("status") ?? "active",
-    permissions: formData.get("permissions") ?? ""
+    permissions: latestFormString(formData, "permissions")
   });
 
   if (!parsed.success) {
@@ -204,13 +264,13 @@ export async function saveBranchSettingsAction(_previousState: AuthActionState, 
     branchSettingsId: formData.get("branchSettingsId") ?? "",
     organizationId: formData.get("organizationId"),
     branchId: formData.get("branchId"),
-    generalSettings: formData.get("generalSettings") ?? "",
-    membershipSettings: formData.get("membershipSettings") ?? "",
-    paymentSettings: formData.get("paymentSettings") ?? "",
-    attendanceSettings: formData.get("attendanceSettings") ?? "",
-    classSettings: formData.get("classSettings") ?? "",
-    notificationSettings: formData.get("notificationSettings") ?? "",
-    securitySettings: formData.get("securitySettings") ?? ""
+    generalSettings: latestFormString(formData, "generalSettings"),
+    membershipSettings: latestFormString(formData, "membershipSettings"),
+    paymentSettings: latestFormString(formData, "paymentSettings"),
+    attendanceSettings: latestFormString(formData, "attendanceSettings"),
+    classSettings: latestFormString(formData, "classSettings"),
+    notificationSettings: latestFormString(formData, "notificationSettings"),
+    securitySettings: latestFormString(formData, "securitySettings")
   });
 
   if (!parsed.success) {
@@ -274,10 +334,10 @@ export async function saveTenantConfigAction(_previousState: AuthActionState, fo
     primaryColor: formData.get("primaryColor") ?? "#111315",
     secondaryColor: formData.get("secondaryColor") ?? "#16a34a",
     accentColor: formData.get("accentColor") ?? "#d7ff3f",
-    typography: formData.get("typography") ?? "",
-    emailBranding: formData.get("emailBranding") ?? "",
-    limits: formData.get("limits") ?? "",
-    complianceSettings: formData.get("complianceSettings") ?? ""
+    typography: latestFormString(formData, "typography"),
+    emailBranding: latestFormString(formData, "emailBranding"),
+    limits: latestFormString(formData, "limits"),
+    complianceSettings: latestFormString(formData, "complianceSettings")
   });
 
   if (!parsed.success) {
@@ -328,6 +388,205 @@ export async function saveTenantConfigAction(_previousState: AuthActionState, fo
   return { status: "success", message: "Tenant branding and domain settings saved." };
 }
 
+export async function saveTenantDomainAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(enterpriseAdminRoles, "/admin/settings");
+  const parsed = TenantDomainSchema.safeParse({
+    tenantDomainId: formData.get("tenantDomainId") ?? "",
+    organizationId: formData.get("organizationId"),
+    branchId: formData.get("branchId") ?? "",
+    gymId: formData.get("gymId") ?? "",
+    tenantConfigId: formData.get("tenantConfigId") ?? "",
+    domain: formData.get("domain"),
+    domainType: formData.get("domainType") ?? "custom_domain",
+    routingMode: formData.get("routingMode") ?? "organization",
+    status: formData.get("status") ?? "pending",
+    isPrimary: checkbox(formData, "isPrimary")
+  });
+
+  if (!parsed.success) {
+    return validationState(parsed.error.flatten().fieldErrors);
+  }
+
+  const normalizedDomain = normalizeDomain(parsed.data.domain);
+  if (!normalizedDomain || !isFullTenantDomain(normalizedDomain)) {
+    return fieldError("domain", "Enter a full domain such as apexfit.com or bandra.apexfit.com.");
+  }
+
+  if (isSystemTenantDomain({ domain: normalizedDomain, domain_type: parsed.data.domainType })) {
+    return fieldError("domain", "System deployment domains are managed automatically and cannot be added here.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const featureError = await requireCustomDomainFeature(parsed.data.organizationId);
+  if (featureError) {
+    return featureError;
+  }
+  const branchId = parsed.data.branchId || null;
+  let gymId = parsed.data.gymId || null;
+
+  if (branchId) {
+    const { data: branch, error: branchError } = await supabase
+      .from("branches")
+      .select("id,organization_id,gym_id")
+      .eq("id", branchId)
+      .eq("organization_id", parsed.data.organizationId)
+      .maybeSingle();
+
+    if (branchError) {
+      return { status: "error", message: branchError.message };
+    }
+
+    if (!branch) {
+      return fieldError("branchId", "Selected branch is not accessible for this organization.");
+    }
+
+    gymId = gymId ?? branch.gym_id;
+  }
+
+  if (parsed.data.tenantConfigId) {
+    const { data: tenantConfig, error: tenantConfigError } = await supabase
+      .from("tenant_configs")
+      .select("id,organization_id")
+      .eq("id", parsed.data.tenantConfigId)
+      .eq("organization_id", parsed.data.organizationId)
+      .maybeSingle();
+
+    if (tenantConfigError) {
+      return { status: "error", message: tenantConfigError.message };
+    }
+
+    if (!tenantConfig) {
+      return fieldError("tenantConfigId", "Selected tenant config is not accessible for this organization.");
+    }
+  }
+
+  if (parsed.data.isPrimary) {
+    const unsetResult = await supabase
+      .from("tenant_domains")
+      .update({ is_primary: false })
+      .eq("organization_id", parsed.data.organizationId)
+      .neq("id", parsed.data.tenantDomainId || "00000000-0000-0000-0000-000000000000");
+
+    if (unsetResult.error) {
+      return { status: "error", message: unsetResult.error.message };
+    }
+  }
+
+  const payload = {
+    organization_id: parsed.data.organizationId,
+    branch_id: branchId,
+    gym_id: gymId,
+    tenant_config_id: parsed.data.tenantConfigId || null,
+    domain: normalizedDomain,
+    domain_type: parsed.data.domainType,
+    routing_mode: parsed.data.routingMode,
+    status: parsed.data.status,
+    is_primary: parsed.data.status === "disabled" ? false : parsed.data.isPrimary,
+    ssl_status: parsed.data.status === "disabled" ? "not_applicable" as const : "pending" as const,
+    verified_at: null,
+    last_checked_at: null,
+    metadata: {
+      source: "admin_domain_registry",
+      managed_by: "apex",
+      lifecycle: parsed.data.status
+    } satisfies Json,
+    created_by: context.userId
+  };
+  const result = parsed.data.tenantDomainId
+    ? await supabase.from("tenant_domains").update(payload).eq("id", parsed.data.tenantDomainId).select("*").maybeSingle()
+    : await supabase.from("tenant_domains").insert(payload).select("*").maybeSingle();
+
+  if (result.error || !result.data) {
+    return { status: "error", message: result.error?.message ?? "Tenant domain save failed." };
+  }
+
+  await syncTenantConfigDomainFields(supabase, result.data);
+  await writeEnterpriseAudit(context, parsed.data.tenantDomainId ? "tenant_domain.updated" : "tenant_domain.created", "tenant_domain", result.data.id, {
+    domain: normalizedDomain,
+    routingMode: parsed.data.routingMode,
+    isPrimary: parsed.data.isPrimary
+  });
+  revalidateEnterprisePaths();
+  return { status: "success", message: parsed.data.tenantDomainId ? "Tenant domain updated." : "Tenant domain created. Add it to Vercel, configure DNS, then verify it." };
+}
+
+export async function updateTenantDomainLifecycleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(enterpriseAdminRoles, "/admin/settings");
+  const parsed = TenantDomainLifecycleSchema.safeParse({
+    tenantDomainId: formData.get("tenantDomainId"),
+    action: formData.get("action")
+  });
+
+  if (!parsed.success) {
+    return validationState(parsed.error.flatten().fieldErrors);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: domain, error } = await supabase.from("tenant_domains").select("*").eq("id", parsed.data.tenantDomainId).maybeSingle();
+
+  if (error || !domain) {
+    return { status: "error", message: error?.message ?? "Tenant domain was not found." };
+  }
+
+  if (parsed.data.action !== "set_primary" && isSystemTenantDomain(domain)) {
+    return { status: "error", message: "System deployment domains cannot be disabled or restored from the tenant registry." };
+  }
+
+  if (!isSystemTenantDomain(domain)) {
+    const featureError = await requireCustomDomainFeature(domain.organization_id);
+    if (featureError) {
+      return featureError;
+    }
+  }
+
+  if (parsed.data.action === "set_primary") {
+    const unsetResult = await supabase.from("tenant_domains").update({ is_primary: false }).eq("organization_id", domain.organization_id).neq("id", domain.id);
+    if (unsetResult.error) {
+      return { status: "error", message: unsetResult.error.message };
+    }
+
+    const { data, error: updateError } = await supabase.from("tenant_domains").update({ is_primary: true }).eq("id", domain.id).select("*").maybeSingle();
+    if (updateError || !data) {
+      return { status: "error", message: updateError?.message ?? "Primary domain update failed." };
+    }
+
+    await syncTenantConfigDomainFields(supabase, data);
+  } else if (parsed.data.action === "disable") {
+    const { data, error: updateError } = await supabase
+      .from("tenant_domains")
+      .update({ status: "disabled", is_primary: false, ssl_status: "not_applicable" })
+      .eq("id", domain.id)
+      .select("*")
+      .maybeSingle();
+    if (updateError || !data) {
+      return { status: "error", message: updateError?.message ?? "Domain disable failed." };
+    }
+
+    await syncTenantConfigDomainFields(supabase, data);
+  } else {
+    const { data, error: updateError } = await supabase
+      .from("tenant_domains")
+      .update({ status: "pending", ssl_status: "pending", verified_at: null, last_checked_at: null })
+      .eq("id", domain.id)
+      .select("*")
+      .maybeSingle();
+    if (updateError || !data) {
+      return { status: "error", message: updateError?.message ?? "Domain restore failed." };
+    }
+
+    await syncTenantConfigDomainFields(supabase, data);
+  }
+
+  await writeEnterpriseAudit(context, `tenant_domain.${parsed.data.action}`, "tenant_domain", domain.id, {
+    domain: domain.domain,
+    action: parsed.data.action
+  });
+  revalidateEnterprisePaths();
+  return { status: "success", message: "Tenant domain lifecycle updated." };
+}
+
 export async function saveFeatureFlagAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(enterpriseAdminRoles, "/admin/settings");
@@ -341,7 +600,7 @@ export async function saveFeatureFlagAction(_previousState: AuthActionState, for
     enabled: checkbox(formData, "enabled"),
     rolloutPercentage: formData.get("rolloutPercentage") ?? "0",
     targetPlanTiers: formData.get("targetPlanTiers") ?? "",
-    rules: formData.get("rules") ?? "",
+    rules: latestFormString(formData, "rules"),
     status: formData.get("status") ?? "active"
   });
 
@@ -482,7 +741,7 @@ export async function saveComplianceRequestAction(_previousState: AuthActionStat
     status: formData.get("status") ?? "open",
     dueAt: formData.get("dueAt") ?? "",
     notes: formData.get("notes") ?? "",
-    metadata: formData.get("metadata") ?? ""
+    metadata: latestFormString(formData, "metadata")
   });
 
   if (!parsed.success) {
@@ -527,7 +786,7 @@ export async function queueBackupJobAction(_previousState: AuthActionState, form
     branchId: formData.get("branchId") ?? "",
     backupType: formData.get("backupType") ?? "configuration",
     scope: formData.get("scope") ?? "tenant",
-    metadata: formData.get("metadata") ?? ""
+    metadata: latestFormString(formData, "metadata")
   });
 
   if (!parsed.success) {
@@ -569,7 +828,7 @@ export async function recordHealthCheckAction(_previousState: AuthActionState, f
     status: formData.get("status") ?? "healthy",
     latencyMs: formData.get("latencyMs") || undefined,
     message: formData.get("message") ?? "",
-    metadata: formData.get("metadata") ?? ""
+    metadata: latestFormString(formData, "metadata")
   });
 
   if (!parsed.success) {
@@ -644,6 +903,11 @@ function checkbox(formData: FormData, name: string) {
   return formData.get(name) === "on" || formData.get(name) === "true";
 }
 
+function latestFormString(formData: FormData, name: string) {
+  const values = formData.getAll(name).filter((value): value is string => typeof value === "string");
+  return values.at(-1) ?? "";
+}
+
 function validationState(fieldErrors: Record<string, string[] | undefined>): AuthActionState {
   return {
     status: "error",
@@ -654,6 +918,99 @@ function validationState(fieldErrors: Record<string, string[] | undefined>): Aut
 
 function fieldError(field: string, message: string): AuthActionState {
   return { status: "error", message, fieldErrors: { [field]: [message] } };
+}
+
+async function requireLocationCapacity(
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+  table: "gyms" | "branches"
+): Promise<AuthActionState | null> {
+  try {
+    const currentCount = await getOrganizationLocationCount(supabase, organizationId, table);
+    const withinLimit = await isWithinBranchLimit(organizationId, currentCount);
+    if (!withinLimit) {
+      return { status: "error", message: "Branch limit reached for your current plan. Please upgrade to add more locations." };
+    }
+
+    return null;
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Branch limit reached for your current plan. Please upgrade to add more locations." };
+  }
+}
+
+async function getOrganizationLocationCount(supabase: SupabaseClient<Database>, organizationId: string, table: "gyms" | "branches") {
+  const { count, error } = await supabase
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .neq("status", "archived");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
+async function requireCustomDomainFeature(organizationId: string | null): Promise<AuthActionState | null> {
+  if (!organizationId) {
+    return { status: "error", message: "Feature not available on your current plan." };
+  }
+
+  try {
+    await assertFeature(organizationId, "customDomainEnabled");
+    return null;
+  } catch (error) {
+    return { status: "error", message: featureGateMessage(error) };
+  }
+}
+
+function featureGateMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Feature not available on your current plan.";
+}
+
+async function syncTenantConfigDomainFields(supabase: SupabaseClient<Database>, domain: Database["public"]["Tables"]["tenant_domains"]["Row"]) {
+  if (!domain.tenant_config_id || domain.domain_type === "system") {
+    return;
+  }
+
+  const domainStatus = domain.status === "verified" ? "verified" : domain.status === "failed" ? "failed" : domain.status === "disabled" ? "not_configured" : "pending";
+
+  if (domain.status === "disabled") {
+    const { data: tenantConfig } = await supabase
+      .from("tenant_configs")
+      .select("custom_domain,subdomain")
+      .eq("id", domain.tenant_config_id)
+      .maybeSingle();
+    const patch: Database["public"]["Tables"]["tenant_configs"]["Update"] = {
+      domain_status: domainStatus
+    };
+
+    if (domain.domain_type === "custom_domain" && normalizeDomain(tenantConfig?.custom_domain ?? "") === domain.normalized_domain) {
+      patch.custom_domain = null;
+    }
+
+    if (domain.domain_type === "subdomain" && normalizeDomain(tenantConfig?.subdomain ?? "") === domain.normalized_domain) {
+      patch.subdomain = null;
+    }
+
+    await supabase.from("tenant_configs").update(patch).eq("id", domain.tenant_config_id);
+    return;
+  }
+
+  const patch: Database["public"]["Tables"]["tenant_configs"]["Update"] = {
+    domain_status: domainStatus
+  };
+
+  if (domain.domain_type === "custom_domain" && domain.is_primary) {
+    patch.custom_domain = domain.normalized_domain ?? domain.domain;
+  }
+
+  if (domain.domain_type === "subdomain") {
+    patch.subdomain = domain.normalized_domain ?? domain.domain;
+  }
+
+  await supabase.from("tenant_configs").update(patch).eq("id", domain.tenant_config_id);
 }
 
 async function writeEnterpriseAudit(context: AuthContext, action: string, entityType: string, entityId: string, metadata: Json) {
@@ -670,4 +1027,21 @@ async function writeEnterpriseAudit(context: AuthContext, action: string, entity
 function revalidateEnterprisePaths() {
   revalidatePath("/admin");
   revalidatePath("/admin/settings");
+  revalidatePath("/super-admin");
+  revalidatePath("/super-admin/organizations");
+  revalidatePath("/super-admin/gyms");
+  revalidatePath("/super-admin/domains");
+  revalidatePath("/super-admin/subscriptions");
+  revalidatePath("/super-admin/billing");
+  revalidatePath("/super-admin/users");
+  revalidatePath("/super-admin/roles");
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/super-admin/white-label");
+  revalidatePath("/super-admin/support");
+  revalidatePath("/super-admin/security");
+  revalidatePath("/super-admin/analytics");
+  revalidatePath("/super-admin/monitoring");
+  revalidatePath("/super-admin/backups");
+  revalidatePath("/super-admin/audit-logs");
+  revalidatePath("/super-admin/feature-flags");
 }

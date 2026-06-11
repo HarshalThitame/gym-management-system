@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { assertFeature } from "@/lib/tenant";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
 import type { ClassRow, ClassSessionRow } from "@/types/classes";
@@ -37,7 +39,8 @@ type ClassNotificationEventType = Database["public"]["Tables"]["class_notificati
 
 export async function saveClassCategoryAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/classes");
+  const scope = await requireGymAdminScope("/admin/classes");
+  const context = scope;
   const parsed = ClassCategorySchema.safeParse({
     categoryId: formData.get("categoryId") ?? "",
     name: formData.get("name"),
@@ -52,7 +55,11 @@ export async function saveClassCategoryAction(_previousState: AuthActionState, f
   }
 
   const supabase = await createSupabaseServerClient();
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
+  const featureError = await requireClassSchedulingFeature(supabase, getContextOrganizationId(scope), gymId);
+  if (featureError) {
+    return featureError;
+  }
   const slug = slugifyClassName(parsed.data.name);
   const payload = {
     gym_id: gymId,
@@ -62,10 +69,10 @@ export async function saveClassCategoryAction(_previousState: AuthActionState, f
     color_token: parsed.data.colorToken,
     status: parsed.data.status,
     display_order: parsed.data.displayOrder,
-    created_by: context.userId
+    created_by: scope.userId
   };
   const result = parsed.data.categoryId
-    ? await supabase.from("class_categories").update(payload).eq("id", parsed.data.categoryId).select("*").maybeSingle()
+    ? await supabase.from("class_categories").update(payload).eq("id", parsed.data.categoryId).eq("gym_id", scope.gymId).select("*").maybeSingle()
     : await supabase.from("class_categories").insert(payload).select("*").maybeSingle();
 
   if (result.error || !result.data) {
@@ -79,7 +86,8 @@ export async function saveClassCategoryAction(_previousState: AuthActionState, f
 
 export async function saveClassAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/classes");
+  const scope = await requireGymAdminScope("/admin/classes");
+  const context = scope;
   const parsed = ClassSchema.safeParse({
     classId: formData.get("classId") ?? "",
     categoryId: formData.get("categoryId") ?? "",
@@ -106,7 +114,7 @@ export async function saveClassAction(_previousState: AuthActionState, formData:
   }
 
   const supabase = await createSupabaseServerClient();
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const slug = slugifyClassName(parsed.data.name);
   const classPayload = {
     gym_id: gymId,
@@ -129,10 +137,10 @@ export async function saveClassAction(_previousState: AuthActionState, formData:
     status: parsed.data.status,
     archived_at: parsed.data.status === "archived" ? new Date().toISOString() : null,
     calendar_integration: { google: null, outlook: null, apple: null } as Json,
-    created_by: context.userId
+    created_by: scope.userId
   };
   const classResult = parsed.data.classId
-    ? await supabase.from("classes").update(classPayload).eq("id", parsed.data.classId).select("*").maybeSingle()
+    ? await supabase.from("classes").update(classPayload).eq("id", parsed.data.classId).eq("gym_id", scope.gymId).select("*").maybeSingle()
     : await supabase.from("classes").insert(classPayload).select("*").maybeSingle();
 
   if (classResult.error || !classResult.data) {
@@ -146,7 +154,7 @@ export async function saveClassAction(_previousState: AuthActionState, formData:
       trainer_id: parsed.data.primaryTrainerId,
       role: "primary",
       status: "active",
-      created_by: context.userId
+      created_by: scope.userId
     }, { onConflict: "class_id,trainer_id,role" });
   }
 
@@ -157,7 +165,8 @@ export async function saveClassAction(_previousState: AuthActionState, formData:
 
 export async function saveClassSessionAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/admin/classes");
+  const scope = await requireGymAdminScope("/admin/classes");
+  const context = scope;
   const parsed = ClassSessionSchema.safeParse({
     sessionId: formData.get("sessionId") ?? "",
     classId: formData.get("classId"),
@@ -181,6 +190,13 @@ export async function saveClassSessionAction(_previousState: AuthActionState, fo
   const classRow = await getClassById(supabase, parsed.data.classId);
   if (!classRow) {
     return { status: "error", message: "Class not found." };
+  }
+  if (classRow.gym_id !== scope.gymId) {
+    return { status: "error", message: "Class does not belong to this gym." };
+  }
+  const featureError = await requireClassSchedulingFeature(supabase, getContextOrganizationId(scope), classRow.gym_id);
+  if (featureError) {
+    return featureError;
   }
   const access = await ensureClassWriteAccess(supabase, context, parsed.data.classId, parsed.data.primaryTrainerId || parsed.data.substituteTrainerId || null);
   if (!access.ok) {
@@ -210,11 +226,11 @@ export async function saveClassSessionAction(_previousState: AuthActionState, fo
     reserved_capacity: parsed.data.reservedCapacity,
     location: parsed.data.location || classRow.location,
     notes: parsed.data.notes || null,
-    created_by: context.userId,
+    created_by: scope.userId,
     calendar_payload: { googleEventId: null, outlookEventId: null, appleIcsUid: null } as Json
   };
   const result = parsed.data.sessionId
-    ? await supabase.from("class_sessions").update(payload).eq("id", parsed.data.sessionId).select("*").maybeSingle()
+    ? await supabase.from("class_sessions").update(payload).eq("id", parsed.data.sessionId).eq("gym_id", scope.gymId).select("*").maybeSingle()
     : await supabase.from("class_sessions").insert(payload).select("*").maybeSingle();
 
   if (result.error || !result.data) {
@@ -228,7 +244,8 @@ export async function saveClassSessionAction(_previousState: AuthActionState, fo
 
 export async function generateClassScheduleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/classes");
+  const scope = await requireGymAdminScope("/admin/classes");
+  const context = scope;
   const parsed = ClassScheduleSchema.safeParse({
     classId: formData.get("classId"),
     recurrence: formData.get("recurrence"),
@@ -251,6 +268,13 @@ export async function generateClassScheduleAction(_previousState: AuthActionStat
   if (!classRow) {
     return { status: "error", message: "Class not found." };
   }
+  if (classRow.gym_id !== scope.gymId) {
+    return { status: "error", message: "Class does not belong to this gym." };
+  }
+  const featureError = await requireClassSchedulingFeature(supabase, getContextOrganizationId(scope), classRow.gym_id);
+  if (featureError) {
+    return featureError;
+  }
   const primaryTrainer = await getPrimaryTrainerForClass(supabase, classRow.id);
   const scheduleResult = await supabase.from("class_schedules").insert({
     gym_id: classRow.gym_id,
@@ -264,7 +288,7 @@ export async function generateClassScheduleAction(_previousState: AuthActionStat
     ends_at: parsed.data.endsAt,
     capacity_override: parsed.data.capacityOverride === "" ? null : Number(parsed.data.capacityOverride),
     notes: parsed.data.notes || null,
-    created_by: context.userId
+    created_by: scope.userId
   }).select("*").maybeSingle();
 
   if (scheduleResult.error || !scheduleResult.data) {
@@ -297,7 +321,7 @@ export async function generateClassScheduleAction(_previousState: AuthActionStat
       capacity: schedule.capacity_override ?? classRow.default_capacity,
       reserved_capacity: Math.min(classRow.reserved_capacity, schedule.capacity_override ?? classRow.default_capacity),
       location: classRow.location,
-      created_by: context.userId,
+      created_by: scope.userId,
       calendar_payload: { googleEventId: null, outlookEventId: null, appleIcsUid: null } as Json
     }));
 
@@ -315,7 +339,7 @@ export async function generateClassScheduleAction(_previousState: AuthActionStat
 
 export async function bookClassAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["member", "super_admin", "gym_admin", "reception_staff"], "/member/classes");
+  const context = await requireRole(["member", "super_admin", "organization_owner", "gym_admin", "reception_staff"], "/member/classes");
   const parsed = BookClassSchema.safeParse({
     sessionId: formData.get("sessionId"),
     memberId: formData.get("memberId") ?? ""
@@ -334,8 +358,15 @@ export async function bookClassAction(_previousState: AuthActionState, formData:
   if (!bundle) {
     return { status: "error", message: "Class session not found." };
   }
+  if (bundle.session.gym_id !== member.gym_id) {
+    return { status: "error", message: "Member cannot book classes outside their gym." };
+  }
+  const featureError = await requireClassSchedulingFeature(supabase, getContextOrganizationId(context), bundle.session.gym_id);
+  if (featureError) {
+    return featureError;
+  }
 
-  const isStaff = hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"]);
+  const isStaff = hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"]);
   if (!isStaff && !isSessionBookable(bundle.session, bundle.classRow)) {
     return { status: "error", message: "Booking is not open for this session." };
   }
@@ -420,7 +451,7 @@ export async function bookClassAction(_previousState: AuthActionState, formData:
 
 export async function cancelClassBookingAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["member", "super_admin", "gym_admin", "reception_staff"], "/member/classes");
+  const context = await requireRole(["member", "super_admin", "organization_owner", "gym_admin", "reception_staff"], "/member/classes");
   const parsed = CancelClassBookingSchema.safeParse({
     bookingId: formData.get("bookingId"),
     reason: formData.get("reason") ?? ""
@@ -440,7 +471,10 @@ export async function cancelClassBookingAction(_previousState: AuthActionState, 
     return { status: "error", message: "Class session not found." };
   }
   const member = await getMemberById(supabase, booking.member_id);
-  const isStaff = hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"]);
+  const isStaff = hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"]);
+  if (isStaff && getContextGymId(context) && booking.gym_id !== getContextGymId(context)) {
+    return { status: "error", message: "Booking does not belong to this gym." };
+  }
   if (!isStaff && member?.user_id !== context.userId) {
     return { status: "error", message: "You can only cancel your own class bookings." };
   }
@@ -471,7 +505,7 @@ export async function cancelClassBookingAction(_previousState: AuthActionState, 
 
 export async function recordClassAttendanceAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/classes");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/classes");
   const parsed = ClassAttendanceSchema.safeParse({
     sessionId: formData.get("sessionId"),
     bookingId: formData.get("bookingId") ?? "",
@@ -528,7 +562,7 @@ export async function recordClassAttendanceAction(_previousState: AuthActionStat
 
 export async function updateClassSessionStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/classes");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/classes");
   const parsed = ClassSessionStatusSchema.safeParse({
     sessionId: formData.get("sessionId"),
     nextStatus: formData.get("nextStatus"),
@@ -624,10 +658,14 @@ async function hasTrainerSessionConflict(supabase: AppSupabase, input: { trainer
 }
 
 async function getBookingMember(supabase: AppSupabase, context: AuthContext, requestedMemberId: string | null): Promise<MemberRow | null> {
-  const isStaff = hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"]);
-  const query = isStaff && requestedMemberId
+  const isStaff = hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"]);
+  let query = isStaff && requestedMemberId
     ? supabase.from("members").select("*").eq("id", requestedMemberId)
     : supabase.from("members").select("*").eq("user_id", context.userId ?? "");
+  const contextGymId = getContextGymId(context);
+  if (isStaff && contextGymId) {
+    query = query.eq("gym_id", contextGymId);
+  }
   const { data, error } = await query.maybeSingle();
   if (error) {
     throw new Error(error.message);
@@ -694,7 +732,14 @@ async function promoteNextWaitlistMember(supabase: AppSupabase, context: AuthCon
 }
 
 async function ensureClassWriteAccess(supabase: AppSupabase, context: AuthContext, classId: string, trainerId: string | null): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"])) {
+  if (hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"])) {
+    const contextGymId = getContextGymId(context);
+    if (contextGymId) {
+      const classRow = await getClassById(supabase, classId);
+      if (!classRow || classRow.gym_id !== contextGymId) {
+        return { ok: false, message: "Class does not belong to this gym." };
+      }
+    }
     return { ok: true };
   }
   if (!hasRequiredRole(context.roles, ["trainer"])) {
@@ -712,7 +757,11 @@ async function ensureClassWriteAccess(supabase: AppSupabase, context: AuthContex
 }
 
 async function ensureSessionWriteAccess(supabase: AppSupabase, context: AuthContext, session: ClassSessionRow): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"])) {
+  if (hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"])) {
+    const contextGymId = getContextGymId(context);
+    if (contextGymId && session.gym_id !== contextGymId) {
+      return { ok: false, message: "Class session does not belong to this gym." };
+    }
     return { ok: true };
   }
   const trainer = await getTrainerForContext(supabase, context);
@@ -781,12 +830,55 @@ async function logClassSession(supabase: AppSupabase, context: AuthContext, sess
 async function writeClassAudit(context: AuthContext, action: string, entityType: string, entityId: string, metadata: Json = {}) {
   await writeAuditLog({
     actorId: context.userId,
-    gymId: context.profile?.gym_id ?? null,
+    gymId: getContextGymId(context),
     action,
     entityType,
     entityId,
     metadata
   });
+}
+
+function getContextGymId(context: AuthContext) {
+  return (context as AuthContext & { gymId?: string | null }).gymId ?? context.profile?.gym_id ?? null;
+}
+
+function getContextOrganizationId(context: AuthContext) {
+  return (context as AuthContext & { scopedOrganizationId?: string | null }).scopedOrganizationId ?? context.organizationId ?? null;
+}
+
+async function requireClassSchedulingFeature(
+  supabase: AppSupabase,
+  organizationId: string | null,
+  gymId: string | null
+): Promise<AuthActionState | null> {
+  const resolvedOrganizationId = organizationId ?? await getOrganizationIdForGym(supabase, gymId);
+  if (!resolvedOrganizationId) {
+    return { status: "error", message: "Feature not available on your current plan." };
+  }
+
+  try {
+    await assertFeature(resolvedOrganizationId, "classSchedulingEnabled");
+    return null;
+  } catch (error) {
+    return { status: "error", message: featureGateMessage(error) };
+  }
+}
+
+async function getOrganizationIdForGym(supabase: AppSupabase, gymId: string | null) {
+  if (!gymId) {
+    return null;
+  }
+
+  const { data, error } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.organization_id ?? null;
+}
+
+function featureGateMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Feature not available on your current plan.";
 }
 
 function revalidateClassPaths() {

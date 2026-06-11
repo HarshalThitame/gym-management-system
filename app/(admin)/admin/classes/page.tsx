@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BarChart3, CalendarDays, Dumbbell, ListChecks, UsersRound } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -9,8 +10,9 @@ import { ClassStatusBadge } from "@/features/classes/components/class-status-bad
 import { formatClassLabel } from "@/features/classes/lib/business-rules";
 import { getClassOperationsDashboard, listClassCategories, listClasses } from "@/features/classes/services/class-service";
 import { listActiveTrainers } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 type AdminClassesPageProps = {
   searchParams: Promise<{ q?: string; status?: string; categoryId?: string; page?: string }>;
@@ -23,16 +25,19 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminClassesPage({ searchParams }: AdminClassesPageProps) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/classes");
+  const scope = await requireGymAdminScope("/admin/classes");
   const params = await searchParams;
-  const gymId = context.profile?.gym_id ?? null;
-  const [dashboard, categories, classResult, trainers] = await Promise.all([
+  const gymId = scope.gymId;
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const [dashboard, categories, classResult, trainers, planContext] = await Promise.all([
     getClassOperationsDashboard(gymId),
     listClassCategories(gymId),
     listClasses({ gymId, query: params.q, status: params.status, categoryId: params.categoryId, page: Number(params.page ?? "1"), pageSize: 40 }),
-    listActiveTrainers(gymId)
+    listActiveTrainers(gymId),
+    organizationId ? getOrgPlanContext(organizationId) : null
   ]);
   const activeClasses = classResult.classes.filter((classRow) => classRow.status === "active");
+  const classSchedulingEnabled = planContext?.features.classSchedulingEnabled === true;
 
   return (
     <div className="space-y-8">
@@ -113,11 +118,23 @@ export default async function AdminClassesPage({ searchParams }: AdminClassesPag
         <div className="space-y-5">
           <Card>
             <CardHeader><h3 className="text-2xl font-black">Create Class</h3></CardHeader>
-            <CardContent><ClassForm categories={categories} trainers={trainers} /></CardContent>
+            <CardContent>
+              {classSchedulingEnabled ? (
+                <ClassForm categories={categories} trainers={trainers} />
+              ) : (
+                <FeatureLocked compact featureName="Class Creation" requiredPlan="Standard" />
+              )}
+            </CardContent>
           </Card>
           <Card>
             <CardHeader><h3 className="text-2xl font-black">Class Category</h3></CardHeader>
-            <CardContent><ClassCategoryForm /></CardContent>
+            <CardContent>
+              {classSchedulingEnabled ? (
+                <ClassCategoryForm />
+              ) : (
+                <FeatureLocked compact featureName="Class Categories" requiredPlan="Standard" />
+              )}
+            </CardContent>
           </Card>
         </div>
       </div>
@@ -128,14 +145,26 @@ export default async function AdminClassesPage({ searchParams }: AdminClassesPag
             <h3 className="text-2xl font-black">Generate Recurring Sessions</h3>
             <p className="text-sm leading-6 text-muted-foreground">One-time, daily, weekly, monthly, and custom recurrence with trainer conflict checks.</p>
           </CardHeader>
-          <CardContent><ClassScheduleForm classes={activeClasses} /></CardContent>
+          <CardContent>
+            {classSchedulingEnabled ? (
+              <ClassScheduleForm classes={activeClasses} />
+            ) : (
+              <FeatureLocked compact featureName="Recurring Class Schedules" requiredPlan="Standard" />
+            )}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader>
             <h3 className="text-2xl font-black">Create One-Off Session</h3>
             <p className="text-sm leading-6 text-muted-foreground">Use for workshops, substitutions, holidays, special events, and manual calendar corrections.</p>
           </CardHeader>
-          <CardContent><ClassSessionForm classes={activeClasses} trainers={trainers} /></CardContent>
+          <CardContent>
+            {classSchedulingEnabled ? (
+              <ClassSessionForm classes={activeClasses} trainers={trainers} />
+            ) : (
+              <FeatureLocked compact featureName="One-Off Class Sessions" requiredPlan="Standard" />
+            )}
+          </CardContent>
         </Card>
       </div>
 

@@ -56,8 +56,8 @@ export function FitnessGoalForm({ memberId, trainerId = "", goals = [] }: { memb
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
-      <input name="trainerId" type="hidden" value={trainerId} />
+      <HiddenInput name="memberId" value={memberId} />
+      <HiddenInput name="trainerId" value={trainerId} />
       <Field id={`goal-title-${memberId}`} label="Goal Title" name="title" state={state}><Input id={`goal-title-${memberId}`} name="title" placeholder="Lose 5kg while maintaining strength" /></Field>
       <div className="grid gap-4 md:grid-cols-3">
         <Select name="goalType" label="Goal type" defaultValue="general_fitness">
@@ -86,7 +86,7 @@ export function GoalStatusForm({ goal }: { goal: FitnessGoalRow }) {
   return (
     <form action={formAction} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
       <FormMessage state={state} />
-      <input name="goalId" type="hidden" value={goal.id} />
+      <HiddenInput name="goalId" value={goal.id} />
       <select className={selectClass} name="status" defaultValue={goal.status} aria-label="Goal status">
         <option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
       </select>
@@ -102,8 +102,8 @@ export function WorkoutSessionForm({ memberId, trainerId = "", assignments = [],
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
-      <input name="trainerId" type="hidden" value={trainerId} />
+      <HiddenInput name="memberId" value={memberId} />
+      <HiddenInput name="trainerId" value={trainerId} />
       <Field id={`workout-title-${memberId}`} label="Workout Title" name="workoutTitle" state={state}><Input id={`workout-title-${memberId}`} name="workoutTitle" placeholder="Upper Strength Session" /></Field>
       <div className="grid gap-4 md:grid-cols-3">
         <Input name="sessionDate" type="date" defaultValue={today} aria-label="Session date" />
@@ -122,7 +122,7 @@ export function WorkoutSessionForm({ memberId, trainerId = "", assignments = [],
           {goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.title}</option>)}
         </select>
       </div>
-      <input name="source" type="hidden" value={trainerId ? "trainer_logged" : "manual"} />
+      <HiddenInput name="source" value={trainerId ? "trainer_logged" : "manual"} />
       <Textarea name="notes" placeholder="Session notes, fatigue, form cues, or recovery context." />
       <AuthSubmitButton>Log Workout</AuthSubmitButton>
     </form>
@@ -134,8 +134,8 @@ export function ExerciseLogForm({ memberId, workoutSessionId, exercises }: { mem
   return (
     <form action={formAction} className="space-y-3">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
-      <input name="workoutSessionId" type="hidden" value={workoutSessionId} />
+      <HiddenInput name="memberId" value={memberId} />
+      <HiddenInput name="workoutSessionId" value={workoutSessionId} />
       <select className={selectClass} name="exerciseId" defaultValue="" aria-label="Exercise">
         <option value="">Custom exercise</option>
         {exercises.map((exercise) => <option key={exercise.id} value={exercise.id}>{exercise.name}</option>)}
@@ -158,7 +158,7 @@ export function BodyMeasurementForm({ memberId }: { memberId: string }) {
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
+      <HiddenInput name="memberId" value={memberId} />
       <Input name="recordedOn" type="date" defaultValue={today} aria-label="Recorded date" />
       <div className="grid gap-4 md:grid-cols-3">
         <Input name="weightKg" placeholder="Weight kg" type="number" step="0.01" />
@@ -181,9 +181,9 @@ export function ProgressPhotoForm({ memberId }: { memberId: string }) {
   const [state, formAction] = useActionState(saveProgressPhotoAction, initialAuthActionState);
   const today = new Date().toISOString().slice(0, 10);
   return (
-    <form action={formAction} className="space-y-4" encType="multipart/form-data">
+    <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
+      <HiddenInput name="memberId" value={memberId} />
       <div className="grid gap-4 md:grid-cols-3">
         <Input name="photoDate" type="date" defaultValue={today} aria-label="Photo date" />
         <Select name="viewType" label="View" defaultValue="front"><option value="front">Front</option><option value="side">Side</option><option value="back">Back</option></Select>
@@ -202,8 +202,8 @@ export function NutritionPlanForm({ memberId, trainerId = "" }: { memberId: stri
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
-      <input name="trainerId" type="hidden" value={trainerId} />
+      <HiddenInput name="memberId" value={memberId} />
+      <HiddenInput name="trainerId" value={trainerId} />
       <Field id={`nutrition-name-${memberId}`} label="Plan Name" name="name" state={state}><Input id={`nutrition-name-${memberId}`} name="name" placeholder="Lean muscle nutrition block" /></Field>
       <div className="grid gap-4 md:grid-cols-3">
         <Select name="planType" label="Plan type" defaultValue="maintenance"><option value="weight_loss">Weight loss</option><option value="muscle_gain">Muscle gain</option><option value="maintenance">Maintenance</option><option value="custom">Custom</option></Select>
@@ -231,8 +231,8 @@ export function MealPlanForm({ nutritionPlan, memberId }: { nutritionPlan: Nutri
   return (
     <form action={formAction} className="space-y-3">
       <FormMessage state={state} />
-      <input name="nutritionPlanId" type="hidden" value={nutritionPlan.id} />
-      <input name="memberId" type="hidden" value={memberId} />
+      <HiddenInput name="nutritionPlanId" value={nutritionPlan.id} />
+      <HiddenInput name="memberId" value={memberId} />
       <Select name="mealType" label="Meal" defaultValue="breakfast"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option></Select>
       <Input name="title" placeholder="Meal title" />
       <div className="grid gap-3 md:grid-cols-4">
@@ -253,7 +253,7 @@ export function MealEntryForm({ memberId, nutritionPlans }: { memberId: string; 
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
+      <HiddenInput name="memberId" value={memberId} />
       <div className="grid gap-4 md:grid-cols-3">
         <Input name="entryDate" type="date" defaultValue={today} aria-label="Entry date" />
         <Select name="mealType" label="Meal" defaultValue="breakfast"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option></Select>
@@ -281,7 +281,7 @@ export function FitnessMilestoneForm({ memberId, goals = [] }: { memberId: strin
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
+      <HiddenInput name="memberId" value={memberId} />
       <select className={selectClass} name="fitnessGoalId" defaultValue="" aria-label="Related goal">
         <option value="">No goal</option>
         {goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.title}</option>)}
@@ -330,4 +330,8 @@ function Field({ id, label, name, state, children }: { id: string; label: string
       <FieldError message={state.fieldErrors?.[name]?.[0]} />
     </div>
   );
+}
+
+function HiddenInput({ name, value }: { name: string; value: string }) {
+  return <input name={name} suppressHydrationWarning type="hidden" value={value} />;
 }

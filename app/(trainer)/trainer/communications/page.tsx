@@ -17,7 +17,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerCommunicationsPage() {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer/communications");
+  const context = await requireRole(["trainer"], "/trainer/communications");
   const gymId = context.profile?.gym_id ?? null;
   const [center, assignedMembers, templates] = await Promise.all([
     context.userId ? getTrainerNotificationCenter(context.userId, gymId) : null,

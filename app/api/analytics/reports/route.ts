@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthContext } from "@/lib/auth/session";
-import { canAny } from "@/lib/rbac";
+import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { analyticsRowsToCsv, analyticsRowsToExcel, analyticsRowsToPdf } from "@/features/analytics/lib/report-export";
 import { analyticsReportKeys, reportFormats, type AnalyticsReportFormat, type AnalyticsReportKey } from "@/types/analytics";
@@ -8,10 +7,15 @@ import { getAnalyticsReportPayload } from "@/features/analytics/services/analyti
 import type { Json } from "@/types/database";
 
 export async function GET(request: NextRequest) {
-  const context = await getAuthContext();
+  const auth = await requireApiPermission("reports", "export");
 
-  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
+  if (!gymScope.ok) {
+    return gymScope.response;
   }
 
   const keyParam = request.nextUrl.searchParams.get("key") ?? "executive_kpi_snapshot";
@@ -19,24 +23,25 @@ export async function GET(request: NextRequest) {
   const reportKey: AnalyticsReportKey = analyticsReportKeys.includes(keyParam as AnalyticsReportKey) ? keyParam as AnalyticsReportKey : "executive_kpi_snapshot";
   const format: AnalyticsReportFormat = reportFormats.includes(formatParam as AnalyticsReportFormat) ? formatParam as AnalyticsReportFormat : "csv";
   const report = await getAnalyticsReportPayload({
-    gymId: context.profile?.gym_id ?? null,
+    gymId: gymScope.gymId,
     reportKey
   });
 
   const supabase = await createSupabaseServerClient();
   const { data: exportRow } = await supabase.from("report_exports").insert({
-    gym_id: context.profile?.gym_id ?? null,
+    gym_id: gymScope.gymId,
     report_key: report.key,
     category: report.category,
     format,
     status: "completed",
     row_count: report.rows.length,
     filters: Object.fromEntries(request.nextUrl.searchParams.entries()) as Json,
-    requested_by: context.userId,
+    requested_by: auth.context.userId,
     completed_at: new Date().toISOString()
   }).select("id").maybeSingle();
 
-  await supabase.from("saved_reports").update({ last_run_at: new Date().toISOString() }).eq("report_key", report.key);
+  const savedReportUpdate = supabase.from("saved_reports").update({ last_run_at: new Date().toISOString() }).eq("report_key", report.key);
+  await (gymScope.gymId ? savedReportUpdate.eq("gym_id", gymScope.gymId) : savedReportUpdate.is("gym_id", null));
 
   const filename = `${report.key}-${exportRow?.id ?? Date.now()}`;
   if (format === "excel") {

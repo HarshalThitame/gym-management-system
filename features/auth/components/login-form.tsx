@@ -36,7 +36,7 @@ export function LoginForm({ nextPath, inactive = false }: LoginFormProps) {
 
       <div className="space-y-2">
         <label className="text-sm font-bold" htmlFor="email">Email</label>
-        <Input autoComplete="email" id="email" name="email" placeholder="you@example.com" type="email" />
+        <Input autoComplete="email" id="email" name="email" placeholder="you@example.com" required type="email" />
         <FieldError message={state.fieldErrors?.email?.[0]} />
       </div>
 
@@ -47,7 +47,7 @@ export function LoginForm({ nextPath, inactive = false }: LoginFormProps) {
             Forgot?
           </Link>
         </div>
-        <Input autoComplete="current-password" id="password" name="password" type="password" />
+        <Input autoComplete="current-password" id="password" name="password" required type="password" />
         <FieldError message={state.fieldErrors?.password?.[0]} />
       </div>
 

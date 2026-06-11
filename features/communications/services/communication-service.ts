@@ -96,10 +96,16 @@ export async function getCommunicationDashboard(gymId: string | null): Promise<C
 
 export async function getMemberNotificationCenter(userId: string): Promise<NotificationCenterData | null> {
   const supabase = await createSupabaseServerClient();
-  const { data: member, error } = await supabase.from("members").select("*").eq("user_id", userId).maybeSingle();
+  const { data: members, error } = await supabase
+    .from("members")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1);
   if (error) {
     throw new Error(error.message);
   }
+  const member = members?.[0] ?? null;
   if (!member) {
     return null;
   }

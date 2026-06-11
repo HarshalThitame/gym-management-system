@@ -36,7 +36,7 @@ const maxProgressPhotoBytes = 10 * 1024 * 1024;
 
 export async function saveExerciseAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
   const parsed = ExerciseSchema.safeParse({
     exerciseId: formData.get("exerciseId") ?? "",
     name: formData.get("name"),
@@ -89,7 +89,7 @@ export async function saveExerciseAction(_previousState: AuthActionState, formDa
 
 export async function saveFitnessGoalAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
   const parsed = FitnessGoalSchema.safeParse({
     goalId: formData.get("goalId") ?? "",
     memberId: formData.get("memberId"),
@@ -152,7 +152,7 @@ export async function saveFitnessGoalAction(_previousState: AuthActionState, for
 
 export async function updateFitnessGoalStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
   const parsed = FitnessGoalStatusSchema.safeParse({
     goalId: formData.get("goalId"),
     status: formData.get("status"),
@@ -191,7 +191,7 @@ export async function updateFitnessGoalStatusAction(_previousState: AuthActionSt
 
 export async function saveWorkoutSessionAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
   const parsed = WorkoutSessionSchema.safeParse({
     workoutSessionId: formData.get("workoutSessionId") ?? "",
     memberId: formData.get("memberId"),
@@ -256,7 +256,7 @@ export async function saveWorkoutSessionAction(_previousState: AuthActionState, 
 
 export async function addExerciseLogAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
   const parsed = ExerciseLogSchema.safeParse({
     workoutSessionId: formData.get("workoutSessionId"),
     memberId: formData.get("memberId"),
@@ -312,7 +312,7 @@ export async function addExerciseLogAction(_previousState: AuthActionState, form
 
 export async function saveBodyMeasurementAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
   const parsed = BodyMeasurementSchema.safeParse({
     measurementId: formData.get("measurementId") ?? "",
     memberId: formData.get("memberId"),
@@ -380,7 +380,7 @@ export async function saveBodyMeasurementAction(_previousState: AuthActionState,
 
 export async function saveProgressPhotoAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
   const parsed = ProgressPhotoSchema.safeParse({
     photoId: formData.get("photoId") ?? "",
     memberId: formData.get("memberId"),
@@ -451,7 +451,7 @@ export async function saveProgressPhotoAction(_previousState: AuthActionState, f
 
 export async function saveNutritionPlanAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
   const parsed = NutritionPlanSchema.safeParse({
     nutritionPlanId: formData.get("nutritionPlanId") ?? "",
     memberId: formData.get("memberId"),
@@ -515,7 +515,7 @@ export async function saveNutritionPlanAction(_previousState: AuthActionState, f
 
 export async function saveMealPlanAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
   const parsed = MealPlanSchema.safeParse({
     mealPlanId: formData.get("mealPlanId") ?? "",
     nutritionPlanId: formData.get("nutritionPlanId"),
@@ -567,7 +567,7 @@ export async function saveMealPlanAction(_previousState: AuthActionState, formDa
 
 export async function saveMealEntryAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");
   const parsed = MealEntrySchema.safeParse({
     mealEntryId: formData.get("mealEntryId") ?? "",
     memberId: formData.get("memberId"),
@@ -626,7 +626,7 @@ export async function saveMealEntryAction(_previousState: AuthActionState, formD
 
 export async function saveFitnessMilestoneAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/progress");
   const parsed = FitnessMilestoneSchema.safeParse({
     milestoneId: formData.get("milestoneId") ?? "",
     memberId: formData.get("memberId"),

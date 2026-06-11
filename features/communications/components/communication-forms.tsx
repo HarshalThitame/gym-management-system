@@ -121,8 +121,8 @@ export function NotificationStateForm({ notification, compact = false }: { notif
   return (
     <form action={formAction} className={compact ? "flex flex-wrap items-center gap-2" : "space-y-2"}>
       <FormMessage state={state} />
-      <input name="notificationId" type="hidden" value={notification.id} />
-      <input name="nextStatus" type="hidden" value={notification.status === "archived" ? "read" : "read"} />
+      <input name="notificationId" suppressHydrationWarning type="hidden" value={notification.id} />
+      <input name="nextStatus" suppressHydrationWarning type="hidden" value={notification.status === "archived" ? "read" : "read"} />
       <Button size="sm" type="submit" variant="secondary">Mark Read</Button>
     </form>
   );
@@ -133,8 +133,8 @@ export function ArchiveNotificationForm({ notification }: { notification: Notifi
   return (
     <form action={formAction} className="inline-flex">
       <FormMessage state={state} />
-      <input name="notificationId" type="hidden" value={notification.id} />
-      <input name="nextStatus" type="hidden" value="archived" />
+      <input name="notificationId" suppressHydrationWarning type="hidden" value={notification.id} />
+      <input name="nextStatus" suppressHydrationWarning type="hidden" value="archived" />
       <Button size="sm" type="submit" variant="ghost">Archive</Button>
     </form>
   );
@@ -237,7 +237,7 @@ export function CampaignDispatchForm({ campaign }: { campaign: CampaignRow }) {
   return (
     <form action={formAction} className="space-y-2">
       <FormMessage state={state} />
-      <input name="campaignId" type="hidden" value={campaign.id} />
+      <input name="campaignId" suppressHydrationWarning type="hidden" value={campaign.id} />
       <div className="grid gap-2 sm:grid-cols-2">
         <Button name="mode" type="submit" value="queue" variant="secondary">Queue</Button>
         <Button name="mode" type="submit" value="send_now" variant="accent">Send Now</Button>
@@ -281,7 +281,7 @@ export function AutomationRunForm({ rule }: { rule: CommunicationAutomationRuleR
   return (
     <form action={formAction} className="space-y-2">
       <FormMessage state={state} />
-      <input name="automationRuleId" type="hidden" value={rule.id} />
+      <input name="automationRuleId" suppressHydrationWarning type="hidden" value={rule.id} />
       <Button className="w-full" type="submit" variant="secondary">Queue Automation</Button>
     </form>
   );
@@ -343,7 +343,7 @@ function SelectField({ label, name, options }: { label: string; name: string; op
 function Check({ name, label, checked }: { name: string; label: string; checked: boolean }) {
   return (
     <label className="flex min-h-11 items-center gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm font-bold">
-      <input defaultChecked={checked} name={name} type="checkbox" />
+      <input defaultChecked={checked} name={name} suppressHydrationWarning type="checkbox" />
       <span>{label}</span>
     </label>
   );

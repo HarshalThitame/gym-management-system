@@ -1,18 +1,21 @@
-import { NextResponse } from "next/server";
 import { classRowsToCsv } from "@/features/classes/lib/csv";
 import { classReportFormats, classRowsToExcel, classRowsToPdf, type ClassReportFormat } from "@/features/classes/lib/report-export";
 import { getClassReportRows } from "@/features/classes/services/class-service";
-import { getAuthContext } from "@/lib/auth/session";
-import { canAny } from "@/lib/rbac";
+import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
 
 const reportTypes = ["attendance", "bookings", "no_shows", "waitlists", "trainer_sessions"] as const;
 type ReportType = (typeof reportTypes)[number];
 
 export async function GET(request: Request) {
-  const context = await getAuthContext();
+  const auth = await requireApiPermission("reports", "export");
 
-  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
+  if (!gymScope.ok) {
+    return gymScope.response;
   }
 
   const url = new URL(request.url);
@@ -20,7 +23,7 @@ export async function GET(request: Request) {
   const type: ReportType = reportTypes.includes(typeParam as ReportType) ? (typeParam as ReportType) : "bookings";
   const formatParam = url.searchParams.get("format") ?? "csv";
   const format: ClassReportFormat = classReportFormats.includes(formatParam as ClassReportFormat) ? (formatParam as ClassReportFormat) : "csv";
-  const report = await getClassReportRows(context.profile?.gym_id ?? null, type);
+  const report = await getClassReportRows(gymScope.gymId, type);
 
   if (format === "pdf") {
     const pdf = await classRowsToPdf(report);

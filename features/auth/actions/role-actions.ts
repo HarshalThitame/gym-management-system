@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { RoleAssignmentSchema } from "../schemas/auth";
 import type { AuthActionState } from "./action-state";
 
 export async function assignUserRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const actor = await requireRole(["super_admin", "gym_admin"], "/admin/settings");
+  const actor = await requireGymAdminScope("/admin/settings");
   const parsed = RoleAssignmentSchema.safeParse({
     userId: formData.get("userId"),
     roleName: formData.get("roleName"),
@@ -23,26 +23,18 @@ export async function assignUserRoleAction(_previousState: AuthActionState, form
     };
   }
 
-  if (actor.primaryRole !== "super_admin" && parsed.data.roleName === "super_admin") {
-    return { status: "error", message: "Only Super Admins can assign the Super Admin role." };
-  }
-
-  if (actor.primaryRole !== "super_admin") {
-    const actorGymId = actor.profile?.gym_id ?? null;
-
-    if (!actorGymId) {
-      return { status: "error", message: "Your account is not connected to a gym." };
-    }
-
-    if (parsed.data.gymId && parsed.data.gymId !== actorGymId) {
-      return { status: "error", message: "Gym Admins can only assign roles inside their own gym." };
-    }
+  if (parsed.data.roleName === "super_admin" || parsed.data.roleName === "organization_owner") {
+    return { status: "error", message: "Use the Super Admin portal to assign platform or organization owner roles." };
   }
 
   const adminClient = getSupabaseAdminClient();
 
   if (!adminClient) {
     return { status: "error", message: "Supabase service credentials are not configured." };
+  }
+
+  if (parsed.data.gymId && parsed.data.gymId !== actor.gymId) {
+    return { status: "error", message: "Gym Admins can only assign roles inside their own gym." };
   }
 
   const { data: role, error: roleError } = await adminClient
@@ -55,9 +47,7 @@ export async function assignUserRoleAction(_previousState: AuthActionState, form
     return { status: "error", message: "Role does not exist." };
   }
 
-  const gymId = actor.primaryRole === "super_admin"
-    ? parsed.data.gymId || actor.profile?.gym_id || null
-    : actor.profile?.gym_id ?? null;
+  const gymId = actor.gymId;
   const { error } = await adminClient.from("user_roles").insert({
     user_id: parsed.data.userId,
     role_id: role.id,
@@ -79,5 +69,7 @@ export async function assignUserRoleAction(_previousState: AuthActionState, form
   });
 
   revalidatePath("/admin");
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/staff");
   return { status: "success", message: "Role assigned." };
 }

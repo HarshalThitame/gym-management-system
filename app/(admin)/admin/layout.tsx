@@ -1,7 +1,9 @@
 import { Activity, BarChart3, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, MessageSquare, Settings, Tags, UserRoundPlus, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalShell, type PortalNavItem } from "@/components/layout/portal-shell";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 const adminNav = [
   { href: "/admin", label: "Dashboard", icon: Gauge, iconKey: "gauge" },
@@ -16,15 +18,31 @@ const adminNav = [
   { href: "/admin/ai", label: "AI Intelligence", icon: Brain, iconKey: "brain" },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, iconKey: "bar-chart" },
   { href: "/admin/staff", label: "Staff", icon: BriefcaseBusiness, iconKey: "briefcase" },
-  { href: "/admin/members", label: "Create User", icon: UserRoundPlus, iconKey: "user-plus" },
+  { href: "/admin/members/new", label: "Create User", icon: UserRoundPlus, iconKey: "user-plus" },
   { href: "/admin/settings", label: "Settings", icon: Settings, iconKey: "settings" }
 ] satisfies PortalNavItem[];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin");
+  const [scope, tenantSite] = await Promise.all([
+    requireGymAdminScope("/admin"),
+    getTenantSiteConfig()
+  ]);
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const planContext = organizationId ? await getOrgPlanContext(organizationId) : null;
 
   return (
-    <PortalShell context={context} eyebrow="Admin Panel" navItems={adminNav} title="Operations Dashboard">
+    <PortalShell
+      branchName={tenantSite.branchName}
+      context={scope}
+      eyebrow="Gym Admin Panel"
+      navItems={adminNav}
+      planContext={planContext}
+      showPlanIndicator
+      tenantInitial={tenantSite.brandInitial}
+      tenantName={tenantSite.name}
+      tenantShortName={tenantSite.shortName}
+      title="Gym Operations Dashboard"
+    >
       {children}
     </PortalShell>
   );

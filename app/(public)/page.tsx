@@ -8,8 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { JsonLd } from "@/components/seo/json-ld";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { faqs, gallery, membershipPlans, programs, siteConfig, testimonials, trainers } from "@/data/site";
+import { faqs, gallery, membershipPlans, programs, testimonials, trainers } from "@/data/site";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 import { absoluteUrl } from "@/lib/utils";
 
 export const metadata: Metadata = createMetadata({
@@ -18,21 +19,22 @@ export const metadata: Metadata = createMetadata({
   path: "/"
 });
 
-export default function HomePage() {
+export default async function HomePage() {
+  const tenantSite = await getTenantSiteConfig();
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "ExerciseGym",
-    name: siteConfig.name,
-    description: siteConfig.description,
-    telephone: siteConfig.phone,
-    email: siteConfig.email,
+    name: tenantSite.name,
+    description: tenantSite.description,
+    telephone: tenantSite.phone,
+    email: tenantSite.email,
     url: absoluteUrl("/"),
     address: {
       "@type": "PostalAddress",
-      streetAddress: siteConfig.address,
-      addressLocality: "Pune",
-      addressRegion: "Maharashtra",
-      addressCountry: "IN"
+      streetAddress: tenantSite.address,
+      addressLocality: tenantSite.tenant.branch.city ?? "Pune",
+      addressRegion: tenantSite.tenant.branch.state ?? "Maharashtra",
+      addressCountry: tenantSite.tenant.branch.country ?? "IN"
     },
     openingHours: "Mo-Sa 05:30-22:00, Su 07:00-14:00",
     priceRange: "₹₹₹"

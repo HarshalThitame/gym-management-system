@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { PackageCheck, ReceiptText, TimerReset } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { formatMoney } from "@/features/memberships/lib/business-rules";
 import { PtPackageForm, PtPurchaseForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { listActiveTrainers, listPersonalTrainingPackages } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 export const metadata: Metadata = createMetadata({
   title: "Personal Training Packages",
@@ -17,21 +19,24 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminTrainerPackagesPage() {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/trainers/packages");
-  const gymId = context.profile?.gym_id ?? null;
-  const [packages, trainers, membersResult] = await Promise.all([
+  const scope = await requireGymAdminScope("/admin/trainers/packages");
+  const gymId = scope.gymId;
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const [packages, trainers, membersResult, planContext] = await Promise.all([
     listPersonalTrainingPackages(gymId),
     listActiveTrainers(gymId),
-    listMembers({ gymId, pageSize: 100 })
+    listMembers({ gymId, pageSize: 100 }),
+    organizationId ? getOrgPlanContext(organizationId) : null
   ]);
   const activePackages = packages.filter((packageRow) => packageRow.status === "active");
   const revenuePotential = activePackages.reduce((total, packageRow) => total + packageRow.price_amount, 0);
+  const trainerAssignmentEnabled = planContext?.features.trainerAssignmentEnabled === true;
 
   return (
     <div className="space-y-8">
       <div>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Personal Training</p>
-        <h2 className="mt-2 text-3xl font-black">Packages and purchase workflow</h2>
+        <h2 className="mt-2 text-3xl font-black">Personal Training Packages and purchase workflow</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Build sellable PT packages, assign trainers, generate billing-ready records, and allocate sessions for tracking.</p>
       </div>
 
@@ -76,7 +81,11 @@ export default async function AdminTrainerPackagesPage() {
               <h3 className="text-2xl font-black">Create Package</h3>
             </CardHeader>
             <CardContent>
-              <PtPackageForm />
+              {trainerAssignmentEnabled ? (
+                <PtPackageForm />
+              ) : (
+                <FeatureLocked compact featureName="PT Packages" requiredPlan="Standard" />
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -84,7 +93,11 @@ export default async function AdminTrainerPackagesPage() {
               <h3 className="text-2xl font-black">Assign Package</h3>
             </CardHeader>
             <CardContent>
-              <PtPurchaseForm members={membersResult.members} packages={activePackages} trainers={trainers} />
+              {trainerAssignmentEnabled ? (
+                <PtPurchaseForm members={membersResult.members} packages={activePackages} trainers={trainers} />
+              ) : (
+                <FeatureLocked compact featureName="PT Package Assignment" requiredPlan="Standard" />
+              )}
             </CardContent>
           </Card>
         </div>

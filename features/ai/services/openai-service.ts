@@ -1,10 +1,11 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { assertFeature } from "@/lib/tenant";
 import type { Json } from "@/types/database";
 import { appendSafetyDisclaimer, evaluatePromptSafety, hashPrompt, validateAiOutput } from "../lib/safety";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
-const DEFAULT_TEXT_MODEL = "gpt-5.4-mini";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const AI_TEXT_TIMEOUT_MS = 20_000;
 const AI_EMBEDDING_TIMEOUT_MS = 12_000;
@@ -18,12 +19,20 @@ type GenerateTextInput = {
   maxOutputTokens?: number;
 };
 
+type AiFeatureContext = {
+  organizationId?: string | null;
+  gymId?: string | null;
+  userId?: string | null;
+};
+
 type GenerateTextResult = {
   content: string;
   status: "success" | "fallback" | "blocked" | "error";
   model: string;
   safetyFlags: string[];
 };
+
+type AppSupabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 type ResponsesApiOutput = {
   output_text?: string;
@@ -47,8 +56,11 @@ type EmbeddingApiOutput = {
 };
 
 export async function generateAiText(input: GenerateTextInput): Promise<GenerateTextResult> {
+  await assertAiFeature(input);
+
   const startedAt = Date.now();
-  const model = process.env.OPENAI_MODEL || DEFAULT_TEXT_MODEL;
+  const model = readConfiguredEnv("OPENAI_MODEL");
+  const observationModel = model ?? "not-configured";
   const apiKey = process.env.OPENAI_API_KEY;
   const safety = evaluatePromptSafety(input.prompt);
 
@@ -57,7 +69,7 @@ export async function generateAiText(input: GenerateTextInput): Promise<Generate
       gymId: input.gymId ?? null,
       userId: input.userId ?? null,
       featureKey: input.featureKey,
-      model,
+      model: observationModel,
       prompt: input.prompt,
       latencyMs: Date.now() - startedAt,
       status: "blocked",
@@ -68,28 +80,28 @@ export async function generateAiText(input: GenerateTextInput): Promise<Generate
     return {
       content: appendSafetyDisclaimer(input.fallback),
       status: "blocked",
-      model,
+      model: observationModel,
       safetyFlags: safety.flags
     };
   }
 
-  if (!apiKey) {
+  if (!apiKey || !model) {
     await recordAiObservation({
       gymId: input.gymId ?? null,
       userId: input.userId ?? null,
       featureKey: input.featureKey,
-      model,
+      model: observationModel,
       prompt: input.prompt,
       latencyMs: Date.now() - startedAt,
       status: "fallback",
       safetyFlags: [],
-      errorMessage: "OPENAI_API_KEY is not configured."
+      errorMessage: !apiKey ? "OPENAI_API_KEY is not configured." : "OPENAI_MODEL is not configured."
     });
 
     return {
       content: appendSafetyDisclaimer(input.fallback),
       status: "fallback",
-      model,
+      model: observationModel,
       safetyFlags: []
     };
   }
@@ -161,7 +173,10 @@ export async function generateAiText(input: GenerateTextInput): Promise<Generate
   }
 }
 
-export async function generateEmbedding(input: string) {
+// Optional tenant context was added so embedding provider calls can enforce SaaS package gating.
+export async function generateEmbedding(input: string, context?: AiFeatureContext) {
+  await assertAiFeature(context ?? {});
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return null;
@@ -169,12 +184,12 @@ export async function generateEmbedding(input: string) {
 
   const response = await fetch(OPENAI_EMBEDDINGS_URL, {
     method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json"
-      },
-      signal: AbortSignal.timeout(AI_EMBEDDING_TIMEOUT_MS),
-      body: JSON.stringify({
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json"
+    },
+    signal: AbortSignal.timeout(AI_EMBEDDING_TIMEOUT_MS),
+    body: JSON.stringify({
       model: process.env.OPENAI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL,
       input: input.slice(0, 8000)
     })
@@ -186,6 +201,79 @@ export async function generateEmbedding(input: string) {
 
   const body = await response.json() as EmbeddingApiOutput;
   return body.data?.[0]?.embedding ?? null;
+}
+
+async function assertAiFeature(input: AiFeatureContext) {
+  const organizationId = input.organizationId ?? await resolveAiOrganizationId(input);
+  if (!organizationId) {
+    throw new Error("Feature not available on your current plan.");
+  }
+
+  await assertFeature(organizationId, "aiEnabled");
+}
+
+async function resolveAiOrganizationId(input: AiFeatureContext) {
+  const supabase = await createSupabaseServerClient();
+
+  if (input.gymId) {
+    const organizationId = await getOrganizationIdForGym(supabase, input.gymId);
+    if (organizationId) {
+      return organizationId;
+    }
+  }
+
+  if (!input.userId) {
+    return null;
+  }
+
+  const [memberResult, trainerResult, branchUserResult] = await Promise.all([
+    supabase.from("members").select("gym_id").eq("user_id", input.userId).maybeSingle(),
+    supabase.from("trainers").select("gym_id").eq("user_id", input.userId).maybeSingle(),
+    supabase.from("branch_users").select("organization_id").eq("user_id", input.userId).eq("status", "active").maybeSingle()
+  ]);
+
+  if (branchUserResult.error) {
+    throw new Error(branchUserResult.error.message);
+  }
+
+  if (branchUserResult.data?.organization_id) {
+    return branchUserResult.data.organization_id;
+  }
+
+  if (memberResult.error) {
+    throw new Error(memberResult.error.message);
+  }
+
+  if (memberResult.data?.gym_id) {
+    const organizationId = await getOrganizationIdForGym(supabase, memberResult.data.gym_id);
+    if (organizationId) {
+      return organizationId;
+    }
+  }
+
+  if (trainerResult.error) {
+    throw new Error(trainerResult.error.message);
+  }
+
+  if (trainerResult.data?.gym_id) {
+    return getOrganizationIdForGym(supabase, trainerResult.data.gym_id);
+  }
+
+  return null;
+}
+
+async function getOrganizationIdForGym(supabase: AppSupabase, gymId: string) {
+  const { data, error } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.organization_id ?? null;
+}
+
+function readConfiguredEnv(name: string) {
+  const value = process.env[name];
+  return value && value.trim().length > 0 ? value.trim() : null;
 }
 
 async function recordAiObservation(input: {

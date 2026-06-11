@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { PushSubscriptionSchema } from "@/features/pwa/schemas/pwa";
-import { getAuthContext } from "@/lib/auth/session";
+import { getApiTenantBranchId, getApiTenantOrganizationId, requireApiAuth } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
-  const context = await getAuthContext();
+  const auth = await requireApiAuth({ unauthenticatedMessage: "Sign in to enable push notifications." });
 
-  if (!context.isAuthenticated || !context.userId) {
-    return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in to enable push notifications." } }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
-  const rateLimit = await checkRateLimit(`pwa-push:${context.userId}`, 12, 60_000);
+  const rateLimit = await checkRateLimit(`pwa-push:${auth.context.userId}`, 12, 60_000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many push subscription requests." } }, { status: 429 });
   }
@@ -40,9 +40,9 @@ export async function POST(request: Request) {
 
   const { error } = await supabase.from("pwa_push_subscriptions").upsert(
     {
-      user_id: context.userId,
-      organization_id: null,
-      branch_id: null,
+      user_id: auth.context.userId,
+      organization_id: getApiTenantOrganizationId(auth.context, auth.tenant),
+      branch_id: getApiTenantBranchId(auth.tenant),
       endpoint: parsed.data.endpoint,
       p256dh: parsed.data.keys.p256dh,
       auth_secret: parsed.data.keys.auth,
@@ -61,10 +61,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const context = await getAuthContext();
+  const auth = await requireApiAuth({ unauthenticatedMessage: "Sign in to manage push notifications." });
 
-  if (!context.isAuthenticated || !context.userId) {
-    return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in to manage push notifications." } }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const body: unknown = await request.json().catch(() => null);
@@ -82,7 +82,7 @@ export async function DELETE(request: Request) {
   const { error } = await supabase
     .from("pwa_push_subscriptions")
     .update({ status: "revoked", updated_at: new Date().toISOString() })
-    .eq("user_id", context.userId)
+    .eq("user_id", auth.context.userId)
     .eq("endpoint", endpoint);
 
   if (error) {

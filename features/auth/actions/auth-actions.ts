@@ -9,11 +9,12 @@ import { getRoleRedirect } from "@/lib/rbac";
 import { sanitizeRedirectPath } from "@/lib/auth/redirects";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIpFromHeaders } from "@/lib/security/request";
+import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { absoluteUrl } from "@/lib/utils";
 import { sendEmail } from "@/services/email/resend";
 import type { Database } from "@/types/database";
-import { isRoleName } from "@/types/auth";
+import { isRoleName, type RoleName } from "@/types/auth";
 import {
   ChangePasswordSchema,
   ForgotPasswordSchema,
@@ -288,6 +289,12 @@ export async function signOutAction() {
 }
 
 async function resolveUserRedirect(supabase: SupabaseClient<Database>, userId: string) {
+  const serviceRoleNames = await resolveUserRoleNamesWithServiceRole(userId);
+
+  if (serviceRoleNames.length > 0) {
+    return getRoleRedirect(serviceRoleNames);
+  }
+
   const { data: assignments } = await supabase.from("user_roles").select("role_id").eq("user_id", userId);
   const roleIds = assignments?.map((assignment) => assignment.role_id) ?? [];
 
@@ -301,6 +308,40 @@ async function resolveUserRedirect(supabase: SupabaseClient<Database>, userId: s
     .filter(isRoleName);
 
   return getRoleRedirect(roleNames);
+}
+
+async function resolveUserRoleNamesWithServiceRole(userId: string) {
+  const url = getSupabaseUrl();
+  const serviceKey = getSupabaseServiceKey();
+
+  if (!url || !serviceKey) {
+    return [];
+  }
+
+  const endpoint = new URL("/rest/v1/user_roles", url);
+  endpoint.searchParams.set("select", "roles(name)");
+  endpoint.searchParams.set("user_id", `eq.${userId}`);
+
+  try {
+    const response = await fetch(endpoint, {
+      cache: "no-store",
+      headers: {
+        apikey: serviceKey,
+        authorization: `Bearer ${serviceKey}`
+      }
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const assignments = await response.json() as Array<{ roles?: { name?: string | null } | null }>;
+    return assignments
+      .map((assignment) => assignment.roles?.name)
+      .filter((roleName): roleName is RoleName => typeof roleName === "string" && isRoleName(roleName));
+  } catch {
+    return [];
+  }
 }
 
 async function createAuthClientOrNull() {

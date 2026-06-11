@@ -1,19 +1,22 @@
 import type { MetadataRoute } from "next";
-import { siteConfig } from "@/data/site";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const tenantSite = await getTenantSiteConfig();
+  const themeColor = tenantSite.tenant.brand.primaryColor ?? "#111214";
+
   return {
-    name: siteConfig.name,
-    short_name: siteConfig.shortName,
-    description: siteConfig.description,
+    name: tenantSite.name,
+    short_name: tenantSite.shortName,
+    description: tenantSite.description,
     start_url: "/member?source=pwa",
     scope: "/",
-    id: "/?app=apex-performance-club",
+    id: `/?app=${tenantSite.tenant.tenantKey ?? "apex-performance-club"}`,
     display: "standalone",
     display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
     orientation: "portrait",
     background_color: "#070809",
-    theme_color: "#111214",
+    theme_color: themeColor,
     categories: ["fitness", "health", "lifestyle", "business", "productivity"],
     lang: "en",
     dir: "ltr",
@@ -37,14 +40,14 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "390x844",
         type: "image/svg+xml",
         form_factor: "narrow",
-        label: "Apex mobile member dashboard"
+        label: `${tenantSite.shortName} mobile member dashboard`
       },
       {
         src: "/screenshots/desktop-dashboard.svg",
         sizes: "1440x1024",
         type: "image/svg+xml",
         form_factor: "wide",
-        label: "Apex operations dashboard"
+        label: `${tenantSite.shortName} operations dashboard`
       }
     ],
     shortcuts: [

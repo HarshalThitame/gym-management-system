@@ -1,6 +1,4 @@
-import { NextResponse } from "next/server";
-import { getAuthContext } from "@/lib/auth/session";
-import { canAny } from "@/lib/rbac";
+import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
 import { trainingRowsToCsv } from "@/features/training/lib/csv";
 import { getTrainingReportRows } from "@/features/training/services/training-service";
 
@@ -8,16 +6,21 @@ const reportTypes = ["sessions", "assignments", "ratings", "staff"] as const;
 type ReportType = (typeof reportTypes)[number];
 
 export async function GET(request: Request) {
-  const context = await getAuthContext();
+  const auth = await requireApiPermission("reports", "export");
 
-  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
+  if (!gymScope.ok) {
+    return gymScope.response;
   }
 
   const url = new URL(request.url);
   const typeParam = url.searchParams.get("type") ?? "sessions";
   const type: ReportType = reportTypes.includes(typeParam as ReportType) ? typeParam as ReportType : "sessions";
-  const report = await getTrainingReportRows(context.profile?.gym_id ?? null, type);
+  const report = await getTrainingReportRows(gymScope.gymId, type);
   const csv = trainingRowsToCsv(report);
 
   return new Response(csv, {

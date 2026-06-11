@@ -15,7 +15,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerClassesPage() {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer/classes");
+  const context = await requireRole(["trainer"], "/trainer/classes");
   const portal = await getTrainerClassesPortal(context.userId ?? "", context.profile?.gym_id ?? null);
   const todaysSessions = portal.sessions.filter((session) => session.session_date === new Date().toISOString().slice(0, 10));
   const activeBookings = portal.bookings.filter((booking) => ["booked", "checked_in"].includes(booking.status));

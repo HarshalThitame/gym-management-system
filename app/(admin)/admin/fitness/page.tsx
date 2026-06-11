@@ -6,7 +6,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { ExerciseForm } from "@/features/fitness/components/fitness-forms";
 import { formatFitnessLabel } from "@/features/fitness/lib/business-rules";
 import { getFitnessOperationsDashboard, listExercises } from "@/features/fitness/services/fitness-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 type AdminFitnessPageProps = {
@@ -20,9 +20,9 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminFitnessPage({ searchParams }: AdminFitnessPageProps) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/fitness");
+  const scope = await requireGymAdminScope("/admin/fitness");
   const params = await searchParams;
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const [dashboard, exerciseResult] = await Promise.all([
     getFitnessOperationsDashboard(gymId),
     listExercises({ gymId, query: params.q, category: params.category, difficulty: params.difficulty, page: Number(params.page ?? "1"), pageSize: 60 })

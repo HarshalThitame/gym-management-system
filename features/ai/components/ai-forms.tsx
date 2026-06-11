@@ -174,7 +174,7 @@ export function AiRecommendationReviewForm({ recommendationId }: { recommendatio
   return (
     <form action={formAction} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
       <FormMessage state={state} />
-      <input name="recommendationId" type="hidden" value={recommendationId} />
+      <input name="recommendationId" suppressHydrationWarning type="hidden" value={recommendationId} />
       <select className={selectClass} name="status" defaultValue="approved" aria-label="Recommendation review status">
         <option value="approved">Approve</option>
         <option value="rejected">Reject</option>

@@ -11,12 +11,29 @@ export function slugifyEnterpriseName(value: string) {
 }
 
 export function normalizeDomain(value: string) {
-  return value
+  const normalized = value
     .trim()
     .toLowerCase()
     .replace(/^https?:\/\//, "")
-    .replace(/\/.*$/, "")
-    .replace(/^www\./, "");
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
+    .replace(/^www\./, "")
+    .replace(/\.$/, "");
+
+  return normalized || null;
+}
+
+export function isFullTenantDomain(value: string) {
+  const normalized = normalizeDomain(value);
+  return Boolean(normalized && (normalized === "localhost" || normalized.includes(".")));
+}
+
+export function isResolvableTenantDomain(input: { status: string; organizationStatus?: string | null; tenantStatus?: string | null; branchStatus?: string | null }) {
+  const organizationAllowed = !input.organizationStatus || input.organizationStatus === "active" || input.organizationStatus === "trial";
+  const tenantAllowed = !input.tenantStatus || input.tenantStatus === "active" || input.tenantStatus === "trial";
+  const branchAllowed = !input.branchStatus || input.branchStatus === "active" || input.branchStatus === "planned" || input.branchStatus === "maintenance";
+
+  return input.status === "verified" && organizationAllowed && tenantAllowed && branchAllowed;
 }
 
 export function calculateUsagePercent(used: number, limit: number | null | undefined) {

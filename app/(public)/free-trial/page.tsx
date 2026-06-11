@@ -4,8 +4,9 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LazyLeadForm } from "@/features/public/components/lazy-lead-form";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { programs, siteConfig } from "@/data/site";
+import { programs } from "@/data/site";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 export const metadata: Metadata = createMetadata({
   title: "Book a Free Gym Trial",
@@ -13,8 +14,9 @@ export const metadata: Metadata = createMetadata({
   path: "/free-trial"
 });
 
-export default function FreeTrialPage() {
-  const whatsappHref = `https://wa.me/${siteConfig.whatsapp}?text=${encodeURIComponent("Hi Apex, I want to reserve a free trial session.")}`;
+export default async function FreeTrialPage() {
+  const tenantSite = await getTenantSiteConfig();
+  const whatsappHref = `https://wa.me/${tenantSite.whatsapp}?text=${encodeURIComponent(`Hi ${tenantSite.shortName}, I want to reserve a free trial session.`)}`;
 
   return (
     <>
@@ -22,7 +24,7 @@ export default function FreeTrialPage() {
         <div className="container-page grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-accent">Free Trial</p>
-            <h1 className="mt-4 text-balance text-5xl font-black leading-tight md:text-7xl">Book a free trial and experience Apex before you join.</h1>
+            <h1 className="mt-4 text-balance text-5xl font-black leading-tight md:text-7xl">Book a free trial and experience {tenantSite.shortName} before you join.</h1>
             <p className="mt-6 text-lg leading-8 text-white/70">Visit the club, explore the training floor, meet the team, and understand the best membership path for your goals.</p>
             <div className="mt-8 grid gap-3 text-sm font-semibold text-white/76 sm:grid-cols-3">
               {["Facility walkthrough", "Coach guidance", "Plan recommendation"].map((item) => (

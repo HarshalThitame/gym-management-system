@@ -2,6 +2,8 @@ import { Activity, Brain, CalendarCheck, CalendarDays, Dumbbell, Gauge, MessageS
 import type { ReactNode } from "react";
 import { PortalShell, type PortalNavItem } from "@/components/layout/portal-shell";
 import { requireRole } from "@/lib/auth/guards";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 const trainerNav = [
   { href: "/trainer", label: "Dashboard", icon: Gauge, iconKey: "gauge" },
@@ -16,10 +18,25 @@ const trainerNav = [
 ] satisfies PortalNavItem[];
 
 export default async function TrainerLayout({ children }: { children: ReactNode }) {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer");
+  const [context, tenantSite] = await Promise.all([
+    requireRole(["trainer"], "/trainer"),
+    getTenantSiteConfig()
+  ]);
+  const planContext = context.organizationId ? await getOrgPlanContext(context.organizationId) : null;
 
   return (
-    <PortalShell context={context} eyebrow="Trainer Portal" navItems={trainerNav} title="Trainer Dashboard">
+    <PortalShell
+      branchName={tenantSite.branchName}
+      context={context}
+      eyebrow="Trainer Portal"
+      navItems={trainerNav}
+      planContext={planContext}
+      showPlanIndicator
+      tenantInitial={tenantSite.brandInitial}
+      tenantName={tenantSite.name}
+      tenantShortName={tenantSite.shortName}
+      title="Trainer Dashboard"
+    >
       {children}
     </PortalShell>
   );

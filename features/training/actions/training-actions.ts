@@ -4,10 +4,12 @@ import { addDays, formatISO } from "date-fns";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
+import { requirePrimaryRole, requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
 import { validateAllowedFile } from "@/lib/security/file-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { assertFeature } from "@/lib/tenant";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
 import type { AuthContext } from "@/types/auth";
@@ -44,7 +46,7 @@ const certificateMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "
 const maxCertificateBytes = 10 * 1024 * 1024;
 
 export async function saveTrainerAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
   const parsed = TrainerSchema.safeParse({
     trainerId: formData.get("trainerId") ?? "",
     userId: formData.get("userId") ?? "",
@@ -69,7 +71,7 @@ export async function saveTrainerAction(_previousState: AuthActionState, formDat
   }
 
   const supabase = await createSupabaseServerClient();
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const trainerId = parsed.data.trainerId || null;
   const employeeCode = trainerId ? null : await generateTrainerCode(supabase, gymId);
   const trainerPayload = {
@@ -85,7 +87,7 @@ export async function saveTrainerAction(_previousState: AuthActionState, formDat
     years_experience: parsed.data.yearsExperience,
     hourly_rate_amount: parsed.data.hourlyRateAmount,
     archived_at: parsed.data.status === "archived" ? new Date().toISOString() : null,
-    created_by: context.userId
+    created_by: scope.userId
   };
 
   const trainerResult = trainerId
@@ -104,6 +106,7 @@ export async function saveTrainerAction(_previousState: AuthActionState, formDat
           archived_at: trainerPayload.archived_at
         })
         .eq("id", trainerId)
+        .eq("gym_id", scope.gymId)
         .select("*")
         .maybeSingle()
     : await supabase
@@ -135,7 +138,7 @@ export async function saveTrainerAction(_previousState: AuthActionState, formDat
   }
 
   await writeAuditLog({
-    actorId: context.userId,
+    actorId: scope.userId,
     gymId,
     action: trainerId ? "trainer.updated" : "trainer.created",
     entityType: "trainer",
@@ -149,7 +152,8 @@ export async function saveTrainerAction(_previousState: AuthActionState, formDat
 }
 
 export async function addTrainerSpecializationAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "trainer"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
+  const context = scope;
   const parsed = TrainerSpecializationSchema.safeParse({
     trainerId: formData.get("trainerId"),
     specialization: formData.get("specialization"),
@@ -184,7 +188,8 @@ export async function addTrainerSpecializationAction(_previousState: AuthActionS
 }
 
 export async function saveCertificationAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "trainer"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
+  const context = scope;
   const parsed = CertificationSchema.safeParse({
     trainerId: formData.get("trainerId"),
     certificationName: formData.get("certificationName"),
@@ -208,7 +213,7 @@ export async function saveCertificationAction(_previousState: AuthActionState, f
   const upload = certificateFile instanceof File && certificateFile.size > 0
     ? await uploadCertificateFile(supabase, {
         trainerId: parsed.data.trainerId,
-        actorId: context.userId,
+        actorId: scope.userId,
         file: certificateFile
       })
     : { ok: true as const, filePath: null, fileUrl: null };
@@ -227,7 +232,7 @@ export async function saveCertificationAction(_previousState: AuthActionState, f
     certificate_file_path: upload.filePath,
     certificate_file_url: upload.fileUrl,
     status: parsed.data.status,
-    created_by: context.userId
+    created_by: scope.userId
   });
 
   if (error) {
@@ -241,7 +246,8 @@ export async function saveCertificationAction(_previousState: AuthActionState, f
 }
 
 export async function saveAvailabilityAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "trainer"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
+  const context = scope;
   const parsed = AvailabilitySchema.safeParse({
     trainerId: formData.get("trainerId"),
     dayOfWeek: formData.get("dayOfWeek"),
@@ -287,7 +293,8 @@ export async function saveAvailabilityAction(_previousState: AuthActionState, fo
 }
 
 export async function assignTrainerAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
+  const context = scope;
   const parsed = TrainerAssignmentSchema.safeParse({
     trainerId: formData.get("trainerId"),
     memberId: formData.get("memberId"),
@@ -300,6 +307,10 @@ export async function assignTrainerAction(_previousState: AuthActionState, formD
   }
 
   const supabase = await createSupabaseServerClient();
+  const featureError = await requireTrainerAssignmentFeature(supabase, getContextOrganizationId(scope), scope.gymId);
+  if (featureError) {
+    return featureError;
+  }
   const [trainerResult, memberResult] = await Promise.all([
     supabase.from("trainers").select("*").eq("id", parsed.data.trainerId).maybeSingle(),
     supabase.from("members").select("*").eq("id", parsed.data.memberId).maybeSingle()
@@ -311,6 +322,10 @@ export async function assignTrainerAction(_previousState: AuthActionState, formD
 
   if (memberResult.error || !memberResult.data) {
     return { status: "error", message: memberResult.error?.message ?? "Member not found." };
+  }
+
+  if (trainerResult.data.gym_id !== scope.gymId || memberResult.data.gym_id !== scope.gymId) {
+    return { status: "error", message: "Trainer and member must belong to this gym." };
   }
 
   if (parsed.data.assignmentType === "primary") {
@@ -325,12 +340,12 @@ export async function assignTrainerAction(_previousState: AuthActionState, formD
   const { data: assignment, error } = await supabase
     .from("trainer_assignments")
     .insert({
-      gym_id: context.profile?.gym_id ?? memberResult.data.gym_id,
+      gym_id: scope.gymId,
       trainer_id: parsed.data.trainerId,
       member_id: parsed.data.memberId,
       assignment_type: parsed.data.assignmentType,
       reason: parsed.data.reason || null,
-      created_by: context.userId
+      created_by: scope.userId
     })
     .select("*")
     .maybeSingle();
@@ -362,7 +377,8 @@ export async function assignTrainerAction(_previousState: AuthActionState, formD
 }
 
 export async function endTrainerAssignmentAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/trainers");
+  const scope = await requireGymAdminScope("/admin/trainers");
+  const context = scope;
   const parsed = EndTrainerAssignmentSchema.safeParse({
     assignmentId: formData.get("assignmentId"),
     memberId: formData.get("memberId"),
@@ -378,6 +394,10 @@ export async function endTrainerAssignmentAction(_previousState: AuthActionState
 
   if (loadError || !assignment) {
     return { status: "error", message: loadError?.message ?? "Assignment not found." };
+  }
+
+  if (assignment.gym_id !== scope.gymId) {
+    return { status: "error", message: "Assignment does not belong to this gym." };
   }
 
   const { error } = await supabase
@@ -401,7 +421,8 @@ export async function endTrainerAssignmentAction(_previousState: AuthActionState
 }
 
 export async function savePtPackageAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/trainers/packages");
+  const scope = await requireGymAdminScope("/admin/trainers/packages");
+  const context = scope;
   const parsed = PtPackageSchema.safeParse({
     packageId: formData.get("packageId") ?? "",
     name: formData.get("name"),
@@ -419,7 +440,7 @@ export async function savePtPackageAction(_previousState: AuthActionState, formD
   }
 
   const supabase = await createSupabaseServerClient();
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const packageId = parsed.data.packageId || null;
   const payload = {
     gym_id: gymId,
@@ -432,11 +453,11 @@ export async function savePtPackageAction(_previousState: AuthActionState, formD
     status: parsed.data.status,
     is_public: parsed.data.isPublic,
     display_order: parsed.data.displayOrder,
-    created_by: context.userId
+    created_by: scope.userId
   };
 
   const result = packageId
-    ? await supabase.from("personal_training_packages").update(payload).eq("id", packageId).select("id").maybeSingle()
+    ? await supabase.from("personal_training_packages").update(payload).eq("id", packageId).eq("gym_id", scope.gymId).select("id").maybeSingle()
     : await supabase.from("personal_training_packages").insert(payload).select("id").maybeSingle();
 
   if (result.error || !result.data) {
@@ -450,7 +471,8 @@ export async function savePtPackageAction(_previousState: AuthActionState, formD
 }
 
 export async function purchasePtPackageAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/trainers/packages");
+  const scope = await requireGymAdminScope("/admin/trainers/packages");
+  const context = scope;
   const parsed = PtPurchaseSchema.safeParse({
     memberId: formData.get("memberId"),
     packageId: formData.get("packageId"),
@@ -464,6 +486,10 @@ export async function purchasePtPackageAction(_previousState: AuthActionState, f
   }
 
   const supabase = await createSupabaseServerClient();
+  const featureError = await requireTrainerAssignmentFeature(supabase, getContextOrganizationId(scope), scope.gymId);
+  if (featureError) {
+    return featureError;
+  }
   const [packageResult, memberResult] = await Promise.all([
     supabase.from("personal_training_packages").select("*").eq("id", parsed.data.packageId).maybeSingle(),
     supabase.from("members").select("*").eq("id", parsed.data.memberId).maybeSingle()
@@ -477,13 +503,24 @@ export async function purchasePtPackageAction(_previousState: AuthActionState, f
     return { status: "error", message: memberResult.error?.message ?? "Member not found." };
   }
 
-  const gymId = context.profile?.gym_id ?? memberResult.data.gym_id;
+  if (packageResult.data.gym_id !== scope.gymId || memberResult.data.gym_id !== scope.gymId) {
+    return { status: "error", message: "PT package and member must belong to this gym." };
+  }
+
+  if (parsed.data.trainerId) {
+    const trainerAccess = await ensureTrainerWriteAccess(supabase, context, parsed.data.trainerId);
+    if (!trainerAccess.ok) {
+      return { status: "error", message: trainerAccess.message };
+    }
+  }
+
+  const gymId = scope.gymId;
   const invoice = await createPtInvoiceAndPayment(supabase, {
     gymId,
     memberId: parsed.data.memberId,
     packageName: packageResult.data.name,
     packageAmount: packageResult.data.price_amount,
-    actorId: context.userId,
+    actorId: scope.userId,
     isPaid: parsed.data.paymentStatus === "active"
   });
 
@@ -505,7 +542,7 @@ export async function purchasePtPackageAction(_previousState: AuthActionState, f
       expires_on: calculatePackageExpiry(parsed.data.startsOn, packageResult.data.validity_days),
       total_sessions: packageResult.data.session_count,
       price_amount: packageResult.data.price_amount,
-      created_by: context.userId
+      created_by: scope.userId
     })
     .select("*")
     .maybeSingle();
@@ -536,7 +573,7 @@ export async function purchasePtPackageAction(_previousState: AuthActionState, f
 }
 
 export async function saveTrainerSessionAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/sessions");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/sessions");
   const parsed = TrainerSessionSchema.safeParse({
     sessionId: formData.get("sessionId") ?? "",
     trainerId: formData.get("trainerId"),
@@ -564,6 +601,14 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
   if (!access.ok) {
     return { status: "error", message: access.message };
   }
+  const featureError = await requireTrainerAssignmentFeature(supabase, getContextOrganizationId(context), access.trainer.gym_id);
+  if (featureError) {
+    return featureError;
+  }
+  const memberAccess = await ensureTrainerMemberAccess(supabase, context, access.trainer, parsed.data.memberId);
+  if (!memberAccess.ok) {
+    return { status: "error", message: memberAccess.message };
+  }
 
   const payload = {
     gym_id: access.trainer.gym_id,
@@ -581,7 +626,11 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
   };
   const sessionId = parsed.data.sessionId || null;
   const result = sessionId
-    ? await supabase.from("trainer_sessions").update(payload).eq("id", sessionId).select("*").maybeSingle()
+    ? await (
+        access.trainer.gym_id
+          ? supabase.from("trainer_sessions").update(payload).eq("id", sessionId).eq("trainer_id", access.trainer.id).eq("gym_id", access.trainer.gym_id)
+          : supabase.from("trainer_sessions").update(payload).eq("id", sessionId).eq("trainer_id", access.trainer.id).is("gym_id", null)
+      ).select("*").maybeSingle()
     : await supabase.from("trainer_sessions").insert(payload).select("*").maybeSingle();
 
   if (result.error || !result.data) {
@@ -608,7 +657,7 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
 }
 
 export async function updateTrainerSessionStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/sessions");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/sessions");
   const parsed = TrainerSessionStatusSchema.safeParse({
     sessionId: formData.get("sessionId"),
     nextStatus: formData.get("nextStatus"),
@@ -645,7 +694,11 @@ export async function updateTrainerSessionStatusAction(_previousState: AuthActio
     cancelled_at: parsed.data.nextStatus === "cancelled" ? new Date().toISOString() : session.cancelled_at
   };
 
-  const { error } = await supabase.from("trainer_sessions").update(updates).eq("id", parsed.data.sessionId);
+  const { error } = await (
+    access.trainer.gym_id
+      ? supabase.from("trainer_sessions").update(updates).eq("id", parsed.data.sessionId).eq("trainer_id", access.trainer.id).eq("gym_id", access.trainer.gym_id)
+      : supabase.from("trainer_sessions").update(updates).eq("id", parsed.data.sessionId).eq("trainer_id", access.trainer.id).is("gym_id", null)
+  );
 
   if (error) {
     return { status: "error", message: error.message };
@@ -684,7 +737,7 @@ export async function updateTrainerSessionStatusAction(_previousState: AuthActio
 }
 
 export async function saveWorkoutProgramAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/programs");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/programs");
   const parsed = WorkoutProgramSchema.safeParse({
     programId: formData.get("programId") ?? "",
     trainerId: formData.get("trainerId"),
@@ -706,6 +759,18 @@ export async function saveWorkoutProgramAction(_previousState: AuthActionState, 
   if (!access.ok) {
     return { status: "error", message: access.message };
   }
+  if (parsed.data.memberId) {
+    const featureError = await requireTrainerAssignmentFeature(supabase, getContextOrganizationId(context), access.trainer.gym_id);
+    if (featureError) {
+      return featureError;
+    }
+  }
+  if (parsed.data.memberId) {
+    const memberAccess = await ensureTrainerMemberAccess(supabase, context, access.trainer, parsed.data.memberId);
+    if (!memberAccess.ok) {
+      return { status: "error", message: memberAccess.message };
+    }
+  }
 
   const payload = {
     gym_id: access.trainer.gym_id,
@@ -721,7 +786,11 @@ export async function saveWorkoutProgramAction(_previousState: AuthActionState, 
   };
   const programId = parsed.data.programId || null;
   const result = programId
-    ? await supabase.from("workout_programs").update(payload).eq("id", programId).select("id").maybeSingle()
+    ? await (
+        access.trainer.gym_id
+          ? supabase.from("workout_programs").update(payload).eq("id", programId).eq("trainer_id", access.trainer.id).eq("gym_id", access.trainer.gym_id)
+          : supabase.from("workout_programs").update(payload).eq("id", programId).eq("trainer_id", access.trainer.id).is("gym_id", null)
+      ).select("id").maybeSingle()
     : await supabase.from("workout_programs").insert(payload).select("id").maybeSingle();
 
   if (result.error || !result.data) {
@@ -736,7 +805,7 @@ export async function saveWorkoutProgramAction(_previousState: AuthActionState, 
 }
 
 export async function addWorkoutExerciseAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/programs");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/programs");
   const parsed = WorkoutExerciseSchema.safeParse({
     programId: formData.get("programId"),
     dayNumber: formData.get("dayNumber"),
@@ -789,7 +858,7 @@ export async function addWorkoutExerciseAction(_previousState: AuthActionState, 
 }
 
 export async function assignWorkoutProgramAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/programs");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/programs");
   const parsed = WorkoutAssignmentSchema.safeParse({
     programId: formData.get("programId"),
     trainerId: formData.get("trainerId"),
@@ -806,6 +875,26 @@ export async function assignWorkoutProgramAction(_previousState: AuthActionState
   const access = await ensureTrainerWriteAccess(supabase, context, parsed.data.trainerId);
   if (!access.ok) {
     return { status: "error", message: access.message };
+  }
+  const featureError = await requireTrainerAssignmentFeature(supabase, getContextOrganizationId(context), access.trainer.gym_id);
+  if (featureError) {
+    return featureError;
+  }
+  const memberAccess = await ensureTrainerMemberAccess(supabase, context, access.trainer, parsed.data.memberId);
+  if (!memberAccess.ok) {
+    return { status: "error", message: memberAccess.message };
+  }
+
+  const { data: program, error: programError } = await supabase
+    .from("workout_programs")
+    .select("id,trainer_id,gym_id")
+    .eq("id", parsed.data.programId)
+    .maybeSingle();
+  if (programError || !program) {
+    return { status: "error", message: programError?.message ?? "Workout program not found." };
+  }
+  if (program.trainer_id !== access.trainer.id || program.gym_id !== access.trainer.gym_id) {
+    return { status: "error", message: "Workout program does not belong to this trainer." };
   }
 
   const { data: assignment, error } = await supabase
@@ -844,7 +933,7 @@ export async function assignWorkoutProgramAction(_previousState: AuthActionState
 }
 
 export async function saveTrainerNoteAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer"], "/trainer/members");
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer"], "/trainer/members");
   const parsed = TrainerNoteSchema.safeParse({
     trainerId: formData.get("trainerId"),
     memberId: formData.get("memberId"),
@@ -863,6 +952,10 @@ export async function saveTrainerNoteAction(_previousState: AuthActionState, for
   const access = await ensureTrainerWriteAccess(supabase, context, parsed.data.trainerId);
   if (!access.ok) {
     return { status: "error", message: access.message };
+  }
+  const memberAccess = await ensureTrainerMemberAccess(supabase, context, access.trainer, parsed.data.memberId);
+  if (!memberAccess.ok) {
+    return { status: "error", message: memberAccess.message };
   }
 
   const { data: note, error } = await supabase
@@ -892,7 +985,7 @@ export async function saveTrainerNoteAction(_previousState: AuthActionState, for
 }
 
 export async function submitTrainerFeedbackAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["member", "super_admin"], "/member/workouts");
+  const context = await requirePrimaryRole(["member"], "/member/workouts");
   const parsed = TrainerFeedbackSchema.safeParse({
     trainerId: formData.get("trainerId"),
     memberId: formData.get("memberId"),
@@ -913,7 +1006,7 @@ export async function submitTrainerFeedbackAction(_previousState: AuthActionStat
     return { status: "error", message: memberError?.message ?? "Member not found." };
   }
 
-  if (!hasRequiredRole(context.roles, ["super_admin"]) && member.user_id !== context.userId) {
+  if (member.user_id !== context.userId) {
     return { status: "error", message: "You can only submit feedback for your own profile." };
   }
 
@@ -937,7 +1030,8 @@ export async function submitTrainerFeedbackAction(_previousState: AuthActionStat
 }
 
 export async function saveStaffProfileAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/staff");
+  const scope = await requireGymAdminScope("/admin/staff");
+  const context = scope;
   const parsed = StaffProfileSchema.safeParse({
     staffId: formData.get("staffId") ?? "",
     userId: formData.get("userId") ?? "",
@@ -955,7 +1049,7 @@ export async function saveStaffProfileAction(_previousState: AuthActionState, fo
   }
 
   const supabase = await createSupabaseServerClient();
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const staffId = parsed.data.staffId || null;
   const staffCode = staffId ? null : await generateStaffCode(supabase, gymId);
   const payload = {
@@ -969,7 +1063,7 @@ export async function saveStaffProfileAction(_previousState: AuthActionState, fo
     status: parsed.data.status,
     employment_type: parsed.data.employmentType,
     joined_at: parsed.data.joinedAt,
-    created_by: context.userId
+    created_by: scope.userId
   };
 
   const result = staffId
@@ -986,6 +1080,7 @@ export async function saveStaffProfileAction(_previousState: AuthActionState, fo
           joined_at: payload.joined_at
         })
         .eq("id", staffId)
+        .eq("gym_id", scope.gymId)
         .select("id")
         .maybeSingle()
     : await supabase
@@ -1013,7 +1108,11 @@ async function ensureTrainerWriteAccess(supabase: AppSupabase, context: AuthCont
     return { ok: false, message: error?.message ?? "Trainer not found." };
   }
 
-  if (hasRequiredRole(context.roles, ["super_admin", "gym_admin", "reception_staff"])) {
+  if (hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"])) {
+    const contextGymId = getContextGymId(context);
+    if (contextGymId && trainer.gym_id !== contextGymId) {
+      return { ok: false, message: "Trainer does not belong to this gym." };
+    }
     return { ok: true, trainer };
   }
 
@@ -1022,6 +1121,45 @@ async function ensureTrainerWriteAccess(supabase: AppSupabase, context: AuthCont
   }
 
   return { ok: false, message: "You are not allowed to manage this trainer record." };
+}
+
+async function ensureTrainerMemberAccess(
+  supabase: AppSupabase,
+  context: AuthContext,
+  trainer: TrainerRow,
+  memberId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data: member, error: memberError } = await supabase.from("members").select("id,gym_id").eq("id", memberId).maybeSingle();
+
+  if (memberError || !member) {
+    return { ok: false, message: memberError?.message ?? "Member not found." };
+  }
+
+  if (member.gym_id !== trainer.gym_id) {
+    return { ok: false, message: "Member does not belong to this trainer's gym." };
+  }
+
+  if (hasRequiredRole(context.roles, ["super_admin", "organization_owner", "gym_admin", "reception_staff"])) {
+    const contextGymId = getContextGymId(context);
+    if (contextGymId && member.gym_id !== contextGymId) {
+      return { ok: false, message: "Member does not belong to this gym." };
+    }
+    return { ok: true };
+  }
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("trainer_assignments")
+    .select("id")
+    .eq("trainer_id", trainer.id)
+    .eq("member_id", member.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (assignmentError || !assignment) {
+    return { ok: false, message: "Trainer can manage assigned members only." };
+  }
+
+  return { ok: true };
 }
 
 async function generateTrainerCode(supabase: AppSupabase, gymId: string | null) {
@@ -1179,7 +1317,7 @@ async function writeTrainingAudit(context: AuthContext, action: string, entityTy
   await Promise.all([
     writeAuditLog({
       actorId: context.userId,
-      gymId: context.profile?.gym_id ?? null,
+      gymId: getContextGymId(context),
       action,
       entityType,
       entityId,
@@ -1196,13 +1334,56 @@ async function createStaffActivityLog(context: AuthContext, action: string, enti
 
   const supabase = await createSupabaseServerClient();
   await supabase.from("staff_activity_logs").insert({
-    gym_id: context.profile?.gym_id ?? null,
+    gym_id: getContextGymId(context),
     staff_user_id: context.userId,
     action,
     entity_type: entityType,
     entity_id: entityId,
     metadata
   });
+}
+
+function getContextGymId(context: AuthContext) {
+  return (context as AuthContext & { gymId?: string | null }).gymId ?? context.profile?.gym_id ?? null;
+}
+
+function getContextOrganizationId(context: AuthContext) {
+  return (context as AuthContext & { scopedOrganizationId?: string | null }).scopedOrganizationId ?? context.organizationId ?? null;
+}
+
+async function requireTrainerAssignmentFeature(
+  supabase: AppSupabase,
+  organizationId: string | null,
+  gymId: string | null
+): Promise<AuthActionState | null> {
+  const resolvedOrganizationId = organizationId ?? await getOrganizationIdForGym(supabase, gymId);
+  if (!resolvedOrganizationId) {
+    return { status: "error", message: "Feature not available on your current plan." };
+  }
+
+  try {
+    await assertFeature(resolvedOrganizationId, "trainerAssignmentEnabled");
+    return null;
+  } catch (error) {
+    return { status: "error", message: featureGateMessage(error) };
+  }
+}
+
+async function getOrganizationIdForGym(supabase: AppSupabase, gymId: string | null) {
+  if (!gymId) {
+    return null;
+  }
+
+  const { data, error } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.organization_id ?? null;
+}
+
+function featureGateMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Feature not available on your current plan.";
 }
 
 function validationState(fieldErrors: Record<string, string[] | undefined>): AuthActionState {

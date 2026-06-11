@@ -13,6 +13,7 @@ import {
   TrendingUp,
   UsersRound
 } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -33,9 +34,10 @@ import {
 import { AnalyticsStatusBadge, KpiStatusBadge } from "@/features/analytics/components/analytics-status-badge";
 import { formatAnalyticsLabel, formatCurrency } from "@/features/analytics/lib/business-rules";
 import { getExecutiveAnalyticsDashboard } from "@/features/analytics/services/analytics-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { canAny } from "@/lib/rbac";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import type { KpiCard } from "@/types/analytics";
 
 export const metadata: Metadata = createMetadata({
@@ -53,10 +55,16 @@ const legacyReports = [
 ] as const;
 
 export default async function AdminReportsPage() {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/reports");
-  const gymId = context.profile?.gym_id ?? null;
-  const canExportReports = canAny(context.roles, "reports", "export");
-  const dashboard = await getExecutiveAnalyticsDashboard(gymId);
+  const scope = await requireGymAdminScope("/admin/reports");
+  const gymId = scope.gymId;
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const canRequestReports = canAny(scope.roles, "reports", "export");
+  const [dashboard, planContext] = await Promise.all([
+    getExecutiveAnalyticsDashboard(gymId),
+    organizationId ? getOrgPlanContext(organizationId) : null
+  ]);
+  const advancedReportsEnabled = planContext?.features.advancedReportsEnabled === true;
+  const canExportReports = canRequestReports && advancedReportsEnabled;
 
   return (
     <div className="space-y-8">
@@ -81,7 +89,9 @@ export default async function AdminReportsPage() {
             <BarChart3 className="size-4" />
             Sales PDF
           </ButtonLink>
-        </div> : null}
+        </div> : canRequestReports ? (
+          <FeatureLocked compact featureName="Advanced Report Exports" requiredPlan="Standard" />
+        ) : null}
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -373,6 +383,9 @@ export default async function AdminReportsPage() {
             <p className="text-sm leading-6 text-muted-foreground">Existing module-level CSV exports remain available for operations teams.</p>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!advancedReportsEnabled && canRequestReports ? (
+              <FeatureLocked compact featureName="Operational Exports" requiredPlan="Standard" />
+            ) : null}
             {legacyReports.map((report) => (
               <div className="rounded-md border border-border bg-surface-muted p-4" key={report.href}>
                 <div className="flex items-center justify-between gap-3">
@@ -406,6 +419,19 @@ export default async function AdminReportsPage() {
             <CardContent><ReportExportForm reports={dashboard.savedReports} /></CardContent>
           </Card>
         </section>
+      ) : canRequestReports ? (
+        <section className="grid gap-5 xl:grid-cols-2">
+          <FeatureLocked
+            description="Saved report builders and custom export queues are available on Standard and higher plans."
+            featureName="Saved Report Builder"
+            requiredPlan="Standard"
+          />
+          <FeatureLocked
+            description="CSV, Excel, and PDF export queue management is available on Standard and higher plans."
+            featureName="Export Queue"
+            requiredPlan="Standard"
+          />
+        </section>
       ) : null}
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
@@ -423,7 +449,13 @@ export default async function AdminReportsPage() {
             <p className="text-sm leading-6 text-muted-foreground">Register moving average, linear trend, seasonal baseline, or manual forecast models with training windows and parameters.</p>
           </CardHeader>
           <CardContent><ForecastModelForm models={dashboard.forecastModels} /></CardContent>
-        </Card> : null}
+        </Card> : canRequestReports ? (
+          <FeatureLocked
+            description="Forecast model configuration is part of advanced reporting and is available on Standard and higher plans."
+            featureName="Forecast Models"
+            requiredPlan="Standard"
+          />
+        ) : null}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_0.8fr]">

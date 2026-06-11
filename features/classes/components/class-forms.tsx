@@ -174,8 +174,8 @@ export function BookClassForm({ session, memberId = "" }: { session: ClassSessio
   return (
     <form action={formAction} className="space-y-2">
       <FormMessage state={state} />
-      <input name="sessionId" type="hidden" value={session.id} />
-      {memberId ? <input name="memberId" type="hidden" value={memberId} /> : null}
+      <input name="sessionId" suppressHydrationWarning type="hidden" value={session.id} />
+      {memberId ? <input name="memberId" suppressHydrationWarning type="hidden" value={memberId} /> : null}
       <Button className="w-full" type="submit" variant="accent">Book Class</Button>
     </form>
   );
@@ -186,7 +186,7 @@ export function CancelClassBookingForm({ bookingId }: { bookingId: string }) {
   return (
     <form action={formAction} className="space-y-2">
       <FormMessage state={state} />
-      <input name="bookingId" type="hidden" value={bookingId} />
+      <input name="bookingId" suppressHydrationWarning type="hidden" value={bookingId} />
       <Input name="reason" placeholder="Cancellation reason" />
       <Button className="w-full" type="submit" variant="secondary">Cancel Booking</Button>
     </form>
@@ -198,16 +198,16 @@ export function ClassAttendanceForm({ booking }: { booking: ClassBookingRow }) {
   return (
     <form action={formAction} className="grid gap-2 md:grid-cols-[1fr_auto]">
       <FormMessage state={state} />
-      <input name="sessionId" type="hidden" value={booking.session_id} />
-      <input name="bookingId" type="hidden" value={booking.id} />
-      <input name="memberId" type="hidden" value={booking.member_id} />
+      <input name="sessionId" suppressHydrationWarning type="hidden" value={booking.session_id} />
+      <input name="bookingId" suppressHydrationWarning type="hidden" value={booking.id} />
+      <input name="memberId" suppressHydrationWarning type="hidden" value={booking.member_id} />
       <select className={selectClass} name="status" defaultValue="attended" aria-label="Attendance status">
         <option value="attended">Attended</option>
         <option value="late">Late</option>
         <option value="absent">Absent</option>
         <option value="cancelled">Cancelled</option>
       </select>
-      <input name="method" type="hidden" value="trainer" />
+      <input name="method" suppressHydrationWarning type="hidden" value="trainer" />
       <Button type="submit" variant="secondary">Mark</Button>
     </form>
   );
@@ -218,7 +218,7 @@ export function ClassSessionStatusForm({ session }: { session: ClassSessionWithC
   return (
     <form action={formAction} className="space-y-2">
       <FormMessage state={state} />
-      <input name="sessionId" type="hidden" value={session.id} />
+      <input name="sessionId" suppressHydrationWarning type="hidden" value={session.id} />
       <select className={selectClass} name="nextStatus" defaultValue={session.status} aria-label="Session status">
         <option value="scheduled">Scheduled</option>
         <option value="in_progress">In progress</option>

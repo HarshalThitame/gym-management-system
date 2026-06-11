@@ -31,7 +31,7 @@ export function DashboardConfigForm({ configs }: { configs: DashboardConfigRow[]
       </select>
       <div className="grid gap-4 md:grid-cols-3">
         <Field id="dashboard-name" label="Layout name" name="name" state={state}><Input id="dashboard-name" name="name" placeholder="Owner executive dashboard" /></Field>
-        <SelectField label="Role" name="roleName" options={["super_admin", "gym_admin", "reception_staff", "trainer", "member"]} />
+        <SelectField label="Role" name="roleName" options={["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"]} />
         <SelectField label="Scope" name="scope" options={dashboardScopes} />
       </div>
       <Field id="dashboard-layout" label="Layout JSON" name="layout" state={state}>

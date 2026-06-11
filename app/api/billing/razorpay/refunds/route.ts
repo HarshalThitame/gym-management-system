@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
 import { CreateRazorpayRefundSchema } from "@/features/billing/schemas/payment";
 import { createRazorpayRefundForPayment } from "@/features/billing/services/payment-processing";
-import { getAuthContext } from "@/lib/auth/session";
+import { getApiTenantOrganizationId, requireApiRole } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { hasRequiredRole } from "@/lib/rbac";
+import { assertFeature } from "@/lib/tenant";
 
 export async function POST(request: Request) {
-  const context = await getAuthContext();
+  const auth = await requireApiRole(["super_admin", "organization_owner", "gym_admin"], {
+    unauthenticatedMessage: "Only authorized admins can create refunds.",
+    forbiddenMessage: "Only authorized admins can create refunds."
+  });
 
-  if (!context.isAuthenticated || !context.userId || !hasRequiredRole(context.roles, ["super_admin", "gym_admin"])) {
-    return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED", message: "Only authorized admins can create refunds." } }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
-  const rateLimit = await checkRateLimit(`razorpay-refund:${context.userId}`, 10, 60_000);
+  const featureResponse = await requireRazorpayFeature(getApiTenantOrganizationId(auth.context, auth.tenant));
+  if (featureResponse) {
+    return featureResponse;
+  }
+
+  const rateLimit = await checkRateLimit(`razorpay-refund:${auth.context.userId}`, 10, 60_000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ ok: false, error: { code: "RATE_LIMITED", message: "Too many refund requests." } }, { status: 429 });
   }
@@ -24,11 +32,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: { code: "VALIDATION_ERROR", message: "Refund payload is invalid.", fieldErrors: parsed.error.flatten().fieldErrors } }, { status: 400 });
   }
 
-  const result = await createRazorpayRefundForPayment(context, parsed.data);
+  const result = await createRazorpayRefundForPayment(auth.context, parsed.data);
 
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: { code: result.code, message: result.message } }, { status: result.status });
   }
 
   return NextResponse.json({ ok: true, data: result.data });
+}
+
+async function requireRazorpayFeature(organizationId: string | null) {
+  if (!organizationId) {
+    return NextResponse.json({ ok: false, error: { code: "FEATURE_NOT_AVAILABLE", message: "Feature not available on your current plan." } }, { status: 403 });
+  }
+
+  try {
+    await assertFeature(organizationId, "razorpayEnabled");
+    return null;
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: { code: "FEATURE_NOT_AVAILABLE", message: error instanceof Error ? error.message : "Feature not available on your current plan." } },
+      { status: 403 }
+    );
+  }
 }

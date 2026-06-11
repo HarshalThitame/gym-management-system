@@ -21,7 +21,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerProgressPage({ searchParams }: TrainerProgressPageProps) {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer/progress");
+  const context = await requireRole(["trainer"], "/trainer/progress");
   const params = await searchParams;
   const portal = context.userId ? await getTrainerFitnessPortal(context.userId, context.profile?.gym_id ?? null) : { trainer: null, members: [], metrics: { assignedMembers: 0, activeGoals: 0, completedWorkouts30Days: 0, membersMissingWorkouts: 0 } };
   const selected = portal.members.find((item) => item.member.id === params.memberId) ?? portal.members[0] ?? null;

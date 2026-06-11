@@ -206,7 +206,7 @@ export function CheckOutForm({ session, devices }: { session: AttendanceSessionR
   return (
     <form action={formAction} className="space-y-2">
       <FormMessage state={state} />
-      <input name="sessionId" type="hidden" value={session.id} />
+      <input name="sessionId" suppressHydrationWarning type="hidden" value={session.id} />
       <SelectDevice devices={devices} compact />
       <Input name="notes" placeholder="Checkout notes" />
       <Button className="w-full" type="submit" variant="secondary">Check Out</Button>
@@ -220,7 +220,7 @@ export function RegenerateQrForm({ memberId }: { memberId: string }) {
   return (
     <form action={formAction} className="space-y-2">
       <FormMessage state={state} />
-      <input name="memberId" type="hidden" value={memberId} />
+      <input name="memberId" suppressHydrationWarning type="hidden" value={memberId} />
       <Button type="submit" variant="secondary">Regenerate QR</Button>
     </form>
   );

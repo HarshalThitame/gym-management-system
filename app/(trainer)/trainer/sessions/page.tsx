@@ -13,7 +13,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerSessionsPage() {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer/sessions");
+  const context = await requireRole(["trainer"], "/trainer/sessions");
   const dashboard = await getTrainerDashboard(context.userId ?? "", context.profile?.gym_id ?? null);
   const trainerList = dashboard.trainer ? [dashboard.trainer] : [];
 

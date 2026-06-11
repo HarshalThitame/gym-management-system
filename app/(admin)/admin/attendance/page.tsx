@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Activity, AlertTriangle, Clock, DoorOpen, QrCode, UsersRound } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,8 +10,9 @@ import { AccessDeviceForm, CheckOutForm, ManualCheckInForm, QrScanForm, SyncInac
 import { AttendanceStatusBadge } from "@/features/attendance/components/attendance-status-badge";
 import { DailyAttendanceChart, HourlyTrafficChart } from "@/features/attendance/components/lazy-attendance-charts";
 import { getAttendanceDashboard, listAccessDevices } from "@/features/attendance/services/attendance-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 type AdminAttendancePageProps = {
   searchParams: Promise<{ memberQuery?: string; token?: string }>;
@@ -23,15 +25,19 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminAttendancePage({ searchParams }: AdminAttendancePageProps) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/attendance");
+  const scope = await requireGymAdminScope("/admin/attendance");
   const params = await searchParams;
-  const gymId = context.profile?.gym_id ?? null;
+  const gymId = scope.gymId;
   const memberQuery = params.memberQuery?.trim() ?? "";
-  const [dashboard, membersResult, devices] = await Promise.all([
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const [dashboard, membersResult, devices, planContext] = await Promise.all([
     getAttendanceDashboard(gymId),
     listMembers({ gymId, pageSize: 100, query: memberQuery || undefined }),
-    listAccessDevices(gymId)
+    listAccessDevices(gymId),
+    organizationId ? getOrgPlanContext(organizationId) : null
   ]);
+  const biometricEnabled = planContext?.features.biometricAttendanceEnabled === true;
+  const rfidEnabled = planContext?.features.rfidAttendanceEnabled === true;
 
   return (
     <div className="space-y-8">
@@ -194,6 +200,22 @@ export default async function AdminAttendancePage({ searchParams }: AdminAttenda
           </CardHeader>
           <CardContent className="space-y-4">
             <AccessDeviceForm />
+            <div className="grid gap-3 md:grid-cols-2">
+              {biometricEnabled ? null : (
+                <FeatureLocked
+                  compact
+                  featureName="Biometric Attendance"
+                  requiredPlan="Standard"
+                />
+              )}
+              {rfidEnabled ? null : (
+                <FeatureLocked
+                  compact
+                  featureName="RFID Attendance"
+                  requiredPlan="Premium"
+                />
+              )}
+            </div>
             <div className="space-y-2">
               {devices.map((device) => (
                 <div className="rounded-md border border-border bg-surface-muted p-3" key={device.id}>

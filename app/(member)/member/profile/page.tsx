@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ProfileForm } from "@/features/profile/components/profile-form";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -11,7 +11,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberProfilePage() {
-  const context = await requireRole(["member", "super_admin"], "/member/profile");
+  const context = await requirePrimaryRole(["member"], "/member/profile");
 
   if (!context.profile) {
     return (

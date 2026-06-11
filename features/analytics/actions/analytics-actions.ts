@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
@@ -17,11 +17,10 @@ import {
   SavedReportSchema
 } from "../schemas/analytics";
 
-const reportManagerRoles = ["super_admin", "gym_admin"] as const;
-
 export async function saveDashboardConfigAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/admin/reports");
+  const scope = await requireGymAdminScope("/admin/reports");
+  const context = scope;
   const parsed = DashboardConfigSchema.safeParse({
     dashboardConfigId: formData.get("dashboardConfigId") ?? "",
     name: formData.get("name"),
@@ -47,15 +46,15 @@ export async function saveDashboardConfigAction(_previousState: AuthActionState,
 
   const supabase = await createSupabaseServerClient();
   const payload = {
-    gym_id: context.profile?.gym_id ?? null,
-    user_id: parsed.data.scope === "private" ? context.userId : null,
+    gym_id: scope.gymId,
+    user_id: parsed.data.scope === "private" ? scope.userId : null,
     role_name: parsed.data.roleName,
     name: parsed.data.name,
     scope: parsed.data.scope,
     layout: layout.value,
     widgets: widgets.value,
     is_default: parsed.data.isDefault,
-    created_by: context.userId
+    created_by: scope.userId
   };
   const result = parsed.data.dashboardConfigId
     ? await supabase.from("dashboard_configs").update(payload).eq("id", parsed.data.dashboardConfigId).select("*").maybeSingle()
@@ -72,7 +71,8 @@ export async function saveDashboardConfigAction(_previousState: AuthActionState,
 
 export async function saveSavedReportAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(reportManagerRoles, "/admin/reports");
+  const scope = await requireGymAdminScope("/admin/reports");
+  const context = scope;
   const parsed = SavedReportSchema.safeParse({
     savedReportId: formData.get("savedReportId") ?? "",
     name: formData.get("name"),
@@ -100,7 +100,7 @@ export async function saveSavedReportAction(_previousState: AuthActionState, for
 
   const supabase = await createSupabaseServerClient();
   const payload = {
-    gym_id: context.profile?.gym_id ?? null,
+    gym_id: scope.gymId,
     name: parsed.data.name,
     description: parsed.data.description || null,
     category: parsed.data.category,
@@ -109,7 +109,7 @@ export async function saveSavedReportAction(_previousState: AuthActionState, for
     columns: columns.value,
     visibility: parsed.data.visibility,
     status: parsed.data.status,
-    created_by: context.userId
+    created_by: scope.userId
   };
   const result = parsed.data.savedReportId
     ? await supabase.from("saved_reports").update(payload).eq("id", parsed.data.savedReportId).select("*").maybeSingle()
@@ -126,7 +126,8 @@ export async function saveSavedReportAction(_previousState: AuthActionState, for
 
 export async function queueReportExportAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(reportManagerRoles, "/admin/reports");
+  const scope = await requireGymAdminScope("/admin/reports");
+  const context = scope;
   const parsed = ReportExportSchema.safeParse({
     savedReportId: formData.get("savedReportId") ?? "",
     reportKey: formData.get("reportKey"),
@@ -152,14 +153,14 @@ export async function queueReportExportAction(_previousState: AuthActionState, f
     memberId: parsed.data.memberId || null
   };
   const { data, error } = await supabase.from("report_exports").insert({
-    gym_id: context.profile?.gym_id ?? null,
+    gym_id: scope.gymId,
     saved_report_id: parsed.data.savedReportId || null,
     report_key: parsed.data.reportKey,
     category: parsed.data.category,
     format: parsed.data.format,
     status: "queued",
     filters: filters as Json,
-    requested_by: context.userId
+    requested_by: scope.userId
   }).select("*").maybeSingle();
 
   if (error || !data) {
@@ -173,7 +174,8 @@ export async function queueReportExportAction(_previousState: AuthActionState, f
 
 export async function saveForecastModelAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/reports");
+  const scope = await requireGymAdminScope("/admin/reports");
+  const context = scope;
   const parsed = ForecastModelSchema.safeParse({
     forecastModelId: formData.get("forecastModelId") ?? "",
     name: formData.get("name"),
@@ -196,7 +198,7 @@ export async function saveForecastModelAction(_previousState: AuthActionState, f
 
   const supabase = await createSupabaseServerClient();
   const payload = {
-    gym_id: context.profile?.gym_id ?? null,
+    gym_id: scope.gymId,
     name: parsed.data.name,
     metric_key: parsed.data.metricKey,
     model_type: parsed.data.modelType,
@@ -204,7 +206,7 @@ export async function saveForecastModelAction(_previousState: AuthActionState, f
     training_window_days: parsed.data.trainingWindowDays,
     parameters: parameters.value,
     status: parsed.data.status,
-    created_by: context.userId
+    created_by: scope.userId
   };
   const result = parsed.data.forecastModelId
     ? await supabase.from("forecast_models").update(payload).eq("id", parsed.data.forecastModelId).select("*").maybeSingle()
@@ -221,7 +223,8 @@ export async function saveForecastModelAction(_previousState: AuthActionState, f
 
 export async function updateInsightStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(reportManagerRoles, "/admin/reports");
+  const scope = await requireGymAdminScope("/admin/reports");
+  const context = scope;
   const parsed = InsightStatusSchema.safeParse({
     insightId: formData.get("insightId"),
     status: formData.get("status") ?? "acknowledged"
@@ -248,7 +251,7 @@ export async function updateInsightStatusAction(_previousState: AuthActionState,
 
 export async function captureAnalyticsEventAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff", "trainer", "member"], "/admin/reports");
+  const scope = await requireGymAdminScope("/admin/reports");
   const parsed = AnalyticsEventSchema.safeParse({
     eventName: formData.get("eventName"),
     entityType: formData.get("entityType") ?? "",
@@ -268,8 +271,8 @@ export async function captureAnalyticsEventAction(_previousState: AuthActionStat
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("analytics_events").insert({
-    gym_id: context.profile?.gym_id ?? null,
-    actor_id: context.userId,
+    gym_id: scope.gymId,
+    actor_id: scope.userId,
     event_name: parsed.data.eventName,
     entity_type: parsed.data.entityType || null,
     entity_id: parsed.data.entityId || null,
@@ -292,12 +295,16 @@ function checkbox(formData: FormData, key: string) {
 async function writeAnalyticsAudit(context: AuthContext, action: string, entityType: string, entityId: string, metadata: Json = {}) {
   await writeAuditLog({
     actorId: context.userId,
-    gymId: context.profile?.gym_id ?? null,
+    gymId: getContextGymId(context),
     action,
     entityType,
     entityId,
     metadata
   });
+}
+
+function getContextGymId(context: AuthContext) {
+  return (context as AuthContext & { gymId?: string | null }).gymId ?? context.profile?.gym_id ?? null;
 }
 
 function revalidateAnalyticsPaths() {

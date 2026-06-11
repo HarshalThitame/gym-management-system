@@ -1,4 +1,6 @@
 import { addDays, formatISO, startOfMonth } from "date-fns";
+import { calculateCurrentStreak } from "@/features/attendance/lib/business-rules";
+import { calculateWorkoutStreak, getTodaysNutrition } from "@/features/fitness/lib/business-rules";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   MemberDirectoryItem,
@@ -258,17 +260,209 @@ export async function getMemberProfile(memberId: string): Promise<MemberProfile 
 
 export async function getMemberDashboard(userId: string) {
   const supabase = await createSupabaseServerClient();
-  const { data: member, error: memberError } = await supabase.from("members").select("*").eq("user_id", userId).maybeSingle();
+  const { data: members, error: memberError } = await supabase
+    .from("members")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1);
 
   if (memberError) {
     throw new Error(memberError.message);
   }
+
+  const member = members?.[0] ?? null;
 
   if (!member) {
     return null;
   }
 
   return getMemberProfile(member.id);
+}
+
+export async function getMemberDashboardOverview(userId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: members, error: memberError } = await supabase
+    .from("members")
+    .select("id,gym_id,full_name,member_code,status,user_id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (memberError) {
+    throw new Error(memberError.message);
+  }
+
+  const member = members?.[0] ?? null;
+  if (!member) {
+    return null;
+  }
+
+  const today = todayDate();
+  const now = new Date().toISOString();
+  const [
+    membershipResult,
+    attendanceResult,
+    classBookingsResult,
+    waitlistResult,
+    activeProgramResult,
+    workoutResult,
+    nutritionPlanResult,
+    mealEntriesResult,
+    activeGoalResult,
+    milestoneResult,
+    ptSessionsResult,
+    notificationsResult,
+    announcementsResult
+  ] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select("id,status,end_date,total_amount,membership_plan_id")
+      .eq("member_id", member.id)
+      .in("status", ["pending", "active", "frozen", "suspended"])
+      .order("created_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("attendance_sessions")
+      .select("check_in_at,duration_minutes")
+      .eq("member_id", member.id)
+      .order("check_in_at", { ascending: false })
+      .limit(80),
+    supabase
+      .from("class_bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", member.id)
+      .eq("status", "booked"),
+    supabase
+      .from("class_waitlists")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", member.id)
+      .eq("status", "waiting"),
+    supabase
+      .from("workout_program_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", member.id)
+      .eq("status", "active"),
+    supabase
+      .from("workout_sessions")
+      .select("session_date,status")
+      .eq("member_id", member.id)
+      .order("session_date", { ascending: false })
+      .limit(60),
+    supabase
+      .from("nutrition_plans")
+      .select("id,name,status")
+      .eq("member_id", member.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("meal_entries")
+      .select("entry_date,calories,protein_g,carbs_g,fat_g,water_ml")
+      .eq("member_id", member.id)
+      .eq("entry_date", today),
+    supabase
+      .from("fitness_goals")
+      .select("id,title,status")
+      .eq("member_id", member.id)
+      .eq("status", "active")
+      .order("starts_on", { ascending: false })
+      .limit(1),
+    supabase
+      .from("fitness_milestones")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", member.id),
+    supabase
+      .from("trainer_sessions")
+      .select("session_date,starts_at,status", { count: "exact" })
+      .eq("member_id", member.id)
+      .in("status", ["scheduled", "rescheduled"])
+      .gte("session_date", today)
+      .order("session_date", { ascending: true })
+      .order("starts_at", { ascending: true })
+      .limit(1),
+    supabase
+      .from("notifications")
+      .select("status,priority")
+      .or(`user_id.eq.${userId},member_id.eq.${member.id}`)
+      .order("created_at", { ascending: false })
+      .limit(80),
+    member.gym_id
+      ? supabase
+          .from("announcements")
+          .select("id", { count: "exact", head: true })
+          .eq("gym_id", member.gym_id)
+          .eq("status", "published")
+          .or(`starts_at.is.null,starts_at.lte.${now}`)
+          .or(`ends_at.is.null,ends_at.gte.${now}`)
+          .in("target_segment", ["all_members", "member"])
+      : Promise.resolve({ data: null, error: null, count: 0 })
+  ]);
+
+  const firstError = [
+    membershipResult,
+    attendanceResult,
+    classBookingsResult,
+    waitlistResult,
+    activeProgramResult,
+    workoutResult,
+    nutritionPlanResult,
+    mealEntriesResult,
+    activeGoalResult,
+    milestoneResult,
+    ptSessionsResult,
+    notificationsResult,
+    announcementsResult
+  ].find((result) => result.error)?.error;
+  if (firstError) {
+    throw new Error(firstError.message);
+  }
+
+  const currentMembership = membershipResult.data?.[0] ?? null;
+  const planResult = currentMembership
+    ? await supabase
+        .from("membership_plans")
+        .select("id,name,price_amount,currency,plan_type")
+        .eq("id", currentMembership.membership_plan_id)
+        .maybeSingle()
+    : { data: null, error: null };
+
+  if (planResult.error) {
+    throw new Error(planResult.error.message);
+  }
+
+  const attendanceRows = attendanceResult.data ?? [];
+  const workoutRows = workoutResult.data ?? [];
+  const mealRows = mealEntriesResult.data ?? [];
+  const nutritionToday = getTodaysNutrition(mealRows, today);
+  const notifications = notificationsResult.data ?? [];
+
+  return {
+    member,
+    currentMembership,
+    currentPlan: planResult.data ?? null,
+    activeNutritionPlan: nutritionPlanResult.data?.[0] ?? null,
+    activeGoal: activeGoalResult.data?.[0] ?? null,
+    nextPtSession: ptSessionsResult.data?.[0] ?? null,
+    metrics: {
+      attendanceCount: attendanceRows.length,
+      lastVisitAt: attendanceRows[0]?.check_in_at ?? null,
+      attendanceStreak: calculateCurrentStreak(attendanceRows.map((visit) => visit.check_in_at)),
+      bookedClasses: classBookingsResult.count ?? 0,
+      activeWaitlists: waitlistResult.count ?? 0,
+      activeWorkoutPrograms: activeProgramResult.count ?? 0,
+      completedWorkouts: workoutRows.filter((workout) => workout.status === "completed").length,
+      workoutStreak: calculateWorkoutStreak(workoutRows),
+      caloriesToday: nutritionToday.calories,
+      waterToday: nutritionToday.water,
+      milestoneCount: milestoneResult.count ?? 0,
+      upcomingPtSessions: ptSessionsResult.count ?? 0,
+      unreadNotifications: notifications.filter((notification) => notification.status === "unread").length,
+      priorityNotifications: notifications.filter((notification) => notification.status === "unread" && (notification.priority === "high" || notification.priority === "urgent")).length,
+      totalCommunicationRecords: notifications.length,
+      announcements: announcementsResult.count ?? 0
+    }
+  };
 }
 
 export async function getMembershipReportRows(filter: ReportFilter) {

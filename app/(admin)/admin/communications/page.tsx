@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bell, Mail, Megaphone, MessageSquare, Send, UsersRound, Workflow } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { listMembers } from "@/features/memberships/services/membership-service";
@@ -18,9 +19,10 @@ import {
 import { CommunicationStatusBadge } from "@/features/communications/components/communication-status-badge";
 import { formatCommunicationLabel } from "@/features/communications/lib/business-rules";
 import { getCommunicationDashboard } from "@/features/communications/services/communication-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { hasRequiredRole } from "@/lib/rbac";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 export const metadata: Metadata = createMetadata({
   title: "Communication Hub",
@@ -29,14 +31,17 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function AdminCommunicationsPage() {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/communications");
-  const gymId = context.profile?.gym_id ?? null;
-  const canManageCommunications = hasRequiredRole(context.roles, ["super_admin", "gym_admin"]);
-  const [dashboard, membersResult, trainers] = await Promise.all([
+  const scope = await requireGymAdminScope("/admin/communications");
+  const gymId = scope.gymId;
+  const canManageCommunications = hasRequiredRole(scope.roles, ["super_admin", "gym_admin"]);
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  const [dashboard, membersResult, trainers, planContext] = await Promise.all([
     getCommunicationDashboard(gymId),
     listMembers({ gymId, pageSize: 120 }),
-    listActiveTrainers(gymId)
+    listActiveTrainers(gymId),
+    organizationId ? getOrgPlanContext(organizationId) : null
   ]);
+  const communicationsEnabled = planContext?.features.communicationsEnabled === true;
 
   return (
     <div className="space-y-8">
@@ -70,7 +75,7 @@ export default async function AdminCommunicationsPage() {
         </Card>
       </div>
 
-      {canManageCommunications ? (
+      {canManageCommunications && communicationsEnabled ? (
         <div className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
           <Card>
             <CardHeader>
@@ -107,9 +112,15 @@ export default async function AdminCommunicationsPage() {
             </CardContent>
           </Card>
         </div>
+      ) : canManageCommunications ? (
+        <FeatureLocked
+          description="Campaign creation and dispatch queues are available on Standard and higher plans."
+          featureName="Campaign Management"
+          requiredPlan="Standard"
+        />
       ) : null}
 
-      {canManageCommunications ? (
+      {canManageCommunications && communicationsEnabled ? (
         <div className="grid gap-5 xl:grid-cols-2">
           <Card>
             <CardHeader>
@@ -126,9 +137,15 @@ export default async function AdminCommunicationsPage() {
             <CardContent><AnnouncementForm announcements={dashboard.announcements} segments={dashboard.segments} /></CardContent>
           </Card>
         </div>
+      ) : canManageCommunications ? (
+        <FeatureLocked
+          description="Templates and segmented announcements are available on Standard and higher plans."
+          featureName="Bulk Announcements"
+          requiredPlan="Standard"
+        />
       ) : null}
 
-      {canManageCommunications ? (
+      {canManageCommunications && communicationsEnabled ? (
         <div className="grid gap-5 xl:grid-cols-[0.85fr_1fr]">
           <Card>
             <CardHeader>
@@ -176,6 +193,12 @@ export default async function AdminCommunicationsPage() {
             </CardContent>
           </Card>
         </div>
+      ) : canManageCommunications ? (
+        <FeatureLocked
+          description="Member segmentation and retention automation are available on Standard and higher plans."
+          featureName="Communication Automation"
+          requiredPlan="Standard"
+        />
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1fr]">

@@ -21,10 +21,14 @@ function getResendClient() {
 
 export async function sendEmail({ to, subject, html }: SendEmailInput) {
   const resend = getResendClient();
-  const from = process.env.RESEND_FROM_EMAIL ?? "Apex Performance Club <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL;
 
   if (!resend) {
     return { sent: false, reason: "Resend is not configured." };
+  }
+
+  if (!from) {
+    return { sent: false, reason: "RESEND_FROM_EMAIL is not configured." };
   }
 
   const { error } = await resend.emails.send({

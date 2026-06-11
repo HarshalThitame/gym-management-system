@@ -7,7 +7,7 @@ import { PlanStatusForm } from "@/features/memberships/components/plan-status-fo
 import { formatMoney } from "@/features/memberships/lib/business-rules";
 import { parsePlanFeatures } from "@/features/memberships/lib/feature-catalog";
 import { listMembershipPlans } from "@/features/memberships/services/membership-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -17,8 +17,8 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MembershipPlansPage() {
-  const context = await requireRole(["super_admin", "gym_admin"], "/admin/membership-plans");
-  const plans = await listMembershipPlans(context.profile?.gym_id ?? null);
+  const scope = await requireGymAdminScope("/admin/membership-plans");
+  const plans = await listMembershipPlans(scope.gymId);
 
   return (
     <div className="space-y-8">

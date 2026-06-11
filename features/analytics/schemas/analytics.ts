@@ -7,7 +7,7 @@ const jsonText = z.string().trim().max(8000).optional().or(z.literal(""));
 export const DashboardConfigSchema = z.object({
   dashboardConfigId: optionalUuid,
   name: z.string().trim().min(2).max(120),
-  roleName: z.enum(["super_admin", "gym_admin", "reception_staff", "trainer", "member"]),
+  roleName: z.enum(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"]),
   scope: z.enum(dashboardScopes),
   layout: jsonText,
   widgets: jsonText,

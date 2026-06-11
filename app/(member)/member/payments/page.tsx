@@ -6,7 +6,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
 import { formatCurrency } from "@/features/billing/lib/money";
 import { getMemberDashboard } from "@/features/memberships/services/membership-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -22,7 +22,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberPaymentsPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/payments");
+  const context = await requirePrimaryRole(["member"], "/member/payments");
   const profile = context.userId ? await getMemberDashboard(context.userId) : null;
 
   if (!profile?.member) {

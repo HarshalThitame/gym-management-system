@@ -8,7 +8,7 @@ import { DeleteDocumentForm, MemberLifecycleForms } from "@/features/memberships
 import { MembershipStatusBadge } from "@/features/memberships/components/membership-status-badge";
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
 import { getMemberProfile, listActiveMembershipPlans } from "@/features/memberships/services/membership-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 type MemberProfilePageProps = {
@@ -26,14 +26,14 @@ export async function generateMetadata({ params }: MemberProfilePageProps): Prom
 }
 
 export default async function AdminMemberProfilePage({ params }: MemberProfilePageProps) {
-  const context = await requireRole(["super_admin", "gym_admin", "reception_staff"], "/admin/members");
+  const scope = await requireGymAdminScope("/admin/members");
   const { memberId } = await params;
   const [profile, plans] = await Promise.all([
     getMemberProfile(memberId),
-    listActiveMembershipPlans(context.profile?.gym_id ?? null)
+    listActiveMembershipPlans(scope.gymId)
   ]);
 
-  if (!profile) {
+  if (!profile || profile.member.gym_id !== scope.gymId) {
     notFound();
   }
 

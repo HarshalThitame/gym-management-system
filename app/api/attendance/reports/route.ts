@@ -1,18 +1,21 @@
-import { NextResponse } from "next/server";
 import { attendanceRowsToCsv } from "@/features/attendance/lib/csv";
 import { attendanceReportFormats, attendanceRowsToExcel, attendanceRowsToPdf, type AttendanceReportFormat } from "@/features/attendance/lib/report-export";
 import { getAttendanceReportRows } from "@/features/attendance/services/attendance-service";
-import { getAuthContext } from "@/lib/auth/session";
-import { canAny } from "@/lib/rbac";
+import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
 
 const reportTypes = ["daily", "weekly", "monthly", "custom", "exceptions"] as const;
 type ReportType = (typeof reportTypes)[number];
 
 export async function GET(request: Request) {
-  const context = await getAuthContext();
+  const auth = await requireApiPermission("reports", "export");
 
-  if (!context.isAuthenticated || !canAny(context.roles, "reports", "export")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
+  if (!gymScope.ok) {
+    return gymScope.response;
   }
 
   const url = new URL(request.url);
@@ -23,7 +26,7 @@ export async function GET(request: Request) {
   const from = url.searchParams.get("from") ?? undefined;
   const to = url.searchParams.get("to") ?? undefined;
   const rows = await getAttendanceReportRows({
-    gymId: context.profile?.gym_id ?? null,
+    gymId: gymScope.gymId,
     type,
     from,
     to

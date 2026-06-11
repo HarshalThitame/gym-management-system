@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Brain, Dumbbell, Target, UsersRound } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { AiProgramGeneratorForm } from "@/features/ai/components/ai-forms";
@@ -7,6 +8,7 @@ import { AiReviewBadge, AiRiskBadge } from "@/features/ai/components/ai-status-b
 import { getTrainerAiDashboard } from "@/features/ai/services/ai-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 export const metadata: Metadata = createMetadata({
   title: "Trainer AI Assistant",
@@ -15,7 +17,26 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerAiPage() {
-  const context = await requireRole(["trainer", "gym_admin", "super_admin"], "/trainer/ai");
+  const context = await requireRole(["trainer"], "/trainer/ai");
+  const planContext = context.organizationId ? await getOrgPlanContext(context.organizationId) : null;
+
+  if (!planContext?.features.aiEnabled) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Trainer Intelligence</p>
+          <h2 className="mt-2 text-3xl font-black">AI-assisted coaching operations</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Prioritize members who need outreach, review supervised recommendations, and draft workout programs for approval.</p>
+        </div>
+        <FeatureLocked
+          description="AI workout recommendations, coaching risk signals, and program generation are available on Premium."
+          featureName="AI Workout Recommendations"
+          requiredPlan="Premium"
+        />
+      </div>
+    );
+  }
+
   const dashboard = context.userId ? await getTrainerAiDashboard(context.userId, context.profile?.gym_id ?? null) : null;
   const highRisk = dashboard?.riskMembers.filter((member) => (member.churn_risk_score ?? 0) >= 60).length ?? 0;
 

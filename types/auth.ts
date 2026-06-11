@@ -1,8 +1,8 @@
-export const roleNames = ["super_admin", "gym_admin", "reception_staff", "trainer", "member"] as const;
+export const roleNames = ["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"] as const;
 
 export type RoleName = (typeof roleNames)[number];
 
-export type StaffRoleName = Extract<RoleName, "super_admin" | "gym_admin" | "reception_staff">;
+export type StaffRoleName = Extract<RoleName, "super_admin" | "organization_owner" | "gym_admin" | "reception_staff">;
 
 export const permissionActions = ["read", "create", "update", "delete", "export", "approve"] as const;
 
@@ -55,6 +55,7 @@ export type AuthContext = {
   userId: string | null;
   email: string | null;
   profile: AuthProfile | null;
+  organizationId: string | null;
   roles: RoleName[];
   primaryRole: RoleName | null;
   isAuthenticated: boolean;

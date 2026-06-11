@@ -19,7 +19,7 @@ export const metadata: Metadata = createMetadata({
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
-  const nextPath = sanitizeRedirectPath(params.next, "/member");
+  const nextPath = params.next ? sanitizeRedirectPath(params.next, "") : "";
 
   return (
     <AuthShell

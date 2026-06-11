@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { assertFeature } from "@/lib/tenant";
 import type { AuthContext } from "@/types/auth";
 import type { Database, Json } from "@/types/database";
 import {
@@ -57,6 +58,11 @@ export async function createRazorpayOrderForPayment(context: AuthContext, paymen
   }
 
   const payment = access.data;
+  const featureAccess = await requireRazorpayFeatureForPayment(payment);
+  if (!featureAccess.ok) {
+    return featureAccess;
+  }
+
   const eligibility = validateOnlinePaymentEligibility(payment);
   if (!eligibility.ok) {
     return eligibility;
@@ -129,6 +135,16 @@ export async function verifyRazorpayPaymentForOrder(context: AuthContext, input:
     return { ok: false, status: 400, code: "INVALID_SIGNATURE", message: "Payment signature verification failed." };
   }
 
+  const access = await loadAccessiblePaymentByOrderId(input.orderId);
+  if (!access.ok) {
+    return access;
+  }
+
+  const featureAccess = await requireRazorpayFeatureForPayment(access.data);
+  if (!featureAccess.ok) {
+    return featureAccess;
+  }
+
   const paymentResult = await fetchRazorpayPayment(input.paymentId);
   if (!paymentResult.ok) {
     return { ok: false, status: 503, code: "RAZORPAY_NOT_CONFIGURED", message: paymentResult.message };
@@ -141,11 +157,6 @@ export async function verifyRazorpayPaymentForOrder(context: AuthContext, input:
 
   if (!razorpayPayment.captured) {
     return { ok: false, status: 409, code: "PAYMENT_NOT_CAPTURED", message: "Razorpay has not captured this payment yet." };
-  }
-
-  const access = await loadAccessiblePaymentByOrderId(input.orderId);
-  if (!access.ok) {
-    return access;
   }
 
   const validation = validateRazorpayPaymentMatch(access.data, razorpayPayment);
@@ -235,6 +246,11 @@ export async function createRazorpayRefundForPayment(context: AuthContext, input
   }
 
   const payment = access.data;
+  const featureAccess = await requireRazorpayFeatureForPayment(payment);
+  if (!featureAccess.ok) {
+    return featureAccess;
+  }
+
   if (payment.provider !== "razorpay" || !payment.provider_payment_id) {
     return { ok: false, status: 409, code: "PAYMENT_NOT_REFUNDABLE_ONLINE", message: "Only completed Razorpay payments can be refunded through this endpoint." };
   }
@@ -332,6 +348,39 @@ async function loadAccessiblePaymentByOrderId(orderId: string): Promise<Result<P
   }
 
   return { ok: true, data };
+}
+
+async function requireRazorpayFeatureForPayment(payment: PaymentRow): Promise<Result<PaymentRow>> {
+  try {
+    const organizationId = await getOrganizationIdForGym(payment.gym_id);
+    if (!organizationId) {
+      return { ok: false, status: 403, code: "FEATURE_NOT_AVAILABLE", message: "Feature not available on your current plan." };
+    }
+
+    await assertFeature(organizationId, "razorpayEnabled");
+    return { ok: true, data: payment };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 403,
+      code: "FEATURE_NOT_AVAILABLE",
+      message: error instanceof Error ? error.message : "Feature not available on your current plan."
+    };
+  }
+}
+
+async function getOrganizationIdForGym(gymId: string | null) {
+  if (!gymId) {
+    return null;
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.organization_id ?? null;
 }
 
 function validateOnlinePaymentEligibility(payment: PaymentRow): Result<PaymentRow> {

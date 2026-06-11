@@ -1,17 +1,13 @@
 import type { Metadata } from "next";
-import { Activity, Bell, CalendarCheck, CalendarDays, CreditCard, Flame } from "lucide-react";
+import { Activity, Apple, Bell, CalendarCheck, CalendarDays, CreditCard, Droplets, Dumbbell, Flame, Megaphone, MessageSquareText, Trophy } from "lucide-react";
 import { MobileReadinessPanel } from "@/components/pwa/mobile-readiness-panel";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
-import { getMemberAttendancePortal } from "@/features/attendance/services/attendance-service";
-import { getMemberClassesPortal } from "@/features/classes/services/class-service";
-import { getMemberNotificationCenter } from "@/features/communications/services/communication-service";
-import { getMemberFitnessPortal } from "@/features/fitness/services/fitness-service";
 import { MembershipStatusBadge } from "@/features/memberships/components/membership-status-badge";
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
-import { getMemberDashboard } from "@/features/memberships/services/membership-service";
-import { requireRole } from "@/lib/auth/guards";
+import { getMemberDashboardOverview } from "@/features/memberships/services/membership-service";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -21,23 +17,30 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberDashboardPage() {
-  const context = await requireRole(["member", "super_admin"], "/member");
-  const [profile, attendance, classes, fitness, notifications] = context.userId
-    ? await Promise.all([getMemberDashboard(context.userId), getMemberAttendancePortal(context.userId), getMemberClassesPortal(context.userId), getMemberFitnessPortal(context.userId), getMemberNotificationCenter(context.userId)])
-    : [null, null, null, null, null];
-  const membership = profile?.currentMembership ?? null;
-  const plan = profile?.currentPlan ?? null;
+  const context = await requirePrimaryRole(["member"], "/member");
+  const overview = context.userId ? await getMemberDashboardOverview(context.userId) : null;
+  const membership = overview?.currentMembership ?? null;
+  const plan = overview?.currentPlan ?? null;
+  const metrics = overview?.metrics;
 
   return (
     <div className="space-y-8">
       <MobileReadinessPanel />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <StatCard detail={plan?.name ?? "No membership assigned"} icon={<CreditCard className="size-5" />} label="Membership" value={membership?.status ?? "None"} />
-        <StatCard detail={attendance?.metrics.lastVisitAt ? `Last visit ${new Date(attendance.metrics.lastVisitAt).toLocaleDateString("en-IN")}` : "No visit recorded"} icon={<Flame className="size-5" />} label="Attendance" value={`${attendance?.metrics.attendanceCount ?? 0} visits`} />
-        <StatCard detail={`${classes?.waitlists.filter((row) => row.status === "waiting").length ?? 0} active waitlists`} icon={<CalendarCheck className="size-5" />} label="Classes" value={`${classes?.bookings.filter((row) => row.status === "booked").length ?? 0} booked`} />
-        <StatCard detail={fitness?.activeGoal?.title ?? "No active goal"} icon={<Activity className="size-5" />} label="Fitness" value={`${fitness?.metrics.completedWorkouts ?? 0} workouts`} />
-        <StatCard detail={`${notifications?.metrics.priority ?? 0} priority alerts`} icon={<Bell className="size-5" />} label="Notifications" value={String(notifications?.metrics.unread ?? 0)} />
-        <StatCard detail={membership?.end_date ?? "No expiry date"} icon={<CalendarDays className="size-5" />} label="Remaining Days" value={membership ? String(getRemainingDays(membership.end_date)) : "0"} />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard detail={metrics?.activeWorkoutPrograms ? "Active program assigned" : "No workout assigned"} icon={<Dumbbell className="size-5" />} label="Today's Workout" value={metrics?.activeWorkoutPrograms ? "Ready" : "None"} />
+        <StatCard detail={overview?.activeNutritionPlan?.name ?? "No nutrition plan assigned"} icon={<Apple className="size-5" />} label="Today's Nutrition" value={String(metrics?.caloriesToday ?? 0)} />
+        <StatCard detail="Water intake logged today" icon={<Droplets className="size-5" />} label="Water Goal" value={`${metrics?.waterToday ?? 0} ml`} />
+        <StatCard detail={`${metrics?.completedWorkouts ?? 0} completed workouts`} icon={<Flame className="size-5" />} label="Workout Streak" value={`${metrics?.workoutStreak ?? 0} days`} />
+        <StatCard detail={metrics?.lastVisitAt ? `Last visit ${new Date(metrics.lastVisitAt).toLocaleDateString("en-IN")}` : "No visit recorded"} icon={<CalendarCheck className="size-5" />} label="Attendance Streak" value={`${metrics?.attendanceStreak ?? 0} days`} />
+        <StatCard detail={`${metrics?.activeWaitlists ?? 0} active waitlists`} icon={<CalendarDays className="size-5" />} label="Upcoming Classes" value={`${metrics?.bookedClasses ?? 0} booked`} />
+        <StatCard detail={overview?.nextPtSession ? `${overview.nextPtSession.session_date} at ${overview.nextPtSession.starts_at.slice(0, 5)}` : "No upcoming PT session"} icon={<Dumbbell className="size-5" />} label="Upcoming PT Sessions" value={String(metrics?.upcomingPtSessions ?? 0)} />
+        <StatCard detail={plan?.name ?? "No membership assigned"} icon={<CreditCard className="size-5" />} label="Membership Status" value={membership?.status ?? "None"} />
+        <StatCard detail={membership?.end_date ?? "No expiry date"} icon={<CalendarDays className="size-5" />} label="Membership Expiry" value={membership ? String(getRemainingDays(membership.end_date)) : "0"} />
+        <StatCard detail={overview?.activeGoal?.title ?? "No active goal"} icon={<Activity className="size-5" />} label="Progress Summary" value={overview?.activeGoal ? `${metrics?.completedWorkouts ?? 0} workouts` : "No goal"} />
+        <StatCard detail="Milestones and badges unlocked" icon={<Trophy className="size-5" />} label="Achievements" value={String(metrics?.milestoneCount ?? 0)} />
+        <StatCard detail={`${metrics?.totalCommunicationRecords ?? 0} communication records`} icon={<MessageSquareText className="size-5" />} label="Trainer Messages" value={String(metrics?.unreadNotifications ?? 0)} />
+        <StatCard detail="Visible gym notices" icon={<Megaphone className="size-5" />} label="Announcements" value={String(metrics?.announcements ?? 0)} />
+        <StatCard detail={`${metrics?.priorityNotifications ?? 0} priority alerts`} icon={<Bell className="size-5" />} label="Notifications" value={String(metrics?.unreadNotifications ?? 0)} />
       </div>
       <Card>
         <CardHeader>
@@ -66,16 +69,19 @@ export default async function MemberDashboardPage() {
           ) : (
             <div className="rounded-md border border-warning/25 bg-warning/10 p-5 text-sm font-semibold text-warning">No member membership record is connected to this login yet.</div>
           )}
-          <div className="flex flex-wrap gap-3">
-            <ButtonLink href="/member/profile" variant="primary">Complete Profile</ButtonLink>
-            <ButtonLink href="/member/membership" variant="secondary">View Membership</ButtonLink>
-            <ButtonLink href="/member/payments" variant="secondary">Payments and Invoices</ButtonLink>
-            <ButtonLink href="/member/attendance" variant="secondary">Attendance QR</ButtonLink>
-            <ButtonLink href="/member/classes" variant="secondary">Book Classes</ButtonLink>
-            <ButtonLink href="/member/workouts" variant="secondary">View Workouts</ButtonLink>
-            <ButtonLink href="/member/fitness" variant="secondary">Track Fitness</ButtonLink>
-            <ButtonLink href="/member/notifications" variant="secondary">Notification Center</ButtonLink>
-            <ButtonLink href="/membership-plans" variant="accent">Renew Membership</ButtonLink>
+          <div>
+            <h3 className="text-lg font-black">Quick Actions</h3>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <ButtonLink href="/member/profile" variant="primary">Complete Profile</ButtonLink>
+              <ButtonLink href="/member/membership" variant="secondary">View Membership</ButtonLink>
+              <ButtonLink href="/member/payments" variant="secondary">Payments and Invoices</ButtonLink>
+              <ButtonLink href="/member/attendance" variant="secondary">Attendance QR</ButtonLink>
+              <ButtonLink href="/member/classes" variant="secondary">Book Classes</ButtonLink>
+              <ButtonLink href="/member/workouts" variant="secondary">View Workouts</ButtonLink>
+              <ButtonLink href="/member/fitness" variant="secondary">Track Fitness</ButtonLink>
+              <ButtonLink href="/member/notifications" variant="secondary">Notification Center</ButtonLink>
+              <ButtonLink href="/membership-plans" variant="accent">Renew Membership</ButtonLink>
+            </div>
           </div>
         </CardContent>
       </Card>

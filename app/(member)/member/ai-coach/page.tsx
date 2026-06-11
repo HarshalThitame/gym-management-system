@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import { Bot, Brain, ShieldCheck, Sparkles, Target } from "lucide-react";
+import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { AiCoachChatPanel, GenerateAiProfileForm, NutritionGuidanceForm } from "@/features/ai/components/ai-forms";
 import { AiReviewBadge, AiRiskBadge } from "@/features/ai/components/ai-status-badge";
 import { getMemberAiDashboard } from "@/features/ai/services/ai-service";
 import { calculateChurnRiskScore, calculateEngagementScore, inferFitnessLevel } from "@/features/ai/lib/business-rules";
-import { requireRole } from "@/lib/auth/guards";
+import { requirePrimaryRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 
 export const metadata: Metadata = createMetadata({
   title: "AI Coach",
@@ -16,7 +18,26 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberAiCoachPage() {
-  const context = await requireRole(["member", "super_admin"], "/member/ai-coach");
+  const context = await requirePrimaryRole(["member"], "/member/ai-coach");
+  const planContext = context.organizationId ? await getOrgPlanContext(context.organizationId) : null;
+
+  if (!planContext?.features.aiEnabled) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">AI Fitness Intelligence</p>
+          <h2 className="mt-2 text-3xl font-black">Personal coaching with human supervision</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">AI analyzes your goals, attendance, workouts, measurements, nutrition logs, and class participation to suggest next actions.</p>
+        </div>
+        <FeatureLocked
+          description="AI coaching, recommendations, and nutrition guidance are available when your organization enables the Premium plan."
+          featureName="AI Coach"
+          requiredPlan="Premium"
+        />
+      </div>
+    );
+  }
+
   const dashboard = context.userId ? await getMemberAiDashboard(context.userId) : null;
   const aiContext = dashboard?.context ?? null;
   const engagement = aiContext ? calculateEngagementScore(aiContext.signals) : 0;

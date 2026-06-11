@@ -222,7 +222,7 @@ export async function saveLatestMemberAiProfile(input: { userId: string; created
   const { data, error } = await supabase.from("ai_fitness_profiles").insert({
     gym_id: context.member.gym_id,
     member_id: context.member.id,
-    profile_version: Date.now(),
+    profile_version: Math.floor(Date.now() / 1000),
     fitness_level: level,
     primary_goal: context.goals.find((goal) => goal.status === "active")?.title ?? null,
     engagement_score: engagement,
@@ -284,7 +284,7 @@ export async function generateCoachReply(input: { userId: string; message: strin
 export async function generateWorkoutProgramDraft(input: { userId: string; level: "beginner" | "intermediate" | "advanced"; weeks: number; generatedBy: string | null }) {
   const context = await buildMemberFitnessContext(input.userId);
   if (!context) {
-    throw new Error("No member fitness context is available.");
+    return generateTrainerScopedProgramDraft(input);
   }
 
   const result = await generateAiText({
@@ -298,13 +298,60 @@ export async function generateWorkoutProgramDraft(input: { userId: string; level
   const { data, error } = await supabase.from("ai_generated_programs").insert({
     gym_id: context.member.gym_id,
     member_id: context.member.id,
-    trainer_id: context.member.assigned_trainer_id,
+    trainer_id: context.trainer?.id ?? null,
     name: `${input.level} ${context.goals[0]?.title ?? "fitness"} plan`,
     level: input.level,
     goal: context.goals[0]?.title ?? "general fitness",
     duration_weeks: input.weeks,
     program_json: { content: result.content, source: result.status } as Json,
     recovery_guidance: "Review sleep, soreness, and session readiness weekly.",
+    safety_notes: "Trainer approval is required before assigning this AI-generated plan.",
+    status: "pending_review",
+    generated_by: input.generatedBy
+  }).select("*").maybeSingle();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "AI program draft could not be created.");
+  }
+
+  return data;
+}
+
+async function generateTrainerScopedProgramDraft(input: { userId: string; level: "beginner" | "intermediate" | "advanced"; weeks: number; generatedBy: string | null }) {
+  const supabase = await createSupabaseServerClient();
+  const { data: trainer, error: trainerError } = await supabase
+    .from("trainers")
+    .select("id,gym_id,display_name")
+    .eq("user_id", input.userId)
+    .maybeSingle();
+
+  if (trainerError || !trainer) {
+    throw new Error(trainerError?.message ?? "No trainer record is connected to this account.");
+  }
+
+  const fallback = `${input.weeks}-week ${input.level} trainer draft: use 3 structured sessions per week, balance strength, conditioning, mobility, and recovery, progress only when form is consistent, and review the plan with a qualified trainer before assigning it to a member.`;
+  const result = await generateAiText({
+    featureKey: "workout_program_generator",
+    prompt: [
+      `Create a ${input.weeks}-week ${input.level} workout program draft for trainer review.`,
+      "Include exercises, sets, reps, weekly progressions, recovery guidance, and safety notes.",
+      "Do not provide medical diagnosis, guaranteed results, or unsupervised injury advice."
+    ].join("\n"),
+    fallback,
+    gymId: trainer.gym_id,
+    userId: input.generatedBy
+  });
+
+  const { data, error } = await supabase.from("ai_generated_programs").insert({
+    gym_id: trainer.gym_id,
+    member_id: null,
+    trainer_id: trainer.id,
+    name: `${input.level} trainer-reviewed program draft`,
+    level: input.level,
+    goal: "general fitness",
+    duration_weeks: input.weeks,
+    program_json: { content: result.content, source: result.status, scope: "trainer" } as Json,
+    recovery_guidance: "Review soreness, readiness, sleep, and progression weekly before assigning to a member.",
     safety_notes: "Trainer approval is required before assigning this AI-generated plan.",
     status: "pending_review",
     generated_by: input.generatedBy
@@ -439,7 +486,7 @@ async function saveRecommendations(input: { context: AiFitnessContext; recommend
   const rows: RecommendationInsert[] = input.recommendations.map((recommendation) => ({
     gym_id: input.context.member.gym_id,
     member_id: input.context.member.id,
-    trainer_id: input.context.member.assigned_trainer_id,
+    trainer_id: input.context.trainer?.id ?? null,
     recommendation_type: recommendation.type,
     title: recommendation.title,
     summary: recommendation.summary,
@@ -524,9 +571,9 @@ function buildRuleBasedExecutiveInsights(analytics: Awaited<ReturnType<typeof ge
   }];
 }
 
-function buildCoachFallback(message: string, context: AiFitnessContext | null) {
+function buildCoachFallback(_message: string, context: AiFitnessContext | null) {
   const goal = context?.goals.find((item) => item.status === "active")?.title ?? "your current goal";
-  return `For ${goal}, keep the next step simple: complete your planned session, log the result, and review how your body responds. Your message was: "${message.slice(0, 120)}". Ask your trainer to review any pain, injury, or medical concern before changing intensity.`;
+  return `For ${goal}, keep the next step simple: complete your planned session, log the result, and review how your body responds. Ask your trainer to review any pain, injury, or medical concern before changing intensity.`;
 }
 
 function buildProgramFallback(context: AiFitnessContext, level: string, weeks: number) {
