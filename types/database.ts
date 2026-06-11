@@ -69,6 +69,126 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["organizations"]["Insert"]>;
         Relationships: Relationship[];
       };
+      packages: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          max_members: number;
+          max_branches: number;
+          qr_attendance_enabled: boolean;
+          biometric_attendance_enabled: boolean;
+          rfid_attendance_enabled: boolean;
+          class_scheduling_enabled: boolean;
+          trainer_assignment_enabled: boolean;
+          razorpay_enabled: boolean;
+          communications_enabled: boolean;
+          ai_enabled: boolean;
+          advanced_reports_enabled: boolean;
+          custom_domain_enabled: boolean;
+          api_access_enabled: boolean;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          max_members: number;
+          max_branches: number;
+          qr_attendance_enabled?: boolean;
+          biometric_attendance_enabled?: boolean;
+          rfid_attendance_enabled?: boolean;
+          class_scheduling_enabled?: boolean;
+          trainer_assignment_enabled?: boolean;
+          razorpay_enabled?: boolean;
+          communications_enabled?: boolean;
+          ai_enabled?: boolean;
+          advanced_reports_enabled?: boolean;
+          custom_domain_enabled?: boolean;
+          api_access_enabled?: boolean;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["packages"]["Insert"]>;
+        Relationships: Relationship[];
+      };
+      organization_subscriptions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          package_id: string;
+          status: "active" | "trial" | "expired" | "suspended" | "cancelled";
+          trial_ends_at: string | null;
+          started_at: string;
+          expires_at: string | null;
+          assigned_by: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          package_id: string;
+          status?: "active" | "trial" | "expired" | "suspended" | "cancelled";
+          trial_ends_at?: string | null;
+          started_at?: string;
+          expires_at?: string | null;
+          assigned_by?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["organization_subscriptions"]["Insert"]>;
+        Relationships: Relationship[];
+      };
+      organization_approval_requests: {
+        Row: {
+          id: string;
+          organization_id: string;
+          action: "transfer_owner" | "suspend" | "delete" | "bulk_suspend" | "bulk_assign_package" | "permanent_purge";
+          status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
+          requested_by: string | null;
+          reviewed_by: string | null;
+          target_user_id: string | null;
+          payload: Json;
+          before_snapshot: Json;
+          after_snapshot: Json;
+          reason: string | null;
+          review_note: string | null;
+          requested_at: string;
+          reviewed_at: string | null;
+          expires_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          action: "transfer_owner" | "suspend" | "delete" | "bulk_suspend" | "bulk_assign_package" | "permanent_purge";
+          status?: "pending" | "approved" | "rejected" | "cancelled" | "expired";
+          requested_by?: string | null;
+          reviewed_by?: string | null;
+          target_user_id?: string | null;
+          payload?: Json;
+          before_snapshot?: Json;
+          after_snapshot?: Json;
+          reason?: string | null;
+          review_note?: string | null;
+          requested_at?: string;
+          reviewed_at?: string | null;
+          expires_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["organization_approval_requests"]["Insert"]>;
+        Relationships: Relationship[];
+      };
       branches: {
         Row: {
           id: string;
@@ -1259,6 +1379,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           user_id: string | null;
           feature_key: string;
           provider: string;
@@ -1277,6 +1398,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           user_id?: string | null;
           feature_key: string;
           provider?: string;
@@ -1429,6 +1551,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           member_id: string;
           membership_plan_id: string;
           status: "pending" | "active" | "expired" | "cancelled" | "frozen" | "suspended";
@@ -1455,6 +1578,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           member_id: string;
           membership_plan_id: string;
           status?: "pending" | "active" | "expired" | "cancelled" | "frozen" | "suspended";
@@ -1552,6 +1676,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           member_id: string;
           document_type: "profile_photo" | "identity_proof" | "medical_declaration" | "membership_agreement" | "other";
           file_name: string;
@@ -1565,6 +1690,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           member_id: string;
           document_type: "profile_photo" | "identity_proof" | "medical_declaration" | "membership_agreement" | "other";
           file_name: string;
@@ -5171,6 +5297,18 @@ export type Database = {
       refresh_analytics_materialized_views: {
         Args: Record<string, never>;
         Returns: void;
+      };
+      expire_organization_approval_requests: {
+        Args: { p_actor_id?: string | null };
+        Returns: number;
+      };
+      apply_organization_approval_request: {
+        Args: {
+          p_approval_id: string;
+          p_reviewer_id: string;
+          p_review_note?: string | null;
+        };
+        Returns: Json;
       };
     };
     Enums: Record<string, never>;

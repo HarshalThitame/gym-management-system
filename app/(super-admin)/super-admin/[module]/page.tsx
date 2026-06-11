@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { getEnterpriseDashboard } from "@/features/enterprise/services/enterprise-service";
 import { SuperAdminModuleWorkspace } from "@/features/super-admin/components/super-admin-module-workspace";
 import { getSuperAdminModule, superAdminModules } from "@/features/super-admin/lib/super-admin-modules";
+import { getGymBranchManagementData, normalizeGymBranchFilters } from "@/features/super-admin/services/gym-branch-management-service";
+import { getOrganizationManagementData, normalizeOrganizationFilters, type OrganizationSortOption } from "@/features/super-admin/services/organization-management-service";
+import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import { createMetadata } from "@/lib/seo/metadata";
 
 type SuperAdminModuleRouteProps = {
@@ -43,6 +46,35 @@ export default async function SuperAdminModuleRoute({ params, searchParams }: Su
   }
 
   const dashboard = await getEnterpriseDashboard();
+  const organizationManagement = selectedModule.slug === "organizations"
+    ? await getOrganizationManagementData(dashboard, normalizeOrganizationFilters({
+      query: stringParam(filters.q) ?? "",
+      status: stringParam(filters.status) ?? "all",
+      sort: (stringParam(filters.sort) ?? "created_desc") as OrganizationSortOption,
+      page: Number(stringParam(filters.page) ?? 1),
+      pageSize: Number(stringParam(filters.pageSize) ?? 12)
+    }))
+    : null;
+  const gymBranchManagement = selectedModule.slug === "gyms"
+    ? await getGymBranchManagementData(normalizeGymBranchFilters({
+      query: stringParam(filters.q) ?? "",
+      organizationId: stringParam(filters.organizationId) ?? "all",
+      status: stringParam(filters.status) ?? "all"
+    }))
+    : null;
 
-  return <SuperAdminModuleWorkspace dashboard={dashboard} filters={filters} superModule={selectedModule} />;
+  return (
+    <SuperAdminModuleWorkspace
+      criticalSuperAdminEmail={getCriticalSuperAdminEmail()}
+      dashboard={dashboard}
+      filters={filters}
+      gymBranchManagement={gymBranchManagement}
+      organizationManagement={organizationManagement}
+      superModule={selectedModule}
+    />
+  );
+}
+
+function stringParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }

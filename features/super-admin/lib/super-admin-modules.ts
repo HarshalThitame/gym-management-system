@@ -211,6 +211,7 @@ export const superAdminModules = [
 
 export const superAdminNavItems = [
   { href: "/super-admin", label: "Dashboard", icon: Gauge, iconKey: "gauge" },
+  { href: "/super-admin/approvals", label: "Approvals", icon: ShieldCheck, iconKey: "bell" },
   ...superAdminModules.map((module) => ({
     href: module.href,
     label: module.label,

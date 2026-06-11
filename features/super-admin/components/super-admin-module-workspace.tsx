@@ -15,17 +15,15 @@ import {
   UsersRound
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ButtonLink } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/stat-card";
 import {
   BackupJobForm,
-  BranchForm,
   BranchSettingsForm,
   BranchUserForm,
   ComplianceRequestForm,
   FeatureFlagForm,
-  GymForm,
   HealthCheckForm,
-  OrganizationForm,
   SecurityEventStatusForm,
   SubscriptionForm,
   TenantConfigForm,
@@ -38,12 +36,20 @@ import { buildRecoveryPointLabel, formatCompactNumber, formatCurrency, formatEnt
 import { latestHealthByComponent } from "@/features/enterprise/services/enterprise-service";
 import { ROLE_PERMISSIONS, rolePriority } from "@/lib/rbac";
 import type { EnterpriseDashboard } from "@/types/enterprise";
+import { fallbackCriticalSuperAdminEmail } from "../lib/super-admin-governance-config";
 import type { SuperAdminModule } from "../lib/super-admin-modules";
+import { GymBranchManagementWorkspace } from "./gyms/GymBranchManagementWorkspace";
+import { OrganizationManagementWorkspace } from "./organizations/OrganizationManagementWorkspace";
+import type { GymBranchManagementData } from "../services/gym-branch-management-service";
+import type { OrganizationManagementData } from "../services/organization-management-service";
 
 type SuperAdminModuleWorkspaceProps = {
   superModule: SuperAdminModule;
   dashboard: EnterpriseDashboard;
   filters?: Record<string, string | string[] | undefined>;
+  gymBranchManagement?: GymBranchManagementData | null;
+  organizationManagement?: OrganizationManagementData | null;
+  criticalSuperAdminEmail?: string;
 };
 
 type SummaryStat = {
@@ -53,82 +59,28 @@ type SummaryStat = {
   icon: ReactNode;
 };
 
-export function SuperAdminModuleWorkspace({ superModule, dashboard, filters = {} }: SuperAdminModuleWorkspaceProps) {
+export function SuperAdminModuleWorkspace({ superModule, dashboard, filters = {}, gymBranchManagement = null, organizationManagement = null, criticalSuperAdminEmail = fallbackCriticalSuperAdminEmail }: SuperAdminModuleWorkspaceProps) {
   const context = buildModuleContext(dashboard);
-  const stats = getModuleStats(superModule.slug, dashboard, context);
+  const stats = getModuleStats(superModule.slug, dashboard, context, organizationManagement);
 
   return (
     <ModuleShell stats={stats} superModule={superModule}>
-      {renderModuleBody(superModule, dashboard, context, filters)}
+      {renderModuleBody(superModule, dashboard, context, filters, gymBranchManagement, organizationManagement, criticalSuperAdminEmail)}
     </ModuleShell>
   );
 }
 
-function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDashboard, context: ModuleContext, filters: Record<string, string | string[] | undefined>) {
+function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDashboard, context: ModuleContext, filters: Record<string, string | string[] | undefined>, gymBranchManagement: GymBranchManagementData | null, organizationManagement: OrganizationManagementData | null, criticalSuperAdminEmail: string) {
   switch (superModule.slug) {
     case "organizations":
-      return (
-        <TwoColumn>
-          <FormPanel description="Create new tenants, update business status, and keep billing domains current." title="Create or Update Organization">
-            <OrganizationForm organizations={dashboard.organizations} />
-          </FormPanel>
-          <RecordPanel
-            description="Platform-wide tenant registry."
-            emptyText="No organizations are available."
-            items={dashboard.organizations}
-            title="Organizations"
-            renderItem={(organization) => (
-              <RecordCard
-                badges={[organization.status, organization.organization_type]}
-                meta={[organization.primary_domain ?? organization.slug, organization.billing_email ?? "No billing email"].join(" · ")}
-                title={organization.name}
-              />
-            )}
-          />
-        </TwoColumn>
-      );
+      return organizationManagement
+        ? <OrganizationManagementWorkspace criticalSuperAdminEmail={criticalSuperAdminEmail} data={organizationManagement} />
+        : <EmptyState text="Organization management data is not available." />;
 
     case "gyms":
-      return (
-        <div className="space-y-5">
-          <TwoColumn>
-            <FormPanel description="Create or update the gym layer that sits under each organization." title="Gym Management">
-              <GymForm gyms={dashboard.gyms} organizations={dashboard.organizations} />
-            </FormPanel>
-            <FormPanel description="Create branches, attach gym records, and define operating location details." title="Branch Management">
-              <BranchForm branches={dashboard.branches} organizations={dashboard.organizations} />
-            </FormPanel>
-          </TwoColumn>
-          <TwoColumn>
-            <RecordPanel
-              description="Gym records connected to tenant organizations."
-              emptyText="No gyms are available."
-              items={dashboard.gyms}
-              title="Gyms"
-              renderItem={(gym) => (
-                <RecordCard
-                  badges={[gym.status]}
-                  meta={[context.organizationName(gym.organization_id), gym.timezone, gym.currency].join(" · ")}
-                  title={gym.name}
-                />
-              )}
-            />
-            <RecordPanel
-              description="Operational branch records and capacity signals."
-              emptyText="No branches are available."
-              items={dashboard.branches}
-              title="Branches"
-              renderItem={(branch) => (
-                <RecordCard
-                  badges={[branch.status]}
-                  meta={[context.organizationName(branch.organization_id), branch.city ?? "No city", `${branch.capacity} capacity`].join(" · ")}
-                  title={`${branch.name} (${branch.branch_code})`}
-                />
-              )}
-            />
-          </TwoColumn>
-        </div>
-      );
+      return gymBranchManagement
+        ? <GymBranchManagementWorkspace data={gymBranchManagement} />
+        : <EmptyState text="Gym and branch management data is not available." />;
 
     case "domains":
       return (
@@ -262,7 +214,18 @@ function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDa
     case "security":
       return (
         <TwoColumn>
-          <SecurityEventList events={filterSecurityEvents(dashboard.securityEvents, filters)} filters={filters} />
+          <div className="space-y-5">
+            <SecurityEventList events={filterSecurityEvents(dashboard.securityEvents, filters)} filters={filters} />
+            <Card>
+              <CardHeader>
+                <h3 className="text-2xl font-black">Super Admin MFA</h3>
+                <p className="text-sm leading-6 text-muted-foreground">Enroll or verify TOTP MFA before running organization transfer, suspend, delete, or bulk actions.</p>
+              </CardHeader>
+              <CardContent>
+                <ButtonLink href="/super-admin/security/mfa" variant="accent">Open MFA Setup</ButtonLink>
+              </CardContent>
+            </Card>
+          </div>
           <RecordPanel
             description="Aggregated security posture by status and severity."
             emptyText="No security summary rows are available."
@@ -399,7 +362,7 @@ function ModuleShell({ children, stats, superModule }: { children: ReactNode; st
   );
 }
 
-function getModuleStats(slug: string, dashboard: EnterpriseDashboard, context: ModuleContext): SummaryStat[] {
+function getModuleStats(slug: string, dashboard: EnterpriseDashboard, context: ModuleContext, organizationManagement: OrganizationManagementData | null = null): SummaryStat[] {
   const base = [
     stat("Organizations", dashboard.organizations.length, "Tenant organizations", <Building2 className="size-5" />),
     stat("Gyms", dashboard.gyms.length, "Gym records", <Building2 className="size-5" />),
@@ -410,10 +373,10 @@ function getModuleStats(slug: string, dashboard: EnterpriseDashboard, context: M
   switch (slug) {
     case "organizations":
       return [
-        stat("Organizations", dashboard.organizations.length, "All tenant records", <Building2 className="size-5" />),
-        stat("Active", dashboard.organizations.filter((item) => item.status === "active" || item.status === "trial").length, "Active or trial tenants", <ShieldCheck className="size-5" />),
-        stat("Suspended", dashboard.organizations.filter((item) => item.status === "suspended" || item.status === "deactivated").length, "Needs governance review", <AlertTriangle className="size-5" />),
-        stat("Domains", dashboard.organizations.filter((item) => item.primary_domain).length, "Primary domains configured", <Globe2 className="size-5" />)
+        stat("Organizations", organizationManagement?.summary.totalOrganizations ?? dashboard.organizations.length, "All tenant records", <Building2 className="size-5" />),
+        stat("Active", organizationManagement?.summary.activeOrganizations ?? dashboard.organizations.filter((item) => item.status === "active" || item.status === "trial").length, "Active or trial tenants on this page", <ShieldCheck className="size-5" />),
+        stat("At Risk", organizationManagement?.summary.suspendedOrganizations ?? dashboard.organizations.filter((item) => item.status === "suspended" || item.status === "deactivated").length, "Restricted or archived on this page", <AlertTriangle className="size-5" />),
+        stat("Avg Health", organizationManagement?.summary.averageHealthScore ?? 0, "Average customer health on this page", <HeartPulse className="size-5" />)
       ];
     case "gyms":
       return [
