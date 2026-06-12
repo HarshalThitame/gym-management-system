@@ -72,7 +72,7 @@ export default async function SuperAdminUserDetailPage({ params, searchParams }:
         </div>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={<UserCheck className="size-5" />} label="Status" value={formatEnterpriseLabel(record.user.status)} />
         <StatCard icon={<ShieldCheck className="size-5" />} label="Roles" value={record.roles.map(formatEnterpriseLabel).join(", ") || "None"} />
         <StatCard icon={<LogIn className="size-5" />} label="Logins" value={formatCompactNumber(record.loginCount)} />
@@ -181,7 +181,7 @@ function LoginHistoryEntryCard({ entry }: { entry: LoginHistoryEntry }) {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
             {entry.ipAddress && <span className="flex items-center gap-1"><Globe className="size-3" />{entry.ipAddress}</span>}
             {deviceType}
-            <span className="truncate max-w-[200px]">{entry.userAgent ?? "Unknown device"}</span>
+            <span className="min-w-0 shrink truncate">{entry.userAgent ?? "Unknown device"}</span>
           </div>
           {entry.failureReason && <p className="mt-1 text-xs text-red-600">{entry.failureReason}</p>}
         </div>

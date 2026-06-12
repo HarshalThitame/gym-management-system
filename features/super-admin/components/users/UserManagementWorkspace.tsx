@@ -138,7 +138,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
 
       <Card>
         <CardHeader>
-          <form className="grid gap-3 lg:grid-cols-[1fr_160px_160px_200px_140px_auto]">
+          <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_200px_140px_auto]">
             <div className="relative">
               <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -345,13 +345,15 @@ function UserRow({
   return (
     <div className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex items-start gap-3 lg:items-center">
-        <input
-          aria-label={`Select ${record.user.full_name}`}
-          checked={isSelected}
-          className="mt-1 size-4 accent-primary lg:mt-0"
-          onChange={onToggle}
-          type="checkbox"
-        />
+        <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center lg:size-auto">
+          <input
+            aria-label={`Select ${record.user.full_name}`}
+            checked={isSelected}
+            className="size-4 accent-primary"
+            onChange={onToggle}
+            type="checkbox"
+          />
+        </label>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate font-black">{record.user.full_name}</p>
@@ -377,7 +379,7 @@ function UserRow({
           )}
         </div>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex gap-1.5 overflow-x-auto">
         <Button onClick={onView} size="sm" variant="ghost" title="View details"><Eye className="size-4" /></Button>
         <Button onClick={onEdit} size="sm" variant="ghost" title="Edit profile"><Edit3 className="size-4" /></Button>
         {record.user.status !== "active" ? (
@@ -414,7 +416,7 @@ function DrawerModal({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative flex w-full max-w-xl flex-col overflow-y-auto bg-background p-6 shadow-xl">
+      <div className="relative flex w-full max-w-xl flex-col overflow-y-auto bg-background p-4 shadow-xl sm:p-6 md:max-w-2xl">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-black">{drawerTitle(drawer)}</h2>
           <Button onClick={onClose} size="sm" variant="ghost"><XCircle className="size-5" /></Button>
