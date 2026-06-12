@@ -148,11 +148,10 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
   const organizations = organizationsResult.data ?? [];
   const allAssignments = branchUsersResult as BranchUserRow[];
   const branchRows = branchesResult;
-  const gymRows = gymsResult;
   const profiles = profilesResult.data ?? [];
 
   const branchById = new Map(branchRows.map((b) => [b.id, b]));
-  const gymById = new Map(gymRows.map((g) => [g.id, g]));
+  const gymById = new Map((gymsResult ?? []).map((g) => [g.id, g]));
   const orgById = new Map(organizations.map((o) => [o.id, o]));
   const userIds = profiles.map((p) => p.id);
   const assignmentByUser = groupAssignmentsByUser(allAssignments.filter((a) => userIds.includes(a.user_id)));
@@ -164,7 +163,9 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
 
     const uniqueOrgIds = Array.from(new Set(assignments.map((a) => a.organization_id).filter(Boolean)));
     const uniqueBranchIds = Array.from(new Set(assignments.map((a) => a.branch_id).filter(Boolean)));
-    const uniqueGymIds = Array.from(new Set(uniqueBranchIds.map((bid) => branchById.get(bid)?.gym_id).filter(Boolean)));
+    const uniqueGymIds = Array.from(new Set(
+      uniqueBranchIds.map((bid) => branchById.get(bid)?.gym_id).filter((x): x is string => x != null)
+    ));
 
     const assignedOrgs = uniqueOrgIds.map((id) => orgById.get(id)).filter((o): o is NonNullable<typeof o> => o != null);
     const assignedBranches = uniqueBranchIds.map((id) => branchById.get(id)).filter((b): b is NonNullable<typeof b> => b != null);
@@ -239,13 +240,13 @@ export async function getUserDetailData(
   const uniqueOrgIds = Array.from(new Set(safeAssignments.map((a) => a.organization_id).filter(Boolean)));
   const uniqueBranchIds = Array.from(new Set(safeAssignments.map((a) => a.branch_id).filter(Boolean)));
 
-  const [organizations, branchRows, gymRows] = await Promise.all([
+  const [organizations, branchRows] = await Promise.all([
     uniqueOrgIds.length > 0 ? supabase.from("organizations").select("id, name, slug").in("id", uniqueOrgIds).then((r) => r.data ?? []) : Promise.resolve([]),
     uniqueBranchIds.length > 0 ? supabase.from("branches").select("id, name, branch_code, gym_id").in("id", uniqueBranchIds).then((r) => r.data ?? []) : Promise.resolve([]),
     Promise.resolve([] as Array<{ id: string; name: string; slug: string }>)
   ]);
 
-  const uniqueGymIds = Array.from(new Set(branchRows.map((b) => b.gym_id).filter(Boolean)));
+  const uniqueGymIds = Array.from(new Set(branchRows.map((b) => b.gym_id).filter((x): x is string => x != null)));
   const gymRowsResolved = uniqueGymIds.length > 0
     ? await supabase.from("gyms").select("id, name, slug").in("id", uniqueGymIds).then((r) => r.data ?? [])
     : [];
@@ -461,14 +462,13 @@ function groupAssignmentsByUser(assignments: BranchUserRow[]) {
 }
 
 function buildOrganizationGroups(records: UserManagementRecord[], organizations: Array<{ id: string; name: string; slug: string; status: string }>): OrganizationUserGroup[] {
-  const orgById = new Map(organizations.map((o) => [o.id, o]));
-
   const unassigned: UserManagementRecord[] = [];
   const byOrgId = new Map<string, UserManagementRecord[]>();
 
   for (const record of records) {
-    if (record.organizations.length > 0) {
-      const orgId = record.organizations[0].id;
+    const primaryOrg = record.organizations[0];
+    if (primaryOrg) {
+      const orgId = primaryOrg.id;
       const existing = byOrgId.get(orgId) ?? [];
       existing.push(record);
       byOrgId.set(orgId, existing);
