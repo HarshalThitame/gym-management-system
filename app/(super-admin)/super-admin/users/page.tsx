@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { createMetadata } from "@/lib/seo/metadata";
 import { requireRole } from "@/lib/auth/guards";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
-import { getUserManagementData, normalizeUserManagementFilters, type UserSortOption } from "@/features/super-admin/services/user-management-service";
+import { getUserManagementData, getPendingInvites, normalizeUserManagementFilters, type UserSortOption } from "@/features/super-admin/services/user-management-service";
 import { UserManagementWorkspace } from "@/features/super-admin/components/users/UserManagementWorkspace";
 
 export const metadata: Metadata = createMetadata({
@@ -30,7 +30,10 @@ export default async function SuperAdminUsersPage({ searchParams }: SuperAdminUs
     pageSize: Number(stringParam(query.pageSize) ?? 25)
   });
 
-  const data = await getUserManagementData(filters);
+  const [data, pendingInvites] = await Promise.all([
+    getUserManagementData(filters),
+    getPendingInvites()
+  ]);
 
   if (data.pagination.totalPages > 0 && data.pagination.page > data.pagination.totalPages) {
     const params = new URLSearchParams();
@@ -48,6 +51,7 @@ export default async function SuperAdminUsersPage({ searchParams }: SuperAdminUs
     <UserManagementWorkspace
       criticalSuperAdminEmail={getCriticalSuperAdminEmail()}
       data={data}
+      pendingInvites={pendingInvites}
     />
   );
 }

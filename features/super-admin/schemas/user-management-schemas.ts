@@ -74,6 +74,32 @@ export const updateUserProfileSchema = z.object({
   stepUpEmail: stepUpEmail.optional()
 });
 
+export const resendInviteSchema = z.object({
+  userId: z.string().uuid(),
+  email: z.string().trim().email(),
+  stepUpEmail,
+  reason: z.string().trim().max(500).optional()
+});
+
+export const revokeInviteSchema = z.object({
+  userId: z.string().uuid(),
+  confirmation: z.string().trim(),
+  stepUpEmail,
+  reason: z.string().trim().max(500).optional()
+});
+
+export const deleteUserSchema = z.object({
+  userId: z.string().uuid(),
+  confirmation: z.string().trim(),
+  stepUpEmail,
+  reason: z.string().trim().max(500).optional()
+});
+
+export const accountNoteSchema = z.object({
+  userId: z.string().uuid(),
+  content: z.string().trim().min(1, "Note content is required.").max(2000)
+});
+
 export type UserManagementFiltersInput = z.infer<typeof userManagementFiltersSchema>;
 export type InviteUserInput = z.infer<typeof inviteUserSchema>;
 export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>;
@@ -82,3 +108,7 @@ export type ResetUserPasswordInput = z.infer<typeof resetUserPasswordSchema>;
 export type TransferUserRoleInput = z.infer<typeof transferUserRoleSchema>;
 export type BulkUserActionInput = z.infer<typeof bulkUserActionSchema>;
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
+export type ResendInviteInput = z.infer<typeof resendInviteSchema>;
+export type RevokeInviteInput = z.infer<typeof revokeInviteSchema>;
+export type DeleteUserInput = z.infer<typeof deleteUserSchema>;
+export type AccountNoteInput = z.infer<typeof accountNoteSchema>;

@@ -14,12 +14,16 @@ import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-govern
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import {
   bulkUserActionSchema,
+  deleteUserSchema,
   forceLogoutUserSchema,
   inviteUserSchema,
+  resendInviteSchema,
   resetUserPasswordSchema,
+  revokeInviteSchema,
   transferUserRoleSchema,
   updateUserStatusSchema
 } from "../schemas/user-management-schemas";
+import { deleteUserCascade, getPendingInvites } from "../services/user-management-service";
 import type { Database } from "@/types/database";
 import { checkRateLimit } from "@/lib/rate-limiter";
 
@@ -548,6 +552,123 @@ export async function saveUserProfileAction(_previousState: AuthActionState, for
 
   revalidateUserPaths();
   return { status: "success", message: "User profile updated." };
+}
+
+export async function resendInviteAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`resend_invite:${context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many resend requests. Slow down." };
+  const parsed = resendInviteSchema.safeParse({
+    userId: formData.get("userId"),
+    email: formData.get("email"),
+    stepUpEmail: formData.get("stepUpEmail") ?? "",
+    reason: formData.get("reason") ?? ""
+  });
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const supabase = await createSupabaseServerClient();
+  const criticalAccess = await verifyCriticalSuperAdminAccess(context, supabase, parsed.data.stepUpEmail);
+  if (!criticalAccess.ok) return criticalAccess.state;
+
+  const adminClient = supabase as AuthAdminClient;
+  const linkResult = await adminClient.auth.admin.generateLink({ type: "invite", email: parsed.data.email.toLowerCase().trim() });
+  if (linkResult.error) return { status: "error", message: linkResult.error.message };
+
+  const inviteLink = linkResult.data?.properties?.action_link ?? "/login";
+  const emailResult = await sendEmail({
+    to: parsed.data.email.toLowerCase().trim(),
+    subject: "Invitation Resent — Apex Performance Club",
+    html: renderBrandedEmail({
+      title: "Your invitation has been resent",
+      preview: "A Super Admin resent your invitation.",
+      body: [
+        "<p>Your invitation to join the platform has been resent.</p>",
+        parsed.data.reason ? `<p><strong>Reason:</strong> ${escapeHtml(parsed.data.reason)}</p>` : "",
+        "<p>Use the link below to complete your access setup.</p>"
+      ].join(""),
+      ctaLabel: "Accept Invitation",
+      ctaUrl: inviteLink
+    })
+  });
+
+  await writeAuditLog({
+    actorId: context.userId,
+    action: "user.invite_resent",
+    entityType: "profile",
+    entityId: parsed.data.userId,
+    metadata: { email: parsed.data.email.toLowerCase().trim(), emailSent: emailResult.sent, reason: parsed.data.reason || null }
+  });
+
+  revalidateUserPaths();
+  return { status: "success", message: emailResult.sent ? "Invitation resent." : `Resend failed (${emailResult.reason}).` };
+}
+
+export async function revokeInviteAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`revoke_invite:${context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many revoke requests. Slow down." };
+  const parsed = revokeInviteSchema.safeParse({
+    userId: formData.get("userId"),
+    confirmation: formData.get("confirmation") ?? "",
+    stepUpEmail: formData.get("stepUpEmail") ?? "",
+    reason: formData.get("reason") ?? ""
+  });
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+  if (parsed.data.confirmation !== "REVOKE") return fieldError("confirmation", "Type REVOKE to confirm.");
+
+  const supabase = await createSupabaseServerClient();
+  const criticalAccess = await verifyCriticalSuperAdminAccess(context, supabase, parsed.data.stepUpEmail);
+  if (!criticalAccess.ok) return criticalAccess.state;
+
+  const adminClient = supabase as AuthAdminClient;
+  await adminClient.auth.admin.deleteUser(parsed.data.userId).catch(() => {});
+  const { error } = await supabase.from("profiles").update({ status: "archived" }).eq("id", parsed.data.userId);
+  if (error) return { status: "error", message: error.message };
+
+  await writeAuditLog({
+    actorId: context.userId,
+    action: "user.invite_revoked",
+    entityType: "profile",
+    entityId: parsed.data.userId,
+    metadata: { reason: parsed.data.reason || null }
+  });
+
+  revalidateUserPaths();
+  return { status: "success", message: "Invitation revoked and user archived." };
+}
+
+export async function deleteUserAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`delete_user:${context.userId}`, 5, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many delete requests. Slow down." };
+  const parsed = deleteUserSchema.safeParse({
+    userId: formData.get("userId"),
+    confirmation: formData.get("confirmation") ?? "",
+    stepUpEmail: formData.get("stepUpEmail") ?? "",
+    reason: formData.get("reason") ?? ""
+  });
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+  if (parsed.data.confirmation !== "DELETE") return fieldError("confirmation", "Type DELETE to confirm permanent deletion.");
+
+  const supabase = await createSupabaseServerClient();
+  const criticalAccess = await verifyCriticalSuperAdminAccess(context, supabase, parsed.data.stepUpEmail);
+  if (!criticalAccess.ok) return criticalAccess.state;
+
+  await writeAuditLog({
+    actorId: context.userId,
+    action: "user.deleted",
+    entityType: "profile",
+    entityId: parsed.data.userId,
+    metadata: { reason: parsed.data.reason || null, method: "cascade" }
+  });
+
+  await deleteUserCascade(parsed.data.userId);
+
+  revalidateUserPaths();
+  return { status: "success", message: "User permanently deleted with all associated data." };
 }
 
 async function verifyCriticalSuperAdminAccess(

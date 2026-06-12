@@ -106,6 +106,13 @@ export type UserDetailData = {
 
 type ProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "gym_id" | "full_name" | "email" | "phone" | "avatar_url" | "status" | "created_at" | "updated_at">;
 type BranchUserRow = Pick<Database["public"]["Tables"]["branch_users"]["Row"], "id" | "user_id" | "organization_id" | "branch_id" | "role_name" | "status">;
+type AuthAdminClient = import("@supabase/supabase-js").SupabaseClient<Database> & {
+  auth: {
+    admin: {
+      deleteUser(id: string): Promise<{ error: { message: string } | null }>;
+    };
+  };
+};
 type LoginHistoryRow = {
   id: string;
   user_id: string;
@@ -206,6 +213,33 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
     },
     summary
   };
+}
+
+export async function getPendingInvites() {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, phone, status, created_at, updated_at")
+    .eq("status", "invited")
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function deleteUserCascade(userId: string) {
+  const supabase = await createSupabaseServerClient();
+
+  await supabase.from("audit_logs").delete().eq("entity_id", userId).then((r) => r.error && console.error("[delete cascade] audit_logs", r.error.message));
+  const adminClient = supabase as AuthAdminClient;
+  await adminClient.auth.admin.deleteUser(userId).catch((e: Error) => console.error("[delete cascade] auth user", e.message));
+  await supabase.from("profiles").delete().eq("id", userId).then((r) => r.error && console.error("[delete cascade] profile", r.error.message));
+  try { await (supabase as any).from("login_history").delete().eq("user_id", userId); } catch {}
+  try { await supabase.from("branch_users").delete().eq("user_id", userId); } catch {}
+  try { await supabase.from("user_roles").delete().eq("user_id", userId); } catch {}
+
+  return { success: true };
 }
 
 export async function getUserDetailData(

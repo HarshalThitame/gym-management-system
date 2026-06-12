@@ -38,9 +38,12 @@ import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterpris
 import { roleNames } from "@/types/auth";
 import {
   bulkUserActionAction,
+  deleteUserAction,
   forceLogoutUserAction,
   inviteUserAction,
+  resendInviteAction,
   resetUserPasswordAction,
+  revokeInviteAction,
   saveUserProfileAction,
   transferUserRoleAction,
   updateUserStatusAction
@@ -58,11 +61,14 @@ type DrawerState =
   | { type: "force_logout"; record: UserManagementRecord }
   | { type: "reset_password"; record: UserManagementRecord }
   | { type: "transfer_role"; record: UserManagementRecord }
-  | { type: "bulk"; selectedIds: string[] };
+  | { type: "bulk"; selectedIds: string[] }
+  | { type: "delete"; record: UserManagementRecord }
+  | { type: "resend_invite"; record: UserManagementRecord }
+  | { type: "revoke_invite"; record: UserManagementRecord };
 
 type SortOption = "created_desc" | "name_asc" | "email_asc" | "role_asc" | "org_asc";
 
-export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { criticalSuperAdminEmail: string; data: UserManagementData }) {
+export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pendingInvites }: { criticalSuperAdminEmail: string; data: UserManagementData; pendingInvites: Array<{ id: string; full_name: string; email: string | null; phone: string | null; status: string; created_at: string }> }) {
   const router = useRouter();
   const [drawer, setDrawer] = useState<DrawerState>({ type: "closed" });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -104,6 +110,31 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { cri
         <SummaryCard label="Suspended" value={formatCompactNumber(data.summary.suspendedUsers)} icon={<Ban className="size-5 text-red-600" />} />
         <SummaryCard label="Super Admins" value={formatCompactNumber(data.summary.superAdmins)} icon={<ShieldCheck className="size-5 text-indigo-600" />} />
       </section>
+
+      {pendingInvites.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Mail className="size-5 text-amber-600" />
+              <h2 className="text-lg font-black">Pending Invites ({pendingInvites.length})</h2>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingInvites.map((invite) => (
+              <div key={invite.id} className="flex flex-col gap-2 rounded-md border border-border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-black">{invite.full_name}</p>
+                  <p className="truncate text-sm font-semibold text-muted-foreground">{invite.email ?? "No email"} · Invited {new Date(invite.created_at).toLocaleDateString("en-IN")}</p>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button onClick={() => setDrawer({ type: "resend_invite", record: data.records.find((r) => r.user.id === invite.id) ?? buildMinimalRecord(invite) })} size="sm" variant="ghost" title="Resend invite"><Mail className="size-4" /></Button>
+                  <Button onClick={() => setDrawer({ type: "revoke_invite", record: data.records.find((r) => r.user.id === invite.id) ?? buildMinimalRecord(invite) })} size="sm" variant="ghost" title="Revoke invite"><XCircle className="size-4 text-red-600" /></Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -200,7 +231,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { cri
         </CardContent>
       </Card>
 
-      <DrawerModal drawer={drawer} onClose={() => setDrawer({ type: "closed" })} criticalSuperAdminEmail={criticalSuperAdminEmail} organizations={data.organizations} />
+      <DrawerModal drawer={drawer} onClose={() => setDrawer({ type: "closed" })} onDelete={(rec) => setDrawer({ type: "delete", record: rec })} criticalSuperAdminEmail={criticalSuperAdminEmail} organizations={data.organizations} />
       <ToastContainer />
     </div>
   );
@@ -368,11 +399,13 @@ function UserRow({
 function DrawerModal({
   drawer,
   onClose,
+  onDelete,
   criticalSuperAdminEmail,
   organizations
 }: {
   drawer: DrawerState;
   onClose: () => void;
+  onDelete: (record: UserManagementRecord) => void;
   criticalSuperAdminEmail: string;
   organizations: UserManagementData["organizations"];
 }) {
@@ -391,7 +424,7 @@ function DrawerModal({
           <InviteUserForm onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} organizations={organizations} />
         )}
         {drawer.type === "detail" && (
-          <UserDetailView record={drawer.record} />
+          <UserDetailView record={drawer.record} onDelete={onDelete} />
         )}
         {drawer.type === "edit" && (
           <EditUserForm record={drawer.record} onClose={onClose} />
@@ -411,6 +444,15 @@ function DrawerModal({
         {drawer.type === "bulk" && (
           <BulkUserActionForm selectedIds={drawer.selectedIds} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
         )}
+        {drawer.type === "delete" && (
+          <DeleteUserForm record={drawer.record} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
+        )}
+        {drawer.type === "resend_invite" && (
+          <ResendInviteForm record={drawer.record} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
+        )}
+        {drawer.type === "revoke_invite" && (
+          <RevokeInviteForm record={drawer.record} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
+        )}
       </div>
     </div>
   );
@@ -426,6 +468,9 @@ function drawerTitle(drawer: DrawerState): string {
     case "reset_password": return `Reset Password: ${drawer.record.user.full_name}`;
     case "transfer_role": return `Transfer Role: ${drawer.record.user.full_name}`;
     case "bulk": return `Bulk Actions (${drawer.selectedIds.length} users)`;
+    case "delete": return `Delete User: ${drawer.record.user.full_name}`;
+    case "resend_invite": return `Resend Invitation`;
+    case "revoke_invite": return `Revoke Invitation`;
     default: return "";
   }
 }
@@ -764,7 +809,151 @@ function BulkUserActionForm({ selectedIds, onClose, criticalSuperAdminEmail }: {
   );
 }
 
-function UserDetailView({ record }: { record: UserManagementRecord }) {
+function ResendInviteForm({ record, onClose, criticalSuperAdminEmail }: { record: UserManagementRecord; onClose: () => void; criticalSuperAdminEmail: string }) {
+  const [state, formAction] = useActionState(resendInviteAction, initialAuthActionState);
+
+  useEffect(() => {
+    if (state.status === "success") { showToast(state.message ?? "Invitation resent.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
+
+  return (
+    <form action={formAction} className="space-y-5">
+      <input name="userId" type="hidden" value={record.user.id} />
+      <input name="email" type="hidden" value={record.user.email ?? ""} />
+
+      <Card>
+        <CardContent className="space-y-3 p-5">
+          <p className="font-black">Resend invitation to {record.user.full_name}</p>
+          <p className="text-sm font-semibold text-muted-foreground">Email: {record.user.email ?? "No email on file"}</p>
+        </CardContent>
+      </Card>
+
+      <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
+        <Input name="stepUpEmail" placeholder={criticalSuperAdminEmail} required />
+      </FormField>
+
+      <FormField label="Reason (optional)" error={state.fieldErrors?.reason}>
+        <Textarea name="reason" placeholder="Why is this invitation being resent?" rows={2} />
+      </FormField>
+
+      <FormMessage state={state} />
+      <div className="flex gap-3">
+        <SubmitButton label="Resend Invitation" />
+        <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
+      </div>
+    </form>
+  );
+}
+
+function RevokeInviteForm({ record, onClose, criticalSuperAdminEmail }: { record: UserManagementRecord; onClose: () => void; criticalSuperAdminEmail: string }) {
+  const [state, formAction] = useActionState(revokeInviteAction, initialAuthActionState);
+
+  useEffect(() => {
+    if (state.status === "success") { showToast(state.message ?? "Invitation revoked.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
+
+  return (
+    <form action={formAction} className="space-y-5">
+      <input name="userId" type="hidden" value={record.user.id} />
+
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="space-y-3 p-5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-5 text-red-600" />
+            <p className="font-black text-red-800">Revoke Invitation</p>
+          </div>
+          <p className="text-sm leading-6 text-red-700">
+            This will invalidate the invite for <strong>{record.user.full_name}</strong> ({record.user.email}) and archive the account.
+          </p>
+        </CardContent>
+      </Card>
+
+      <FormField label="Type REVOKE to confirm" error={state.fieldErrors?.confirmation}>
+        <Input name="confirmation" placeholder="REVOKE" required />
+      </FormField>
+
+      <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
+        <Input name="stepUpEmail" placeholder={criticalSuperAdminEmail} required />
+      </FormField>
+
+      <FormField label="Reason (optional)" error={state.fieldErrors?.reason}>
+        <Textarea name="reason" placeholder="Why is this invitation being revoked?" rows={2} />
+      </FormField>
+
+      <FormMessage state={state} />
+      <div className="flex gap-3">
+        <SubmitButton label="Revoke Invitation" />
+        <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
+      </div>
+    </form>
+  );
+}
+
+function DeleteUserForm({ record, onClose, criticalSuperAdminEmail }: { record: UserManagementRecord; onClose: () => void; criticalSuperAdminEmail: string }) {
+  const [state, formAction] = useActionState(deleteUserAction, initialAuthActionState);
+
+  useEffect(() => {
+    if (state.status === "success") { showToast(state.message ?? "User deleted.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
+
+  return (
+    <form action={formAction} className="space-y-5">
+      <input name="userId" type="hidden" value={record.user.id} />
+
+      <Card className="border-red-300 bg-red-50">
+        <CardContent className="space-y-3 p-5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-5 text-red-600" />
+            <p className="font-black text-red-800">Permanent Deletion</p>
+          </div>
+          <p className="text-sm leading-6 text-red-700">
+            This will permanently delete <strong>{record.user.full_name}</strong> ({record.user.email}) and cascade through all associated data — profiles, assignments, roles, audit logs, login history, and activity events. <strong>This cannot be undone.</strong>
+          </p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-red-600">
+            GDPR compliance: Full data erasure will be performed.
+          </p>
+        </CardContent>
+      </Card>
+
+      <FormField label="Type DELETE to confirm" error={state.fieldErrors?.confirmation}>
+        <Input name="confirmation" placeholder="DELETE" required />
+      </FormField>
+
+      <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
+        <Input name="stepUpEmail" placeholder={criticalSuperAdminEmail} required />
+      </FormField>
+
+      <FormField label="Reason (required)" error={state.fieldErrors?.reason}>
+        <Textarea name="reason" placeholder="Why is this user being permanently deleted?" rows={2} required />
+      </FormField>
+
+      <FormMessage state={state} />
+      <div className="flex gap-3">
+        <SubmitButton label="Permanently Delete" />
+        <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
+      </div>
+    </form>
+  );
+}
+
+function buildMinimalRecord(invite: { id: string; full_name: string; email: string | null; status: string; created_at: string }): UserManagementRecord {
+  return {
+    user: { id: invite.id, gym_id: null, full_name: invite.full_name, email: invite.email, phone: null, avatar_url: null, status: invite.status as "active" | "invited" | "suspended" | "archived", created_at: invite.created_at, updated_at: invite.created_at },
+    roles: [],
+    primaryRole: null,
+    primaryOrganization: null,
+    organizations: [],
+    gyms: [],
+    branches: [],
+    loginCount: 0,
+    lastLoginAt: null,
+    lastActivityAt: null,
+    hasActiveSessions: false,
+    pendingApprovals: 0
+  };
+}
+
+function UserDetailView({ record, onDelete }: { record: UserManagementRecord; onDelete: (record: UserManagementRecord) => void }) {
   return (
     <div className="space-y-5">
       <Card>
@@ -851,6 +1040,34 @@ function UserDetailView({ record }: { record: UserManagementRecord }) {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <h3 className="text-lg font-black">Sessions</h3>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DetailLine label="Active Sessions" value={record.hasActiveSessions ? "Active" : "None"} />
+            <DetailLine label="Last Activity" value={record.lastActivityAt ? new Date(record.lastActivityAt).toLocaleString("en-IN") : "No activity"} />
+            <DetailLine label="Last Login" value={record.lastLoginAt ? new Date(record.lastLoginAt).toLocaleString("en-IN") : "N/A"} />
+            <DetailLine label="Login Count" value={String(record.loginCount)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="rounded-lg border border-red-200 bg-red-50 p-5">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="size-5 text-red-600" />
+          <p className="font-black text-red-800">Danger Zone</p>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-red-700">
+          Permanently delete this user and all associated data. This action cannot be undone.
+        </p>
+        <Button className="mt-3" onClick={() => onDelete(record)} variant="secondary">
+          <XCircle className="mr-2 size-4" />
+          Delete User
+        </Button>
+      </div>
     </div>
   );
 }
