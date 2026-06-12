@@ -59,7 +59,9 @@ export default async function SuperAdminModuleRoute({ params, searchParams }: Su
     ? await getGymBranchManagementData(normalizeGymBranchFilters({
       query: stringParam(filters.q) ?? "",
       organizationId: stringParam(filters.organizationId) ?? "all",
-      status: stringParam(filters.status) ?? "all"
+      status: stringParam(filters.status) ?? "all",
+      page: Number(stringParam(filters.page) ?? 1),
+      pageSize: Number(stringParam(filters.pageSize) ?? 20)
     }))
     : null;
 

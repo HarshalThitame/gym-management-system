@@ -481,6 +481,30 @@ async function processCheckIn(input: {
     return { status: "error", message: "Member does not belong to this gym." };
   }
 
+  const branchScope = await resolveAttendanceBranchScope(supabase, {
+    gymId,
+    contextBranchId: getContextBranchId(input.context),
+    memberBranchId: validation.member.branch_id
+  });
+  if (!branchScope.ok) {
+    await recordDeniedAccess(supabase, input.context, {
+      ...validation,
+      allowed: false,
+      reasonCode: "branch_scope_required",
+      message: branchScope.message
+    }, {
+      gymId,
+      qrTokenId: input.qrTokenId,
+      deviceId: input.deviceId,
+      source: input.source
+    });
+    return { status: "error", message: branchScope.message };
+  }
+
+  if (!validation.member.branch_id && branchScope.branchId) {
+    await supabase.from("members").update({ branch_id: branchScope.branchId }).eq("id", validation.member.id);
+  }
+
   const { data: existingSession, error: existingError } = await supabase
     .from("attendance_sessions")
     .select("*")
@@ -539,6 +563,7 @@ async function processCheckIn(input: {
     .from("attendance_sessions")
     .insert({
       gym_id: gymId,
+      branch_id: branchScope.branchId,
       member_id: validation.member.id,
       membership_id: validation.membership?.id ?? null,
       qr_token_id: input.qrTokenId,
@@ -576,7 +601,7 @@ async function processCheckIn(input: {
       message: "Member checked in.",
       actor_id: input.context.userId,
       device_id: input.deviceId,
-      metadata: { memberCode: validation.member.member_code } as Json
+      metadata: { memberCode: validation.member.member_code, branchId: branchScope.branchId } as Json
     }),
     logAccessAttempt(supabase, input.context, {
       gymId,
@@ -590,10 +615,10 @@ async function processCheckIn(input: {
       decision: "granted",
       reasonCode: "access_granted",
       message: "Entry granted.",
-      snapshot: { membershipStatus: validation.membership?.status ?? null } as Json
+      snapshot: { membershipStatus: validation.membership?.status ?? null, branchId: branchScope.branchId } as Json
     }),
     refreshAttendanceMetric(supabase, gymId, session.check_in_at),
-    writeAttendanceAudit(input.context, "attendance.checked_in", "attendance_session", session.id, { memberId: validation.member.id, source: input.source })
+    writeAttendanceAudit(input.context, "attendance.checked_in", "attendance_session", session.id, { memberId: validation.member.id, source: input.source, branchId: branchScope.branchId })
   ]);
 
   return { status: "success", message: `${validation.member.full_name} checked in.` };
@@ -841,6 +866,69 @@ async function writeAttendanceAudit(context: AuthContext, action: string, entity
 
 function getContextGymId(context: AuthContext) {
   return (context as AuthContext & { gymId?: string | null }).gymId ?? context.profile?.gym_id ?? null;
+}
+
+function getContextBranchId(context: AuthContext) {
+  return (context as AuthContext & { branchId?: string | null }).branchId ?? null;
+}
+
+async function resolveAttendanceBranchScope(
+  supabase: AppSupabase,
+  input: {
+    gymId: string | null;
+    contextBranchId: string | null;
+    memberBranchId: string | null;
+  }
+): Promise<{ ok: true; branchId: string } | { ok: false; message: string }> {
+  if (!input.gymId) {
+    return { ok: false, message: "A gym scope is required before attendance can be recorded." };
+  }
+
+  const preferredBranchId = input.memberBranchId ?? input.contextBranchId;
+  if (preferredBranchId) {
+    const { data, error } = await supabase
+      .from("branches")
+      .select("id, gym_id, status")
+      .eq("id", preferredBranchId)
+      .maybeSingle();
+
+    if (error) {
+      return { ok: false, message: error.message };
+    }
+
+    if (!data || data.gym_id !== input.gymId || data.status === "archived") {
+      return { ok: false, message: "Selected branch is not available for this gym. Choose the correct branch before check-in." };
+    }
+
+    return { ok: true, branchId: data.id };
+  }
+
+  const { data: branches, error } = await supabase
+    .from("branches")
+    .select("id")
+    .eq("gym_id", input.gymId)
+    .neq("status", "archived")
+    .order("created_at", { ascending: true })
+    .limit(2);
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  if (!branches || branches.length === 0) {
+    return { ok: false, message: "Create a branch under this gym before recording attendance." };
+  }
+
+  if (branches.length > 1) {
+    return { ok: false, message: "Select a branch context before recording attendance for a multi-branch gym." };
+  }
+
+  const branch = branches[0];
+  if (!branch) {
+    return { ok: false, message: "Create a branch under this gym before recording attendance." };
+  }
+
+  return { ok: true, branchId: branch.id };
 }
 
 function revalidateAttendancePaths(memberId?: string) {

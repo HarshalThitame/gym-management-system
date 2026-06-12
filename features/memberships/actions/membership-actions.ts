@@ -195,11 +195,21 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
     return memberLimitError;
   }
 
+  const branchScope = await resolveOperationalBranchScope(supabase, {
+    gymId,
+    contextBranchId: getContextBranchId(scope),
+    existingBranchId: null
+  });
+  if (!branchScope.ok) {
+    return { status: "error", message: branchScope.message };
+  }
+
   const memberCode = await generateMemberCode(supabase, gymId);
   const { data: member, error: memberError } = await supabase
     .from("members")
     .insert({
       gym_id: gymId,
+      branch_id: branchScope.branchId,
       member_code: memberCode,
       full_name: parsed.data.fullName,
       email: parsed.data.email || null,
@@ -224,6 +234,7 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
   const membership = await createMembershipRecord({
     supabase,
     gymId,
+    branchId: branchScope.branchId,
     memberId: member.id,
     plan,
     actorId: scope.userId,
@@ -261,7 +272,7 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
     action: "member.onboarded",
     entityType: "member",
     entityId: member.id,
-    metadata: { memberCode, planId: plan.id }
+    metadata: { memberCode, planId: plan.id, branchId: branchScope.branchId }
   });
 
   revalidatePath("/admin");
@@ -310,6 +321,19 @@ export async function assignMembershipAction(_previousState: AuthActionState, fo
     return { status: "error", message: "Choose an active membership plan." };
   }
 
+  const branchScope = await resolveOperationalBranchScope(supabase, {
+    gymId: member.gym_id,
+    contextBranchId: getContextBranchId(scope),
+    existingBranchId: member.branch_id
+  });
+  if (!branchScope.ok) {
+    return { status: "error", message: branchScope.message };
+  }
+
+  if (!member.branch_id && branchScope.branchId) {
+    await supabase.from("members").update({ branch_id: branchScope.branchId }).eq("id", member.id);
+  }
+
   const endDate = calculateEndDate(parsed.data.startDate, plan.duration_days);
   const dateError = validateMembershipDates(parsed.data.startDate, endDate);
 
@@ -320,6 +344,7 @@ export async function assignMembershipAction(_previousState: AuthActionState, fo
   const result = await createMembershipRecord({
     supabase,
     gymId: member.gym_id,
+    branchId: branchScope.branchId,
     memberId: member.id,
     plan,
     actorId: scope.userId,
@@ -378,6 +403,20 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
     return { status: "error", message: "Choose an active renewal plan." };
   }
 
+  const member = await loadMember(supabase, membership.member_id);
+  const branchScope = await resolveOperationalBranchScope(supabase, {
+    gymId: membership.gym_id,
+    contextBranchId: getContextBranchId(scope),
+    existingBranchId: member?.branch_id ?? null
+  });
+  if (!branchScope.ok) {
+    return { status: "error", message: branchScope.message };
+  }
+
+  if (member && !member.branch_id && branchScope.branchId) {
+    await supabase.from("members").update({ branch_id: branchScope.branchId }).eq("id", member.id);
+  }
+
   const startDate = parsed.data.startDate;
   const endDate = calculateEndDate(startDate, plan.duration_days);
   const dateError = validateMembershipDates(startDate, endDate);
@@ -414,6 +453,7 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
   const billing = await createMembershipBillingRecords({
     supabase,
     gymId: membership.gym_id,
+    branchId: branchScope.branchId,
     memberId: membership.member_id,
     membership: updatedMembership,
     planName: plan.name,
@@ -758,6 +798,7 @@ export async function expireMembershipsFormAction(formData: FormData): Promise<v
 async function createMembershipRecord(input: {
   supabase: SupabaseClient<Database>;
   gymId: string | null;
+  branchId: string | null;
   memberId: string;
   plan: MembershipPlanRow;
   actorId: string | null;
@@ -811,6 +852,7 @@ async function createMembershipRecord(input: {
   const billing = await createMembershipBillingRecords({
     supabase: input.supabase,
     gymId: input.gymId,
+    branchId: input.branchId,
     memberId: input.memberId,
     membership: data,
     planName: input.plan.name,
@@ -862,6 +904,7 @@ async function createMembershipRecord(input: {
 async function createMembershipBillingRecords(input: {
   supabase: SupabaseClient<Database>;
   gymId: string | null;
+  branchId: string | null;
   memberId: string;
   membership: MembershipRow;
   planName: string;
@@ -882,6 +925,7 @@ async function createMembershipBillingRecords(input: {
     .from("invoices")
     .insert({
       gym_id: input.gymId,
+      branch_id: input.branchId,
       member_id: input.memberId,
       membership_id: input.membership.id,
       invoice_number: invoiceNumber,
@@ -972,6 +1016,7 @@ async function createMembershipBillingRecords(input: {
     .from("payments")
     .insert({
       gym_id: input.gymId,
+      branch_id: input.branchId,
       member_id: input.memberId,
       membership_id: input.membership.id,
       invoice_id: invoice.id,
@@ -1062,6 +1107,69 @@ async function loadMembership(supabase: SupabaseClient<Database>, membershipId: 
 
 function getContextOrganizationId(context: AuthContext) {
   return (context as AuthContext & { scopedOrganizationId?: string | null }).scopedOrganizationId ?? context.organizationId ?? null;
+}
+
+function getContextBranchId(context: AuthContext) {
+  return (context as AuthContext & { branchId?: string | null }).branchId ?? null;
+}
+
+async function resolveOperationalBranchScope(
+  supabase: SupabaseClient<Database>,
+  input: {
+    gymId: string | null;
+    contextBranchId: string | null;
+    existingBranchId: string | null;
+  }
+): Promise<{ ok: true; branchId: string } | { ok: false; message: string }> {
+  if (!input.gymId) {
+    return { ok: false, message: "A gym scope is required before member operations can be recorded." };
+  }
+
+  const preferredBranchId = input.existingBranchId ?? input.contextBranchId;
+  if (preferredBranchId) {
+    const { data, error } = await supabase
+      .from("branches")
+      .select("id, gym_id, status")
+      .eq("id", preferredBranchId)
+      .maybeSingle();
+
+    if (error) {
+      return { ok: false, message: error.message };
+    }
+
+    if (!data || data.gym_id !== input.gymId || data.status === "archived") {
+      return { ok: false, message: "Selected branch is not active for this gym. Choose a valid branch before recording member operations." };
+    }
+
+    return { ok: true, branchId: data.id };
+  }
+
+  const { data: branches, error } = await supabase
+    .from("branches")
+    .select("id, status")
+    .eq("gym_id", input.gymId)
+    .neq("status", "archived")
+    .order("created_at", { ascending: true })
+    .limit(2);
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  if (!branches || branches.length === 0) {
+    return { ok: false, message: "Create a branch under this gym before recording members, memberships, or payments." };
+  }
+
+  if (branches.length > 1) {
+    return { ok: false, message: "Select a branch context before recording this operation. This gym has multiple active branches." };
+  }
+
+  const branch = branches[0];
+  if (!branch) {
+    return { ok: false, message: "Create a branch under this gym before recording members, memberships, or payments." };
+  }
+
+  return { ok: true, branchId: branch.id };
 }
 
 async function requireMemberCapacity(supabase: SupabaseClient<Database>, organizationId: string | null, gymId: string | null): Promise<AuthActionState | null> {

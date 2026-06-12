@@ -114,10 +114,11 @@ describe("attendance CSV reports", () => {
 });
 
 function buildAttendanceSessionRow(): AttendanceSessionRow {
-  return {
-    id: "session-1",
-    gym_id: "gym-1",
-    member_id: "member-1",
+	  return {
+	    id: "session-1",
+	    gym_id: "gym-1",
+	    branch_id: null,
+	    member_id: "member-1",
     membership_id: "membership-1",
     qr_token_id: null,
     check_in_at: "2026-06-10T07:00:00.000Z",

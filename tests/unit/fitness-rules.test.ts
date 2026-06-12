@@ -86,9 +86,10 @@ describe("fitness report exports", () => {
 
 function member(overrides: Partial<MemberRow> = {}): MemberRow {
   return {
-    id: "member-1",
-    gym_id: "gym-1",
-    user_id: "user-1",
+	    id: "member-1",
+	    gym_id: "gym-1",
+	    branch_id: null,
+	    user_id: "user-1",
     member_code: "APX-001",
     full_name: "Riya Shah",
     email: "riya@example.com",

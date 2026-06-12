@@ -189,6 +189,52 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["organization_approval_requests"]["Insert"]>;
         Relationships: Relationship[];
       };
+      gym_branch_approval_requests: {
+        Row: {
+          id: string;
+          organization_id: string;
+          gym_id: string | null;
+          branch_id: string | null;
+          action: "transfer_gym_admin" | "gym_lifecycle" | "branch_lifecycle" | "move_gym" | "move_branch" | "bulk_lifecycle";
+          status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
+          requested_by: string | null;
+          reviewed_by: string | null;
+          target_user_id: string | null;
+          payload: Json;
+          before_snapshot: Json;
+          after_snapshot: Json;
+          reason: string | null;
+          review_note: string | null;
+          requested_at: string;
+          reviewed_at: string | null;
+          expires_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          gym_id?: string | null;
+          branch_id?: string | null;
+          action: "transfer_gym_admin" | "gym_lifecycle" | "branch_lifecycle" | "move_gym" | "move_branch" | "bulk_lifecycle";
+          status?: "pending" | "approved" | "rejected" | "cancelled" | "expired";
+          requested_by?: string | null;
+          reviewed_by?: string | null;
+          target_user_id?: string | null;
+          payload?: Json;
+          before_snapshot?: Json;
+          after_snapshot?: Json;
+          reason?: string | null;
+          review_note?: string | null;
+          requested_at?: string;
+          reviewed_at?: string | null;
+          expires_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["gym_branch_approval_requests"]["Insert"]>;
+        Relationships: Relationship[];
+      };
       branches: {
         Row: {
           id: string;
@@ -975,6 +1021,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           member_id: string;
           profile_version: number;
           fitness_level: "beginner" | "intermediate" | "advanced" | "athlete";
@@ -992,6 +1039,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           member_id: string;
           profile_version?: number;
           fitness_level?: "beginner" | "intermediate" | "advanced" | "athlete";
@@ -1455,6 +1503,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           user_id: string | null;
           member_code: string;
           full_name: string;
@@ -1478,6 +1527,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           user_id?: string | null;
           member_code: string;
           full_name: string;
@@ -1551,7 +1601,6 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
-          branch_id: string | null;
           member_id: string;
           membership_plan_id: string;
           status: "pending" | "active" | "expired" | "cancelled" | "frozen" | "suspended";
@@ -1578,7 +1627,6 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
-          branch_id?: string | null;
           member_id: string;
           membership_plan_id: string;
           status?: "pending" | "active" | "expired" | "cancelled" | "frozen" | "suspended";
@@ -1676,7 +1724,6 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
-          branch_id: string | null;
           member_id: string;
           document_type: "profile_photo" | "identity_proof" | "medical_declaration" | "membership_agreement" | "other";
           file_name: string;
@@ -1690,7 +1737,6 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
-          branch_id?: string | null;
           member_id: string;
           document_type: "profile_photo" | "identity_proof" | "medical_declaration" | "membership_agreement" | "other";
           file_name: string;
@@ -1830,6 +1876,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           member_id: string;
           membership_id: string | null;
           invoice_number: string;
@@ -1853,6 +1900,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           member_id: string;
           membership_id?: string | null;
           invoice_number: string;
@@ -1907,6 +1955,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           member_id: string;
           membership_id: string | null;
           invoice_id: string | null;
@@ -1935,6 +1984,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           member_id: string;
           membership_id?: string | null;
           invoice_id?: string | null;
@@ -2812,6 +2862,7 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
           member_id: string;
           membership_id: string | null;
           qr_token_id: string | null;
@@ -2832,6 +2883,7 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
           member_id: string;
           membership_id?: string | null;
           qr_token_id?: string | null;

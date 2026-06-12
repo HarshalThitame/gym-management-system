@@ -9,6 +9,7 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
+  Download,
   GitBranch,
   Layers3,
   Loader2,
@@ -20,7 +21,7 @@ import {
   UserRoundCog
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
 import { initialAuthActionState, type AuthActionState } from "@/features/auth/actions/action-state";
@@ -32,6 +33,8 @@ import type { Json } from "@/types/database";
 import {
   moveBranchToGymAction,
   moveGymToOrganizationAction,
+  remediateBranchScopeAction,
+  reviewGymBranchApprovalAction,
   saveSuperAdminBranchAction,
   saveSuperAdminGymAction,
   transferGymAdminAction,
@@ -54,36 +57,46 @@ type DrawerState =
   | { type: "lifecycle"; entityType: "branch"; branch: BranchNode }
   | { type: "capacity_hours"; branch: BranchNode }
   | { type: "move_gym"; gym: GymBranchNode }
-  | { type: "move_branch"; branch: BranchNode };
+  | { type: "move_branch"; branch: BranchNode }
+  | { type: "remediate_branch"; branch: BranchNode };
 
 export function GymBranchManagementWorkspace({ data }: { data: GymBranchManagementData }) {
   const router = useRouter();
   const [query, setQuery] = useState(data.filters.query);
   const [organizationId, setOrganizationId] = useState(data.filters.organizationId);
   const [status, setStatus] = useState(data.filters.status);
+  const [pageSize, setPageSize] = useState(String(data.filters.pageSize));
   const [drawer, setDrawer] = useState<DrawerState>({ type: "closed" });
 
-  function applyFilters() {
+  function applyFilters(nextPage = 1, overrides: Partial<{ query: string; organizationId: string; status: string; pageSize: string }> = {}) {
     const params = new URLSearchParams();
-    if (query) {
-      params.set("q", query);
+    const nextQuery = overrides.query ?? query;
+    const nextOrganizationId = overrides.organizationId ?? organizationId;
+    const nextStatus = overrides.status ?? status;
+    const nextPageSize = overrides.pageSize ?? pageSize;
+    if (nextQuery) {
+      params.set("q", nextQuery);
     }
-    if (organizationId !== "all") {
-      params.set("organizationId", organizationId);
+    if (nextOrganizationId !== "all") {
+      params.set("organizationId", nextOrganizationId);
     }
-    if (status !== "all") {
-      params.set("status", status);
+    if (nextStatus !== "all") {
+      params.set("status", nextStatus);
     }
+    params.set("page", String(nextPage));
+    params.set("pageSize", nextPageSize);
     router.push(`/super-admin/gyms${params.toString() ? `?${params.toString()}` : ""}`);
   }
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 xl:grid-cols-4">
+      <section className="grid gap-4 xl:grid-cols-6">
         <SummaryCard icon={<Building2 className="size-5" />} label="Gyms" value={formatCompactNumber(data.summary.gyms)} detail={`${formatCompactNumber(data.summary.activeGyms)} active`} />
         <SummaryCard icon={<GitBranch className="size-5" />} label="Branches" value={formatCompactNumber(data.summary.branches)} detail={`${formatCompactNumber(data.summary.activeBranches)} active`} />
         <SummaryCard icon={<UserRoundCog className="size-5" />} label="Missing Admins" value={formatCompactNumber(data.summary.branchesWithoutAdmins)} detail="Branches without active gym admin" />
         <SummaryCard icon={<ShieldAlert className="size-5" />} label="Warnings" value={formatCompactNumber(data.summary.consistencyWarnings)} detail="Hierarchy and data consistency checks" />
+        <SummaryCard icon={<ShieldAlert className="size-5" />} label="Approvals" value={formatCompactNumber(data.summary.pendingApprovals)} detail="Pending maker-checker requests" />
+        <SummaryCard icon={<AlertTriangle className="size-5" />} label="Unresolved Scope" value={formatCompactNumber(data.summary.unresolvedBranchRecords)} detail="Gym-scoped operational records" />
       </section>
 
       <Card>
@@ -96,6 +109,14 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <ButtonLink href="/api/super-admin/gyms/export?format=csv" variant="secondary">
+                <Download aria-hidden="true" className="size-4" />
+                Export CSV
+              </ButtonLink>
+              <ButtonLink href="/api/super-admin/gyms/export?format=pdf" variant="secondary">
+                <Download aria-hidden="true" className="size-4" />
+                Export PDF
+              </ButtonLink>
               <Button onClick={() => setDrawer({ type: "create_gym" })} variant="accent">
                 <Plus aria-hidden="true" className="size-4" />
                 Create Gym
@@ -107,28 +128,39 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
             </div>
           </div>
           <form
-            className="mt-5 grid gap-3 xl:grid-cols-[1fr_220px_190px_auto]"
+            className="mt-5 grid gap-3 xl:grid-cols-[1fr_220px_190px_140px_auto]"
             onSubmit={(event) => {
               event.preventDefault();
-              applyFilters();
+              const formData = new FormData(event.currentTarget);
+              applyFilters(1, {
+                query: String(formData.get("q") ?? ""),
+                organizationId: String(formData.get("organizationId") ?? "all"),
+                status: String(formData.get("status") ?? "all"),
+                pageSize: String(formData.get("pageSize") ?? pageSize)
+              });
             }}
           >
             <label className="relative block">
               <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Search gym, branch, code, city, organization..." value={query} />
+              <Input className="pl-9" name="q" onChange={(event) => setQuery(event.target.value)} placeholder="Search gym, branch, code, city, organization..." value={query} />
             </label>
-            <select aria-label="Filter by organization" className={selectClass} onChange={(event) => setOrganizationId(event.target.value)} value={organizationId}>
+            <select aria-label="Filter by organization" className={selectClass} name="organizationId" onChange={(event) => setOrganizationId(event.target.value)} value={organizationId}>
               <option value="all">All organizations</option>
               {data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
             </select>
-            <select aria-label="Filter by status" className={selectClass} onChange={(event) => setStatus(event.target.value)} value={status}>
+            <select aria-label="Filter by status" className={selectClass} name="status" onChange={(event) => setStatus(event.target.value)} value={status}>
               <option value="all">All statuses</option>
               {[...new Set([...gymStatuses, ...branchStatuses])].map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
+            </select>
+            <select aria-label="Page size" className={selectClass} name="pageSize" onChange={(event) => setPageSize(event.target.value)} value={pageSize}>
+              {[10, 20, 30, 50].map((size) => <option key={size} value={size}>{size} / page</option>)}
             </select>
             <Button type="submit" variant="primary">Apply</Button>
           </form>
         </CardContent>
       </Card>
+
+      <ApprovalReviewPanel approvals={data.approvalRequests} />
 
       <section className="space-y-4">
         {data.gyms.length > 0 ? data.gyms.map((gym) => (
@@ -158,6 +190,20 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
           </CardContent>
         </Card>
       ) : null}
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-semibold text-muted-foreground">
+            Page {data.pagination.page} of {data.pagination.totalPages} · {formatCompactNumber(data.pagination.totalGyms)} gym record(s)
+          </p>
+          <div className="flex gap-2">
+            <Button disabled={data.pagination.page <= 1} onClick={() => applyFilters(data.pagination.page - 1)} size="sm" type="button" variant="secondary">Previous</Button>
+            <Button disabled={data.pagination.page >= data.pagination.totalPages} onClick={() => applyFilters(data.pagination.page + 1)} size="sm" type="button" variant="secondary">Next</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AuditTimeline items={data.auditTimeline} />
 
       <GymBranchDrawer data={data} drawer={drawer} onClose={() => setDrawer({ type: "closed" })} />
     </div>
@@ -245,6 +291,7 @@ function BranchRowCard({ branch, onOpen }: { branch: BranchNode; onOpen: (drawer
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => onOpen({ type: "edit_branch", branch })} size="sm" variant="secondary">Edit</Button>
           <Button onClick={() => onOpen({ type: "capacity_hours", branch })} size="sm" variant="secondary"><CalendarClock aria-hidden="true" className="size-4" />Hours</Button>
+          <Button disabled={!branch.branch.gym_id} onClick={() => onOpen({ type: "remediate_branch", branch })} size="sm" variant="secondary">Remediate</Button>
           <Button onClick={() => onOpen({ type: "lifecycle", entityType: "branch", branch })} size="sm" variant="secondary">Lifecycle</Button>
           <Button onClick={() => onOpen({ type: "move_branch", branch })} size="sm" variant="secondary"><MoveRight aria-hidden="true" className="size-4" />Move</Button>
         </div>
@@ -281,6 +328,9 @@ function GymBranchDrawer({ data, drawer, onClose }: { data: GymBranchManagementD
   }
   if (drawer.type === "move_branch") {
     return <MoveBranchForm branch={drawer.branch} data={data} onClose={onClose} />;
+  }
+  if (drawer.type === "remediate_branch") {
+    return <RemediateBranchForm branch={drawer.branch} onClose={onClose} />;
   }
   return <LifecycleForm drawer={drawer} onClose={onClose} />;
 }
@@ -384,6 +434,7 @@ function TransferAdminForm({ data, gym, onClose }: { data: GymBranchManagementDa
           <FieldError message={state.fieldErrors?.newAdminUserId?.[0]} />
         </label>
         <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason"><Textarea className="min-h-24" name="reason" placeholder="Reason for ownership/admin transfer." /></Field>
+        <Field error={state.fieldErrors?.stepUpEmail?.[0]} label="Critical Super Admin email"><Input name="stepUpEmail" placeholder="Type the critical Super Admin email" type="email" /></Field>
         <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation"><Input name="confirmation" placeholder="Type TRANSFER_ADMIN" /></Field>
         <WarningBox>Existing active gym admin assignments across this gym&apos;s branch scope will be revoked and replaced by the selected user.</WarningBox>
         <DrawerActions onClose={onClose} submitLabel="Transfer Admin" variant="primary" />
@@ -417,6 +468,7 @@ function LifecycleForm({ drawer, onClose }: { drawer: Extract<DrawerState, { typ
           </select>
         </label>
         <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason"><Textarea className="min-h-24" name="reason" placeholder="Why is this lifecycle change required?" /></Field>
+        <Field error={state.fieldErrors?.stepUpEmail?.[0]} label="Critical Super Admin email"><Input name="stepUpEmail" placeholder="Required for suspended, deactivated, or archived status" type="email" /></Field>
         <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation"><Input name="confirmation" placeholder={`Type ${confirmation}`} /></Field>
         <WarningBox>Archiving is blocked when operational dependencies remain. Suspend or deactivate first when you need reversible restriction.</WarningBox>
         <DrawerActions onClose={onClose} submitLabel="Update Lifecycle" variant={nextStatus === "archived" || nextStatus === "suspended" ? "destructive" : "primary"} />
@@ -464,6 +516,7 @@ function MoveGymForm({ data, gym, onClose }: { data: GymBranchManagementData; gy
           <FieldError message={state.fieldErrors?.targetOrganizationId?.[0]} />
         </label>
         <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason"><Textarea className="min-h-24" name="reason" placeholder="Why is this cross-org movement required?" /></Field>
+        <Field error={state.fieldErrors?.stepUpEmail?.[0]} label="Critical Super Admin email"><Input name="stepUpEmail" placeholder="Type the critical Super Admin email" type="email" /></Field>
         <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation"><Input name="confirmation" placeholder="Type MOVE_GYM" /></Field>
         <WarningBox>Cross-organization gym moves are blocked if branches, members, payments, or domain routes still exist.</WarningBox>
         <DrawerActions onClose={onClose} submitLabel="Move Gym" variant="destructive" />
@@ -492,11 +545,139 @@ function MoveBranchForm({ branch, data, onClose }: { branch: BranchNode; data: G
           <FieldError message={state.fieldErrors?.targetGymId?.[0]} />
         </label>
         <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason"><Textarea className="min-h-24" name="reason" placeholder="Why is this branch movement required?" /></Field>
+        <Field error={state.fieldErrors?.stepUpEmail?.[0]} label="Critical Super Admin email"><Input name="stepUpEmail" placeholder="Type the critical Super Admin email" type="email" /></Field>
         <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation"><Input name="confirmation" placeholder="Type MOVE_BRANCH" /></Field>
         <WarningBox>Cross-organization branch moves are blocked when branch users, settings, or domain routes remain attached.</WarningBox>
         <DrawerActions onClose={onClose} submitLabel="Move Branch" variant="destructive" />
       </form>
     </DrawerShell>
+  );
+}
+
+function RemediateBranchForm({ branch, onClose }: { branch: BranchNode; onClose: () => void }) {
+  const router = useRouter();
+  const [state, formAction] = useActionState(remediateBranchScopeAction, initialAuthActionState);
+  useCloseOnSuccess(state.status, onClose);
+  useRefreshOnSuccess(state.status, router);
+
+  return (
+    <DrawerShell onClose={onClose} title="Remediate Branch Scope">
+      <form action={formAction} className="space-y-5">
+        <FormMessage state={state} />
+        <input name="branchId" type="hidden" value={branch.branch.id} />
+        <div className="rounded-md border border-border bg-background p-4">
+          <p className="font-black">{branch.branch.name}</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Assign unresolved gym-scoped members, invoices, payments, and attendance records to this branch when the operational owner has verified the records belong here.
+          </p>
+        </div>
+        <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason">
+          <Textarea className="min-h-24" name="reason" placeholder="Why should unresolved operational records be assigned to this branch?" />
+        </Field>
+        <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation">
+          <Input name="confirmation" placeholder="Type REMEDIATE_BRANCH_SCOPE" />
+        </Field>
+        <WarningBox>This remediation is intended for legacy or imported records. Review warnings before applying it to a multi-branch gym.</WarningBox>
+        <DrawerActions onClose={onClose} submitLabel="Remediate Scope" variant="destructive" />
+      </form>
+    </DrawerShell>
+  );
+}
+
+function ApprovalReviewPanel({ approvals }: { approvals: GymBranchManagementData["approvalRequests"] }) {
+  const router = useRouter();
+  const [state, formAction] = useActionState(reviewGymBranchApprovalAction, initialAuthActionState);
+  useRefreshOnSuccess(state.status, router);
+
+  if (approvals.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col gap-2 p-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-xl font-black">Maker-Checker Approvals</h3>
+            <p className="mt-1 text-sm text-muted-foreground">No pending Gym/Branch governance approvals for the current view.</p>
+          </div>
+          <Badge variant="success">Clear</Badge>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="text-2xl font-black">Maker-Checker Approvals</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+              Critical admin transfer, lifecycle, and move requests require a different Super Admin with fresh MFA before they are applied.
+            </p>
+          </div>
+          <Badge variant="warning">{approvals.length} pending</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FormMessage state={state} />
+        {approvals.map((approval) => (
+          <form action={formAction} className="rounded-md border border-border bg-background p-4" key={approval.id}>
+            <input name="approvalId" type="hidden" value={approval.id} />
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="warning">{formatEnterpriseLabel(approval.action)}</Badge>
+                  <EnterpriseStatusBadge status={approval.status} />
+                </div>
+                <p className="mt-2 font-black">{approval.gymName ?? approval.branchName ?? approval.organizationName ?? "Gym/Branch request"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{approval.reason ?? "No reason supplied."}</p>
+              </div>
+              <div className="text-sm font-semibold text-muted-foreground">
+                <p>Organization: {approval.organizationName ?? approval.organizationId}</p>
+                <p>Branch: {approval.branchName ?? approval.branchId ?? "N/A"}</p>
+                <p>Requested by: {approval.requestedByName ?? approval.requestedBy ?? "System"}</p>
+                <p>Expires: {formatDateTime(approval.expiresAt)}</p>
+              </div>
+              <div className="space-y-3">
+                <select aria-label="Approval decision" className={selectClass} name="decision" defaultValue="approve">
+                  <option value="approve">Approve</option>
+                  <option value="reject">Reject</option>
+                </select>
+                <Input name="stepUpEmail" placeholder="Critical Super Admin email" type="email" />
+                <Textarea className="min-h-20" name="reviewNote" placeholder="Review note" />
+                <Button type="submit" variant="primary">Submit Review</Button>
+              </div>
+            </div>
+          </form>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AuditTimeline({ items }: { items: GymBranchManagementData["auditTimeline"] }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <h3 className="text-2xl font-black">Recent Governance Activity</h3>
+        <p className="text-sm leading-6 text-muted-foreground">Latest gym and branch audit events for the current hierarchy view.</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.slice(0, 10).map((item) => (
+          <div className="rounded-md border border-border bg-background p-4" key={item.id}>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-black">{formatEnterpriseLabel(item.action)}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{item.entityType}:{item.entityId ?? "bulk"} · {item.actorName ?? item.actorEmail ?? item.actorId ?? "System"}</p>
+              </div>
+              <Badge variant="neutral">{formatDateTime(item.createdAt)}</Badge>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -671,6 +852,13 @@ function getDayHours(hours: Json | undefined, day: string) {
 function formatOperatingHours(hours: Json) {
   const monday = getDayHours(hours, "monday");
   return monday.closed ? "Monday closed" : `Monday ${monday.opensAt}-${monday.closesAt}`;
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
 }
 
 export default GymBranchManagementWorkspace;

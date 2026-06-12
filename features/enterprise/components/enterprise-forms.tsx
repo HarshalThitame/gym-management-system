@@ -572,7 +572,7 @@ function FeatureRulesControls() {
 
   return (
     <ControlGroup title="Feature rule requirements">
-      <input name="rules" type="hidden" value={toJson({ min_staff_role: minimumRole, requires_mfa: requiresMfa, staff_only: staffOnly })} />
+      <input name="rules" suppressHydrationWarning type="hidden" value={toJson({ min_staff_role: minimumRole, requires_mfa: requiresMfa, staff_only: staffOnly })} />
       <div className="grid gap-4 md:grid-cols-3">
         <SelectControl label="Minimum staff role" onChange={setMinimumRole} options={roleNames} value={minimumRole} />
         <CheckboxControl checked={requiresMfa} label="Require MFA" onChange={setRequiresMfa} />
@@ -704,7 +704,7 @@ function TimeControl({ label, onChange, value }: { label: string; onChange: (val
 function CheckboxControl({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
   return (
     <label className="flex min-h-11 items-center gap-2 text-sm font-bold">
-      <input checked={checked} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+      <input checked={checked} onChange={(event) => onChange(event.target.checked)} suppressHydrationWarning type="checkbox" />
       {label}
     </label>
   );
