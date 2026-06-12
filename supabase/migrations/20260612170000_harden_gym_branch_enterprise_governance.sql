@@ -30,7 +30,7 @@ where branch_id is not null;
 -- Safe backfill only where the gym has exactly one branch. Multi-branch gyms
 -- are intentionally left null because automatic assignment would be ambiguous.
 with single_branch_gyms as (
-  select gym_id, min(id) as branch_id
+  select gym_id, (array_agg(id order by id::text))[1] as branch_id
   from public.branches
   where gym_id is not null
   group by gym_id
@@ -43,7 +43,7 @@ where m.branch_id is null
   and m.gym_id = sbg.gym_id;
 
 with single_branch_gyms as (
-  select gym_id, min(id) as branch_id
+  select gym_id, (array_agg(id order by id::text))[1] as branch_id
   from public.branches
   where gym_id is not null
   group by gym_id
@@ -56,7 +56,7 @@ where p.branch_id is null
   and p.gym_id = sbg.gym_id;
 
 with single_branch_gyms as (
-  select gym_id, min(id) as branch_id
+  select gym_id, (array_agg(id order by id::text))[1] as branch_id
   from public.branches
   where gym_id is not null
   group by gym_id
