@@ -1,9 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/types/database";
 import type { RoleName, ProfileStatus } from "@/types/auth";
-import type { OrganizationRow } from "@/types/enterprise";
+import type { OrganizationRow, BranchRow, GymRow } from "@/types/enterprise";
 
-export const userSortOptions = ["created_desc", "name_asc", "email_asc", "role_asc"] as const;
+export const userSortOptions = ["created_desc", "name_asc", "email_asc", "role_asc", "org_asc"] as const;
 export type UserSortOption = (typeof userSortOptions)[number];
 
 export type UserManagementFilters = {
@@ -29,6 +29,7 @@ export type UserManagementRecord = {
   user: ProfileRow;
   roles: RoleName[];
   primaryRole: RoleName | null;
+  primaryOrganization: { id: string; name: string; slug: string } | null;
   organizations: Array<{ id: string; name: string; slug: string }>;
   gyms: Array<{ id: string; name: string; slug: string }>;
   branches: Array<{ id: string; name: string; branchCode: string }>;
@@ -53,8 +54,15 @@ export type UserManagementSummary = {
   receptionStaff: number;
 };
 
+export type OrganizationUserGroup = {
+  organization: { id: string; name: string; slug: string; status: string } | null;
+  records: UserManagementRecord[];
+  total: number;
+};
+
 export type UserManagementData = {
   records: UserManagementRecord[];
+  organizationGroups: OrganizationUserGroup[];
   organizations: Array<Pick<OrganizationRow, "id" | "name" | "slug" | "status">>;
   filters: UserManagementFilters;
   pagination: UserManagementPagination;
@@ -117,7 +125,7 @@ const defaultFilters: UserManagementFilters = {
   role: "all",
   status: "all",
   organizationId: "all",
-  sort: "created_desc",
+  sort: "org_asc",
   page: 1,
   pageSize: 25
 };
@@ -126,39 +134,50 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
   const supabase = await createSupabaseServerClient();
   const filters = normalizeUserManagementFilters(input);
 
-  const [profilesResult, organizationsResult, branchUsersResult] = await Promise.all([
+  const [profilesResult, organizationsResult, branchUsersResult, branchesResult, gymsResult] = await Promise.all([
     queryProfilesPage(supabase, filters),
     supabase.from("organizations").select("id, name, slug, status").order("name", { ascending: true }).limit(5000),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).from("branch_users").select("id, user_id, organization_id, branch_id, role_name, status").in("status", ["active", "invited"]).limit(20000)
+    fetchBranchUsers(supabase, filters.organizationId),
+    fetchBranches(supabase, filters.organizationId),
+    fetchGyms(supabase, filters.organizationId)
   ]);
 
   if (profilesResult.error) throw new Error(String(profilesResult.error));
   if (organizationsResult.error) throw new Error(String(organizationsResult.error));
-  if (branchUsersResult.error) throw new Error(String(branchUsersResult.error));
 
   const organizations = organizationsResult.data ?? [];
-  const allAssignments = (branchUsersResult.data ?? []) as BranchUserRow[];
+  const allAssignments = branchUsersResult as BranchUserRow[];
+  const branchRows = branchesResult;
+  const gymRows = gymsResult;
   const profiles = profilesResult.data ?? [];
 
+  const branchById = new Map(branchRows.map((b) => [b.id, b]));
+  const gymById = new Map(gymRows.map((g) => [g.id, g]));
+  const orgById = new Map(organizations.map((o) => [o.id, o]));
   const userIds = profiles.map((p) => p.id);
   const assignmentByUser = groupAssignmentsByUser(allAssignments.filter((a) => userIds.includes(a.user_id)));
-  const orgById = new Map(organizations.map((o) => [o.id, o]));
 
   const records: UserManagementRecord[] = profiles.map((profile) => {
     const assignments = assignmentByUser.get(profile.id) ?? [];
     const roles = Array.from(new Set(assignments.map((a) => a.role_name))) as RoleName[];
     const activeAssignments = assignments.filter((a) => a.status === "active");
-    const uniqueOrgIds = Array.from(new Set(assignments.map((a) => a.organization_id).filter(Boolean)));
 
+    const uniqueOrgIds = Array.from(new Set(assignments.map((a) => a.organization_id).filter(Boolean)));
+    const uniqueBranchIds = Array.from(new Set(assignments.map((a) => a.branch_id).filter(Boolean)));
+    const uniqueGymIds = Array.from(new Set(uniqueBranchIds.map((bid) => branchById.get(bid)?.gym_id).filter(Boolean)));
+
+    const assignedOrgs = uniqueOrgIds.map((id) => orgById.get(id)).filter((o): o is NonNullable<typeof o> => o != null);
+    const assignedBranches = uniqueBranchIds.map((id) => branchById.get(id)).filter((b): b is NonNullable<typeof b> => b != null);
+    const assignedGyms = uniqueGymIds.map((id) => gymById.get(id)).filter((g): g is NonNullable<typeof g> => g != null);
 
     return {
       user: profile,
       roles,
       primaryRole: roles[0] ?? null,
-      organizations: uniqueOrgIds.map((id) => orgById.get(id)).filter((o): o is NonNullable<typeof o> => o != null).map((o) => ({ id: o.id, name: o.name, slug: o.slug })),
-      gyms: [],
-      branches: [],
+      primaryOrganization: assignedOrgs[0] ? { id: assignedOrgs[0].id, name: assignedOrgs[0].name, slug: assignedOrgs[0].slug } : null,
+      organizations: assignedOrgs.map((o) => ({ id: o.id, name: o.name, slug: o.slug })),
+      gyms: assignedGyms.map((g) => ({ id: g.id, name: g.name, slug: g.slug })),
+      branches: assignedBranches.map((b) => ({ id: b.id, name: b.name, branchCode: b.branch_code })),
       loginCount: 0,
       lastLoginAt: null,
       lastActivityAt: null,
@@ -169,9 +188,11 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
 
   const sortedRecords = sortRecords(records, filters.sort);
   const summary = buildUserManagementSummary(records);
+  const organizationGroups = buildOrganizationGroups(sortedRecords, organizations);
 
   return {
     records: sortedRecords,
+    organizationGroups,
     organizations,
     filters,
     pagination: {
@@ -211,13 +232,22 @@ export async function getUserDetailData(
     .eq("user_id", userId)
     .limit(500);
 
-  const safeAssignments = (assignments ?? []) as Array<{ role_name: string; status: string; organization_id: string; user_id: string }>;
+  const safeAssignments = (assignments ?? []) as Array<{ role_name: string; status: string; organization_id: string; user_id: string; branch_id: string }>;
   const roles = Array.from(new Set(safeAssignments.map((a) => a.role_name))) as RoleName[];
   const activeAssignments = safeAssignments.filter((a) => a.status === "active");
 
   const uniqueOrgIds = Array.from(new Set(safeAssignments.map((a) => a.organization_id).filter(Boolean)));
-  const organizations = uniqueOrgIds.length > 0
-    ? (await supabase.from("organizations").select("id, name, slug").in("id", uniqueOrgIds)).data ?? []
+  const uniqueBranchIds = Array.from(new Set(safeAssignments.map((a) => a.branch_id).filter(Boolean)));
+
+  const [organizations, branchRows, gymRows] = await Promise.all([
+    uniqueOrgIds.length > 0 ? supabase.from("organizations").select("id, name, slug").in("id", uniqueOrgIds).then((r) => r.data ?? []) : Promise.resolve([]),
+    uniqueBranchIds.length > 0 ? supabase.from("branches").select("id, name, branch_code, gym_id").in("id", uniqueBranchIds).then((r) => r.data ?? []) : Promise.resolve([]),
+    Promise.resolve([] as Array<{ id: string; name: string; slug: string }>)
+  ]);
+
+  const uniqueGymIds = Array.from(new Set(branchRows.map((b) => b.gym_id).filter(Boolean)));
+  const gymRowsResolved = uniqueGymIds.length > 0
+    ? await supabase.from("gyms").select("id, name, slug").in("id", uniqueGymIds).then((r) => r.data ?? [])
     : [];
 
   const [loginResult, activityResult, auditResult] = await Promise.all([
@@ -244,13 +274,18 @@ export async function getUserDetailData(
     loginHistory.slice(0, 50).map(loginToEvent)
   );
 
+  const assignedOrgs = organizations.map((o) => ({ id: o.id, name: o.name, slug: o.slug }));
+  const assignedBranches = branchRows.map((b) => ({ id: b.id, name: b.name, branchCode: b.branch_code }));
+  const assignedGyms = gymRowsResolved.map((g) => ({ id: g.id, name: g.name, slug: g.slug }));
+
   const record: UserManagementRecord = {
     user: profile,
     roles,
     primaryRole: roles[0] ?? null,
-    organizations,
-    gyms: [],
-    branches: [],
+    primaryOrganization: assignedOrgs[0] ?? null,
+    organizations: assignedOrgs,
+    gyms: assignedGyms,
+    branches: assignedBranches,
     loginCount: loginResult.count ?? loginHistory.length,
     lastLoginAt: loginHistory.find((e) => e.status === "success")?.createdAt ?? null,
     lastActivityAt: activityTimeline[0]?.createdAt ?? null,
@@ -292,6 +327,21 @@ async function queryProfilesPage(supabase: Awaited<ReturnType<typeof createSupab
     query = query.eq("status", filters.status as ProfileStatus);
   }
 
+  if (filters.organizationId !== "all") {
+    const { data: orgUserIds } = await supabase
+      .from("branch_users")
+      .select("user_id")
+      .eq("organization_id", filters.organizationId)
+      .in("status", ["active", "invited"])
+      .limit(20000);
+
+    const ids = [...new Set((orgUserIds ?? []).map((r) => r.user_id))];
+    if (ids.length === 0) {
+      return { data: [] as ProfileRow[], count: 0, error: null };
+    }
+    query = query.in("id", ids);
+  }
+
   const safeQuery = sanitizeSearch(filters.query);
   if (safeQuery) {
     query = query.or([
@@ -311,6 +361,41 @@ async function queryProfilesPage(supabase: Awaited<ReturnType<typeof createSupab
 
   if (error) throw new Error(error.message);
   return { data: data ?? [], count: count ?? 0, error };
+}
+
+async function fetchBranchUsers(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, organizationId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("branch_users")
+    .select("id, user_id, organization_id, branch_id, role_name, status");
+
+  if (organizationId !== "all") {
+    query = query.eq("organization_id", organizationId);
+  } else {
+    query = query.in("status", ["active", "invited"]);
+  }
+
+  const { data, error } = await query.limit(20000);
+  if (error) throw new Error(String(error));
+  return (data ?? []) as BranchUserRow[];
+}
+
+async function fetchBranches(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, organizationId: string) {
+  let query = supabase.from("branches").select("id, name, branch_code, gym_id, organization_id");
+  if (organizationId !== "all") {
+    query = query.eq("organization_id", organizationId);
+  }
+  const { data } = await query.limit(5000);
+  return (data ?? []) as Array<Pick<BranchRow, "id" | "name" | "branch_code" | "gym_id" | "organization_id">>;
+}
+
+async function fetchGyms(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, organizationId: string) {
+  let query = supabase.from("gyms").select("id, name, slug, organization_id");
+  if (organizationId !== "all") {
+    query = query.eq("organization_id", organizationId);
+  }
+  const { data } = await query.limit(5000);
+  return (data ?? []) as Array<Pick<GymRow, "id" | "name" | "slug" | "organization_id">>;
 }
 
 async function getLoginHistoryForUser(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, page: number, pageSize: number) {
@@ -375,6 +460,47 @@ function groupAssignmentsByUser(assignments: BranchUserRow[]) {
   return byUser;
 }
 
+function buildOrganizationGroups(records: UserManagementRecord[], organizations: Array<{ id: string; name: string; slug: string; status: string }>): OrganizationUserGroup[] {
+  const orgById = new Map(organizations.map((o) => [o.id, o]));
+
+  const unassigned: UserManagementRecord[] = [];
+  const byOrgId = new Map<string, UserManagementRecord[]>();
+
+  for (const record of records) {
+    if (record.organizations.length > 0) {
+      const orgId = record.organizations[0].id;
+      const existing = byOrgId.get(orgId) ?? [];
+      existing.push(record);
+      byOrgId.set(orgId, existing);
+    } else {
+      unassigned.push(record);
+    }
+  }
+
+  const groups: OrganizationUserGroup[] = [];
+
+  for (const org of organizations) {
+    const orgRecords = byOrgId.get(org.id);
+    if (orgRecords && orgRecords.length > 0) {
+      groups.push({
+        organization: { id: org.id, name: org.name, slug: org.slug, status: org.status },
+        records: orgRecords,
+        total: orgRecords.length
+      });
+    }
+  }
+
+  if (unassigned.length > 0) {
+    groups.push({
+      organization: null,
+      records: unassigned,
+      total: unassigned.length
+    });
+  }
+
+  return groups;
+}
+
 function buildUserManagementSummary(records: UserManagementRecord[]): UserManagementSummary {
   return {
     totalUsers: records.length,
@@ -399,6 +525,8 @@ function sortRecords(records: UserManagementRecord[], sort: UserSortOption) {
     sorted.sort((a, b) => (a.user.email ?? "").localeCompare(b.user.email ?? ""));
   } else if (sort === "role_asc") {
     sorted.sort((a, b) => (a.primaryRole ?? "").localeCompare(b.primaryRole ?? ""));
+  } else if (sort === "org_asc") {
+    sorted.sort((a, b) => (a.primaryOrganization?.name ?? "").localeCompare(b.primaryOrganization?.name ?? ""));
   } else {
     sorted.sort((a, b) => new Date(b.user.created_at).getTime() - new Date(a.user.created_at).getTime());
   }

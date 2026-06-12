@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Ban,
+  Building2,
+  ChevronDown,
   Download,
   Edit3,
   Eye,
@@ -58,7 +60,7 @@ type DrawerState =
   | { type: "transfer_role"; record: UserManagementRecord }
   | { type: "bulk"; selectedIds: string[] };
 
-type SortOption = "created_desc" | "name_asc" | "email_asc" | "role_asc";
+type SortOption = "created_desc" | "name_asc" | "email_asc" | "role_asc" | "org_asc";
 
 export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { criticalSuperAdminEmail: string; data: UserManagementData }) {
   const router = useRouter();
@@ -131,6 +133,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { cri
               {data.organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
             </select>
             <select className={selectClass} value={sort} onChange={(e) => { setSort(e.target.value as SortOption); router.push(`/super-admin/users?sort=${e.target.value}`); }}>
+              <option value="org_asc">Organization</option>
               <option value="created_desc">Newest First</option>
               <option value="name_asc">Name A-Z</option>
               <option value="email_asc">Email A-Z</option>
@@ -155,24 +158,24 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { cri
             )}
           </div>
 
-          <div className="mt-4 space-y-3">
-            {data.records.length > 0 ? data.records.map((record) => (
-              <UserRow
-                key={record.user.id}
-                record={record}
-                isSelected={selectedIds.has(record.user.id)}
-                onToggle={() => {
+          <div className="mt-4 space-y-4">
+            {data.organizationGroups.length > 0 ? data.organizationGroups.map((group) => (
+              <OrgGroupSection
+                key={group.organization?.id ?? "__unassigned__"}
+                group={group}
+                selectedIds={selectedIds}
+                onToggle={(userId) => {
                   const next = new Set(selectedIds);
-                  if (next.has(record.user.id)) next.delete(record.user.id);
-                  else next.add(record.user.id);
+                  if (next.has(userId)) next.delete(userId);
+                  else next.add(userId);
                   setSelectedIds(next);
                 }}
-                onView={() => setDrawer({ type: "detail", record })}
-                onEdit={() => setDrawer({ type: "edit", record })}
-                onStatus={(action) => setDrawer({ type: "status", record, action })}
-                onForceLogout={() => setDrawer({ type: "force_logout", record })}
-                onResetPassword={() => setDrawer({ type: "reset_password", record })}
-                onTransferRole={() => setDrawer({ type: "transfer_role", record })}
+                onView={(record) => setDrawer({ type: "detail", record })}
+                onEdit={(record) => setDrawer({ type: "edit", record })}
+                onStatus={(record, action) => setDrawer({ type: "status", record, action })}
+                onForceLogout={(record) => setDrawer({ type: "force_logout", record })}
+                onResetPassword={(record) => setDrawer({ type: "reset_password", record })}
+                onTransferRole={(record) => setDrawer({ type: "transfer_role", record })}
               />
             )) : (
               <div className="rounded-md border border-dashed border-border bg-background p-8 text-center text-sm font-semibold text-muted-foreground">
@@ -217,6 +220,76 @@ function SummaryCard({ icon, label, value }: { icon: ReactNode; label: string; v
   );
 }
 
+function OrgGroupSection({
+  group,
+  selectedIds,
+  onToggle,
+  onView,
+  onEdit,
+  onStatus,
+  onForceLogout,
+  onResetPassword,
+  onTransferRole
+}: {
+  group: import("../../services/user-management-service").OrganizationUserGroup;
+  selectedIds: Set<string>;
+  onToggle: (userId: string) => void;
+  onView: (record: UserManagementRecord) => void;
+  onEdit: (record: UserManagementRecord) => void;
+  onStatus: (record: UserManagementRecord, action: "activate" | "suspend" | "archive") => void;
+  onForceLogout: (record: UserManagementRecord) => void;
+  onResetPassword: (record: UserManagementRecord) => void;
+  onTransferRole: (record: UserManagementRecord) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const isUnassigned = group.organization === null;
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      <button
+        className="flex w-full items-center gap-3 bg-background px-5 py-3 text-left transition hover:bg-surface-muted"
+        onClick={() => setOpen(!open)}
+        type="button"
+      >
+        {isUnassigned ? (
+          <UsersRound className="size-5 shrink-0 text-muted-foreground" />
+        ) : (
+          <Building2 className="size-5 shrink-0 text-indigo-600" />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="font-black truncate">{isUnassigned ? "Unassigned Users" : group.organization!.name}</p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            {group.total} user{group.total !== 1 ? "s" : ""}
+            {!isUnassigned && ` · ${group.organization!.slug}`}
+            {!isUnassigned && <EnterpriseStatusBadge status={group.organization!.status as "active" | "suspended" | "archived"} />}
+          </p>
+        </div>
+        <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "" : "-rotate-90"}`} />
+      </button>
+      {open && (
+        <div className="divide-y divide-border">
+          {group.records.length > 0 ? group.records.map((record) => (
+            <UserRow
+              key={record.user.id}
+              record={record}
+              isSelected={selectedIds.has(record.user.id)}
+              onToggle={() => onToggle(record.user.id)}
+              onView={() => onView(record)}
+              onEdit={() => onEdit(record)}
+              onStatus={(action) => onStatus(record, action)}
+              onForceLogout={() => onForceLogout(record)}
+              onResetPassword={() => onResetPassword(record)}
+              onTransferRole={() => onTransferRole(record)}
+            />
+          )) : (
+            <div className="px-5 py-4 text-sm font-semibold text-muted-foreground">No users in this organization.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UserRow({
   record,
   isSelected,
@@ -239,7 +312,7 @@ function UserRow({
   onTransferRole: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-border bg-background p-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex items-start gap-3 lg:items-center">
         <input
           aria-label={`Select ${record.user.full_name}`}
@@ -258,8 +331,19 @@ function UserRow({
           </div>
           <p className="mt-1 truncate text-sm font-semibold text-muted-foreground">
             {record.user.email ?? "No email"} · {record.user.phone ?? "No phone"}
-            {record.organizations.length > 0 && ` · ${record.organizations.map((o) => o.name).join(", ")}`}
           </p>
+          {(record.branches.length > 0 || record.gyms.length > 0) && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {record.gyms.map((gym) => (
+                <Badge key={gym.id} variant="neutral">{gym.name}</Badge>
+              ))}
+              {record.branches.map((branch) => (
+                <span key={branch.id} className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                  {branch.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -693,6 +777,7 @@ function UserDetailView({ record }: { record: UserManagementRecord }) {
             <DetailLine label="Email" value={record.user.email ?? "Not set"} />
             <DetailLine label="Phone" value={record.user.phone ?? "Not set"} />
             <DetailLine label="User ID" value={record.user.id} />
+            <DetailLine label="Primary Org" value={record.primaryOrganization?.name ?? "None"} />
             <DetailLine label="Created" value={new Date(record.user.created_at).toLocaleString("en-IN")} />
             <DetailLine label="Updated" value={new Date(record.user.updated_at).toLocaleString("en-IN")} />
           </div>
@@ -716,12 +801,12 @@ function UserDetailView({ record }: { record: UserManagementRecord }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <h3 className="text-lg font-black">Organization Access</h3>
-        </CardHeader>
-        <CardContent>
-          {record.organizations.length > 0 ? (
+      {record.organizations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-black">Organization Access</h3>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-2">
               {record.organizations.map((org) => (
                 <div className="rounded-md border border-border bg-surface p-3" key={org.id}>
@@ -730,11 +815,42 @@ function UserDetailView({ record }: { record: UserManagementRecord }) {
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-sm font-semibold text-muted-foreground">No organization access assigned.</p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {record.gyms.length > 0 && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-black">Gym Access</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {record.gyms.map((gym) => (
+                <Badge key={gym.id} variant="neutral">{gym.name}</Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {record.branches.length > 0 && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-black">Branch Access</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {record.branches.map((branch) => (
+                <div className="rounded-md border border-border bg-surface p-3" key={branch.id}>
+                  <p className="font-bold">{branch.name}</p>
+                  <p className="text-xs font-semibold text-muted-foreground">Code: {branch.branchCode}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
