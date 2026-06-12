@@ -29,6 +29,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
+import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
@@ -197,6 +198,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { cri
       </Card>
 
       <DrawerModal drawer={drawer} onClose={() => setDrawer({ type: "closed" })} criticalSuperAdminEmail={criticalSuperAdminEmail} organizations={data.organizations} />
+      <ToastContainer />
     </div>
   );
 }
@@ -348,8 +350,8 @@ function InviteUserForm({ onClose, criticalSuperAdminEmail, organizations }: { o
   const [state, formAction] = useActionState(inviteUserAction, initialAuthActionState);
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status === "success") { showToast(state.message ?? "User invited.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -413,8 +415,8 @@ function EditUserForm({ record, onClose }: { record: UserManagementRecord; onClo
   const [state, formAction] = useActionState(saveUserProfileAction, initialAuthActionState);
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -441,8 +443,8 @@ function UserStatusForm({ record, action, onClose, criticalSuperAdminEmail }: { 
   const [state, formAction] = useActionState(updateUserStatusAction, initialAuthActionState);
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
 
   const actionLabels = { activate: "Activate", suspend: "Suspend", archive: "Archive" };
   const currentStatus = record.user.status;
@@ -485,8 +487,8 @@ function UserForceLogoutForm({ record, onClose, criticalSuperAdminEmail }: { rec
   const [state, formAction] = useActionState(forceLogoutUserAction, initialAuthActionState);
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -530,8 +532,8 @@ function UserResetPasswordForm({ record, onClose, criticalSuperAdminEmail }: { r
   const [state, formAction] = useActionState(resetUserPasswordAction, initialAuthActionState);
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -570,8 +572,8 @@ function UserTransferRoleForm({ record, onClose, criticalSuperAdminEmail, organi
   const [state, formAction] = useActionState(transferUserRoleAction, initialAuthActionState);
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -596,6 +598,10 @@ function UserTransferRoleForm({ record, onClose, criticalSuperAdminEmail, organi
           <option value="">Select organization</option>
           {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
         </select>
+      </FormField>
+
+      <FormField label="Target branch ID" error={state.fieldErrors?.targetBranchId}>
+        <Input name="targetBranchId" placeholder="UUID of branch" required />
       </FormField>
 
       <FormField label="Target gym ID (optional)" error={state.fieldErrors?.targetGymId}>
@@ -627,8 +633,8 @@ function BulkUserActionForm({ selectedIds, onClose, criticalSuperAdminEmail }: {
   const [state, formAction] = useActionState(bulkUserActionAction, initialAuthActionState);
 
   useEffect(() => {
-    if (state.status === "success") onClose();
-  }, [state.status, onClose]);
+    if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
+  }, [state.status, state.message, onClose]);
 
   return (
     <form action={formAction} className="space-y-5">

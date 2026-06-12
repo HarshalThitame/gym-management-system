@@ -21,6 +21,7 @@ import {
   updateUserStatusSchema
 } from "../schemas/user-management-schemas";
 import type { Database } from "@/types/database";
+import { checkRateLimit } from "@/lib/rate-limiter";
 
 const superAdminRoles = ["super_admin"] as const;
 const criticalMfaFreshnessCookieName = "super_admin_mfa_verified_at";
@@ -50,6 +51,10 @@ type AuthAdminClient = SupabaseClient<Database> & {
 export async function inviteUserAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`invite:${context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) {
+    return { status: "error", message: `Too many invite requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
+  }
   const parsed = inviteUserSchema.safeParse({
     email: formData.get("email"),
     fullName: formData.get("fullName"),
@@ -194,6 +199,8 @@ export async function inviteUserAction(_previousState: AuthActionState, formData
 export async function updateUserStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`status:${context.userId}`, 20, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many status change requests. Slow down." };
   const parsed = updateUserStatusSchema.safeParse({
     userId: formData.get("userId"),
     action: formData.get("action"),
@@ -251,6 +258,8 @@ export async function updateUserStatusAction(_previousState: AuthActionState, fo
 export async function forceLogoutUserAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`force_logout:${context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many force logout requests. Slow down." };
   const parsed = forceLogoutUserSchema.safeParse({
     userId: formData.get("userId"),
     confirmation: formData.get("confirmation") ?? "",
@@ -307,6 +316,8 @@ export async function forceLogoutUserAction(_previousState: AuthActionState, for
 export async function resetUserPasswordAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`reset_pwd:${context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many password reset requests. Slow down." };
   const parsed = resetUserPasswordSchema.safeParse({
     userId: formData.get("userId"),
     email: formData.get("email"),
@@ -375,6 +386,8 @@ export async function resetUserPasswordAction(_previousState: AuthActionState, f
 export async function transferUserRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`transfer:${context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many role transfer requests. Slow down." };
   const parsed = transferUserRoleSchema.safeParse({
     userId: formData.get("userId"),
     targetRole: formData.get("targetRole"),
@@ -448,6 +461,8 @@ export async function transferUserRoleAction(_previousState: AuthActionState, fo
 export async function bulkUserActionAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`bulk:${context.userId}`, 5, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many bulk action requests. Slow down." };
   const parsed = bulkUserActionSchema.safeParse({
     userIds: formData.getAll("userIds"),
     action: formData.get("action"),
@@ -509,6 +524,8 @@ export async function bulkUserActionAction(_previousState: AuthActionState, form
 export async function saveUserProfileAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`save_profile:${context.userId}`, 20, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many profile save requests. Slow down." };
   const userId = String(formData.get("userId") ?? "");
   const fullName = String(formData.get("fullName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
