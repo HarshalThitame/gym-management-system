@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   Activity,
-  Clock,
   Download,
   Globe,
   Lock,
@@ -13,7 +12,6 @@ import {
   UserCheck,
   UserX
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
@@ -51,7 +49,7 @@ export default async function SuperAdminUserDetailPage({ params, searchParams }:
 
   if (!data) notFound();
 
-  const { record, loginHistory, activityTimeline, loginHistoryPagination, activityPagination } = data;
+  const { record, loginHistory, activityTimeline, loginHistoryPagination } = data;
 
   return (
     <div className="space-y-6">

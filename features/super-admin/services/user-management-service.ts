@@ -129,6 +129,7 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
   const [profilesResult, organizationsResult, branchUsersResult] = await Promise.all([
     queryProfilesPage(supabase, filters),
     supabase.from("organizations").select("id, name, slug, status").order("name", { ascending: true }).limit(5000),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any).from("branch_users").select("id, user_id, organization_id, branch_id, role_name, status").in("status", ["active", "invited"]).limit(20000)
   ]);
 
@@ -149,8 +150,7 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
     const roles = Array.from(new Set(assignments.map((a) => a.role_name))) as RoleName[];
     const activeAssignments = assignments.filter((a) => a.status === "active");
     const uniqueOrgIds = Array.from(new Set(assignments.map((a) => a.organization_id).filter(Boolean)));
-    const uniqueGymIds: string[] = [];
-    const uniqueBranchIds = Array.from(new Set(assignments.map((a) => a.branch_id).filter(Boolean)));
+
 
     return {
       user: profile,
@@ -204,6 +204,7 @@ export async function getUserDetailData(
   if (profileError) throw new Error(profileError.message);
   if (!profile) return null;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: assignments } = await (supabase as any)
     .from("branch_users")
     .select("id, user_id, organization_id, branch_id, role_name, status")
@@ -316,6 +317,7 @@ async function getLoginHistoryForUser(supabase: Awaited<ReturnType<typeof create
   const rangeFrom = (page - 1) * pageSize;
   const rangeTo = rangeFrom + pageSize - 1;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error, count } = await (supabase as any)
     .from("login_history")
     .select("*", { count: "exact" })

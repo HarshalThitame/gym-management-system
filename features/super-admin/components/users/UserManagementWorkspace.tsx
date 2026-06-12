@@ -7,22 +7,16 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Ban,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
- Download,
+  Download,
   Edit3,
   Eye,
   KeyRound,
   Loader2,
-  Lock,
   LogOut,
   Mail,
-  MailPlus,
   Plus,
   RotateCcw,
   Search,
-  ShieldAlert,
   ShieldCheck,
   UserCheck,
   UserCog,
@@ -39,8 +33,6 @@ import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { roleNames } from "@/types/auth";
-import type { RoleName } from "@/types/auth";
-import type { Json } from "@/types/database";
 import {
   bulkUserActionAction,
   forceLogoutUserAction,
@@ -72,8 +64,6 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data }: { cri
   const [drawer, setDrawer] = useState<DrawerState>({ type: "closed" });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortOption>(data.filters.sort);
-
-  const allSelected = data.records.length > 0 && data.records.every((r) => selectedIds.has(r.user.id));
 
   useEffect(() => {
     if (drawer.type === "closed") {

@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { renderBrandedEmail } from "@/emails/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/services/email/resend";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
@@ -20,15 +20,13 @@ import {
   transferUserRoleSchema,
   updateUserStatusSchema
 } from "../schemas/user-management-schemas";
-import type { Database, Json } from "@/types/database";
+import type { Database } from "@/types/database";
 
 const superAdminRoles = ["super_admin"] as const;
 const criticalMfaFreshnessCookieName = "super_admin_mfa_verified_at";
 const resetPasswordUrl = "/reset-password";
 
-type ProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "full_name" | "email" | "status">;
-type UserRoleInsert = Database["public"]["Tables"]["user_roles"]["Insert"];
-type BranchUserInsert = Database["public"]["Tables"]["branch_users"]["Insert"];
+
 
 type AuthAdminClient = SupabaseClient<Database> & {
   auth: {
@@ -279,6 +277,7 @@ export async function forceLogoutUserAction(_previousState: AuthActionState, for
 
   if (error) return { status: "error", message: error.message };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: loginError } = await (supabase as any).from("login_history").insert({
     user_id: parsed.data.userId,
     email: context.email ?? "unknown",
