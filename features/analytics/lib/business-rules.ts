@@ -89,7 +89,17 @@ export function reportTitle(reportKey: AnalyticsReportKey) {
     trainer_scorecard: "Trainer Performance Scorecard",
     class_utilization: "Class Utilization Report",
     fitness_outcomes: "Fitness Outcomes Report",
-    sales_funnel: "Sales Funnel Report"
+    sales_funnel: "Sales Funnel Report",
+    revenue_intelligence: "Revenue Intelligence Report",
+    membership_cohorts: "Membership Cohort Analysis",
+    churn_analysis: "Churn Analysis Report",
+    ltv_analysis: "Lifetime Value Analysis",
+    branch_scorecard: "Branch Scorecard Report",
+    trainer_performance: "Trainer Performance Report",
+    marketing_attribution: "Marketing Attribution Report",
+    capacity_utilization: "Capacity Utilization Report",
+    behavior_engagement: "Behavior Engagement Report",
+    forecast_scenario: "Forecast Scenario Report"
   };
   return titles[reportKey];
 }

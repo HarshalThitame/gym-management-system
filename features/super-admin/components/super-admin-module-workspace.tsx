@@ -330,7 +330,7 @@ function ModuleShell({ children, stats, superModule }: { children: ReactNode; st
                 <p className="mt-4 max-w-3xl text-base leading-8 text-muted-foreground">{superModule.description}</p>
               </div>
               <div className="grid size-14 shrink-0 place-items-center rounded-md bg-accent/20 text-foreground">
-                <superModule.icon aria-hidden="true" className="size-7" />
+                <span className="size-7 [&>svg]:size-full" aria-hidden="true">{superModule.icon}</span>
               </div>
             </div>
           </CardContent>

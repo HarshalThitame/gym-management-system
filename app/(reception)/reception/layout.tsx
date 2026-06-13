@@ -5,13 +5,13 @@ import { requireReceptionScope } from "@/features/reception/lib/access";
 import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 const receptionNav = [
-  { href: "/reception", label: "Dashboard", icon: Gauge, iconKey: "gauge" },
-  { href: "/reception/members", label: "Members", icon: UsersRound, iconKey: "users" },
-  { href: "/reception/register", label: "Register", icon: UserRoundPlus, iconKey: "user-plus" },
-  { href: "/reception/attendance", label: "Attendance", icon: CalendarCheck, iconKey: "calendar-check" },
-  { href: "/reception/payments", label: "Payments", icon: CreditCard, iconKey: "credit-card" },
-  { href: "/reception/classes", label: "Classes", icon: CalendarDays, iconKey: "calendar-days" },
-  { href: "/reception/messages", label: "Messages", icon: MessageSquare, iconKey: "message-square" }
+  { href: "/reception", label: "Dashboard", icon: <Gauge className="size-5" />, iconKey: "gauge" },
+  { href: "/reception/members", label: "Members", icon: <UsersRound className="size-5" />, iconKey: "users" },
+  { href: "/reception/register", label: "Register", icon: <UserRoundPlus className="size-5" />, iconKey: "user-plus" },
+  { href: "/reception/attendance", label: "Attendance", icon: <CalendarCheck className="size-5" />, iconKey: "calendar-check" },
+  { href: "/reception/payments", label: "Payments", icon: <CreditCard className="size-5" />, iconKey: "credit-card" },
+  { href: "/reception/classes", label: "Classes", icon: <CalendarDays className="size-5" />, iconKey: "calendar-days" },
+  { href: "/reception/messages", label: "Messages", icon: <MessageSquare className="size-5" />, iconKey: "message-square" }
 ] satisfies PortalNavItem[];
 
 export default async function ReceptionLayout({ children }: { children: ReactNode }) {

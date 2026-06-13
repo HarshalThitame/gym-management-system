@@ -508,7 +508,7 @@ export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }:
 
                     return (
                       <ButtonLink className="justify-start text-left" href={superModule.href} key={slug} size="sm" variant="secondary">
-                        <superModule.icon aria-hidden="true" className="size-4 shrink-0" />
+                        {superModule.icon}
                         {superModule.label}
                       </ButtonLink>
                     );

@@ -6,20 +6,20 @@ import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 const adminNav = [
-  { href: "/admin", label: "Dashboard", icon: Gauge, iconKey: "gauge" },
-  { href: "/admin/members", label: "Members", icon: UsersRound, iconKey: "users" },
-  { href: "/admin/attendance", label: "Attendance", icon: CalendarCheck, iconKey: "calendar-check" },
-  { href: "/admin/classes", label: "Classes", icon: CalendarDays, iconKey: "calendar-days" },
-  { href: "/admin/fitness", label: "Fitness", icon: Activity, iconKey: "activity" },
-  { href: "/admin/trainers", label: "Trainers", icon: Dumbbell, iconKey: "dumbbell" },
-  { href: "/admin/membership-plans", label: "Plans", icon: Tags, iconKey: "tags" },
-  { href: "/admin/payments", label: "Payments", icon: CreditCard, iconKey: "credit-card" },
-  { href: "/admin/communications", label: "Communications", icon: MessageSquare, iconKey: "message-square" },
-  { href: "/admin/ai", label: "AI Intelligence", icon: Brain, iconKey: "brain" },
-  { href: "/admin/reports", label: "Reports", icon: BarChart3, iconKey: "bar-chart" },
-  { href: "/admin/staff", label: "Staff", icon: BriefcaseBusiness, iconKey: "briefcase" },
-  { href: "/admin/members/new", label: "Create User", icon: UserRoundPlus, iconKey: "user-plus" },
-  { href: "/admin/settings", label: "Settings", icon: Settings, iconKey: "settings" }
+  { href: "/admin", label: "Dashboard", icon: <Gauge className="size-5" />, iconKey: "gauge" },
+  { href: "/admin/members", label: "Members", icon: <UsersRound className="size-5" />, iconKey: "users" },
+  { href: "/admin/attendance", label: "Attendance", icon: <CalendarCheck className="size-5" />, iconKey: "calendar-check" },
+  { href: "/admin/classes", label: "Classes", icon: <CalendarDays className="size-5" />, iconKey: "calendar-days" },
+  { href: "/admin/fitness", label: "Fitness", icon: <Activity className="size-5" />, iconKey: "activity" },
+  { href: "/admin/trainers", label: "Trainers", icon: <Dumbbell className="size-5" />, iconKey: "dumbbell" },
+  { href: "/admin/membership-plans", label: "Plans", icon: <Tags className="size-5" />, iconKey: "tags" },
+  { href: "/admin/payments", label: "Payments", icon: <CreditCard className="size-5" />, iconKey: "credit-card" },
+  { href: "/admin/communications", label: "Communications", icon: <MessageSquare className="size-5" />, iconKey: "message-square" },
+  { href: "/admin/ai", label: "AI Intelligence", icon: <Brain className="size-5" />, iconKey: "brain" },
+  { href: "/admin/reports", label: "Reports", icon: <BarChart3 className="size-5" />, iconKey: "bar-chart" },
+  { href: "/admin/staff", label: "Staff", icon: <BriefcaseBusiness className="size-5" />, iconKey: "briefcase" },
+  { href: "/admin/members/new", label: "Create User", icon: <UserRoundPlus className="size-5" />, iconKey: "user-plus" },
+  { href: "/admin/settings", label: "Settings", icon: <Settings className="size-5" />, iconKey: "settings" }
 ] satisfies PortalNavItem[];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

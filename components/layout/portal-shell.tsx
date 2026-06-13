@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { MobileBottomNav, type MobilePortalIconKey } from "@/components/pwa/mobile-bottom-nav";
 import { SignOutButton } from "@/components/pwa/sign-out-button";
@@ -18,7 +17,7 @@ import { ProtectedPageCacheGuard } from "./protected-page-cache-guard";
 export type PortalNavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: ReactNode;
   iconKey: MobilePortalIconKey;
 };
 
@@ -125,7 +124,7 @@ export function PortalShell({
               key={`${item.href}-${item.label}`}
               onClick={closeSidebar}
             >
-              <item.icon aria-hidden="true" className="size-5" />
+              {item.icon}
               {item.label}
             </Link>
           ))}
@@ -158,7 +157,7 @@ export function PortalShell({
                 href={item.href}
                 key={`${item.href}-${item.label}`}
               >
-                <item.icon aria-hidden="true" className="size-5" />
+                {item.icon}
                 {item.label}
               </Link>
             ))}

@@ -100,7 +100,7 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
   ].find((result) => result.error)?.error;
 
   if (firstError) {
-    throw new Error(firstError.message);
+    console.error("[enterprise-dashboard] Query failed:", firstError.message);
   }
 
   const organizations = organizationsResult.data ?? [];

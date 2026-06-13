@@ -15,7 +15,7 @@ type SuperAdminModuleRouteProps = {
 
 export function generateStaticParams() {
   return superAdminModules
-    .filter((m) => m.slug !== "domains" && m.slug !== "white-label")
+    .filter((m) => m.slug !== "domains" && m.slug !== "white-label" && m.slug !== "support" && m.slug !== "subscriptions" && m.slug !== "billing" && m.slug !== "approvals" && m.slug !== "analytics" && m.slug !== "monitoring" && m.slug !== "backups" && m.slug !== "ux-governance" && m.slug !== "production-safety")
     .map((module) => ({ module: module.slug }));
 }
 

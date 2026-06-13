@@ -16,6 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_login_history_status ON public.login_history(stat
 
 ALTER TABLE public.login_history ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "super_admin_full_access_login_history" ON public.login_history;
 CREATE POLICY "super_admin_full_access_login_history"
   ON public.login_history
   FOR ALL
@@ -33,6 +34,7 @@ CREATE POLICY "super_admin_full_access_login_history"
     )
   );
 
+DROP POLICY IF EXISTS "user_read_own_login_history" ON public.login_history;
 CREATE POLICY "user_read_own_login_history"
   ON public.login_history
   FOR SELECT

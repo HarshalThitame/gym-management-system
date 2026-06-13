@@ -289,9 +289,7 @@ function buildSensitiveContentSecurityPolicy(nonce: string, upgradeInsecureReque
   const scriptSource = process.env.NODE_ENV === "development"
     ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' https://checkout.razorpay.com`
     : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com`;
-  const styleSource = process.env.NODE_ENV === "development"
-    ? "style-src 'self' 'unsafe-inline'"
-    : `style-src 'self' 'nonce-${nonce}'`;
+  const styleSource = `style-src 'self' 'unsafe-inline'`;
 
   return [
     ...baseContentSecurityPolicy(upgradeInsecureRequests),

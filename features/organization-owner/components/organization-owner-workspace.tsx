@@ -116,7 +116,7 @@ function OrganizationOwnerDashboardView({ dashboard, planContext }: { dashboard:
             <div className="grid gap-3 md:grid-cols-2">
               {organizationOwnerModules.map((item) => (
                 <ButtonLink className="justify-start text-left" href={item.href} key={item.slug} variant="secondary">
-                  <item.icon aria-hidden="true" className="size-4 shrink-0" />
+                  {item.icon}
                   {item.label}
                 </ButtonLink>
               ))}
@@ -190,7 +190,7 @@ function ModuleHero({ dashboard, module }: { dashboard: OrganizationOwnerDashboa
           <h2 className="mt-3 text-3xl font-black md:text-4xl">{module.title}</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">{module.description}</p>
         </div>
-        <module.icon aria-hidden="true" className="size-10 text-accent" />
+        <span className="size-10 text-accent [&>svg]:size-full" aria-hidden="true">{module.icon}</span>
       </div>
     </section>
   );

@@ -334,7 +334,7 @@ export default async function AdminReportsPage() {
             <p className="text-sm leading-6 text-muted-foreground">Active membership distribution and plan revenue concentration.</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {dashboard.planPopularity.map((plan) => (
+             {(dashboard.membershipAnalytics.planPopularity ?? []).map((plan) => (
               <div className="rounded-md border border-border bg-surface-muted p-4" key={plan.plan}>
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-black">{plan.plan}</p>
@@ -343,7 +343,7 @@ export default async function AdminReportsPage() {
                 <p className="mt-2 text-2xl font-black">{formatCurrency(plan.revenue)}</p>
               </div>
             ))}
-            {dashboard.planPopularity.length === 0 ? <EmptyState text="Plan popularity will appear after active memberships are assigned." /> : null}
+            {(dashboard.membershipAnalytics.planPopularity ?? []).length === 0 ? <EmptyState text="Plan popularity will appear after active memberships are assigned." /> : null}
           </CardContent>
         </Card>
       </section>

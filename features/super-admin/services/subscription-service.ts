@@ -188,7 +188,8 @@ export async function getAllOrgsWithSubscriptions(): Promise<OrgSubscriptionSumm
   ]);
 
   if (organizationsResult.error) {
-    throw new Error(organizationsResult.error.message);
+    console.error("[subscription-service] Organizations query failed.", organizationsResult.error.message);
+    return [];
   }
 
   if (isSchemaCacheMissing(subscriptionsResult.error) || isSchemaCacheMissing(packagesResult.error)) {
@@ -198,7 +199,8 @@ export async function getAllOrgsWithSubscriptions(): Promise<OrgSubscriptionSumm
   const firstError = [subscriptionsResult, packagesResult].find((result) => result.error)?.error;
 
   if (firstError) {
-    throw new Error(firstError.message);
+    console.error("[subscription-service] Subscription or packages query failed.", firstError.message);
+    return getAllOrgsWithLegacySubscriptions(supabase, organizationsResult.data ?? []);
   }
 
   const subscriptionsByOrganization = new Map((subscriptionsResult.data ?? []).map((subscription) => [subscription.organization_id, subscription]));

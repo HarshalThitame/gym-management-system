@@ -6,15 +6,15 @@ import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getTenantSiteConfig } from "@/lib/tenant/site";
 
 const trainerNav = [
-  { href: "/trainer", label: "Dashboard", icon: Gauge, iconKey: "gauge" },
-  { href: "/trainer/members", label: "Assigned Members", icon: UsersRound, iconKey: "users" },
-  { href: "/trainer/attendance", label: "Attendance", icon: CalendarCheck, iconKey: "calendar-check" },
-  { href: "/trainer/classes", label: "Classes", icon: CalendarDays, iconKey: "calendar-days" },
-  { href: "/trainer/sessions", label: "Sessions", icon: CalendarCheck, iconKey: "calendar-check" },
-  { href: "/trainer/programs", label: "Programs", icon: Dumbbell, iconKey: "dumbbell" },
-  { href: "/trainer/progress", label: "Progress", icon: Activity, iconKey: "activity" },
-  { href: "/trainer/ai", label: "AI Assistant", icon: Brain, iconKey: "brain" },
-  { href: "/trainer/communications", label: "Communications", icon: MessageSquare, iconKey: "message-square" }
+  { href: "/trainer", label: "Dashboard", icon: <Gauge className="size-5" />, iconKey: "gauge" },
+  { href: "/trainer/members", label: "Assigned Members", icon: <UsersRound className="size-5" />, iconKey: "users" },
+  { href: "/trainer/attendance", label: "Attendance", icon: <CalendarCheck className="size-5" />, iconKey: "calendar-check" },
+  { href: "/trainer/classes", label: "Classes", icon: <CalendarDays className="size-5" />, iconKey: "calendar-days" },
+  { href: "/trainer/sessions", label: "Sessions", icon: <CalendarCheck className="size-5" />, iconKey: "calendar-check" },
+  { href: "/trainer/programs", label: "Programs", icon: <Dumbbell className="size-5" />, iconKey: "dumbbell" },
+  { href: "/trainer/progress", label: "Progress", icon: <Activity className="size-5" />, iconKey: "activity" },
+  { href: "/trainer/ai", label: "AI Assistant", icon: <Brain className="size-5" />, iconKey: "brain" },
+  { href: "/trainer/communications", label: "Communications", icon: <MessageSquare className="size-5" />, iconKey: "message-square" }
 ] satisfies PortalNavItem[];
 
 export default async function TrainerLayout({ children }: { children: ReactNode }) {

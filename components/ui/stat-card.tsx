@@ -6,9 +6,16 @@ type StatCardProps = {
   value: string;
   detail: string;
   icon?: ReactNode;
+  status?: "good" | "watch" | "risk";
 };
 
-export function StatCard({ label, value, detail, icon }: StatCardProps) {
+const dotColors: Record<string, string> = {
+  good: "bg-green-500",
+  watch: "bg-amber-500",
+  risk: "bg-red-500"
+};
+
+export function StatCard({ label, value, detail, icon, status }: StatCardProps) {
   return (
     <Card>
       <CardContent className="p-5 md:p-6">
@@ -18,7 +25,10 @@ export function StatCard({ label, value, detail, icon }: StatCardProps) {
             <p className="mt-3 text-3xl font-black">{value}</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p>
           </div>
-          {icon ? <div className="rounded-md bg-accent/20 p-2 text-foreground">{icon}</div> : null}
+          <div className="flex items-start gap-3">
+            {status ? <span className={`mt-1 size-2 shrink-0 rounded-full ${dotColors[status] ?? "bg-gray-300"}`} /> : null}
+            {icon ? <div className="rounded-md bg-accent/20 p-2 text-foreground">{icon}</div> : null}
+          </div>
         </div>
       </CardContent>
     </Card>
