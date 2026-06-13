@@ -9,6 +9,16 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assertFeature } from "@/lib/tenant";
 import type { Json } from "@/types/database";
 
+const sseClients = new Map<string, Set<(data: string) => void>>();
+
+function notifyDomainCheck(domainId: string, data: Record<string, unknown>) {
+  const listeners = sseClients.get(domainId);
+  if (listeners) {
+    const payload = JSON.stringify({ event: "check_complete", domainId, ...data });
+    for (const send of listeners) send(payload);
+  }
+}
+
 export const runtime = "nodejs";
 
 const DomainCheckSchema = z.object({
@@ -140,6 +150,13 @@ export async function POST(request: Request) {
       ownershipStatus: result.ownershipStatus,
       tlsStatus: result.tlsStatus
     }
+  });
+
+  notifyDomainCheck(domain.id, {
+    status: updatedDomain.status,
+    ssl_status: updatedDomain.ssl_status,
+    checked_at: checkedAt,
+    errorMessage: result.errorMessage,
   });
 
   return NextResponse.json({

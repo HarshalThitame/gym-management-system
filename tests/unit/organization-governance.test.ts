@@ -12,7 +12,7 @@ import {
   mergeRestoredOrganizationSettings,
   mergeSoftDeleteSettings
 } from "@/features/super-admin/lib/organization-governance";
-import { fallbackCriticalSuperAdminEmail, getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
+import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import type { OrganizationRow } from "@/types/enterprise";
 
 const baseOrganization: OrganizationRow = {
@@ -174,16 +174,13 @@ describe("super admin organization governance rules", () => {
     expect(JSON.stringify(snapshot.governance)).toContain("retention period complete");
   });
 
-  it("uses the configured critical Super Admin email with a safe fallback", () => {
+  it("throws when critical Super Admin email is not configured", () => {
     const previous = process.env.SUPER_ADMIN_CRITICAL_EMAIL;
     const previousPublic = process.env.NEXT_PUBLIC_SUPER_ADMIN_CRITICAL_EMAIL;
     delete process.env.SUPER_ADMIN_CRITICAL_EMAIL;
     delete process.env.NEXT_PUBLIC_SUPER_ADMIN_CRITICAL_EMAIL;
 
-    expect(getCriticalSuperAdminEmail()).toBe(fallbackCriticalSuperAdminEmail);
-
-    process.env.SUPER_ADMIN_CRITICAL_EMAIL = " Admin@Example.com ";
-    expect(getCriticalSuperAdminEmail()).toBe("admin@example.com");
+    expect(() => getCriticalSuperAdminEmail()).toThrow("SUPER_ADMIN_CRITICAL_EMAIL is not configured");
 
     if (previous) {
       process.env.SUPER_ADMIN_CRITICAL_EMAIL = previous;
@@ -195,6 +192,17 @@ describe("super admin organization governance rules", () => {
       process.env.NEXT_PUBLIC_SUPER_ADMIN_CRITICAL_EMAIL = previousPublic;
     } else {
       delete process.env.NEXT_PUBLIC_SUPER_ADMIN_CRITICAL_EMAIL;
+    }
+  });
+
+  it("returns trimmed and lowercased critical Super Admin email when configured", () => {
+    const previous = process.env.SUPER_ADMIN_CRITICAL_EMAIL;
+    process.env.SUPER_ADMIN_CRITICAL_EMAIL = " Admin@Example.com ";
+    expect(getCriticalSuperAdminEmail()).toBe("admin@example.com");
+    if (previous) {
+      process.env.SUPER_ADMIN_CRITICAL_EMAIL = previous;
+    } else {
+      delete process.env.SUPER_ADMIN_CRITICAL_EMAIL;
     }
   });
 });

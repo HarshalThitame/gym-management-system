@@ -36,7 +36,6 @@ import { buildRecoveryPointLabel, formatCompactNumber, formatCurrency, formatEnt
 import { latestHealthByComponent } from "@/features/enterprise/services/enterprise-service";
 import { ROLE_PERMISSIONS, rolePriority } from "@/lib/rbac";
 import type { EnterpriseDashboard } from "@/types/enterprise";
-import { fallbackCriticalSuperAdminEmail } from "../lib/super-admin-governance-config";
 import type { SuperAdminModule } from "../lib/super-admin-modules";
 import { GymBranchManagementWorkspace } from "./gyms/GymBranchManagementWorkspace";
 import { OrganizationManagementWorkspace } from "./organizations/OrganizationManagementWorkspace";
@@ -59,7 +58,7 @@ type SummaryStat = {
   icon: ReactNode;
 };
 
-export function SuperAdminModuleWorkspace({ superModule, dashboard, filters = {}, gymBranchManagement = null, organizationManagement = null, criticalSuperAdminEmail = fallbackCriticalSuperAdminEmail }: SuperAdminModuleWorkspaceProps) {
+export function SuperAdminModuleWorkspace({ superModule, dashboard, filters = {}, gymBranchManagement = null, organizationManagement = null, criticalSuperAdminEmail = "" }: SuperAdminModuleWorkspaceProps) {
   const context = buildModuleContext(dashboard);
   const stats = getModuleStats(superModule.slug, dashboard, context, organizationManagement);
 

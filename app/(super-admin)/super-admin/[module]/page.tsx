@@ -14,7 +14,9 @@ type SuperAdminModuleRouteProps = {
 };
 
 export function generateStaticParams() {
-  return superAdminModules.map((module) => ({ module: module.slug }));
+  return superAdminModules
+    .filter((m) => m.slug !== "domains" && m.slug !== "white-label")
+    .map((module) => ({ module: module.slug }));
 }
 
 export async function generateMetadata({ params }: SuperAdminModuleRouteProps): Promise<Metadata> {

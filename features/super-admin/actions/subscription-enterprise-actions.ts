@@ -1,0 +1,620 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { writeAuditLog } from "@/lib/audit";
+import { requireApiRole } from "@/lib/auth/api-guards";
+import { requireRole } from "@/lib/auth/guards";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limiter";
+import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
+import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
+import type { AuthActionState } from "@/features/auth/actions/action-state";
+import { validateTransition } from "../services/subscription-state-machine";
+import { assignPackageToOrg } from "../services/subscription-service";
+import { recordSubscriptionEvent } from "../services/subscription-events-service";
+import { schedulePlanChange, cancelScheduledChange } from "../services/subscription-scheduled-changes-service";
+import { assignAddon, removeAddon } from "../services/subscription-addon-service";
+import { convertTrialToPaid } from "../services/subscription-trial-service";
+import {
+  upgradePlanSchema,
+  downgradePlanSchema,
+  cancelSubscriptionSchema,
+  reactivateSubscriptionSchema,
+  extendTrialSchema,
+  convertTrialSchema,
+  assignAddonSchema,
+  removeAddonSchema,
+  scheduleChangeSchema,
+  cancelScheduledChangeSchema,
+  bulkUpdateSubscriptionStatusSchema,
+} from "../schemas/subscription-enterprise-schemas";
+import { prorate, formatProrationSummary, getDaysInPeriod } from "../services/subscription-proration";
+import type { ProrationResult } from "../services/subscription-proration";
+
+const superAdminRoles = ["super_admin"] as const;
+const criticalMfaCookie = "super_admin_mfa_verified_at";
+
+function fieldError(field: string, message: string): AuthActionState {
+  return { status: "error", message, fieldErrors: { [field]: [message] } };
+}
+
+function validationState(fieldErrors: Record<string, string[] | undefined>): AuthActionState {
+  return {
+    status: "error",
+    message: "Check the highlighted fields.",
+    fieldErrors: Object.fromEntries(Object.entries(fieldErrors).filter(([, v]) => v?.length)) as Record<string, string[]>,
+  };
+}
+
+function revalidatePaths() {
+  revalidatePath("/super-admin");
+  revalidatePath("/super-admin/subscriptions");
+  revalidatePath("/organization/plan");
+}
+
+async function verifyMfaStepUp(stepUpEmail: string): Promise<AuthActionState | null> {
+  const email = getCriticalSuperAdminEmail();
+  if (stepUpEmail.trim().toLowerCase() !== email) {
+    return fieldError("stepUpEmail", `Type ${email} to pass the step-up identity check.`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const mfaResult = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (mfaResult.data?.currentLevel !== "aal2") {
+    return { status: "error", message: "MFA step-up required. Go to /super-admin/security/mfa first.", fieldErrors: { stepUpEmail: ["Verify MFA first."] } };
+  }
+
+  const cookieStore = await cookies();
+  const verifiedAt = cookieStore.get(criticalMfaCookie)?.value ?? null;
+  if (!isMfaFreshEnough(verifiedAt)) {
+    return { status: "error", message: "MFA session expired. Verify a fresh code.", fieldErrors: { stepUpEmail: ["Re-verify MFA within 10 minutes."] } };
+  }
+
+  return null;
+}
+
+export async function upgradePlanAction(input: unknown): Promise<AuthActionState> {
+  const parsed = upgradePlanSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  const rateCheck = checkRateLimit(`upgrade:${auth.context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const db = supabase as never as {
+      from(t: string): {
+        select(c: string): {
+          eq(c: string, v: string): {
+            single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+
+    const { data: sub } = await db.from("organization_subscriptions").select("*").eq("id", parsed.data.subscriptionId).single();
+    if (!sub) return { status: "error", message: "Subscription not found." };
+
+    const { data: currentPkg } = await db.from("packages").select("*").eq("id", sub.package_id as string).single();
+    const { data: newPkg } = await db.from("packages").select("*").eq("id", parsed.data.newPackageId).single();
+    if (!currentPkg || !newPkg) return { status: "error", message: "Package not found." };
+
+    const priceOverride = sub.price_override as number | undefined;
+    const currentPrice = priceOverride ?? (currentPkg.price as number) ?? 0;
+    const newPrice = (newPkg.price as number) ?? 0;
+    const billingPeriod = (sub.billing_period as string) || (currentPkg.billing_period as string) || "monthly";
+    const period = billingPeriod as "monthly" | "quarterly" | "half_yearly" | "annual";
+
+    const nextBillingDate = sub.next_billing_date as string | null;
+    const billingAnchor = sub.billing_anchor as string | null;
+    const lastBillingDate = sub.last_billing_date as string | null;
+    const now = new Date();
+
+    let daysRemaining = getDaysInPeriod(period);
+    if (nextBillingDate) {
+      daysRemaining = Math.max(0, Math.round((new Date(nextBillingDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    } else if (billingAnchor) {
+      const anchor = new Date(billingAnchor);
+      const daysSinceAnchor = Math.round((now.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24));
+      daysRemaining = Math.max(0, getDaysInPeriod(period) - daysSinceAnchor);
+    } else if (lastBillingDate) {
+      const lastBill = new Date(lastBillingDate);
+      const daysSinceLastBill = Math.round((now.getTime() - lastBill.getTime()) / (1000 * 60 * 60 * 24));
+      daysRemaining = Math.max(0, getDaysInPeriod(period) - daysSinceLastBill);
+    }
+
+    const prorationResult: ProrationResult = prorate({
+      currentPrice,
+      newPrice,
+      billingPeriod: period,
+      daysRemainingInPeriod: daysRemaining,
+    });
+
+    const pkgDb = supabase as never as {
+      from(t: string): {
+        upsert(r: Record<string, unknown>, o: { onConflict: string }): {
+          select(c: string): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+        };
+      };
+    };
+
+    const upsertPayload: Record<string, unknown> = {
+      organization_id: sub.organization_id,
+      package_id: parsed.data.newPackageId,
+      status: sub.status,
+      expires_at: sub.expires_at ?? null,
+      trial_ends_at: sub.trial_ends_at ?? null,
+      assigned_by: auth.context.userId,
+      notes: parsed.data.reason ?? null,
+    };
+
+    await pkgDb.from("organization_subscriptions").upsert(upsertPayload, { onConflict: "organization_id" }).select("*");
+
+    if (prorationResult.netCharge > 0) {
+      const txDb = supabase as never as {
+        from(t: string): {
+          insert(r: Record<string, unknown>): Promise<{ error: { message: string } | null }>;
+        };
+      };
+      await txDb.from("transactions").insert({
+        gym_id: null,
+        member_id: null,
+        invoice_id: null,
+        payment_id: null,
+        transaction_type: "payment_collected",
+        direction: "credit",
+        amount: prorationResult.netCharge,
+        currency: (newPkg.currency as string) ?? "INR",
+        description: `Prorated upgrade charge (${formatProrationSummary(prorationResult)})`,
+        metadata: { proration: prorationResult, subscriptionId: parsed.data.subscriptionId, fromPackage: sub.package_id, toPackage: parsed.data.newPackageId },
+        created_by: auth.context.userId,
+      });
+    }
+
+    await recordSubscriptionEvent({
+      organizationId: sub.organization_id as string,
+      subscriptionId: parsed.data.subscriptionId,
+      eventType: "upgraded",
+      previousState: { package_id: sub.package_id, price: currentPrice },
+      newState: { package_id: parsed.data.newPackageId, price: newPrice, proration: prorationResult },
+      actorId: auth.context.userId,
+      reason: parsed.data.reason
+        ? `${parsed.data.reason} (${formatProrationSummary(prorationResult)})`
+        : `Upgrade with proration: ${formatProrationSummary(prorationResult)}`,
+    });
+
+    revalidatePaths();
+    return {
+      status: "success",
+      message: `Plan upgraded. ${prorationResult.netCharge > 0 ? formatProrationSummary(prorationResult) + " will be charged." : "No additional charge for this upgrade."}`,
+    };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Upgrade failed." };
+  }
+}
+
+export async function downgradePlanAction(input: unknown): Promise<AuthActionState> {
+  const parsed = downgradePlanSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  const rateCheck = checkRateLimit(`downgrade:${auth.context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const db = supabase as never as {
+      from(t: string): {
+        select(c: string): {
+          eq(c: string, v: string): {
+            single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+
+    const { data: sub } = await db.from("organization_subscriptions").select("*").eq("id", parsed.data.subscriptionId).single();
+    if (!sub) return { status: "error", message: "Subscription not found." };
+
+    const { data: currentPkg } = await db.from("packages").select("*").eq("id", sub.package_id as string).single();
+    const { data: newPkg } = await db.from("packages").select("*").eq("id", parsed.data.newPackageId).single();
+    if (!currentPkg || !newPkg) return { status: "error", message: "Package not found." };
+
+    const pkgRow = newPkg as unknown as { max_members: number; max_branches: number };
+    const usage = await checkUsage(sub.organization_id as string, pkgRow.max_members, pkgRow.max_branches);
+    if (!usage.ok) return usage.error;
+
+    const priceOverride = sub.price_override as number | undefined;
+    const currentPrice = priceOverride ?? (currentPkg.price as number) ?? 0;
+    const newPrice = (newPkg.price as number) ?? 0;
+    const billingPeriod = (sub.billing_period as string) || (currentPkg.billing_period as string) || "monthly";
+    const period = billingPeriod as "monthly" | "quarterly" | "half_yearly" | "annual";
+
+    const nextBillingDate = sub.next_billing_date as string | null;
+    const now = new Date();
+    let daysRemaining = getDaysInPeriod(period);
+    if (nextBillingDate) {
+      daysRemaining = Math.max(0, Math.round((new Date(nextBillingDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+
+    const prorationResult: ProrationResult = prorate({
+      currentPrice,
+      newPrice,
+      billingPeriod: period,
+      daysRemainingInPeriod: daysRemaining,
+    });
+
+    const effectiveDate = new Date();
+    effectiveDate.setDate(effectiveDate.getDate() + 30);
+
+    await schedulePlanChange({
+      subscriptionId: parsed.data.subscriptionId,
+      organizationId: sub.organization_id as string,
+      fromPackageId: sub.package_id as string,
+      toPackageId: parsed.data.newPackageId,
+      changeType: "downgrade",
+      effectiveDate,
+      reason: parsed.data.reason
+        ? `${parsed.data.reason} (expected proration: ${formatProrationSummary(prorationResult)})`
+        : `Expected proration at change: ${formatProrationSummary(prorationResult)}`,
+      createdBy: auth.context.userId,
+    });
+
+    await recordSubscriptionEvent({
+      organizationId: sub.organization_id as string,
+      subscriptionId: parsed.data.subscriptionId,
+      eventType: "downgrade_scheduled",
+      previousState: { package_id: sub.package_id, price: currentPrice },
+      newState: { package_id: parsed.data.newPackageId, price: newPrice, expectedProration: prorationResult, effectiveDate: effectiveDate.toISOString() },
+      actorId: auth.context.userId,
+      reason: parsed.data.reason ?? "Downgrade scheduled with proration estimate",
+    });
+
+    revalidatePaths();
+    return {
+      status: "success",
+      message: `Downgrade scheduled for ${effectiveDate.toLocaleDateString("en-IN")}. Expected proration: ${formatProrationSummary(prorationResult)}`,
+    };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Downgrade failed." };
+  }
+}
+
+async function checkUsage(
+  organizationId: string,
+  memberLimit: number,
+  branchLimit: number
+): Promise<{ ok: true } | { ok: false; error: AuthActionState }> {
+  const supabase = await createSupabaseServerClient();
+
+  const { count: memberCount } = await (supabase as never as { from(t: string): { select(c: string, o: { count: "exact"; head: true }): { eq(c: string, v: string): Promise<{ count: number | null; error: { message: string } | null }> } } })
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId);
+
+  const { count: branchCount } = await supabase
+    .from("gyms")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("status", "active");
+
+  if (memberLimit !== -1 && (memberCount ?? 0) > memberLimit) {
+    return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${memberCount} members but new plan limits to ${memberLimit}. Remove ${(memberCount ?? 0) - memberLimit} members first.` } };
+  }
+
+  if (branchLimit !== -1 && (branchCount ?? 0) > branchLimit) {
+    return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${branchCount} branches but new plan limits to ${branchLimit}. Deactivate ${(branchCount ?? 0) - branchLimit} branches first.` } };
+  }
+
+  return { ok: true };
+}
+
+export async function cancelSubscriptionAction(input: unknown): Promise<AuthActionState> {
+  const parsed = cancelSubscriptionSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  const mfaError = await verifyMfaStepUp(parsed.data.stepUpEmail);
+  if (mfaError) return mfaError;
+
+  const rateCheck = checkRateLimit(`cancel:${auth.context.userId}`, 5, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const db = supabase as never as {
+      from(t: string): {
+        select(c: string): { eq(c: string, v: string): { single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }> } };
+        update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
+      };
+    };
+
+    const { data: sub } = await db.from("organization_subscriptions").select("*").eq("id", parsed.data.subscriptionId).single();
+    if (!sub) return { status: "error", message: "Subscription not found." };
+
+    const row = sub as unknown as { id: string; organization_id: string; status: string; next_billing_date: string | null; cancellation_reason: string | null };
+    const transition = validateTransition(row.status as never, "cancelled");
+    if (!transition.valid) return { status: "error", message: transition.error ?? "Cannot cancel this subscription." };
+
+    const categoryPrefix = parsed.data.cancellationCategory ? `[${parsed.data.cancellationCategory}] ` : "";
+    const fullReason = `${categoryPrefix}${parsed.data.reason}`;
+
+    if (parsed.data.cancelType === "end_of_period") {
+      const cancelledAt = row.next_billing_date ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      await db.from("organization_subscriptions").update({
+        cancelled_at: cancelledAt,
+        cancellation_reason: fullReason,
+        cancellation_category: parsed.data.cancellationCategory ?? null,
+        data_retention_days: parsed.data.dataRetentionDays,
+      }).eq("id", parsed.data.subscriptionId);
+
+      await recordSubscriptionEvent({
+        organizationId: parsed.data.organizationId,
+        subscriptionId: parsed.data.subscriptionId,
+        eventType: "cancellation_scheduled",
+        previousState: { status: row.status, cancelled_at: null },
+        newState: { status: row.status, cancelled_at: cancelledAt, cancelType: "end_of_period", dataRetentionDays: parsed.data.dataRetentionDays, category: parsed.data.cancellationCategory },
+        actorId: auth.context.userId,
+        reason: fullReason,
+      });
+
+      revalidatePaths();
+      return { status: "success", message: `Cancellation scheduled for end of billing period (${new Date(cancelledAt).toLocaleDateString("en-IN")}). Subscription remains active until then.` };
+    }
+
+    await db.from("organization_subscriptions").update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: fullReason,
+      cancellation_category: parsed.data.cancellationCategory ?? null,
+      data_retention_days: parsed.data.dataRetentionDays,
+    }).eq("id", parsed.data.subscriptionId);
+
+    await recordSubscriptionEvent({
+      organizationId: parsed.data.organizationId,
+      subscriptionId: parsed.data.subscriptionId,
+      eventType: "cancelled",
+      previousState: { status: row.status },
+      newState: { status: "cancelled", cancelType: "immediate", dataRetentionDays: parsed.data.dataRetentionDays, category: parsed.data.cancellationCategory },
+      actorId: auth.context.userId,
+      reason: fullReason,
+    });
+
+    revalidatePaths();
+    return { status: "success", message: "Subscription cancelled immediately. Data retained per retention policy." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Cancellation failed." };
+  }
+}
+
+export async function reactivateSubscriptionAction(input: unknown): Promise<AuthActionState> {
+  const parsed = reactivateSubscriptionSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  const mfaError = await verifyMfaStepUp(parsed.data.stepUpEmail);
+  if (mfaError) return mfaError;
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const db = supabase as never as {
+      from(t: string): {
+        select(c: string): { eq(c: string, v: string): { single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }> } };
+        update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
+      };
+    };
+
+    const { data: sub } = await db.from("organization_subscriptions").select("*").eq("id", parsed.data.subscriptionId).single();
+    if (!sub) return { status: "error", message: "Subscription not found." };
+
+    const row = sub as unknown as { id: string; organization_id: string; status: string; cancelled_at: string | null };
+    const hasPendingCancel = row.status === "active" && row.cancelled_at != null;
+
+    if (!hasPendingCancel) {
+      const transition = validateTransition(row.status as never, "active");
+      if (!transition.valid) return { status: "error", message: transition.error ?? "Cannot reactivate this subscription." };
+    }
+
+    await db.from("organization_subscriptions").update({
+      status: "active",
+      cancelled_at: null,
+      cancellation_reason: null,
+      cancellation_category: null,
+      dunning_attempts: 0,
+      dunning_next_retry: null,
+    }).eq("id", parsed.data.subscriptionId);
+
+    await recordSubscriptionEvent({
+      organizationId: parsed.data.organizationId,
+      subscriptionId: parsed.data.subscriptionId,
+      eventType: "reactivated",
+      previousState: { status: row.status, hadPendingCancel: hasPendingCancel },
+      newState: { status: "active" },
+      actorId: auth.context.userId,
+      reason: parsed.data.reason ?? null,
+    });
+
+    revalidatePaths();
+    return { status: "success", message: "Subscription reactivated." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Reactivation failed." };
+  }
+}
+
+export async function extendTrialAction(input: unknown): Promise<AuthActionState> {
+  const parsed = extendTrialSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: sub } = await supabase
+      .from("organization_subscriptions")
+      .select("id, trial_ends_at")
+      .eq("id", parsed.data.subscriptionId)
+      .single();
+    if (!sub) return { status: "error", message: "Subscription not found." };
+
+    const prevTrialEnd = (sub as unknown as { trial_ends_at: string | null }).trial_ends_at;
+
+    await supabase.from("organization_subscriptions").update({
+      trial_ends_at: parsed.data.newTrialEndDate,
+    }).eq("id", parsed.data.subscriptionId);
+
+    await recordSubscriptionEvent({
+      organizationId: parsed.data.organizationId,
+      subscriptionId: parsed.data.subscriptionId,
+      eventType: "trial_extended",
+      previousState: { trial_ends_at: prevTrialEnd },
+      newState: { trial_ends_at: parsed.data.newTrialEndDate },
+      actorId: auth.context.userId,
+      reason: parsed.data.reason ?? null,
+    });
+
+    revalidatePaths();
+    return { status: "success", message: "Trial extended successfully." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Trial extension failed." };
+  }
+}
+
+export async function convertTrialAction(input: unknown): Promise<AuthActionState> {
+  const parsed = convertTrialSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    await convertTrialToPaid(parsed.data.subscriptionId, parsed.data.packageId, auth.context.userId);
+    revalidatePaths();
+    return { status: "success", message: "Trial converted to paid subscription." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Trial conversion failed." };
+  }
+}
+
+export async function assignAddonAction(input: unknown): Promise<AuthActionState> {
+  const parsed = assignAddonSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    await assignAddon(parsed.data.subscriptionId, parsed.data.addonId, parsed.data.quantity, auth.context.userId);
+    revalidatePaths();
+    return { status: "success", message: "Add-on assigned." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Add-on assignment failed." };
+  }
+}
+
+export async function removeAddonAction(input: unknown): Promise<AuthActionState> {
+  const parsed = removeAddonSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    await removeAddon(parsed.data.assignedAddonId, auth.context.userId);
+    revalidatePaths();
+    return { status: "success", message: "Add-on removed." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Add-on removal failed." };
+  }
+}
+
+export async function scheduleChangeAction(input: unknown): Promise<AuthActionState> {
+  const parsed = scheduleChangeSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    await schedulePlanChange({
+      subscriptionId: parsed.data.subscriptionId,
+      organizationId: parsed.data.organizationId,
+      fromPackageId: parsed.data.fromPackageId,
+      toPackageId: parsed.data.toPackageId,
+      changeType: parsed.data.changeType,
+      effectiveDate: new Date(parsed.data.effectiveDate),
+      reason: parsed.data.reason ?? "",
+      createdBy: auth.context.userId,
+    });
+    revalidatePaths();
+    return { status: "success", message: "Plan change scheduled." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Failed to schedule plan change." };
+  }
+}
+
+export async function cancelScheduledChangeAction(input: unknown): Promise<AuthActionState> {
+  const parsed = cancelScheduledChangeSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    await cancelScheduledChange(parsed.data.changeId, parsed.data.organizationId, auth.context.userId);
+    revalidatePaths();
+    return { status: "success", message: "Scheduled change cancelled." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Failed to cancel scheduled change." };
+  }
+}
+
+export async function bulkUpdateSubscriptionStatusAction(input: unknown): Promise<AuthActionState> {
+  const parsed = bulkUpdateSubscriptionStatusSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: subs } = await supabase
+      .from("organization_subscriptions")
+      .select("id, organization_id, status")
+      .in("id", parsed.data.subscriptionIds);
+
+    const rows = (subs ?? []) as Array<{ id: string; organization_id: string; status: string }>;
+
+    for (const sub of rows) {
+      const transition = validateTransition(sub.status as never, parsed.data.status);
+      if (!transition.valid) continue;
+
+      await supabase.from("organization_subscriptions").update({ status: parsed.data.status }).eq("id", sub.id);
+
+      await recordSubscriptionEvent({
+        organizationId: sub.organization_id,
+        subscriptionId: sub.id,
+        eventType: "status_changed",
+        previousState: { status: sub.status },
+        newState: { status: parsed.data.status },
+        actorId: auth.context.userId,
+        reason: parsed.data.reason ?? "Bulk status update",
+      });
+    }
+
+    revalidatePaths();
+    return { status: "success", message: `Updated ${rows.length} subscription(s).` };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Bulk update failed." };
+  }
+}

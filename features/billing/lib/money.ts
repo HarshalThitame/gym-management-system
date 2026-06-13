@@ -8,8 +8,21 @@ export function toMinorUnits(value: number | string) {
   return Math.round(parsed * 100);
 }
 
+const CURRENCY_LOCALE: Record<string, string> = {
+  INR: "en-IN",
+  USD: "en-US",
+  EUR: "de-DE",
+  GBP: "en-GB",
+  AED: "ar-AE",
+  SAR: "ar-SA",
+  SGD: "en-SG",
+  AUD: "en-AU",
+  CAD: "en-CA",
+};
+
 export function formatCurrency(amount: number, currency = "INR") {
-  return new Intl.NumberFormat("en-IN", {
+  const locale = CURRENCY_LOCALE[currency] ?? "en-US";
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     maximumFractionDigits: 0

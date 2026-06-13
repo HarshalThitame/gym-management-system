@@ -5,6 +5,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { assertFeature } from "@/lib/tenant";
 import type { AuthContext } from "@/types/auth";
 import type { Database, Json } from "@/types/database";
+import { recordSubscriptionEvent } from "@/features/super-admin/services/subscription-events-service";
+import { billingLogger } from "../lib/logger";
 import {
   createRazorpayOrder,
   createRazorpayRefund,
@@ -481,6 +483,10 @@ async function processRazorpayWebhookPayload(admin: AppSupabase, payload: Record
   if ((eventType === "payment.captured" || eventType === "payment.authorized") && paymentEntity?.captured) {
     const payment = await loadPaymentForWebhook(admin, paymentEntity);
     if (!payment) {
+      const subResult = await processSubscriptionWebhookPayment(paymentEntity, payload);
+      if (subResult.processed) {
+        return { ok: true, data: { status: "processed" } };
+      }
       return { ok: true, data: { status: "ignored" } };
     }
 
@@ -529,6 +535,96 @@ async function processRazorpayWebhookPayload(admin: AppSupabase, payload: Record
   }
 
   return { ok: true, data: { status: "ignored" } };
+}
+
+async function processSubscriptionWebhookPayment(
+  paymentEntity: RazorpayPaymentEntity,
+  payload: Record<string, unknown>,
+): Promise<{ processed: boolean }> {
+  if (!paymentEntity.orderId) return { processed: false };
+
+  const orderEntity = asObject(readNestedObject(payload, ["payload", "order", "entity"]));
+  const notes = asObject(orderEntity?.notes);
+  const orgInvoiceId = readString(notes?.invoice_id);
+  if (!orgInvoiceId) return { processed: false };
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return { processed: false };
+
+  const db = supabase as never as {
+    from(t: string): {
+      select(c: string): {
+        eq(c: string, v: string): {
+          maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+          single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+          order(c: string, o: { ascending: boolean }): { limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> };
+        };
+      };
+      insert(r: Record<string, unknown>): Promise<{ error: { message: string } | null }>;
+      update(r: Record<string, unknown>): {
+        eq(c: string, v: string): Promise<{ error: { message: string } | null }>;
+      };
+    };
+  };
+
+  const { data: invoice } = await db.from("org_subscription_invoices").select("*").eq("id", orgInvoiceId).maybeSingle();
+  if (!invoice) return { processed: false };
+  if (invoice.status === "paid") return { processed: true };
+
+  const now = new Date().toISOString();
+  const paymentNumber = `SUB-PAY-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+
+  const { data: existingInvoice } = await db.from("org_subscription_invoices").select("*").eq("id", orgInvoiceId).single();
+  if (!existingInvoice) return { processed: false };
+  const currentAmountPaid = (existingInvoice.amount_paid as number) || 0;
+  const totalAmount = (existingInvoice.total_amount as number) || (existingInvoice.subtotal_amount as number) || 0;
+  const newAmountPaid = currentAmountPaid + paymentEntity.amount;
+  const newStatus = newAmountPaid >= totalAmount ? "paid" : "partially_paid";
+
+  await db.from("org_subscription_invoices").update({
+    status: newStatus,
+    amount_paid: newAmountPaid,
+    razorpay_payment_id: paymentEntity.id,
+    paid_at: newStatus === "paid" ? now : (existingInvoice.paid_at as string | null) ?? null,
+  }).eq("id", orgInvoiceId);
+
+  const orgId = invoice.organization_id as string;
+  const subId = invoice.subscription_id as string;
+
+  await db.from("org_subscription_payments").insert({
+    organization_id: orgId,
+    subscription_id: subId,
+    invoice_id: orgInvoiceId,
+    payment_number: paymentNumber,
+    status: "paid",
+    provider: "razorpay",
+    amount: paymentEntity.amount,
+    currency: paymentEntity.currency || "INR",
+    provider_order_id: paymentEntity.orderId,
+    provider_payment_id: paymentEntity.id,
+    paid_at: now,
+  });
+
+  if (newStatus === "paid") {
+    await db.from("organization_subscriptions").update({
+      last_billing_date: now,
+    }).eq("id", subId);
+  }
+
+  try {
+    await recordSubscriptionEvent({
+      organizationId: orgId,
+      subscriptionId: subId,
+      eventType: "payment_recovered",
+      newState: { invoiceId: orgInvoiceId, razorpayPaymentId: paymentEntity.id, amount: paymentEntity.amount, status: newStatus },
+      reason: `Subscription invoice ${orgInvoiceId} paid via Razorpay webhook (order: ${paymentEntity.orderId})`,
+      metadata: { providerPaymentId: paymentEntity.id, providerOrderId: paymentEntity.orderId },
+    });
+  } catch {
+    // non-critical; don't fail the webhook for event recording failure
+  }
+
+  return { processed: true };
 }
 
 async function loadPaymentForWebhook(admin: AppSupabase, razorpayPayment: RazorpayPaymentEntity) {
@@ -625,7 +721,7 @@ async function insertTransactionOnce(admin: AppSupabase, payment: PaymentRow, ac
   });
 
   if (error && error.code !== "23505") {
-    console.error("Payment transaction insert failed", { paymentId: payment.id, transactionType, message: error.message });
+    billingLogger.error("insertTransactionOnce", "Payment transaction insert failed", { paymentId: payment.id, transactionType, message: error.message });
   }
 }
 

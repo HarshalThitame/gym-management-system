@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { MobileBottomNav, type MobilePortalIconKey } from "@/components/pwa/mobile-bottom-nav";
@@ -59,9 +63,84 @@ export function PortalShell({
   const mobileNavItems = navItems.map(({ href, label, iconKey }) => ({ href, label, iconKey }));
   const showPlanBanner = shouldRenderPlanBanner(planContext, planBannerMode);
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeSidebar(); };
+    document.addEventListener("keydown", handleKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
+    };
+  }, [sidebarOpen, closeSidebar]);
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <ProtectedPageCacheGuard />
+
+      {/* Mobile sidebar overlay */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-ink/45 transition-opacity duration-200 lg:hidden",
+          sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+        onClick={closeSidebar}
+        aria-hidden="true"
+      />
+
+      {/* Mobile sidebar drawer */}
+      <aside
+        ref={sidebarRef}
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-surface transition-transform duration-200 lg:hidden",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+        role="dialog"
+        aria-modal={sidebarOpen}
+        aria-label="Navigation menu"
+      >
+        <div className="flex items-center justify-between border-b border-border p-4">
+          <Link className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.16em]" href="/" onClick={closeSidebar}>
+            <span className="grid size-9 place-items-center rounded-md bg-accent text-accent-foreground">{tenantInitial}</span>
+            <span>{tenantShortName}</span>
+          </Link>
+          <button
+            onClick={closeSidebar}
+            className="flex size-11 items-center justify-center rounded-md hover:bg-surface-muted"
+            aria-label="Close navigation menu"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+        <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
+          {navItems.map((item) => (
+            <Link
+              className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
+              href={item.href}
+              key={`${item.href}-${item.label}`}
+              onClick={closeSidebar}
+            >
+              <item.icon aria-hidden="true" className="size-5" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        {showPlanIndicator && planContext ? (
+          <div className="border-t border-border p-3">
+            <PlanIndicator planContext={planContext} planManageHref={planManageHref} />
+          </div>
+        ) : null}
+        <form action={signOutAction} className="border-t border-border p-3" onClick={closeSidebar}>
+          <SignOutButton />
+        </form>
+      </aside>
+
+      {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-border bg-surface lg:block">
         <div className="flex h-full flex-col">
           <div className="border-b border-border p-6">
@@ -75,11 +154,11 @@ export function PortalShell({
           <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
             {navItems.map((item) => (
               <Link
-                className="flex items-center gap-3 rounded-md px-3 py-3 text-sm font-bold text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
+                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
                 href={item.href}
                 key={`${item.href}-${item.label}`}
               >
-                <item.icon aria-hidden="true" className="size-4" />
+                <item.icon aria-hidden="true" className="size-5" />
                 {item.label}
               </Link>
             ))}
@@ -98,10 +177,20 @@ export function PortalShell({
       <div className="lg:pl-72">
         <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
           <div className="container-page flex min-h-16 items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
-              <h1 className="text-xl font-black md:text-2xl">{title}</h1>
-              <p className="mt-1 text-xs font-semibold text-muted-foreground sm:hidden">{tenantName}</p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="flex size-11 items-center justify-center rounded-md hover:bg-surface-muted lg:hidden"
+                aria-label="Open navigation menu"
+                aria-expanded={sidebarOpen}
+              >
+                <Menu className="size-5" />
+              </button>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
+                <h1 className="text-xl font-black md:text-2xl">{title}</h1>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground sm:hidden">{tenantName}</p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               {showPlanIndicator && planContext ? (
