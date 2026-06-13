@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
-  CheckCircle2, Download, EyeOff,
+  ArrowLeftRight, CheckCircle2, Download, EyeOff,
   FileText,
   Globe2,
   Image,
@@ -19,6 +19,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { showToast } from "@/components/ui/toast";
+import { FileUploadZone } from "@/features/enterprise/components/FileUploadZone";
+import { AccessibilityBadge } from "@/features/enterprise/components/AccessibilityBadge";
+import { AuditTimeline } from "@/features/enterprise/components/AuditTimeline";
+import { DevicePreviewToggle, getDeviceWidth } from "@/features/enterprise/components/DevicePreviewToggle";
 
 const tabs = ["brand-assets", "theme-editor", "email", "login", "health"] as const;
 type DetailTab = (typeof tabs)[number];
@@ -86,6 +91,9 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
   const [editingConfig, setEditingConfig] = useState<Record<string, unknown> | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("brand-assets");
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
 
   const orgMap = useMemo(() => new Map(organizations.map((o) => [o.id as string, o])), [organizations]);
   const domainMap = useMemo(() => {
@@ -185,6 +193,42 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
     { label: "Tenant key valid", key: "hasTenantKey" },
   ];
 
+  const originalColors: Record<string, string> = {};
+  if (selectedConfig) {
+    const cols = (selectedConfig as Record<string, unknown>).brand_colors as Record<string, unknown> ?? {};
+    for (const [k, v] of Object.entries(cols)) originalColors[k] = v as string;
+  }
+
+  function renderThemePreview(colors: Record<string, string>, brandName: string) {
+    const primary = colors.primary ?? "#6366f1";
+    const secondary = colors.secondary ?? "#8b5cf6";
+    const accent = colors.accent ?? "#f59e0b";
+    return (
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="p-4" style={{ backgroundColor: primary, color: "#fff" }}>
+          <p className="text-lg font-bold">{brandName}</p>
+          <p className="text-sm opacity-80">Welcome to your branded portal</p>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="h-3 w-3/4 rounded bg-muted" />
+          <div className="h-3 w-1/2 rounded bg-muted" />
+          <div className="flex gap-2 mt-4">
+            <span className="px-3 py-1.5 rounded text-xs font-bold text-white" style={{ backgroundColor: primary }}>Primary</span>
+            <span className="px-3 py-1.5 rounded text-xs font-bold text-white" style={{ backgroundColor: secondary }}>Secondary</span>
+            <span className="px-3 py-1.5 rounded text-xs font-bold text-white" style={{ backgroundColor: accent }}>Accent</span>
+          </div>
+          <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: `${primary}15`, borderLeft: `4px solid ${primary}` }}>
+            <p className="text-xs font-semibold" style={{ color: primary }}>Sample Card</p>
+            <p className="text-xs text-muted-foreground mt-1">This is how themed cards will appear across the platform.</p>
+          </div>
+        </div>
+        <div className="p-3 border-t border-border text-xs text-muted-foreground text-center">
+          {brandName} &middot; Powered by Gym Discovery
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
@@ -243,11 +287,21 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
         </select>
       </div>
 
+      {/* Bulk Actions */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+          <span className="text-sm font-semibold">{selectedIds.size} selected</span>
+          <Button size="sm" variant="secondary" onClick={() => { showToast("Export started", "info"); setSelectedIds(new Set()); }}>Export Selected</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+        </div>
+      )}
+
       {/* Configs Table */}
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr className="border-b border-border text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+              <th className="p-3 text-left w-8"><input type="checkbox" onChange={(e) => setSelectedIds(e.target.checked ? new Set(filteredConfigs.map((c) => c.id as string)) : new Set())} checked={selectedIds.size === filteredConfigs.length && filteredConfigs.length > 0} className="rounded" /></th>
               <th className="p-3 text-left">Brand</th>
               <th className="p-3 text-left hidden sm:table-cell">Plan</th>
               <th className="p-3 text-left">Status</th>
@@ -273,6 +327,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                   onClick={() => handleConfigClick(cid)}
                   className={`cursor-pointer transition-colors hover:bg-muted/30 ${selectedConfigId === cid ? "bg-muted/50" : ""}`}
                 >
+                  <td className="p-3"><input type="checkbox" checked={selectedIds.has(cid)} onChange={(e) => setSelectedIds((prev) => { const n = new Set(prev); e.target.checked ? n.add(cid) : n.delete(cid); return n; })} className="rounded" onClick={(e) => e.stopPropagation()} /></td>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
                       <span className="font-bold">{cfg.brand_name as string ?? "Unnamed Brand"}</span>
@@ -368,26 +423,13 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                 <Card>
                   <CardHeader><h3 className="text-sm font-bold">Logo</h3></CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center justify-center h-32 rounded-lg bg-muted border border-border">
-                      {editingConfig.logo_url ? (
-                        <img
-                          src={editingConfig.logo_url as string}
-                          alt="Brand logo"
-                          className="max-h-28 max-w-full object-contain"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                      ) : (
-                        <Image className="size-10 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground">Logo URL</label>
-                      <input
-                        value={editingConfig.logo_url as string ?? ""}
-                        onChange={(e) => setEditingConfig({ ...editingConfig, logo_url: e.target.value })}
-                        className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-3 text-sm"
-                        placeholder="https://..."
-                      />
+                    <FileUploadZone configId={selectedConfig?.id as string ?? ""} currentUrl={editingConfig.logo_url as string ?? null} type="logo" onUploaded={(url) => setEditingConfig({ ...editingConfig, logo_url: url })} />
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1">
+                        <label className="text-xs font-semibold text-muted-foreground">Logo URL</label>
+                        <input value={editingConfig.logo_url as string ?? ""} onChange={(e) => setEditingConfig({ ...editingConfig, logo_url: e.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="https://..." />
+                      </div>
+                      <div className="shrink-0"><AccessibilityBadge fg={(editingConfig.brand_colors as Record<string, string>)?.primary ?? "#000"} bg="#fff" /></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -396,26 +438,10 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                 <Card>
                   <CardHeader><h3 className="text-sm font-bold">Favicon</h3></CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center justify-center h-32 rounded-lg bg-muted border border-border">
-                      {editingConfig.favicon_url ? (
-                        <img
-                          src={editingConfig.favicon_url as string}
-                          alt="Favicon"
-                          className="max-h-12 max-w-full object-contain"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                      ) : (
-                        <Smartphone className="size-10 text-muted-foreground" />
-                      )}
-                    </div>
+                    <FileUploadZone configId={selectedConfig?.id as string ?? ""} currentUrl={editingConfig.favicon_url as string ?? null} type="favicon" onUploaded={(url) => setEditingConfig({ ...editingConfig, favicon_url: url })} />
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground">Favicon URL</label>
-                      <input
-                        value={editingConfig.favicon_url as string ?? ""}
-                        onChange={(e) => setEditingConfig({ ...editingConfig, favicon_url: e.target.value })}
-                        className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-3 text-sm"
-                        placeholder="https://..."
-                      />
+                      <input value={editingConfig.favicon_url as string ?? ""} onChange={(e) => setEditingConfig({ ...editingConfig, favicon_url: e.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="https://..." />
                     </div>
                   </CardContent>
                 </Card>
@@ -448,6 +474,40 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                         </div>
                       );
                     })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Accessibility Check */}
+              <Card>
+                <CardHeader><h3 className="text-sm font-bold">Accessibility</h3></CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    {(() => {
+                      const pc = (editingConfig.brand_colors as Record<string, string>)?.primary ?? "#000";
+                      const sc = (editingConfig.brand_colors as Record<string, string>)?.secondary ?? "#000";
+                      const ac = (editingConfig.brand_colors as Record<string, string>)?.accent ?? "#000";
+                      return (
+                        <>
+                          <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                            <span className="text-xs">Primary on White</span>
+                            <AccessibilityBadge fg={pc} bg="#ffffff" />
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                            <span className="text-xs">Secondary on White</span>
+                            <AccessibilityBadge fg={sc} bg="#ffffff" />
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                            <span className="text-xs">Accent on White</span>
+                            <AccessibilityBadge fg={ac} bg="#ffffff" />
+                          </div>
+                          <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                            <span className="text-xs">White text on Primary</span>
+                            <AccessibilityBadge fg="#ffffff" bg={pc} />
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
@@ -507,39 +567,21 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
 
               {/* Live Preview */}
               <Card>
-                <CardHeader><h3 className="text-sm font-bold">Live Preview</h3></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <h3 className="text-sm font-bold">{compareMode ? "Before / After Comparison" : "Live Preview"}</h3>
+                  <button onClick={() => setCompareMode(!compareMode)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <ArrowLeftRight className="size-3.5" />
+                    {compareMode ? "Show After" : "Compare"}
+                  </button>
+                </CardHeader>
                 <CardContent>
-                  {(() => {
-                    const colors = (editingConfig.brand_colors as Record<string, string>) ?? {};
-                    const primary = colors.primary as string ?? "#6366f1";
-                    const secondary = colors.secondary as string ?? "#8b5cf6";
-                    const accent = colors.accent as string ?? "#f59e0b";
-                    const brandName = editingConfig.brand_name as string ?? "Brand";
-                    return (
-                      <div className="rounded-lg border border-border overflow-hidden">
-                        <div className="p-4" style={{ backgroundColor: primary, color: "#fff" }}>
-                          <p className="text-lg font-bold">{brandName}</p>
-                          <p className="text-sm opacity-80">Welcome to your branded portal</p>
-                        </div>
-                        <div className="p-4 space-y-3">
-                          <div className="h-3 w-3/4 rounded bg-muted" />
-                          <div className="h-3 w-1/2 rounded bg-muted" />
-                          <div className="flex gap-2 mt-4">
-                            <span className="px-3 py-1.5 rounded text-xs font-bold text-white" style={{ backgroundColor: primary }}>Primary</span>
-                            <span className="px-3 py-1.5 rounded text-xs font-bold text-white" style={{ backgroundColor: secondary }}>Secondary</span>
-                            <span className="px-3 py-1.5 rounded text-xs font-bold text-white" style={{ backgroundColor: accent }}>Accent</span>
-                          </div>
-                          <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: `${primary}15`, borderLeft: `4px solid ${primary}` }}>
-                            <p className="text-xs font-semibold" style={{ color: primary }}>Sample Card</p>
-                            <p className="text-xs text-muted-foreground mt-1">This is how themed cards will appear across the platform.</p>
-                          </div>
-                        </div>
-                        <div className="p-3 border-t border-border text-xs text-muted-foreground text-center">
-                          {brandName} &middot; Powered by Gym Discovery
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {renderThemePreview(compareMode ? originalColors : editingConfig.brand_colors as Record<string, string> ?? {}, editingConfig.brand_name as string ?? "Brand")}
+                  {compareMode && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">After</p>
+                      {renderThemePreview(editingConfig.brand_colors as Record<string, string> ?? {}, editingConfig.brand_name as string ?? "Brand")}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -583,8 +625,12 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
 
               {/* Email Preview */}
               <Card>
-                <CardHeader><h3 className="text-sm font-bold">Email Preview</h3></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <h3 className="text-sm font-bold">Email Preview</h3>
+                  <DevicePreviewToggle device={previewDevice} onChange={setPreviewDevice} />
+                </CardHeader>
                 <CardContent>
+                  <div className="mx-auto overflow-hidden rounded-lg border border-border shadow-sm transition-all" style={{ maxWidth: getDeviceWidth(previewDevice) }}>
                   {(() => {
                     const colors = (editingConfig.brand_colors as Record<string, string>) ?? {};
                     const primary = colors.primary as string ?? "#6366f1";
@@ -612,6 +658,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                       </div>
                     );
                   })()}
+                </div>
                 </CardContent>
               </Card>
             </div>
@@ -684,8 +731,12 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
 
               {/* Login Preview */}
               <Card>
-                <CardHeader><h3 className="text-sm font-bold">Login Page Preview</h3></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <h3 className="text-sm font-bold">Login Page Preview</h3>
+                  <DevicePreviewToggle device={previewDevice} onChange={setPreviewDevice} />
+                </CardHeader>
                 <CardContent>
+                  <div className="mx-auto overflow-hidden rounded-lg border border-border shadow-sm transition-all" style={{ maxWidth: getDeviceWidth(previewDevice) }}>
                   {(() => {
                     const colors = (editingConfig.brand_colors as Record<string, string>) ?? {};
                     const primary = colors.primary as string ?? "#6366f1";
@@ -725,6 +776,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                       </div>
                     );
                   })()}
+                </div>
                 </CardContent>
               </Card>
             </div>
@@ -851,21 +903,12 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                 </CardContent>
               </Card>
 
-              {/* Audit History */}
-              <Card>
-                <CardHeader><h3 className="text-sm font-bold">Audit History</h3></CardHeader>
-                <CardContent>
-                  <div className="max-h-48 overflow-y-auto space-y-1">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center gap-2 p-2 rounded-md bg-muted/20 text-xs">
-                        <FileText className="size-3 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground">Brand update — colors/logo changed</span>
-                        <span className="ml-auto text-muted-foreground">Recently</span>
-                      </div>
-                    ))}
-                    <p className="text-xs text-muted-foreground text-center pt-2">Full audit trail available via organization events log</p>
-                  </div>
-                </CardContent>
+               {/* Audit History */}
+               <Card>
+                 <CardHeader><h3 className="text-sm font-bold">Audit History</h3></CardHeader>
+                 <CardContent>
+                   <AuditTimeline configId={selectedConfig?.id as string ?? ""} />
+                 </CardContent>
               </Card>
             </div>
           )}

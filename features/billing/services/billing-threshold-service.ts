@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/services/email/resend";
 
 
-function getDb(supabase: any): DbClient { return supabase as never as DbClient; }
+function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }
 
 export type ThresholdInput = {
   organizationId: string;

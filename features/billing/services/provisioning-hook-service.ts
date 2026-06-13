@@ -2,7 +2,7 @@ import type { DbClient } from "./db-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 
-function getDb(supabase: any): DbClient { return supabase as never as DbClient; }
+function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }
 
 export type TriggerEvent =
   | "subscription_activated" | "subscription_cancelled" | "subscription_suspended"

@@ -662,11 +662,11 @@ function DomainDetailPanel({
               <p className="font-semibold">Instructions for {registrar}:</p>
               <ol className="list-decimal ml-4 mt-1 space-y-1 text-xs">
                 <li>Log into <a href={REGISTRAR_LINKS[registrar]} target="_blank" rel="noopener noreferrer" className="underline">{registrar}</a></li>
-                <li>Navigate to your domain's DNS settings</li>
+                <li>Navigate to your domain&apos;s DNS settings</li>
                 <li>Add the A record pointing to {records[0]!.value}</li>
                 <li>Add the CNAME record for www subdomain</li>
                 <li>Add the TXT verification record</li>
-                <li>Return here and click "Check Now" to verify</li>
+                <li>Return here and click &quot;Check Now&quot; to verify</li>
               </ol>
             </div>
           )}
@@ -704,7 +704,7 @@ function DomainDetailPanel({
 
           <div className="p-3 rounded-md bg-muted/50 text-xs text-muted-foreground flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>DNS propagation can take 5 minutes to 48 hours. After adding records, click "Check Now" to verify. If verification fails, check that records exactly match the values above.</span>
+            <span>DNS propagation can take 5 minutes to 48 hours. After adding records, click &quot;Check Now&quot; to verify. If verification fails, check that records exactly match the values above.</span>
           </div>
         </div>
       )}
@@ -735,7 +735,7 @@ function DomainDetailPanel({
           <div className="rounded-lg border border-border p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Certificate Details</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div><span className="text-muted-foreground text-xs">Issuer</span><p className="font-mono text-xs font-bold">Let's Encrypt Authority X3</p></div>
+              <div><span className="text-muted-foreground text-xs">Issuer</span><p className="font-mono text-xs font-bold">Let&apos;s Encrypt Authority X3</p></div>
               <div><span className="text-muted-foreground text-xs">Subject</span><p className="font-mono text-xs font-bold truncate">{domain.domain as string}</p></div>
               <div><span className="text-muted-foreground text-xs">Valid From</span><p className="font-bold text-xs">{formatDate(domain.verified_at as string | null)}</p></div>
               <div>
@@ -760,13 +760,13 @@ function DomainDetailPanel({
           {domain.ssl_status === "failed" && (
             <div className="p-3 rounded-md border border-red-200 bg-red-50 text-sm text-red-700 flex items-start gap-2">
               <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <div><p className="font-semibold">SSL certificate issuance failed.</p><p className="text-xs mt-1">Common causes: DNS records not propagated, CA validation failed, domain not reachable. Click "Check Now" to retry after DNS updates.</p></div>
+              <div><p className="font-semibold">SSL certificate issuance failed.</p><p className="text-xs mt-1">Common causes: DNS records not propagated, CA validation failed, domain not reachable. Click &quot;Check Now&quot; to retry after DNS updates.</p></div>
             </div>
           )}
 
           <div className="p-3 rounded-md bg-muted/50 text-xs text-muted-foreground flex items-start gap-2">
             <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>SSL is managed automatically by Vercel via Let's Encrypt. Certificates are issued within minutes of DNS propagation and auto-renew before expiry. No manual renewal required.</span>
+            <span>SSL is managed automatically by Vercel via Let&apos;s Encrypt. Certificates are issued within minutes of DNS propagation and auto-renew before expiry. No manual renewal required.</span>
           </div>
         </div>
       )}
@@ -790,7 +790,7 @@ function DomainDetailPanel({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No provider events recorded. Use "Add to Vercel" to register this domain with the CDN provider.</p>
+            <p className="text-sm text-muted-foreground">No provider events recorded. Use &quot;Add to Vercel&quot; to register this domain with the CDN provider.</p>
           )}
           <div className="flex gap-2 flex-wrap">
             <Button size="sm" variant="secondary" onClick={() => onProviderAction("add")} disabled={isProvisioning}>

@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isValidGstinFormat, parseGstin, getStateName, getGstTaxSlab } from "../lib/gstin";
 
 
-function getDb(supabase: any): DbClient { return supabase as never as DbClient; }
+function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }
 
 export type TaxCalculationInput = {
   subtotal: number;

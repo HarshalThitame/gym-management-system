@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { CreditCard, Download, ReceiptText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,9 +52,9 @@ export function BillingOverview({
           <h1 className="text-2xl font-bold">Billing</h1>
           <p className="text-sm text-muted-foreground">Manage your subscription, invoices, and payment methods</p>
         </div>
-        <a href="/organization/plan">
+        <Link href="/organization/plan">
           <Button variant="outline" size="sm" className="w-full sm:w-auto">View Plan Details</Button>
-        </a>
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

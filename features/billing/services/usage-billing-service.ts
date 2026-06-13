@@ -3,7 +3,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createRazorpayOrder } from "../lib/razorpay";
 
 
-function getDb(supabase: any): DbClient { return supabase as never as DbClient; }
+function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }
 
 export type UsageSnapshot = {
   organizationId: string;
