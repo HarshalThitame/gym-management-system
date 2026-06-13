@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-
-const clients = new Map<string, Set<(data: string) => void>>();
-
-export function notifyDomainCheck(domainId: string, data: Record<string, unknown>) {
-  const listeners = clients.get(domainId);
-  if (listeners) {
-    const payload = JSON.stringify({ event: "check_complete", domainId, ...data });
-    for (const send of listeners) {
-      send(payload);
-    }
-  }
-}
+import { getSseClients } from "../sse";
 
 export async function GET(request: NextRequest) {
   const domainId = request.nextUrl.searchParams.get("domainId");
   if (!domainId) return NextResponse.json({ error: "domainId required" }, { status: 400 });
 
+  const clients = getSseClients();
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
@@ -26,6 +15,7 @@ export async function GET(request: NextRequest) {
 
       if (!clients.has(domainId)) clients.set(domainId, new Set());
       const listeners = clients.get(domainId)!;
+
       listeners.add(send);
 
       send(JSON.stringify({ event: "connected", domainId }));

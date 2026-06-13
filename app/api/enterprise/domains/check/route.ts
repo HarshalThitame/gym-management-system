@@ -7,17 +7,8 @@ import { requireApiRole } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assertFeature } from "@/lib/tenant";
+import { notifyDomainCheck } from "../sse";
 import type { Json } from "@/types/database";
-
-const sseClients = new Map<string, Set<(data: string) => void>>();
-
-function notifyDomainCheck(domainId: string, data: Record<string, unknown>) {
-  const listeners = sseClients.get(domainId);
-  if (listeners) {
-    const payload = JSON.stringify({ event: "check_complete", domainId, ...data });
-    for (const send of listeners) send(payload);
-  }
-}
 
 export const runtime = "nodejs";
 

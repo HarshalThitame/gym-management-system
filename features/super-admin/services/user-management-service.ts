@@ -235,7 +235,8 @@ export async function deleteUserCascade(userId: string) {
   const adminClient = supabase as AuthAdminClient;
   await adminClient.auth.admin.deleteUser(userId).catch((e: Error) => console.error("[delete cascade] auth user", e.message));
   await supabase.from("profiles").delete().eq("id", userId).then((r) => r.error && console.error("[delete cascade] profile", r.error.message));
-  try { await (supabase as unknown as never).from("login_history").delete().eq("user_id", userId); } catch {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  try { await (supabase as any).from("login_history").delete().eq("user_id", userId); } catch {}
   try { await supabase.from("branch_users").delete().eq("user_id", userId); } catch {}
   try { await supabase.from("user_roles").delete().eq("user_id", userId); } catch {}
 
