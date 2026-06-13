@@ -24,8 +24,10 @@ async function SecurityContent() {
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/super-admin/security/audit" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Audit</Link>
           <Link href="/super-admin/security/incidents" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Incidents</Link>
-          <Link href="/super-admin/security/investigate" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Investigate</Link>
-          <Link href="/super-admin/security/sessions" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Sessions</Link>
+          <Link href="/super-admin/security/mfa" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">MFA</Link>
+          <Link href="/super-admin/security/passwords" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Passwords</Link>
+          <Link href="/super-admin/security/emergency" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Emergency</Link>
+          <Link href="/super-admin/security/compliance" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Compliance</Link>
           <Link href="/super-admin/security/analytics" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Analytics</Link>
           <Link href="/super-admin/security/settings" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">Settings</Link>
         </div>
