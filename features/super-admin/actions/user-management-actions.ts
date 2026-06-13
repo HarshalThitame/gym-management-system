@@ -118,7 +118,9 @@ export async function inviteUserAction(_previousState: AuthActionState, formData
   });
 
   if (profileError) {
-    await adminClient.auth.admin.deleteUser(authUserId).catch(() => {});
+    await adminClient.auth.admin.deleteUser(authUserId).catch((rollbackError) => {
+      console.error("Failed to rollback auth user after profile creation failure:", rollbackError);
+    });
     return { status: "error", message: profileError.message };
   }
 
@@ -500,7 +502,7 @@ export async function bulkUserActionAction(_previousState: AuthActionState, form
   for (const profile of profiles) {
     if (action === "force_logout") {
       const adminClient = supabase as AuthAdminClient;
-      await adminClient.auth.admin.deleteUser(profile.id).catch(() => {});
+      await adminClient.auth.admin.deleteUser(profile.id).catch((err) => { console.error("Auth delete rollback failed:", err); });
     } else {
       const { error } = await supabase.from("profiles").update({ status: nextStatus }).eq("id", profile.id);
       if (!error) successCount++;
@@ -623,7 +625,7 @@ export async function revokeInviteAction(_previousState: AuthActionState, formDa
   if (!criticalAccess.ok) return criticalAccess.state;
 
   const adminClient = supabase as AuthAdminClient;
-  await adminClient.auth.admin.deleteUser(parsed.data.userId).catch(() => {});
+  await adminClient.auth.admin.deleteUser(parsed.data.userId).catch((err) => { console.error("Auth delete rollback failed:", err); });
   const { error } = await supabase.from("profiles").update({ status: "archived" }).eq("id", parsed.data.userId);
   if (error) return { status: "error", message: error.message };
 

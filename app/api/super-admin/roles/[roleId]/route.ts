@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRoleDetailData } from "@/features/super-admin/services/role-management-service";
-import { requireApiAuth } from "@/lib/auth/api-guards";
+import { requireApiRole } from "@/lib/auth/api-guards";
 import { checkRateLimitWithEnv } from "@/lib/rate-limiter";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ roleId: string }> }) {
-  const auth = await requireApiAuth({});
+  const auth = await requireApiRole(["super_admin"], {});
   if (!auth.ok) return auth.response;
 
   const ip = req.headers.get("x-forwarded-for") ?? "unknown";
