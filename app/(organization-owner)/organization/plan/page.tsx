@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
-import { getPlanServerData } from "@/features/organization-owner/services/plan-data-service";
+import { getActivePackagesAction, getOrgSubscriptionAction, getUsageHistoryAction } from "@/features/organization-owner/actions/plan-data-actions";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import type { RoleName } from "@/types/auth";
 
@@ -24,9 +24,11 @@ async function PlanContent() {
   const organizationId = ctx.organizationId ?? null;
   if (!organizationId) redirect("/unauthorized?reason=organization_scope");
 
-  const [planContext, planServerData] = await Promise.all([
+  const [planContext, allPackages, currentSubscription, usageHistory] = await Promise.all([
     getOrgPlanContext(organizationId),
-    getPlanServerData(organizationId),
+    getActivePackagesAction(),
+    getOrgSubscriptionAction(),
+    getUsageHistoryAction(),
   ]);
 
   const { EnterprisePlanManagement } = await import("@/features/organization-owner/components/enterprise-plan-management");
@@ -37,7 +39,9 @@ async function PlanContent() {
       <EnterprisePlanManagement
         organizationId={organizationId}
         planContext={planContext}
-        serverData={planServerData}
+        allPackages={allPackages}
+        currentSubscription={currentSubscription}
+        usageHistory={usageHistory}
       />
     </div>
   );
