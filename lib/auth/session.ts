@@ -75,10 +75,7 @@ function toAuthProfile(profile: AuthProfile): AuthProfile {
 async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, gymId: string | null) {
   if (gymId) {
     const { data } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
-
-    if (data?.organization_id) {
-      return data.organization_id;
-    }
+    if (data?.organization_id) return data.organization_id;
   }
 
   const { data } = await supabase
@@ -89,8 +86,18 @@ async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createS
     .order("role_name", { ascending: false })
     .limit(10);
 
-  const organizationOwnerAssignment = data?.find((assignment) => assignment.role_name === "organization_owner" && assignment.access_scope === "organization");
-  return organizationOwnerAssignment?.organization_id ?? data?.[0]?.organization_id ?? null;
+  const orgOwnerAssignment = data?.find((a) => a.role_name === "organization_owner" && a.access_scope === "organization");
+  if (orgOwnerAssignment?.organization_id) return orgOwnerAssignment.organization_id;
+  if (data?.[0]?.organization_id) return data[0].organization_id;
+
+  // Fallback: check if user is the owner of any organization
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("owner_user_id", userId)
+    .maybeSingle();
+
+  return org?.id ?? null;
 }
 
 export function userHasRole(context: AuthContext, allowedRoles: readonly RoleName[]) {
