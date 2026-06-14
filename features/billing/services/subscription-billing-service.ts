@@ -22,10 +22,17 @@ type DBSelect = {
 
 type DBSelectChain = {
   eq(c: string, v: unknown): DBSelectEq;
-  in(c: string, v: string[]): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+  in(c: string, v: string[]): DBSelectIn;
   order(c: string, o: { ascending: boolean }): QueryResLimit;
   update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
   insert(r: Record<string, unknown>): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+};
+
+type DBSelectIn = Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> & {
+  not(c: string, op: string, v: unknown): {
+    lte(c: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+  };
+  lte(c: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
 };
 
 type DBSelectEq = {
