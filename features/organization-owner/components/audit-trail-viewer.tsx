@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Download, Search } from "lucide-react";
 import type { AuditTrailEntry, AuditTrailFilters, AuditTrailResult } from "@/features/organization-owner/services/audit-trail-service";
+import { getAuditTrailAction } from "@/features/organization-owner/actions/audit-trail-actions";
 
 type AuditTrailViewerProps = {
   organizationId: string;
@@ -59,8 +60,7 @@ export function AuditTrailViewer({ organizationId }: AuditTrailViewerProps) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { getAuditTrail } = await import("@/features/organization-owner/services/audit-trail-service");
-      const result = await getAuditTrail(organizationId, filters);
+      const result = await getAuditTrailAction(filters);
       setData(result);
     } finally {
       setLoading(false);
