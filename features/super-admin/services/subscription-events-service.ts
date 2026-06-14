@@ -39,10 +39,15 @@ type EventInsert = {
 };
 
 type EventsQuery = {
-  select(columns: string): EventsQuery & { insert(row: EventInsert): Promise<{ error: { message: string } | null }> };
+  select(columns: string): EventsSelectQuery;
+  insert(row: EventInsert): Promise<{ error: { message: string } | null }>;
   eq(column: string, value: string): EventsQuery;
   order(column: string, options: { ascending: boolean }): EventsQuery;
   range(from: number, to: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+};
+
+type EventsSelectQuery = EventsQuery & {
+  insert(row: EventInsert): Promise<{ error: { message: string } | null }>;
 };
 
 type EventsClient = {
@@ -63,7 +68,7 @@ export async function recordSubscriptionEvent(input: SubscriptionEventInput): Pr
   };
 
   const client = supabase as never as EventsClient;
-  const { error: insertError } = await client.from("subscription_events").select("*").insert(payload);
+  const { error: insertError } = await client.from("subscription_events").insert(payload);
   if (insertError) {
     console.error("[subscription-events] Failed to record event", { eventType: input.eventType, message: insertError.message });
   }

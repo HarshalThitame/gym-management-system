@@ -8,6 +8,7 @@ import type { Json } from "@/types/database";
 import { assignPackageToOrg, updateSubscriptionStatus } from "../services/subscription-service";
 import type { AssignPackageToOrgInput } from "../services/subscription-service";
 import { assignPackageSchema, updateStatusSchema } from "../schemas/subscription-schemas";
+import { recordSubscriptionEvent } from "../services/subscription-events-service";
 
 const superAdminRoles = ["super_admin"] as const;
 
@@ -51,6 +52,20 @@ export async function assignPackageAction(input: unknown): Promise<AuthActionSta
       packageId: parsed.data.packageId,
       status: parsed.data.status
     });
+
+    // Record subscription lifecycle event for audit trail
+    await recordSubscriptionEvent({
+      organizationId: parsed.data.organizationId,
+      subscriptionId: subscription.id,
+      eventType: parsed.data.status === "trial" ? "trial_started" : "created",
+      newState: {
+        packageId: parsed.data.packageId,
+        status: parsed.data.status,
+      },
+      actorId: auth.context.userId,
+      reason: parsed.data.notes ?? null,
+    });
+
     revalidateSubscriptionPaths();
 
     return { status: "success", message: "Package assigned successfully." };

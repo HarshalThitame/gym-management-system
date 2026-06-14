@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getOrgOwnerContext } from "./action-utils";
+import { validateTransition } from "@/features/super-admin/services/subscription-state-machine";
+import { recordSubscriptionEvent } from "@/features/super-admin/services/subscription-events-service";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
 
@@ -38,10 +41,12 @@ export async function requestPlanChangeAction(prevState: ActionState, formData: 
 export async function toggleAutoRenewAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/plan");
-    const supabase = await createSupabaseServerClient();
+    // Use admin client to bypass RLS (user already authorized via getOrgOwnerContext)
+    const supabase = getSupabaseAdminClient();
+    if (!supabase) return { status: "error", message: "Database connection failed." };
     const enabled = formData.get("enabled") === "true";
 
-    const { error } = await supabase.from("organization_subscriptions").update({ auto_renew: enabled, updated_at: new Date().toISOString() } as never).eq("organization_id", ctx.organizationId);
+    const { error } = await (supabase as any).from("organization_subscriptions").update({ auto_renew: enabled, updated_at: new Date().toISOString() }).eq("organization_id", ctx.organizationId);
     if (error) throw new Error(error.message);
     await writeAuditLog({ actorId: ctx.userId, action: `organization_owner.${enabled ? "enable" : "disable"}_auto_renew`, entityType: "organization_subscription", entityId: null } as never);
     revalidatePath("/organization/plan");
@@ -61,8 +66,42 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
 
     if (!reason || confirmation !== "CANCEL") return { status: "error", message: "Provide a reason and type CANCEL to confirm." };
 
-    const { error } = await supabase.from("organization_subscriptions").update({ status: "cancelled", cancellation_reason: reason, cancelled_at: new Date().toISOString() } as never).eq("organization_id", ctx.organizationId);
+    // Use admin client for read/write (user already authorized via getOrgOwnerContext)
+    const admin = getSupabaseAdminClient();
+    if (!admin) return { status: "error", message: "Database connection failed." };
+
+    // Fetch current subscription to validate state transition
+    const { data: sub } = await (admin as any)
+      .from("organization_subscriptions")
+      .select("id, organization_id, status, package_id")
+      .eq("organization_id", ctx.organizationId)
+      .single();
+
+    if (!sub) return { status: "error", message: "No subscription found for this organization." };
+
+    // Validate state transition using the state machine
+    const subRow = sub as unknown as { id: string; status: string; package_id: string };
+    const transition = validateTransition(subRow.status as never, "cancelled");
+    if (!transition.valid) return { status: "error", message: transition.error ?? "Cannot cancel this subscription from its current state." };
+
+    const { error } = await (admin as any).from("organization_subscriptions").update({
+      status: "cancelled",
+      cancellation_reason: reason,
+      cancelled_at: new Date().toISOString(),
+    }).eq("organization_id", ctx.organizationId);
+
     if (error) throw new Error(error.message);
+
+    await recordSubscriptionEvent({
+      organizationId: ctx.organizationId,
+      subscriptionId: subRow.id,
+      eventType: "cancelled",
+      previousState: { status: subRow.status },
+      newState: { status: "cancelled", cancelType: "immediate" },
+      actorId: ctx.userId,
+      reason,
+    });
+
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.cancel_subscription", entityType: "organization_subscription", entityId: null, metadata: { reason, retentionFeedback } as never });
     revalidatePath("/organization/plan");
     return { status: "success", message: "Subscription cancelled. You will retain access until the end of the billing period." };

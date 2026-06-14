@@ -63,6 +63,8 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
     advanced_reports_enabled: "Advanced Reports & BI",
     custom_domain_enabled: "Custom Domain",
     api_access_enabled: "API Access",
+    notifications_enabled: "Notifications",
+    white_label_enabled: "White Label",
   };
 
   const allFeatureKeys = Object.keys(featureLabels);

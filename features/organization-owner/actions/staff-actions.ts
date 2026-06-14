@@ -6,6 +6,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { requireOrgWithinLimit } from "../lib/entitlement-guards";
 
 export async function inviteStaffAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
@@ -19,6 +20,15 @@ export async function inviteStaffAction(prevState: AuthActionState, formData: Fo
 
     const { data: gym } = await supabase.from("gyms").select("organization_id").eq("id", gymId).single();
     if (!gym || gym.organization_id !== ctx.organizationId) return { ...prevState, status: "error", message: "Gym not in your organization." };
+
+    // Enforce staff limit before inviting
+    const { count: staffCount } = await supabase
+      .from("branch_users")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", ctx.organizationId)
+      .eq("status", "active");
+    const staffLimit = await requireOrgWithinLimit(ctx.organizationId, "max_staff", staffCount ?? 0);
+    if (!staffLimit.ok) return { ...prevState, status: "error", message: staffLimit.error };
 
     const adminClient = getSupabaseAdminClient();
     if (!adminClient) throw new Error("Server configuration error.");

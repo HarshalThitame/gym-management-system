@@ -17,24 +17,36 @@ vi.mock("@/lib/supabase/server", () => ({
 const createSupabaseServerClientMock = vi.mocked(createSupabaseServerClient);
 
 const safeDefaultFlags: OrgFeatureFlags = {
-  maxMembers: 0,
-  maxBranches: 0,
-  qrAttendanceEnabled: false,
-  biometricAttendanceEnabled: false,
-  rfidAttendanceEnabled: false,
-  classSchedulingEnabled: false,
-  trainerAssignmentEnabled: false,
-  razorpayEnabled: false,
-  communicationsEnabled: false,
-  aiEnabled: false,
-  advancedReportsEnabled: false,
-  customDomainEnabled: false,
-  apiAccessEnabled: false
+  maxMembers: 0, maxBranches: 0, maxGyms: 0, maxTrainers: 0, maxStaff: 0, maxStorageGb: 0, maxApiCalls: 0,
+  manualAttendance: false, qrAttendanceEnabled: false, dynamicQrAttendance: false,
+  trainerAttendance: false, staffAttendance: false, branchAttendance: false,
+  biometricAttendanceEnabled: false, fingerprintAttendance: false, faceRecognitionAttendance: false,
+  rfidAttendanceEnabled: false, nfcAttendance: false, geoFencingAttendance: false,
+  attendanceApi: false, attendanceReports: false,
+  memberManagement: false, membershipRenewals: false, expiryTracking: false,
+  goalTracking: false, progressPhotos: false,
+  leadManagement: false, trialManagement: false,
+  trainerManagement: false, workoutAssignment: false, nutritionPlans: false,
+  ptSessions: false, classBooking: false,
+  billingInvoices: false, receipts: false, paymentTracking: false,
+  basicReports: false, advancedReportsEnabled: false,
+  emailNotifications: false, inAppNotifications: false,
+  whatsappIntegration: false, smsIntegration: false,
+  memberPortal: false, trainerPortal: false,
+  aiEnabled: false, aiCoach: false, aiRetentionAnalysis: false, aiRevenueInsights: false,
+  whiteLabelEnabled: false, customDomainEnabled: false, customBranding: false,
+  multiBranchManagement: false, franchiseManagement: false,
+  apiAccessEnabled: false, webhooks: false, auditLogs: false,
+  advancedRbac: false, prioritySupport: false, staffManagement: false,
 };
 
 const standardPackage = {
   max_members: 500,
   max_branches: 3,
+  max_gyms: 3,
+  max_trainers: 20,
+  max_storage_gb: 50,
+  max_api_calls: 10000,
   qr_attendance_enabled: true,
   biometric_attendance_enabled: true,
   rfid_attendance_enabled: false,
@@ -134,10 +146,10 @@ describe("feature resolver", () => {
       qrAttendanceEnabled: true,
       biometricAttendanceEnabled: true,
       rfidAttendanceEnabled: false,
-      classSchedulingEnabled: true,
-      trainerAssignmentEnabled: true,
-      razorpayEnabled: true,
-      communicationsEnabled: true,
+      classBooking: true,
+      workoutAssignment: true,
+      billingInvoices: true,
+      emailNotifications: true,
       aiEnabled: false,
       advancedReportsEnabled: true,
       customDomainEnabled: false,
@@ -153,7 +165,7 @@ describe("feature resolver", () => {
 
   it("hasFeature returns the requested feature state", async () => {
     mockFeatureClient(activeSubscription());
-    await expect(hasFeature("org_1", "classSchedulingEnabled")).resolves.toBe(true);
+    await expect(hasFeature("org_1", "classBooking")).resolves.toBe(true);
 
     mockFeatureClient(activeSubscription());
     await expect(hasFeature("org_1", "aiEnabled")).resolves.toBe(false);
@@ -162,7 +174,7 @@ describe("feature resolver", () => {
   it("assertFeature resolves when the feature is enabled", async () => {
     mockFeatureClient(activeSubscription());
 
-    await expect(assertFeature("org_1", "classSchedulingEnabled")).resolves.toBeUndefined();
+    await expect(assertFeature("org_1", "classBooking")).resolves.toBeUndefined();
   });
 
   it("assertFeature throws when the feature is disabled", async () => {

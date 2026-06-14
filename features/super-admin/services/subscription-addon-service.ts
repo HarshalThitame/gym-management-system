@@ -113,7 +113,7 @@ export async function assignAddon(
   const assigned = await getAssignedAddons(subscriptionId);
   const alreadyAssigned = assigned.find((a) => a.addonId === addonId);
   if (alreadyAssigned) {
-    const { error } = await q.from("subscription_addons").select("").update({ quantity: alreadyAssigned.quantity + quantity, unit_price: addonDef.unitPrice }).eq("id", alreadyAssigned.id);
+    const { error } = await q.from("subscription_addons").update({ quantity: alreadyAssigned.quantity + quantity, unit_price: addonDef.unitPrice }).eq("id", alreadyAssigned.id);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await q.from("subscription_addons").insert({

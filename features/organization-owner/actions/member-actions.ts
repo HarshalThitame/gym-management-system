@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { requireOrgWithinLimit } from "../lib/entitlement-guards";
 
 type MemberInsert = Database["public"]["Tables"]["members"]["Insert"];
 type MemberUpdate = Database["public"]["Tables"]["members"]["Update"];
@@ -37,6 +38,14 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_member", entityType: "member", entityId: memberId });
     } else {
+      // Enforce member limit before creation
+      const { count } = await (supabase as never as { from(t: string): { select(c: string, o: { count: "exact"; head: true }): { eq(k: string, v: string): Promise<{ count: number | null }> } } })
+        .from("members")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId);
+      const limitCheck = await requireOrgWithinLimit(ctx.organizationId, "max_members", count ?? 0);
+      if (!limitCheck.ok) return { ...prevState, status: "error", message: limitCheck.error };
+
       const memberCode = `MEM-${Date.now().toString(36).toUpperCase()}`;
       const insert: Record<string, unknown> = {
         gym_id: gymId, member_code: memberCode, full_name: fullName, phone,

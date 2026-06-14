@@ -11,23 +11,39 @@ import { recordSubscriptionEvent } from "@/features/super-admin/services/subscri
 
 type Supabase = NonNullable<ReturnType<typeof getSupabaseAdminClient>>;
 type DB = {
-  from(t: string): {
-    select(c: string): {
-      eq(c: string, v: unknown): {
-        single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
-        gte(c: string, v: string): { lte(c2: string, v2: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> };
-        not(c: string, op: string, v: unknown): {
-          in(c: string, v: string[]): {
-            lte(c: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
-          };
-        };
-      };
-      in(c: string, v: string[]): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
-      update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
-      insert(r: Record<string, unknown>): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
-      order(c: string, o: { ascending: boolean }): QueryResLimit;
+  from(t: string): DBRoot;
+};
+
+type DBRoot = DBSelect & DBUpdate & DBInsert;
+
+type DBSelect = {
+  select(c: string): DBSelectChain;
+};
+
+type DBSelectChain = {
+  eq(c: string, v: unknown): DBSelectEq;
+  in(c: string, v: string[]): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+  order(c: string, o: { ascending: boolean }): QueryResLimit;
+  update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
+  insert(r: Record<string, unknown>): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+};
+
+type DBSelectEq = {
+  single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+  gte(c: string, v: string): { lte(c2: string, v2: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> };
+  not(c: string, op: string, v: unknown): {
+    in(c: string, v: string[]): {
+      lte(c: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
     };
   };
+};
+
+type DBUpdate = {
+  update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
+};
+
+type DBInsert = {
+  insert(r: Record<string, unknown>): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
 };
 type QueryResLimit = {
   limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
@@ -64,9 +80,8 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
   const { data: subsDue } = await db
     .from("organization_subscriptions")
     .select("")
-    .eq("status", "active")
-    .not("next_billing_date", "is", null)
     .in("status", ["active", "trial"])
+    .not("next_billing_date", "is", null)
     .lte("next_billing_date", now.toISOString());
 
   if (!subsDue || subsDue.length === 0) return result;
@@ -142,7 +157,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
       result.ordersCreated++;
 
       const razorpayOrderId = orderResult.order.id;
-      await db.from("org_subscription_invoices").select("").update({
+      await db.from("org_subscription_invoices").update({
         razorpay_order_id: razorpayOrderId,
       }).eq("id", invoice.id as string);
 
@@ -167,7 +182,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
       const nextBilling = new Date(now);
       nextBilling.setDate(nextBilling.getDate() + daysUntilNextBilling);
 
-      await db.from("organization_subscriptions").select("").update({
+      await db.from("organization_subscriptions").update({
         last_billing_date: now.toISOString(),
         next_billing_date: nextBilling.toISOString(),
       }).eq("id", sub.id as string);

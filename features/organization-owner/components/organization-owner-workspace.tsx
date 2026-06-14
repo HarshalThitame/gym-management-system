@@ -82,7 +82,41 @@ function ModuleHero({ dashboard, module }: { dashboard: OrganizationOwnerDashboa
   );
 }
 
+const MODULE_FEATURE_MAP: Record<string, { feature: string; name: string; plan: string }> = {
+  gyms: { feature: "member_management", name: "Gym Management", plan: "Starter" },
+  staff: { feature: "staff_management", name: "Staff Management", plan: "Growth" },
+  members: { feature: "member_management", name: "Member Management", plan: "Starter" },
+  memberships: { feature: "member_management", name: "Membership Management", plan: "Starter" },
+  revenue: { feature: "billing_invoices", name: "Revenue & Billing", plan: "Starter" },
+  trainers: { feature: "trainer_management", name: "Trainer Management", plan: "Starter" },
+  attendance: { feature: "attendance_reports", name: "Attendance", plan: "Starter" },
+  classes: { feature: "class_booking", name: "Class Booking", plan: "Growth" },
+  communications: { feature: "whatsapp_integration", name: "Communications", plan: "Growth" },
+  analytics: { feature: "advanced_reports", name: "Advanced Analytics", plan: "Growth" },
+  branding: { feature: "custom_branding", name: "White Label Branding", plan: "Enterprise" },
+  domains: { feature: "custom_domain", name: "Custom Domains", plan: "Enterprise" },
+  billing: { feature: "billing_invoices", name: "Billing", plan: "Starter" },
+  nutrition: { feature: "nutrition_plans", name: "Nutrition Plans", plan: "Growth" },
+  support: { feature: "priority_support", name: "Priority Support", plan: "Enterprise" },
+  security: { feature: "audit_logs", name: "Security & Audit", plan: "Enterprise" },
+};
+
 function ModuleContent({ dashboard, module, moduleData, moduleFilters, planContext }: { dashboard: OrganizationOwnerDashboard; module: OrganizationOwnerModule; moduleData?: unknown | undefined; moduleFilters?: ModuleSearchParams | undefined; planContext?: OrgPlanContext | null | undefined }) {
+  const featureCheck = MODULE_FEATURE_MAP[module.slug];
+  const isFeatureEnabled = featureCheck
+    ? planContext?.features?.[featureCheck.feature as keyof typeof planContext.features]
+    : true;
+
+  if (!isFeatureEnabled) {
+    return (
+      <FeatureLocked
+        description={`${featureCheck?.name ?? "This feature"} is available on ${featureCheck?.plan ?? "higher"} plans.`}
+        featureName={featureCheck?.name ?? module.title}
+        requiredPlan={featureCheck?.plan ?? "Growth"}
+      />
+    );
+  }
+
   const common = { dashboard, moduleData, moduleFilters };
   switch (module.slug) {
     case "gyms": return <GymsModule dashboard={dashboard} />;
@@ -92,11 +126,11 @@ function ModuleContent({ dashboard, module, moduleData, moduleFilters, planConte
     case "revenue": return <RevenueEnterpriseModule dashboard={dashboard} />;
     case "trainers": return <TrainersEnterpriseModule dashboard={dashboard} />;
     case "attendance": return <AttendanceEnterpriseModule dashboard={dashboard} />;
-    case "classes": return planContext?.features.classSchedulingEnabled ? <ClassesEnterpriseModule dashboard={dashboard} /> : <FeatureLocked description="Class scheduling is available on Standard and higher plans." featureName="Class Scheduling" requiredPlan="Standard" />;
-    case "communications": return planContext?.features.communicationsEnabled ? <CommunicationsEnterpriseModule dashboard={dashboard} /> : <FeatureLocked description="Communications are available on Standard and higher plans." featureName="Communications" requiredPlan="Standard" />;
+    case "classes": return <ClassesEnterpriseModule dashboard={dashboard} />;
+    case "communications": return <CommunicationsEnterpriseModule dashboard={dashboard} />;
     case "analytics": return <AnalyticsEnterpriseModule dashboard={dashboard} />;
     case "branding": return <BrandingEnterpriseModule dashboard={dashboard} />;
-    case "domains": return planContext?.features.customDomainEnabled ? <DomainsEnterpriseModule dashboard={dashboard} /> : <FeatureLocked description="Custom domains are available on Premium." featureName="Custom Domains" requiredPlan="Premium" />;
+    case "domains": return <DomainsEnterpriseModule dashboard={dashboard} />;
     case "billing": return <BillingEnterpriseModule dashboard={dashboard} />;
     case "nutrition": return <NutritionEnterpriseModule dashboard={dashboard} />;
     case "support": return <SupportEnterpriseModule dashboard={dashboard} />;

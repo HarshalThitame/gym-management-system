@@ -11,8 +11,14 @@ const packageSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(500).optional().or(z.literal("")),
-  maxMembers: z.coerce.number().int().min(0).default(0),
-  maxBranches: z.coerce.number().int().min(0).default(0),
+  maxMembers: z.coerce.number().int().min(-1).default(0),
+  maxBranches: z.coerce.number().int().min(-1).default(0),
+  maxGyms: z.coerce.number().int().min(-1).default(1),
+  maxTrainers: z.coerce.number().int().min(-1).default(0),
+  maxStorage: z.coerce.number().int().min(-1).default(0),
+  maxApiCalls: z.coerce.number().int().min(-1).default(0),
+  trialDays: z.coerce.number().int().min(0).default(0),
+  sortOrder: z.coerce.number().int().min(0).default(0),
   price: z.coerce.number().int().min(0).default(0),
   billingPeriod: z.enum(["monthly", "quarterly", "half_yearly", "annual"]).default("monthly"),
   isActive: z.coerce.boolean().default(true),
@@ -28,6 +34,8 @@ const packageSchema = z.object({
   apiAccess: z.coerce.boolean().default(false),
   biometricAttendance: z.coerce.boolean().default(false),
   rfidAttendance: z.coerce.boolean().default(false),
+  notificationsEnabled: z.coerce.boolean().default(false),
+  whiteLabelEnabled: z.coerce.boolean().default(false),
 });
 
 export async function savePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -70,6 +78,12 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     description: parsed.data.description || null,
     max_members: parsed.data.maxMembers,
     max_branches: parsed.data.maxBranches,
+    max_gyms: parsed.data.maxGyms,
+    max_trainers: parsed.data.maxTrainers,
+    max_storage_gb: parsed.data.maxStorage,
+    max_api_calls: parsed.data.maxApiCalls,
+    trial_days: parsed.data.trialDays,
+    sort_order: parsed.data.sortOrder,
     price: parsed.data.price,
     billing_period: parsed.data.billingPeriod,
     is_active: parsed.data.isActive,
@@ -85,7 +99,11 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     api_access_enabled: parsed.data.apiAccess,
     biometric_attendance_enabled: parsed.data.biometricAttendance,
     rfid_attendance_enabled: parsed.data.rfidAttendance,
+    notifications_enabled: parsed.data.notificationsEnabled,
+    white_label_enabled: parsed.data.whiteLabelEnabled,
   };
+
+
 
   try {
     if (parsed.data.id) {

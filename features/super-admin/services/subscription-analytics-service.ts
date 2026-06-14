@@ -105,8 +105,11 @@ function calculateMrr(
   let total = 0;
   for (const sub of [...active, ...trialing]) {
     const pkg = packageMap.get(sub.package_id as string);
-    if (pkg?.price) {
-      total += normalizeToMonthly(pkg.price, pkg.billing_period);
+    if (!pkg) continue;
+    // Use price_override if set, otherwise fall back to package price
+    const effectivePrice = (sub.price_override as number | null) ?? pkg.price;
+    if (effectivePrice) {
+      total += normalizeToMonthly(effectivePrice, pkg.billing_period);
     }
   }
   return total;
@@ -164,16 +167,16 @@ async function countOverLimits(
       };
     };
 
-    const { data: subs } = await raw.from("organization_subscriptions").select("id, organization_id, package_id");
-    const { data: pkgs } = await raw.from("packages").select("id, max_members, max_branches");
-    if (!subs || !pkgs) return 0;
+    const { data: subs } = await raw.from("organization_subscriptions").select("id, organization_id, package_id, status");
+    const { data: limitsData } = await raw.from("package_limits").select("package_id, limit_code, value");
+    if (!subs || !limitsData) return 0;
 
-    const pkgMap = new Map<string, { max_members: number; max_branches: number }>();
-    for (const p of pkgs) {
-      pkgMap.set(p.id as string, {
-        max_members: (p.max_members as number) ?? -1,
-        max_branches: (p.max_branches as number) ?? -1,
-      });
+    // Build limit map from package_limits (single source of truth)
+    const limitMap = new Map<string, number>();
+    for (const l of limitsData) {
+      if ((l.limit_code as string) === (limitType === "member" ? "max_members" : "max_branches")) {
+        limitMap.set(l.package_id as string, l.value as number);
+      }
     }
 
     const activeSubs = subs.filter((s) => (s.status as string) === "active") as Array<{ organization_id: string; package_id: string }>;
@@ -181,15 +184,12 @@ async function countOverLimits(
     const orgIds = [...new Set(activeSubs.map((s) => s.organization_id))];
 
     let count = 0;
-    const limitField = limitType === "member" ? "max_members" : "max_branches";
 
     for (const orgId of orgIds) {
       const orgSubs = activeSubs.filter((s) => s.organization_id === orgId);
       for (const sub of orgSubs) {
-        const pkg = pkgMap.get(sub.package_id);
-        if (!pkg) continue;
-        const limit = pkg[limitField];
-        if (limit === -1) continue;
+        const limit = limitMap.get(sub.package_id);
+        if (limit === undefined || limit === -1) continue;
 
         let actualCount = 0;
         if (limitType === "member") {

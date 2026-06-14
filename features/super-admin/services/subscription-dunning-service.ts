@@ -13,14 +13,14 @@ const DUNNING_RETRY_DAYS = [3, 5, 7];
 
 type RawQuery = {
   select(c: string): RawFilter;
+  update(r: Record<string, unknown>): RawFilter;
 };
 
 type RawFilter = {
-  eq(c: string, v: unknown): RawFilter;
+  eq(c: string, v: unknown): RawFilter & Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
   lt(c: string, v: string): RawFilter;
   gt(c: string, v: number): RawFilter;
   single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
-  update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
 };
 
 type Db = {
@@ -85,7 +85,7 @@ export async function recordDunningFailure(subscriptionId: string, organizationI
     updateData.status = "suspended";
   }
 
-  const { error: updateError } = await db.from("organization_subscriptions").select("").update(updateData).eq("id", subscriptionId);
+  const { error: updateError } = await db.from("organization_subscriptions").update(updateData).eq("id", subscriptionId);
   if (updateError) throw new Error(updateError.message);
 
   await recordSubscriptionEvent({
@@ -103,7 +103,7 @@ export async function recordDunningSuccess(subscriptionId: string, organizationI
   const supabase = await createSupabaseServerClient();
   const db = supabase as never as Db;
 
-  const { error } = await db.from("organization_subscriptions").select("").update({
+  const { error } = await db.from("organization_subscriptions").update({
     dunning_attempts: 0,
     dunning_next_retry: null,
     status: "active",

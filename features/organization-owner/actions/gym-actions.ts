@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { requireOrgWithinLimit } from "../lib/entitlement-guards";
 
 type GymInsert = Database["public"]["Tables"]["gyms"]["Insert"];
 type GymUpdate = Database["public"]["Tables"]["gyms"]["Update"];
@@ -29,6 +30,14 @@ export async function saveGymAction(prevState: AuthActionState, formData: FormDa
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_gym", entityType: "gym", entityId: gymId });
     } else {
+      // Enforce gym limit before creation
+      const { count } = await supabase
+        .from("gyms")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId);
+      const limitCheck = await requireOrgWithinLimit(ctx.organizationId, "max_gyms", count ?? 0);
+      if (!limitCheck.ok) return { ...prevState, status: "error", message: limitCheck.error };
+
       const insert: GymInsert = { organization_id: ctx.organizationId, name, slug, timezone, currency, status: validStatus };
       const { data, error } = await supabase.from("gyms").insert(insert).select("id").single();
       if (error) throw new Error(error.message);

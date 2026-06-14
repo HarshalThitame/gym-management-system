@@ -7,10 +7,14 @@ export type OrgUsage = {
   branchLimit: number;
   branchPercent: number;
   isOverBranchLimit: boolean;
+  gymLimit?: number;
+  trainerLimit?: number;
+  storageLimit?: number;
+  apiCallLimit?: number;
 };
 
 export type UsageWarning = {
-  type: "member" | "branch";
+  type: "member" | "branch" | "gym" | "trainer" | "storage" | "api_calls";
   level: "over_limit" | "critical" | "warning";
   current: number;
   limit: number;

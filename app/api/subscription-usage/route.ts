@@ -3,6 +3,11 @@ import { getOrgUsage } from "@/features/super-admin/services/subscription-usage-
 import { requireApiAuth } from "@/lib/auth/api-guards";
 import { checkRateLimitWithEnv } from "@/lib/rate-limiter";
 
+function isOrgAccessible(context: { roles: readonly string[]; organizationId: string | null }, orgId: string): boolean {
+  if (context.roles.includes("super_admin")) return true;
+  return context.organizationId === orgId;
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireApiAuth({});
   if (!auth.ok) return auth.response;
@@ -13,6 +18,10 @@ export async function GET(req: NextRequest) {
 
   const organizationId = req.nextUrl.searchParams.get("organizationId") ?? "";
   if (!organizationId) return NextResponse.json({ error: "organizationId param is required" }, { status: 400 });
+
+  if (!isOrgAccessible(auth.context, organizationId)) {
+    return NextResponse.json({ error: "Access denied to this organization's usage data" }, { status: 403 });
+  }
 
   try {
     const usage = await getOrgUsage(organizationId);

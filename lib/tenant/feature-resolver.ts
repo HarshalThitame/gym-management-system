@@ -1,227 +1,253 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { FeatureFlagKey, OrgFeatureFlags } from "./feature-flags";
+import { organizationHasFeature, checkOrganizationLimit } from "@/features/super-admin/services/entitlement-service";
+import type { OrgFeatureFlags, FeatureFlagKey } from "./feature-flags";
 
-type SubscriptionStatus = "active" | "trial";
+type Sb = ReturnType<typeof createSupabaseServerClient> extends Promise<infer R> ? R : never;
 
-type SupabaseQueryError = {
-  message: string;
+const SAFE_DEFAULT: OrgFeatureFlags = {
+  maxMembers: 0, maxBranches: 0, maxGyms: 0, maxTrainers: 0, maxStaff: 0, maxStorageGb: 0, maxApiCalls: 0,
+  manualAttendance: false, qrAttendanceEnabled: false, dynamicQrAttendance: false,
+  trainerAttendance: false, staffAttendance: false, branchAttendance: false,
+  biometricAttendanceEnabled: false, fingerprintAttendance: false, faceRecognitionAttendance: false,
+  rfidAttendanceEnabled: false, nfcAttendance: false, geoFencingAttendance: false,
+  attendanceApi: false, attendanceReports: false,
+  memberManagement: false, membershipRenewals: false, expiryTracking: false,
+  goalTracking: false, progressPhotos: false,
+  leadManagement: false, trialManagement: false,
+  trainerManagement: false, workoutAssignment: false, nutritionPlans: false,
+  ptSessions: false, classBooking: false,
+  billingInvoices: false, receipts: false, paymentTracking: false,
+  basicReports: false, advancedReportsEnabled: false,
+  emailNotifications: false, inAppNotifications: false,
+  whatsappIntegration: false, smsIntegration: false,
+  memberPortal: false, trainerPortal: false,
+  aiEnabled: false, aiCoach: false, aiRetentionAnalysis: false, aiRevenueInsights: false,
+  whiteLabelEnabled: false, customDomainEnabled: false, customBranding: false,
+  multiBranchManagement: false, franchiseManagement: false,
+  apiAccessEnabled: false, webhooks: false, auditLogs: false,
+  advancedRbac: false, prioritySupport: false, staffManagement: false,
 };
 
-type OrganizationSubscriptionQuery = {
-  select(columns: string): OrganizationSubscriptionQuery;
-  eq(column: "organization_id", value: string): OrganizationSubscriptionQuery;
-  in(column: "status", values: SubscriptionStatus[]): OrganizationSubscriptionQuery;
-  order(column: "started_at", options: { ascending: boolean }): OrganizationSubscriptionQuery;
-  limit(count: number): OrganizationSubscriptionQuery;
-  maybeSingle(): Promise<{ data: unknown; error: SupabaseQueryError | null }>;
-};
+// Map of feature flag keys to feature_catalog codes and limit keys
+const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "limit"; code: string }> = {
+  // Limits
+  maxMembers: { type: "limit", code: "max_members" },
+  maxBranches: { type: "limit", code: "max_branches" },
+  maxGyms: { type: "limit", code: "max_gyms" },
+  maxTrainers: { type: "limit", code: "max_trainers" },
+  maxStaff: { type: "limit", code: "max_staff" },
+  maxStorageGb: { type: "limit", code: "max_storage_gb" },
+  maxApiCalls: { type: "limit", code: "max_api_calls" },
 
-type FeatureResolverSupabaseClient = {
-  from(table: "organization_subscriptions"): OrganizationSubscriptionQuery;
-};
+  // Attendance features
+  manualAttendance: { type: "feature", code: "manual_attendance" },
+  qrAttendanceEnabled: { type: "feature", code: "qr_attendance" },
+  dynamicQrAttendance: { type: "feature", code: "dynamic_qr_attendance" },
+  trainerAttendance: { type: "feature", code: "trainer_attendance" },
+  staffAttendance: { type: "feature", code: "staff_attendance" },
+  branchAttendance: { type: "feature", code: "branch_attendance" },
+  biometricAttendanceEnabled: { type: "feature", code: "biometric_attendance" },
+  fingerprintAttendance: { type: "feature", code: "fingerprint_attendance" },
+  faceRecognitionAttendance: { type: "feature", code: "face_recognition_attendance" },
+  rfidAttendanceEnabled: { type: "feature", code: "rfid_attendance" },
+  nfcAttendance: { type: "feature", code: "nfc_attendance" },
+  geoFencingAttendance: { type: "feature", code: "geo_fencing_attendance" },
+  attendanceApi: { type: "feature", code: "attendance_api" },
+  attendanceReports: { type: "feature", code: "attendance_reports" },
 
-const SAFE_DEFAULT_FEATURE_FLAGS: OrgFeatureFlags = {
-  maxMembers: 0,
-  maxBranches: 0,
-  qrAttendanceEnabled: false,
-  biometricAttendanceEnabled: false,
-  rfidAttendanceEnabled: false,
-  classSchedulingEnabled: false,
-  trainerAssignmentEnabled: false,
-  razorpayEnabled: false,
-  communicationsEnabled: false,
-  aiEnabled: false,
-  advancedReportsEnabled: false,
-  customDomainEnabled: false,
-  apiAccessEnabled: false
-};
+  // Membership
+  memberManagement: { type: "feature", code: "member_management" },
+  membershipRenewals: { type: "feature", code: "membership_renewals" },
+  expiryTracking: { type: "feature", code: "expiry_tracking" },
+  goalTracking: { type: "feature", code: "goal_tracking" },
+  progressPhotos: { type: "feature", code: "progress_photos" },
 
-const FEATURE_SELECT = `
-  status,
-  trial_ends_at,
-  packages (
-    max_members,
-    max_branches,
-    qr_attendance_enabled,
-    biometric_attendance_enabled,
-    rfid_attendance_enabled,
-    class_scheduling_enabled,
-    trainer_assignment_enabled,
-    razorpay_enabled,
-    communications_enabled,
-    ai_enabled,
-    advanced_reports_enabled,
-    custom_domain_enabled,
-    api_access_enabled
-  )
-`;
+  // CRM
+  leadManagement: { type: "feature", code: "lead_management" },
+  trialManagement: { type: "feature", code: "trial_management" },
+
+  // Trainer
+  trainerManagement: { type: "feature", code: "trainer_management" },
+  trainerAssignmentEnabled: { type: "feature", code: "workout_assignment" },  // backward compat
+  workoutAssignment: { type: "feature", code: "workout_assignment" },
+  nutritionPlans: { type: "feature", code: "nutrition_plans" },
+  ptSessions: { type: "feature", code: "pt_sessions" },
+  classBooking: { type: "feature", code: "class_booking" },
+  classSchedulingEnabled: { type: "feature", code: "class_booking" },  // backward compat
+
+  // Billing
+  billingInvoices: { type: "feature", code: "billing_invoices" },
+  razorpayEnabled: { type: "feature", code: "billing_invoices" },  // backward compat
+  receipts: { type: "feature", code: "receipts" },
+  paymentTracking: { type: "feature", code: "payment_tracking" },
+
+  // Reports
+  basicReports: { type: "feature", code: "basic_reports" },
+  advancedReportsEnabled: { type: "feature", code: "advanced_reports" },
+
+  // Communication
+  emailNotifications: { type: "feature", code: "email_notifications" },
+  inAppNotifications: { type: "feature", code: "in_app_notifications" },
+  whatsappIntegration: { type: "feature", code: "whatsapp_integration" },
+  smsIntegration: { type: "feature", code: "sms_integration" },
+  communicationsEnabled: { type: "feature", code: "whatsapp_integration" },  // backward compat
+
+  // Portals
+  memberPortal: { type: "feature", code: "member_portal" },
+  trainerPortal: { type: "feature", code: "trainer_portal" },
+
+  // AI
+  aiEnabled: { type: "feature", code: "ai_recommendations" },
+  aiCoach: { type: "feature", code: "ai_coach" },
+  aiRetentionAnalysis: { type: "feature", code: "ai_retention_analysis" },
+  aiRevenueInsights: { type: "feature", code: "ai_revenue_insights" },
+
+  // White Label
+  whiteLabelEnabled: { type: "feature", code: "white_label" },
+  customDomainEnabled: { type: "feature", code: "custom_domain" },
+  customBranding: { type: "feature", code: "custom_branding" },
+
+  // Enterprise
+  multiBranchManagement: { type: "feature", code: "multi_branch_management" },
+  franchiseManagement: { type: "feature", code: "franchise_management" },
+  apiAccessEnabled: { type: "feature", code: "api_access" },
+  webhooks: { type: "feature", code: "webhooks" },
+  auditLogs: { type: "feature", code: "audit_logs" },
+  advancedRbac: { type: "feature", code: "advanced_rbac" },
+  prioritySupport: { type: "feature", code: "priority_support" },
+  staffManagement: { type: "feature", code: "staff_management" },
+};
 
 /**
- * Resolves the package feature flags for an organization.
- *
- * Use this in server components, server actions, route handlers, and server-side
- * services when a full package capability snapshot is needed. The resolver
- * fails closed: missing subscriptions, expired trials, malformed rows, and
- * Supabase errors all return a no-access default.
+ * Resolves all feature flags and limits for an organization.
+ * Queries the new package_features and package_limits tables dynamically.
+ * Adding a new feature to the catalog automatically makes it resolvable here.
  */
 export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFeatureFlags> {
   try {
-    const supabase = await getFeatureResolverClient();
-    const { data, error } = await supabase
+    const supabase = await createSupabaseServerClient();
+    const s = supabase as never as {
+      from(t: string): {
+        select(c: string): {
+          eq(k: string, v: string): {
+            in(k: string, v: string[]): {
+              order(k: string, o: { ascending: boolean }): {
+                limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+              };
+            };
+          };
+        };
+      };
+    };
+
+    const { data: subs } = await s
       .from("organization_subscriptions")
-      .select(FEATURE_SELECT)
+      .select("status, trial_ends_at, package_id")
       .eq("organization_id", organizationId)
       .in("status", ["active", "trial"])
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("started_at", { ascending: false } as never)
+      .limit(1);
 
-    if (error) {
-      console.error("Failed to resolve organization feature flags", {
-        organizationId,
-        message: error.message
-      });
-      return safeDefaultFeatureFlags();
+    const sub = (subs ?? [])[0];
+    if (!sub) return { ...SAFE_DEFAULT };
+
+    const status = sub.status as string;
+    if (status !== "active" && status !== "trial") return { ...SAFE_DEFAULT };
+    if (status === "trial") {
+      const trialEnds = sub.trial_ends_at as string | null;
+      if (trialEnds && new Date(trialEnds).getTime() < Date.now()) return { ...SAFE_DEFAULT };
     }
 
-    return mapSubscriptionToFeatureFlags(data);
+    const packageId = sub.package_id as string;
+    if (!packageId) return { ...SAFE_DEFAULT };
+
+    // Fetch all features and limits for the package in parallel
+    const [featuresData, limitsData] = await Promise.all([
+      (s as never as {
+        from(t: string): {
+          select(c: string): {
+            eq(k: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+          };
+        };
+      }).from("package_features").select("feature_code, value").eq("package_id", packageId),
+      (s as never as {
+        from(t: string): {
+          select(c: string): {
+            eq(k: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+          };
+        };
+      }).from("package_limits").select("limit_code, value").eq("package_id", packageId),
+    ]);
+
+    // Build feature lookup
+    const featureValues: Record<string, boolean> = {};
+    for (const f of (featuresData.data ?? [])) {
+      const val = f.value;
+      featureValues[f.feature_code as string] = val === true || val === "true";
+    }
+
+    // Build limit lookup
+    const limitValues: Record<string, number> = {};
+    for (const l of (limitsData.data ?? [])) {
+      limitValues[l.limit_code as string] = l.value as number;
+    }
+
+    // Build the full OrgFeatureFlags object from the map
+    const result: Record<string, unknown> = {};
+    for (const [key, mapping] of Object.entries(FEATURE_MAP)) {
+      if (mapping.type === "feature") {
+        result[key] = featureValues[mapping.code] ?? false;
+      } else {
+        result[key] = limitValues[mapping.code] ?? 0;
+      }
+    }
+
+    return result as unknown as OrgFeatureFlags;
   } catch (error) {
-    console.error("Unexpected feature resolver failure", {
-      organizationId,
-      message: error instanceof Error ? error.message : "Unknown error"
-    });
-    return safeDefaultFeatureFlags();
+    console.error("Feature resolver failed:", error instanceof Error ? error.message : "Unknown error");
+    return { ...SAFE_DEFAULT };
   }
 }
 
 /**
- * Checks a single package feature flag for an organization.
- *
- * Use this convenience helper when a service or page only needs one boolean
- * capability check and does not need the complete package limit snapshot.
+ * Checks a single feature for an organization.
+ * Logs a warning if the feature key is not recognized (prevents silent false returns).
  */
 export async function hasFeature(organizationId: string, feature: FeatureFlagKey): Promise<boolean> {
-  const flags = await getOrgFeatureFlags(organizationId);
-  return flags[feature];
+  const mapping = FEATURE_MAP[feature];
+  if (!mapping) {
+    console.error(`[feature-resolver] Unknown feature key: "${feature}". Add it to FEATURE_MAP.`);
+    return false;
+  }
+  if (mapping.type !== "feature") {
+    // This is a limit key, not a feature flag
+    return false;
+  }
+  return organizationHasFeature(organizationId, mapping.code);
 }
 
 /**
- * Throws when an organization does not have a required package feature.
- *
- * Use this inside server actions and API route handlers where unavailable
- * package capabilities should immediately stop the operation.
+ * Throws if an organization does not have a required feature.
  */
 export async function assertFeature(organizationId: string, feature: FeatureFlagKey): Promise<void> {
   const enabled = await hasFeature(organizationId, feature);
-
-  if (!enabled) {
-    throw new Error("Feature not available on your current plan.");
-  }
+  if (!enabled) throw new Error("Feature not available on your current plan.");
 }
 
 /**
- * Checks whether an organization can add another member under its package.
- *
- * `maxMembers` uses -1 for unlimited. The comparison is strict so an org with
- * maxMembers 150 can add while the current count is 149, but not at 150.
+ * Checks whether an organization can add another member.
  */
 export async function isWithinMemberLimit(organizationId: string, currentMemberCount: number): Promise<boolean> {
   const flags = await getOrgFeatureFlags(organizationId);
-
-  if (flags.maxMembers === -1) {
-    return true;
-  }
-
+  if (flags.maxMembers === -1) return true;
   return currentMemberCount < flags.maxMembers;
 }
 
 /**
- * Checks whether an organization can add another branch under its package.
- *
- * `maxBranches` uses -1 for unlimited. The comparison is strict so an org with
- * maxBranches 3 can add while the current count is 2, but not at 3.
+ * Checks whether an organization can add another branch.
  */
 export async function isWithinBranchLimit(organizationId: string, currentBranchCount: number): Promise<boolean> {
   const flags = await getOrgFeatureFlags(organizationId);
-
-  if (flags.maxBranches === -1) {
-    return true;
-  }
-
+  if (flags.maxBranches === -1) return true;
   return currentBranchCount < flags.maxBranches;
-}
-
-async function getFeatureResolverClient() {
-  return await createSupabaseServerClient() as unknown as FeatureResolverSupabaseClient;
-}
-
-function safeDefaultFeatureFlags(): OrgFeatureFlags {
-  return { ...SAFE_DEFAULT_FEATURE_FLAGS };
-}
-
-function mapSubscriptionToFeatureFlags(value: unknown): OrgFeatureFlags {
-  if (!isRecord(value)) {
-    return safeDefaultFeatureFlags();
-  }
-
-  const status = value.status;
-  if (status !== "active" && status !== "trial") {
-    return safeDefaultFeatureFlags();
-  }
-
-  if (status === "trial" && !isTrialValid(value.trial_ends_at)) {
-    return safeDefaultFeatureFlags();
-  }
-
-  const packageRecord = readPackageRecord(value.packages);
-  if (!packageRecord) {
-    return safeDefaultFeatureFlags();
-  }
-
-  return {
-    maxMembers: readNumber(packageRecord, "max_members"),
-    maxBranches: readNumber(packageRecord, "max_branches"),
-    qrAttendanceEnabled: readBoolean(packageRecord, "qr_attendance_enabled"),
-    biometricAttendanceEnabled: readBoolean(packageRecord, "biometric_attendance_enabled"),
-    rfidAttendanceEnabled: readBoolean(packageRecord, "rfid_attendance_enabled"),
-    classSchedulingEnabled: readBoolean(packageRecord, "class_scheduling_enabled"),
-    trainerAssignmentEnabled: readBoolean(packageRecord, "trainer_assignment_enabled"),
-    razorpayEnabled: readBoolean(packageRecord, "razorpay_enabled"),
-    communicationsEnabled: readBoolean(packageRecord, "communications_enabled"),
-    aiEnabled: readBoolean(packageRecord, "ai_enabled"),
-    advancedReportsEnabled: readBoolean(packageRecord, "advanced_reports_enabled"),
-    customDomainEnabled: readBoolean(packageRecord, "custom_domain_enabled"),
-    apiAccessEnabled: readBoolean(packageRecord, "api_access_enabled")
-  };
-}
-
-function readPackageRecord(value: unknown) {
-  const packageValue = Array.isArray(value) ? value[0] : value;
-  return isRecord(packageValue) ? packageValue : null;
-}
-
-function isTrialValid(value: unknown) {
-  if (value === null || value === undefined) {
-    return true;
-  }
-
-  if (typeof value !== "string") {
-    return false;
-  }
-
-  const trialEndsAt = Date.parse(value);
-  return Number.isFinite(trialEndsAt) && trialEndsAt > Date.now();
-}
-
-function readBoolean(record: Record<string, unknown>, key: string) {
-  return record[key] === true;
-}
-
-function readNumber(record: Record<string, unknown>, key: string) {
-  const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

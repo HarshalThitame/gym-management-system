@@ -5,12 +5,17 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { requireOrgFeature } from "../lib/entitlement-guards";
 
 type DomainInsert = Database["public"]["Tables"]["tenant_domains"]["Insert"];
 
 export async function addDomainAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/domains");
+    // Custom domains require Enterprise plan feature
+    const featureCheck = await requireOrgFeature(ctx.organizationId, "custom_domain", "add_domain");
+    if (!featureCheck.ok) return { ...prevState, status: "error", message: featureCheck.error };
+
     const supabase = await createSupabaseServerClient();
     const domain = formData.get("domain") as string;
     if (!domain) return { ...prevState, status: "error", message: "Domain is required." };

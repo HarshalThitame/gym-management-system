@@ -103,6 +103,18 @@ export async function upgradePlanAction(input: unknown): Promise<AuthActionState
     const { data: newPkg } = await db.from("packages").select("*").eq("id", parsed.data.newPackageId).single();
     if (!currentPkg || !newPkg) return { status: "error", message: "Package not found." };
 
+    // Validate target package is active
+    if (!(newPkg.is_active as boolean)) {
+      return { status: "error", message: "Cannot upgrade to an inactive package." };
+    }
+
+    // Validate subscription state transition
+    const subStatus = sub.status as string;
+    const transition = validateTransition(subStatus as never, "active");
+    if (!transition.valid) {
+      return { status: "error", message: transition.error ?? "Cannot upgrade subscription in its current state." };
+    }
+
     const priceOverride = sub.price_override as number | undefined;
     const currentPrice = priceOverride ?? (currentPkg.price as number) ?? 0;
     const newPrice = (newPkg.price as number) ?? 0;
@@ -226,8 +238,19 @@ export async function downgradePlanAction(input: unknown): Promise<AuthActionSta
     const { data: newPkg } = await db.from("packages").select("*").eq("id", parsed.data.newPackageId).single();
     if (!currentPkg || !newPkg) return { status: "error", message: "Package not found." };
 
-    const pkgRow = newPkg as unknown as { max_members: number; max_branches: number };
-    const usage = await checkUsage(sub.organization_id as string, pkgRow.max_members, pkgRow.max_branches);
+    // Validate target package is active
+    if (!(newPkg.is_active as boolean)) {
+      return { status: "error", message: "Cannot downgrade to an inactive package." };
+    }
+
+    const pkgRow = newPkg as unknown as { max_members: number; max_branches: number; max_gyms: number; max_trainers: number };
+    const usage = await checkUsage(
+      sub.organization_id as string,
+      pkgRow.max_members,
+      pkgRow.max_branches,
+      pkgRow.max_gyms,
+      pkgRow.max_trainers,
+    );
     if (!usage.ok) return usage.error;
 
     const priceOverride = sub.price_override as number | undefined;
@@ -289,11 +312,14 @@ export async function downgradePlanAction(input: unknown): Promise<AuthActionSta
 async function checkUsage(
   organizationId: string,
   memberLimit: number,
-  branchLimit: number
+  branchLimit: number,
+  gymLimit?: number,
+  trainerLimit?: number,
 ): Promise<{ ok: true } | { ok: false; error: AuthActionState }> {
   const supabase = await createSupabaseServerClient();
+  const sbRaw = supabase as never as { from(t: string): { select(c: string, o: { count: "exact"; head: true }): { eq(c: string, v: string): Promise<{ count: number | null; error: { message: string } | null }> } } };
 
-  const { count: memberCount } = await (supabase as never as { from(t: string): { select(c: string, o: { count: "exact"; head: true }): { eq(c: string, v: string): Promise<{ count: number | null; error: { message: string } | null }> } } })
+  const { count: memberCount } = await sbRaw
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId);
@@ -310,6 +336,30 @@ async function checkUsage(
 
   if (branchLimit !== -1 && (branchCount ?? 0) > branchLimit) {
     return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${branchCount} branches but new plan limits to ${branchLimit}. Deactivate ${(branchCount ?? 0) - branchLimit} branches first.` } };
+  }
+
+  if (gymLimit !== undefined && gymLimit !== -1) {
+    const { count: gymCount } = await supabase
+      .from("gyms")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId);
+
+    if ((gymCount ?? 0) > gymLimit) {
+      return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${gymCount} gyms but new plan limits to ${gymLimit}.` } };
+    }
+  }
+
+  if (trainerLimit !== undefined && trainerLimit !== -1) {
+    const { count: trainerCount } = await supabase
+      .from("branch_users")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("role_name", "trainer")
+      .eq("status", "active");
+
+    if ((trainerCount ?? 0) > trainerLimit) {
+      return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${trainerCount} trainers but new plan limits to ${trainerLimit}.` } };
+    }
   }
 
   return { ok: true };

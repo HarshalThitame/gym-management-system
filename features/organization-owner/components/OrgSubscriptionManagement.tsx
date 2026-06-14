@@ -47,6 +47,8 @@ const featureLabels: Record<string, string> = {
   advancedReportsEnabled: "Advanced Reports",
   customDomainEnabled: "Custom Domain",
   apiAccessEnabled: "API Access",
+  notificationsEnabled: "Notifications",
+  whiteLabelEnabled: "White Label",
 };
 
 export function OrgSubscriptionManagement({ organizationId, planContext, startedAt, subscriptionId }: OrgSubscriptionProps) {
@@ -65,9 +67,10 @@ export function OrgSubscriptionManagement({ organizationId, planContext, started
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [usageRes, pkgRes, assignedRes, eventsRes] = await Promise.all([
+        const [usageRes, pkgRes, addonsRes, assignedRes, eventsRes] = await Promise.all([
           fetch(`/api/subscription-usage?organizationId=${encodeURIComponent(organizationId)}`),
           fetch(`/api/subscription-packages`),
+          fetch(`/api/subscription-addons/available?packageId=${encodeURIComponent(planContext.packageName)}`),
           subscriptionId ? fetch(`/api/subscription-addons/assigned?subscriptionId=${encodeURIComponent(subscriptionId)}`) : null,
           subscriptionId ? fetch(`/api/subscription-events?organizationId=${encodeURIComponent(organizationId)}&limit=20`) : null,
         ]);
@@ -82,6 +85,11 @@ export function OrgSubscriptionManagement({ organizationId, planContext, started
           setWarnings(getUsageWarnings(usageData));
         }
         setPackages(pkgData);
+
+        if (addonsRes?.ok) {
+          const addonData = await addonsRes.json();
+          setAddons(addonData);
+        }
 
         if (assignedRes?.ok) {
           const assignedData = await assignedRes.json();

@@ -21,6 +21,8 @@ const ALL_FEATURES = [
   ["advancedReports", "Advanced Reports", "advanced_reports_enabled"],
   ["customDomain", "Custom Domain", "custom_domain_enabled"],
   ["apiAccess", "API Access", "api_access_enabled"],
+  ["notificationsEnabled", "Notifications", "notifications_enabled"],
+  ["whiteLabelEnabled", "White Label", "white_label_enabled"],
 ];
 
 export function PackageManagementClient({ data }: { data: { organizations: any[]; packages: any[]; subscriptions: any[] } }) {
@@ -194,12 +196,36 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground mb-2">Limits</p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-lg border border-border bg-background p-3">
-                    <label className="text-sm font-semibold" htmlFor="pkg-members">Max Members</label>
+                    <label className="text-sm font-semibold" htmlFor="pkg-members">Max Members (-1 = unlimited)</label>
                     <Input id="pkg-members" name="maxMembers" type="number" defaultValue={editingPkg?.max_members ?? 0} />
                   </div>
                   <div className="rounded-lg border border-border bg-background p-3">
-                    <label className="text-sm font-semibold" htmlFor="pkg-branches">Max Branches</label>
+                    <label className="text-sm font-semibold" htmlFor="pkg-branches">Max Branches (-1 = unlimited)</label>
                     <Input id="pkg-branches" name="maxBranches" type="number" defaultValue={editingPkg?.max_branches ?? 0} />
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <label className="text-sm font-semibold" htmlFor="pkg-gyms">Max Gyms (-1 = unlimited)</label>
+                    <Input id="pkg-gyms" name="maxGyms" type="number" defaultValue={editingPkg?.max_gyms ?? 1} />
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <label className="text-sm font-semibold" htmlFor="pkg-trainers">Max Trainers (-1 = unlimited)</label>
+                    <Input id="pkg-trainers" name="maxTrainers" type="number" defaultValue={editingPkg?.max_trainers ?? 0} />
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <label className="text-sm font-semibold" htmlFor="pkg-storage">Storage GB (-1 = unlimited)</label>
+                    <Input id="pkg-storage" name="maxStorage" type="number" defaultValue={editingPkg?.max_storage_gb ?? 0} />
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <label className="text-sm font-semibold" htmlFor="pkg-apicalls">Monthly API Calls (-1 = unlimited)</label>
+                    <Input id="pkg-apicalls" name="maxApiCalls" type="number" defaultValue={editingPkg?.max_api_calls ?? 0} />
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <label className="text-sm font-semibold" htmlFor="pkg-sort">Sort Order</label>
+                    <Input id="pkg-sort" name="sortOrder" type="number" defaultValue={editingPkg?.sort_order ?? 0} />
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <label className="text-sm font-semibold" htmlFor="pkg-trial">Trial Days</label>
+                    <Input id="pkg-trial" name="trialDays" type="number" defaultValue={editingPkg?.trial_days ?? 0} />
                   </div>
                 </div>
               </div>

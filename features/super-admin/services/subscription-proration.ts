@@ -23,10 +23,10 @@ export function getDaysInPeriod(period: ProrationInput["billingPeriod"]): number
 
 export function prorate(input: ProrationInput): ProrationResult {
   const daysInPeriod = getDaysInPeriod(input.billingPeriod);
-  const daysUsed = daysInPeriod - input.daysRemainingInPeriod;
+  const daysUsed = Math.max(0, daysInPeriod - input.daysRemainingInPeriod);
 
-  const dailyCurrentRate = input.currentPrice / daysInPeriod;
-  const dailyNewRate = input.newPrice / daysInPeriod;
+  const dailyCurrentRate = daysInPeriod > 0 ? input.currentPrice / daysInPeriod : 0;
+  const dailyNewRate = daysInPeriod > 0 ? input.newPrice / daysInPeriod : 0;
 
   const credit = Math.round(dailyCurrentRate * input.daysRemainingInPeriod);
   const chargeForRemaining = Math.round(dailyNewRate * input.daysRemainingInPeriod);

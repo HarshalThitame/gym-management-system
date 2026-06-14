@@ -39,7 +39,7 @@ export async function updateSession(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
 
   let response = createMiddlewareResponse(requestHeaders, contentSecurityPolicy, isSensitivePath);
-  let resolvedOrganizationId: string | null = null;
+  let resolvedOrganizationId: string | null = null as string | null;
 
   if (!hasSupabasePublicEnv()) {
     if (isProtectedPath(pathname)) {
@@ -84,13 +84,28 @@ export async function updateSession(request: NextRequest) {
     return createSameOriginRedirect(request, destination, contentSecurityPolicy);
   }
 
-  // Subscription status gate: hard-block tenant portals only when an organization subscription is
-  // suspended or cancelled. Trial and expired subscriptions are intentionally allowed through so
-  // portal-level plan banners and feature locks can explain the restricted state.
-  if (isAuthenticated && resolvedOrganizationId && shouldApplySubscriptionStatusGate(pathname)) {
-    const isBlocked = await hasHardBlockedSubscription(supabase as unknown as SubscriptionGateClient, resolvedOrganizationId);
-    if (isBlocked) {
-      return createSameOriginRedirect(request, "/unauthorized?reason=subscription_suspended", contentSecurityPolicy);
+  // Subscription status gate: hard-block tenant portals when organization subscription is
+  // suspended or cancelled. Also handles direct SaaS login (non-tenant domains) by resolving
+  // org from the authenticated user's profile.
+  if (isAuthenticated && shouldApplySubscriptionStatusGate(pathname)) {
+    let orgId = resolvedOrganizationId;
+
+    // If tenant didn't resolve (direct SaaS login), try to get org from auth user profile claims
+    if (!orgId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", data?.claims?.sub ?? "")
+        .maybeSingle();
+      orgId = ((profile as { organization_id: string } | null)?.organization_id as string | null) ?? null;
+    }
+
+    if (orgId) {
+      const isBlocked = await hasHardBlockedSubscription(supabase as unknown as SubscriptionGateClient, orgId);
+      if (isBlocked) {
+        console.warn(`[subscription-gate] Blocked access for org ${orgId} on path ${pathname}`);
+        return createSameOriginRedirect(request, "/unauthorized?reason=subscription_suspended", contentSecurityPolicy);
+      }
     }
   }
 

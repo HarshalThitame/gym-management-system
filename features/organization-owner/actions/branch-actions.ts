@@ -3,8 +3,9 @@
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
-import type { Database, Json } from "@/types/database";
+import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { requireOrgWithinLimit } from "../lib/entitlement-guards";
 
 type BranchInsert = Database["public"]["Tables"]["branches"]["Insert"];
 type BranchUpdate = Database["public"]["Tables"]["branches"]["Update"];
@@ -41,6 +42,14 @@ export async function saveBranchAction(prevState: AuthActionState, formData: For
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_branch", entityType: "branch", entityId: branchId });
     } else {
+      // Enforce branch limit before creation
+      const { count } = await supabase
+        .from("branches")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId);
+      const limitCheck = await requireOrgWithinLimit(ctx.organizationId, "max_branches", count ?? 0);
+      if (!limitCheck.ok) return { ...prevState, status: "error", message: limitCheck.error };
+
       const insert: Record<string, unknown> = { organization_id: ctx.organizationId, gym_id: gymId, name, slug, branch_code: branchCode, status, timezone, currency, capacity, address, city, state, country, postal_code: postalCode, phone, email };
       const { data, error } = await supabase.from("branches").insert(insert as never).select("id").single();
       if (error) throw new Error(error.message);

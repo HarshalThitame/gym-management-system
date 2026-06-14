@@ -7,24 +7,34 @@ export type SubscriptionStatus = (typeof subscriptionStatuses)[number];
 export type PackageRow = {
   id: string;
   name: string;
+  slug: string;
   description: string | null;
-  max_members: number;
-  max_branches: number;
-  qr_attendance_enabled: boolean;
-  biometric_attendance_enabled: boolean;
-  rfid_attendance_enabled: boolean;
-  class_scheduling_enabled: boolean;
-  trainer_assignment_enabled: boolean;
-  razorpay_enabled: boolean;
-  communications_enabled: boolean;
-  ai_enabled: boolean;
-  advanced_reports_enabled: boolean;
-  custom_domain_enabled: boolean;
-  api_access_enabled: boolean;
   is_active: boolean;
+  is_archived: boolean;
   sort_order: number;
+  color: string | null;
+  icon: string | null;
+  trial_days: number;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
+  // Legacy compatibility fields (nullable after migration)
+  max_members?: number;
+  max_branches?: number;
+  qr_attendance_enabled?: boolean;
+  biometric_attendance_enabled?: boolean;
+  rfid_attendance_enabled?: boolean;
+  class_scheduling_enabled?: boolean;
+  trainer_assignment_enabled?: boolean;
+  razorpay_enabled?: boolean;
+  communications_enabled?: boolean;
+  ai_enabled?: boolean;
+  advanced_reports_enabled?: boolean;
+  custom_domain_enabled?: boolean;
+  api_access_enabled?: boolean;
+  price?: number;
+  billing_period?: string;
 };
 
 export type OrgSubscriptionSummary = {
@@ -75,6 +85,7 @@ type OrganizationSubscriptionSummaryRow = {
 type PackageSummaryRow = {
   id: string;
   name: string;
+  slug?: string;
 };
 
 type PlatformSubscriptionFallbackRow = {
@@ -232,7 +243,25 @@ export async function getAllPackages(): Promise<PackageRow[]> {
     throw new Error(error.message);
   }
 
-  return data ?? [];
+  return (data ?? []).map((pkg) => {
+    const p = pkg as unknown as Record<string, unknown>;
+    return {
+      id: p.id as string,
+      name: p.name as string,
+      slug: (p.slug as string) ?? "",
+      description: p.description as string | null,
+      is_active: p.is_active as boolean,
+      is_archived: (p.is_archived as boolean) ?? false,
+      sort_order: (p.sort_order as number) ?? 0,
+      color: p.color as string | null,
+      icon: p.icon as string | null,
+      trial_days: (p.trial_days as number) ?? 0,
+      metadata: p.metadata as Record<string, unknown> | null,
+      created_at: p.created_at as string,
+      updated_at: p.updated_at as string,
+      archived_at: p.archived_at as string | null,
+    } as PackageRow;
+  });
 }
 
 /**

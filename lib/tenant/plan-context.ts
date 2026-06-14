@@ -2,133 +2,129 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrgFeatureFlags } from "./feature-resolver";
 import type { OrgFeatureFlags } from "./feature-flags";
 
-type SupabaseQueryError = {
-  message: string;
-};
-
-type PlanSubscriptionQuery = {
-  select(columns: string): PlanSubscriptionQuery;
-  eq(column: "organization_id", value: string): PlanSubscriptionQuery;
-  order(column: "started_at", options: { ascending: boolean }): PlanSubscriptionQuery;
-  limit(count: number): PlanSubscriptionQuery;
-  maybeSingle(): Promise<{ data: unknown; error: SupabaseQueryError | null }>;
-};
-
-type PlanContextSupabaseClient = {
-  from(table: "organization_subscriptions"): PlanSubscriptionQuery;
-};
-
 export type OrgPlanContext = {
   packageName: string;
+  packageSlug: string;
+  packageId: string | null;
   status: string;
   expiresAt: Date | null;
   trialEndsAt: Date | null;
   isTrialing: boolean;
   isSuspended: boolean;
   features: OrgFeatureFlags;
+  maxMembers: number;
+  maxBranches: number;
+  maxGyms: number;
+  maxTrainers: number;
+  maxStaff: number;
+  maxStorageGb: number;
+  maxApiCalls: number;
 };
 
-const PLAN_SELECT = `
-  status,
-  expires_at,
-  trial_ends_at,
-  packages (
-    name
-  )
-`;
+type Sb = ReturnType<typeof createSupabaseServerClient> extends Promise<infer R> ? R : never;
 
 /**
- * Resolves organization package metadata and feature flags for portal rendering.
- *
- * Use this in server components when a page needs both the feature access
- * snapshot and the subscription state shown to the user.
+ * Resolves organization package metadata and feature flags.
+ * Uses the new package_features/package_limits entitlement system.
  */
 export async function getOrgPlanContext(organizationId: string): Promise<OrgPlanContext> {
   const features = await getOrgFeatureFlags(organizationId);
 
   try {
-    const supabase = await getPlanContextClient();
-    const { data, error } = await supabase
+    const supabase = await createSupabaseServerClient();
+    const s = supabase as never as {
+      from(t: string): {
+        select(c: string): {
+          eq(k: string, v: string): {
+            in(k: string, v: string[]): {
+              order(k: string, o: { ascending: boolean }): {
+                limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+              };
+            };
+          };
+        };
+      };
+    };
+
+    const { data: subs } = await s
       .from("organization_subscriptions")
-      .select(PLAN_SELECT)
+      .select("status, expires_at, trial_ends_at, package_id, packages!inner(name, slug)")
       .eq("organization_id", organizationId)
+      .in("status", ["active", "trial", "expired", "suspended", "cancelled"])
       .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
-    if (error) {
-      console.error("Failed to resolve organization plan context", {
-        organizationId,
-        message: error.message
-      });
-      return defaultPlanContext(features);
-    }
+    const sub = (subs ?? [])[0];
+    if (!sub) return defaultPlanContext(features);
 
-    return mapPlanContext(data, features);
+    return mapPlanContext(sub, features);
   } catch (error) {
     console.error("Unexpected plan context failure", {
       organizationId,
-      message: error instanceof Error ? error.message : "Unknown error"
+      message: error instanceof Error ? error.message : "Unknown error",
     });
     return defaultPlanContext(features);
   }
 }
 
-async function getPlanContextClient() {
-  return await createSupabaseServerClient() as unknown as PlanContextSupabaseClient;
-}
-
 function defaultPlanContext(features: OrgFeatureFlags): OrgPlanContext {
   return {
     packageName: "No Plan",
+    packageSlug: "",
+    packageId: null,
     status: "none",
     expiresAt: null,
     trialEndsAt: null,
     isTrialing: false,
     isSuspended: false,
-    features
+    features,
+    maxMembers: features.maxMembers,
+    maxBranches: features.maxBranches,
+    maxGyms: features.maxGyms,
+    maxTrainers: features.maxTrainers,
+    maxStaff: features.maxStaff,
+    maxStorageGb: features.maxStorageGb,
+    maxApiCalls: features.maxApiCalls,
   };
 }
 
-function mapPlanContext(value: unknown, features: OrgFeatureFlags): OrgPlanContext {
-  if (!isRecord(value)) {
-    return defaultPlanContext(features);
-  }
-
-  const status = typeof value.status === "string" ? value.status : "none";
-  const expiresAt = readDate(value.expires_at);
-  const trialEndsAt = readDate(value.trial_ends_at);
+function mapPlanContext(sub: Record<string, unknown>, features: OrgFeatureFlags): OrgPlanContext {
+  const status = typeof sub.status === "string" ? sub.status : "none";
+  const expiresAt = readDate(sub.expires_at);
+  const trialEndsAt = readDate(sub.trial_ends_at);
+  const pkg = readPackage(sub.packages);
+  const packageId = sub.package_id as string | null;
 
   return {
-    packageName: readPackageName(value.packages),
+    packageName: pkg?.name ?? "No Plan",
+    packageSlug: pkg?.slug ?? "",
+    packageId,
     status,
     expiresAt,
     trialEndsAt,
     isTrialing: status === "trial" && Boolean(trialEndsAt && trialEndsAt.getTime() > Date.now()),
     isSuspended: status === "suspended" || status === "expired",
-    features
+    features,
+    maxMembers: features.maxMembers,
+    maxBranches: features.maxBranches,
+    maxGyms: features.maxGyms,
+    maxTrainers: features.maxTrainers,
+    maxStaff: features.maxStaff,
+    maxStorageGb: features.maxStorageGb,
+    maxApiCalls: features.maxApiCalls,
   };
 }
 
-function readPackageName(value: unknown) {
-  const packageRecord = Array.isArray(value) ? value[0] : value;
-
-  if (isRecord(packageRecord) && typeof packageRecord.name === "string" && packageRecord.name.trim().length > 0) {
-    return packageRecord.name;
-  }
-
-  return "No Plan";
+function readPackage(value: unknown): { name: string; slug?: string } | null {
+  const pkgRecord = Array.isArray(value) ? value[0] : value;
+  if (!pkgRecord || typeof pkgRecord !== "object") return null;
+  const r = pkgRecord as Record<string, unknown>;
+  if (typeof r.name !== "string" || !r.name.trim()) return null;
+  return { name: r.name, slug: (r.slug as string) ?? undefined };
 }
 
-function readDate(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
+function readDate(value: unknown): Date | null {
+  if (typeof value !== "string") return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

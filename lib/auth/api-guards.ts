@@ -3,6 +3,7 @@ import { canAny, hasRequiredRole } from "@/lib/rbac";
 import { canAccessResolvedTenant } from "@/lib/tenant/access";
 import { getTenantContext, type TenantContext } from "@/lib/tenant/context";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { requireActiveSubscriptionApi } from "@/lib/tenant/subscription-guard";
 import type { AuthContext, AuthResource, PermissionAction, RoleName } from "@/types/auth";
 import { getAuthContext } from "./session";
 
@@ -67,7 +68,25 @@ export async function requireApiAuth(options: ApiAuthOptions = {}): Promise<ApiA
     };
   }
 
+  // Subscription check for non-super-admin API routes
+  if (!context.roles.includes("super_admin") && context.organizationId && !isApiWhitelistedPath()) {
+    const subGate = await requireActiveSubscriptionApi(context.organizationId, context);
+    if (subGate) {
+      return {
+        ok: false,
+        response: subGate,
+      };
+    }
+  }
+
   return { ok: true, context: context as ApiAuthenticatedContext, tenant };
+}
+
+function isApiWhitelistedPath(): boolean {
+  // Whitelist paths that don't need subscription checks (auth, public endpoints)
+  // This is intentionally empty - all API routes should have subscription checks
+  // Individual routes can skip via their own options
+  return false;
 }
 
 export async function getOptionalApiAuth(options: ApiAuthOptions = {}): Promise<ApiOptionalAuthResult> {
@@ -147,12 +166,32 @@ export async function requireApiPermission(resource: AuthResource, action: Permi
   return auth;
 }
 
-export async function requireActiveSubscriptionForApi(organizationId: string, request: NextRequest) {
-  void request;
-  const planContext = await getOrgPlanContext(organizationId);
+/**
+ * Requires an active subscription for an API request.
+ * Uses the centralized subscription guard.
+ * Automatically applies to the organization context of the authenticated user.
+ */
+export async function requireActiveSubscriptionForApi(organizationId: string, context: { roles: readonly string[] }) {
+  return requireActiveSubscriptionApi(organizationId, context);
+}
 
-  if (planContext.status === "suspended" || planContext.status === "cancelled") {
-    return NextResponse.json({ error: "Subscription suspended", reason: "subscription_suspended" }, { status: 403 });
+/**
+ * Requires a specific package feature for an API request.
+ * Chain after requireApiAuth/requireApiRole.
+ */
+export async function requireApiFeature(
+  organizationId: string,
+  featureCode: string,
+  context: { roles: readonly string[] },
+  actionName?: string,
+): Promise<NextResponse | null> {
+  const subGate = await requireActiveSubscriptionApi(organizationId, context);
+  if (subGate) return subGate;
+
+  const { requireFeature } = await import("@/lib/tenant/subscription-guard");
+  const result = await requireFeature(organizationId, featureCode, actionName ?? "api_access");
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error, code: "feature_not_available" }, { status: 403 });
   }
 
   return null;
