@@ -26,7 +26,7 @@ export default async function AdminPaymentsPage() {
   const scope = await requireGymAdminScope("/admin/payments");
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
   const planContext = organizationId ? await getOrgPlanContext(organizationId) : null;
-  const razorpayEnabled = planContext?.features.razorpayEnabled === true;
+  const razorpayEnabled = planContext?.features.billingInvoices === true;
   const supabase = await createSupabaseServerClient();
   const query = supabase.from("payments").select("*").eq("gym_id", scope.gymId).order("created_at", { ascending: false }).limit(50);
 

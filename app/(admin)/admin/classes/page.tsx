@@ -37,7 +37,7 @@ export default async function AdminClassesPage({ searchParams }: AdminClassesPag
     organizationId ? getOrgPlanContext(organizationId) : null
   ]);
   const activeClasses = classResult.classes.filter((classRow) => classRow.status === "active");
-  const classSchedulingEnabled = planContext?.features.classSchedulingEnabled === true;
+  const classSchedulingEnabled = planContext?.features.classBooking === true;
 
   return (
     <div className="space-y-8">

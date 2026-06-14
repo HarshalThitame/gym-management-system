@@ -80,6 +80,12 @@ export interface OrgFeatureFlags {
   advancedRbac: boolean;
   prioritySupport: boolean;
   staffManagement: boolean;
+
+  // Legacy aliases for backward compatibility (resolved via FEATURE_MAP aliases)
+  classSchedulingEnabled: boolean;
+  communicationsEnabled: boolean;
+  trainerAssignmentEnabled: boolean;
+  razorpayEnabled: boolean;
 }
 
 export type FeatureFlagKey = keyof OrgFeatureFlags;

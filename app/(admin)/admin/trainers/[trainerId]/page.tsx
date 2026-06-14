@@ -62,7 +62,7 @@ export default async function AdminTrainerProfilePage({ params }: TrainerProfile
   const averageRating = bundle.feedback.length > 0
     ? bundle.feedback.reduce((total, feedback) => total + feedback.rating, 0) / bundle.feedback.length
     : 0;
-  const trainerAssignmentEnabled = planContext?.features.trainerAssignmentEnabled === true;
+  const trainerAssignmentEnabled = planContext?.features.workoutAssignment === true;
 
   return (
     <div className="space-y-8">

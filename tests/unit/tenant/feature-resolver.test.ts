@@ -38,6 +38,8 @@ const safeDefaultFlags: OrgFeatureFlags = {
   multiBranchManagement: false, franchiseManagement: false,
   apiAccessEnabled: false, webhooks: false, auditLogs: false,
   advancedRbac: false, prioritySupport: false, staffManagement: false,
+  classSchedulingEnabled: false, communicationsEnabled: false,
+  trainerAssignmentEnabled: false, razorpayEnabled: false,
 };
 
 const standardPackage = {

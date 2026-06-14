@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { organizationHasFeature, checkOrganizationLimit } from "@/features/super-admin/services/entitlement-service";
+import { organizationHasFeature } from "@/features/super-admin/services/entitlement-service";
 import type { OrgFeatureFlags, FeatureFlagKey } from "./feature-flags";
 
 type Sb = ReturnType<typeof createSupabaseServerClient> extends Promise<infer R> ? R : never;
@@ -26,6 +26,9 @@ const SAFE_DEFAULT: OrgFeatureFlags = {
   multiBranchManagement: false, franchiseManagement: false,
   apiAccessEnabled: false, webhooks: false, auditLogs: false,
   advancedRbac: false, prioritySupport: false, staffManagement: false,
+  // Legacy aliases
+  classSchedulingEnabled: false, communicationsEnabled: false,
+  trainerAssignmentEnabled: false, razorpayEnabled: false,
 };
 
 // Map of feature flag keys to feature_catalog codes and limit keys

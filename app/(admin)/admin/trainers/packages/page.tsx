@@ -30,7 +30,7 @@ export default async function AdminTrainerPackagesPage() {
   ]);
   const activePackages = packages.filter((packageRow) => packageRow.status === "active");
   const revenuePotential = activePackages.reduce((total, packageRow) => total + packageRow.price_amount, 0);
-  const trainerAssignmentEnabled = planContext?.features.trainerAssignmentEnabled === true;
+  const trainerAssignmentEnabled = planContext?.features.workoutAssignment === true;
 
   return (
     <div className="space-y-8">

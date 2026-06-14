@@ -48,7 +48,7 @@ export default async function AdminTrainersPage({ searchParams }: AdminTrainersP
     listPersonalTrainingPackages(gymId),
     organizationId ? getOrgPlanContext(organizationId) : null
   ]);
-  const trainerAssignmentEnabled = planContext?.features.trainerAssignmentEnabled === true;
+  const trainerAssignmentEnabled = planContext?.features.workoutAssignment === true;
   const members = memberResult.members;
   const activeAssignments = trainerResult.trainers.reduce((total, trainer) => total + trainer.activeAssignments, 0);
   const upcomingSessions = trainerResult.trainers.reduce((total, trainer) => total + trainer.upcomingSessions, 0);

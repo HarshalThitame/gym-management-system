@@ -1,8 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { canAny, hasRequiredRole } from "@/lib/rbac";
 import { canAccessResolvedTenant } from "@/lib/tenant/access";
 import { getTenantContext, type TenantContext } from "@/lib/tenant/context";
-import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { requireActiveSubscriptionApi } from "@/lib/tenant/subscription-guard";
 import type { AuthContext, AuthResource, PermissionAction, RoleName } from "@/types/auth";
 import { getAuthContext } from "./session";

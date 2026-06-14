@@ -41,7 +41,7 @@ export default async function AdminCommunicationsPage() {
     listActiveTrainers(gymId),
     organizationId ? getOrgPlanContext(organizationId) : null
   ]);
-  const communicationsEnabled = planContext?.features.communicationsEnabled === true;
+  const communicationsEnabled = planContext?.features.whatsappIntegration === true;
 
   return (
     <div className="space-y-8">

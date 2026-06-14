@@ -201,7 +201,7 @@ export function AssignPackageModal({ organization, packages }: AssignPackageModa
                 </select>
                 <p id={`${titleId}-package-desc`} className="text-xs font-semibold text-muted-foreground">
                   {selectedPackage
-                    ? `${formatLimit(selectedPackage.max_members, "member", "members")} · ${formatLimit(selectedPackage.max_branches, "branch", "branches")}`
+                    ? `${formatLimit(selectedPackage.max_members ?? 0, "member", "members")} · ${formatLimit(selectedPackage.max_branches ?? 0, "branch", "branches")}`
                     : "No active package tiers are available."}
                 </p>
               </div>

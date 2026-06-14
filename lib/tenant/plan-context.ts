@@ -21,7 +21,6 @@ export type OrgPlanContext = {
   maxApiCalls: number;
 };
 
-type Sb = ReturnType<typeof createSupabaseServerClient> extends Promise<infer R> ? R : never;
 
 /**
  * Resolves organization package metadata and feature flags.
