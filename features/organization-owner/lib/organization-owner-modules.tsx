@@ -1,4 +1,5 @@
 import {
+  Apple,
   BarChart3,
   Building2,
   CalendarCheck,
@@ -7,12 +8,14 @@ import {
   Dumbbell,
   Gauge,
   Globe2,
+  LifeBuoy,
   MessageSquare,
   Palette,
   ReceiptText,
   Settings,
   ShieldCheck,
   Tags,
+  UserRound,
   UsersRound
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -145,6 +148,33 @@ export const organizationOwnerModules = [
     description: "Review your SaaS plan, usage limits, renewal status, billing state, and subscription capacity.",
     icon: <ReceiptText className="size-5" />,
     iconKey: "receipt"
+  },
+  {
+    slug: "nutrition",
+    href: "/organization/nutrition",
+    label: "Nutrition",
+    title: "Nutrition Management",
+    description: "Manage nutrition templates, meal plans, and view compliance reports across your organization.",
+    icon: <Apple className="size-5" />,
+    iconKey: "settings"
+  },
+  {
+    slug: "support",
+    href: "/organization/support",
+    label: "Support",
+    title: "Support Center",
+    description: "Create and track support tickets, escalate issues, and access documentation for your organization.",
+    icon: <LifeBuoy className="size-5" />,
+    iconKey: "message-square"
+  },
+  {
+    slug: "profile",
+    href: "/organization/profile",
+    label: "Org Profile",
+    title: "Organization Profile",
+    description: "Manage your organization's name, branding, contact information, GST details, and business info.",
+    icon: <UserRound className="size-5" />,
+    iconKey: "users"
   },
   {
     slug: "settings",

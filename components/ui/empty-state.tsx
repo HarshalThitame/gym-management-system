@@ -1,3 +1,5 @@
+"use client";
+
 import { Inbox, Search, ShieldOff, Settings, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { ButtonLink } from "./button";

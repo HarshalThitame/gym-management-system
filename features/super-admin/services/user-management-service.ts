@@ -64,6 +64,8 @@ export type UserManagementData = {
   records: UserManagementRecord[];
   organizationGroups: OrganizationUserGroup[];
   organizations: Array<Pick<OrganizationRow, "id" | "name" | "slug" | "status">>;
+  allBranches: Array<Pick<BranchRow, "id" | "name" | "branch_code" | "gym_id" | "organization_id">>;
+  allGyms: Array<Pick<GymRow, "id" | "name" | "slug" | "organization_id">>;
   filters: UserManagementFilters;
   pagination: UserManagementPagination;
   summary: UserManagementSummary;
@@ -202,6 +204,8 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
     records: sortedRecords,
     organizationGroups,
     organizations,
+    allBranches: branchRows,
+    allGyms: gymsResult ?? [],
     filters,
     pagination: {
       page: filters.page,

@@ -231,7 +231,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
         </CardContent>
       </Card>
 
-      <DrawerModal drawer={drawer} onClose={() => setDrawer({ type: "closed" })} onDelete={(rec) => setDrawer({ type: "delete", record: rec })} criticalSuperAdminEmail={criticalSuperAdminEmail} organizations={data.organizations} />
+      <DrawerModal drawer={drawer} onClose={() => setDrawer({ type: "closed" })} onDelete={(rec) => setDrawer({ type: "delete", record: rec })} criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} />
       <ToastContainer />
     </div>
   );
@@ -403,13 +403,13 @@ function DrawerModal({
   onClose,
   onDelete,
   criticalSuperAdminEmail,
-  organizations
+  data
 }: {
   drawer: DrawerState;
   onClose: () => void;
   onDelete: (record: UserManagementRecord) => void;
   criticalSuperAdminEmail: string;
-  organizations: UserManagementData["organizations"];
+  data: UserManagementData;
 }) {
   if (drawer.type === "closed") return null;
 
@@ -423,7 +423,7 @@ function DrawerModal({
         </div>
 
         {drawer.type === "invite" && (
-          <InviteUserForm onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} organizations={organizations} />
+          <InviteUserForm onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} />
         )}
         {drawer.type === "detail" && (
           <UserDetailView record={drawer.record} onDelete={onDelete} />
@@ -441,7 +441,7 @@ function DrawerModal({
           <UserResetPasswordForm record={drawer.record} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
         )}
         {drawer.type === "transfer_role" && (
-          <UserTransferRoleForm record={drawer.record} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} organizations={organizations} />
+          <UserTransferRoleForm record={drawer.record} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} />
         )}
         {drawer.type === "bulk" && (
           <BulkUserActionForm selectedIds={drawer.selectedIds} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
@@ -477,12 +477,16 @@ function drawerTitle(drawer: DrawerState): string {
   }
 }
 
-function InviteUserForm({ onClose, criticalSuperAdminEmail, organizations }: { onClose: () => void; criticalSuperAdminEmail: string; organizations: UserManagementData["organizations"] }) {
+function InviteUserForm({ onClose, criticalSuperAdminEmail, data }: { onClose: () => void; criticalSuperAdminEmail: string; data: UserManagementData }) {
   const [state, formAction] = useActionState(inviteUserAction, initialAuthActionState);
+  const [selectedOrgId, setSelectedOrgId] = useState("");
 
   useEffect(() => {
     if (state.status === "success") { showToast(state.message ?? "User invited.", "success"); onClose(); }
   }, [state.status, state.message, onClose]);
+
+  const filteredGyms = data.allGyms.filter((g) => !selectedOrgId || g.organization_id === selectedOrgId);
+  const filteredBranches = data.allBranches.filter((b) => !selectedOrgId || b.organization_id === selectedOrgId);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -510,18 +514,26 @@ function InviteUserForm({ onClose, criticalSuperAdminEmail, organizations }: { o
       </FormField>
 
       <FormField label="Organization" error={state.fieldErrors?.organizationId}>
-        <select className={selectClass} name="organizationId" required>
+        <select className={selectClass} name="organizationId" required value={selectedOrgId} onChange={(e) => setSelectedOrgId(e.target.value)}>
           <option value="">Select an organization</option>
-          {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+          {data.organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
         </select>
       </FormField>
 
-      <FormField label="Gym ID (optional)" error={state.fieldErrors?.gymId}>
-        <Input name="gymId" placeholder="UUID of gym" />
+      <FormField label="Gym (optional)" error={state.fieldErrors?.gymId}>
+        <select className={selectClass} name="gymId" defaultValue="">
+          <option value="">No gym (platform-wide)</option>
+          {filteredGyms.map((gym) => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+          {filteredGyms.length === 0 && selectedOrgId && <option value="" disabled>No gyms for this org</option>}
+        </select>
       </FormField>
 
-      <FormField label="Branch ID (optional)" error={state.fieldErrors?.branchId}>
-        <Input name="branchId" placeholder="UUID of branch" />
+      <FormField label="Branch (optional)" error={state.fieldErrors?.branchId}>
+        <select className={selectClass} name="branchId" defaultValue="">
+          <option value="">No branch (all branches)</option>
+          {filteredBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.branch_code})</option>)}
+          {filteredBranches.length === 0 && selectedOrgId && <option value="" disabled>No branches for this org</option>}
+        </select>
       </FormField>
 
       <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
@@ -699,12 +711,16 @@ function UserResetPasswordForm({ record, onClose, criticalSuperAdminEmail }: { r
   );
 }
 
-function UserTransferRoleForm({ record, onClose, criticalSuperAdminEmail, organizations }: { record: UserManagementRecord; onClose: () => void; criticalSuperAdminEmail: string; organizations: UserManagementData["organizations"] }) {
+function UserTransferRoleForm({ record, onClose, criticalSuperAdminEmail, data }: { record: UserManagementRecord; onClose: () => void; criticalSuperAdminEmail: string; data: UserManagementData }) {
   const [state, formAction] = useActionState(transferUserRoleAction, initialAuthActionState);
+  const [targetOrgId, setTargetOrgId] = useState("");
 
   useEffect(() => {
     if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
   }, [state.status, state.message, onClose]);
+
+  const filteredBranches = data.allBranches.filter((b) => !targetOrgId || b.organization_id === targetOrgId);
+  const filteredGyms = data.allGyms.filter((g) => !targetOrgId || g.organization_id === targetOrgId);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -725,18 +741,26 @@ function UserTransferRoleForm({ record, onClose, criticalSuperAdminEmail, organi
       </FormField>
 
       <FormField label="Target organization" error={state.fieldErrors?.targetOrganizationId}>
-        <select className={selectClass} name="targetOrganizationId" required>
+        <select className={selectClass} name="targetOrganizationId" required value={targetOrgId} onChange={(e) => setTargetOrgId(e.target.value)}>
           <option value="">Select organization</option>
-          {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+          {data.organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
         </select>
       </FormField>
 
-      <FormField label="Target branch ID" error={state.fieldErrors?.targetBranchId}>
-        <Input name="targetBranchId" placeholder="UUID of branch" required />
+      <FormField label="Target branch" error={state.fieldErrors?.targetBranchId}>
+        <select className={selectClass} name="targetBranchId" defaultValue="" required>
+          <option value="">Select target branch</option>
+          {filteredBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.branch_code})</option>)}
+          {filteredBranches.length === 0 && targetOrgId && <option value="" disabled>No branches for this org</option>}
+        </select>
       </FormField>
 
-      <FormField label="Target gym ID (optional)" error={state.fieldErrors?.targetGymId}>
-        <Input name="targetGymId" placeholder="UUID of gym" />
+      <FormField label="Target gym (optional)" error={state.fieldErrors?.targetGymId}>
+        <select className={selectClass} name="targetGymId" defaultValue="">
+          <option value="">No specific gym</option>
+          {filteredGyms.map((gym) => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+          {filteredGyms.length === 0 && targetOrgId && <option value="" disabled>No gyms for this org</option>}
+        </select>
       </FormField>
 
       <FormField label="Type TRANSFER_ROLE to confirm" error={state.fieldErrors?.confirmation}>

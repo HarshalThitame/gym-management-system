@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { MobileBottomNav, type MobilePortalIconKey } from "@/components/pwa/mobile-bottom-nav";
 import { SignOutButton } from "@/components/pwa/sign-out-button";
@@ -61,6 +62,17 @@ export function PortalShell({
   const displayName = context.profile?.full_name || context.email || `${tenantShortName} User`;
   const mobileNavItems = navItems.map(({ href, label, iconKey }) => ({ href, label, iconKey }));
   const showPlanBanner = shouldRenderPlanBanner(planContext, planBannerMode);
+  const pathname = usePathname();
+  const isActiveItem = useMemo(() => {
+    const activeSet = new Set<string>();
+    for (const item of navItems) {
+      const href = item.href.endsWith("/") ? item.href : item.href + "/";
+      if (pathname === item.href || pathname.startsWith(href)) {
+        activeSet.add(item.href);
+      }
+    }
+    return (href: string) => activeSet.has(href);
+  }, [pathname, navItems]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -119,9 +131,13 @@ export function PortalShell({
         <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {navItems.map((item) => (
             <Link
-              className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
+              className={cn(
+                "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold transition",
+                isActiveItem(item.href) ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+              )}
               href={item.href}
               key={`${item.href}-${item.label}`}
+              aria-current={isActiveItem(item.href) ? "page" : undefined}
               onClick={closeSidebar}
             >
               {item.icon}
@@ -134,7 +150,7 @@ export function PortalShell({
             <PlanIndicator planContext={planContext} planManageHref={planManageHref} />
           </div>
         ) : null}
-        <form action={signOutAction} className="border-t border-border p-3" onClick={closeSidebar}>
+        <form id="sign-out-form-mobile" action={signOutAction} className="border-t border-border p-3" onClick={closeSidebar}>
           <SignOutButton />
         </form>
       </aside>
@@ -151,25 +167,29 @@ export function PortalShell({
             {branchName ? <p className="mt-2 text-xs font-semibold text-muted-foreground">{branchName}</p> : null}
           </div>
           <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-            {navItems.map((item) => (
-              <Link
-                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground transition hover:bg-surface-muted hover:text-foreground"
-                href={item.href}
-                key={`${item.href}-${item.label}`}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const active = isActiveItem(item.href);
+              return (
+                <Link
+                  className={cn(
+                    "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold transition",
+                    active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+                  )}
+                  href={item.href}
+                  key={`${item.href}-${item.label}`}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {item.icon}
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
           {showPlanIndicator && planContext ? (
             <div className="border-t border-border p-3">
               <PlanIndicator planContext={planContext} planManageHref={planManageHref} />
             </div>
           ) : null}
-          <form action={signOutAction} className="border-t border-border p-3">
-            <SignOutButton />
-          </form>
         </div>
       </aside>
 
@@ -202,7 +222,7 @@ export function PortalShell({
                 <p className="text-sm font-black">{displayName}</p>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{context.primaryRole?.replace("_", " ") ?? "authenticated"}</p>
               </div>
-              <form action={signOutAction} className="lg:hidden">
+              <form id="sign-out-form-desktop" action={signOutAction} className="lg:hidden">
                 <SignOutButton compact />
               </form>
             </div>

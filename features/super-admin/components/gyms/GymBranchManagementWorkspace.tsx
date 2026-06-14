@@ -90,7 +90,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 xl:grid-cols-6">
+      <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-stretch">
         <SummaryCard icon={<Building2 className="size-5" />} label="Gyms" value={formatCompactNumber(data.summary.gyms)} detail={`${formatCompactNumber(data.summary.activeGyms)} active`} />
         <SummaryCard icon={<GitBranch className="size-5" />} label="Branches" value={formatCompactNumber(data.summary.branches)} detail={`${formatCompactNumber(data.summary.activeBranches)} active`} />
         <SummaryCard icon={<UserRoundCog className="size-5" />} label="Missing Admins" value={formatCompactNumber(data.summary.branchesWithoutAdmins)} detail="Branches without active gym admin" />
@@ -251,7 +251,7 @@ function GymHierarchyCard({ gym, onOpen }: { gym: GymBranchNode; onOpen: (drawer
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
           <Metric label="Active members" value={formatCompactNumber(gym.metrics.activeMembers)} />
           <Metric label="Revenue" value={formatCurrency(gym.metrics.revenue)} />
           <Metric label="Inside now" value={formatCompactNumber(gym.metrics.activeAttendanceSessions)} />
@@ -384,7 +384,10 @@ function BranchForm({
   const [state, formAction] = useActionState(saveSuperAdminBranchAction, initialAuthActionState);
   useCloseOnSuccess(state.status, onClose);
   useRefreshOnSuccess(state.status, router);
-  const selectedOrganizationId = branch?.branch.organization_id ?? defaultOrganizationId ?? data.organizations[0]?.id ?? "";
+  const initialOrgId = branch?.branch.organization_id ?? defaultOrganizationId ?? "";
+  const [selectedOrgId, setSelectedOrgId] = useState(initialOrgId);
+
+  const filteredGyms = data.gyms.filter((g) => !selectedOrgId || g.gym.organization_id === selectedOrgId);
 
   return (
     <DrawerShell onClose={onClose} title={title}>
@@ -397,8 +400,21 @@ function BranchForm({
           <Field error={state.fieldErrors?.branchCode?.[0]} label="Branch code"><Input name="branchCode" defaultValue={branch?.branch.branch_code ?? ""} placeholder="BND001" /></Field>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="space-y-2"><span className="text-sm font-bold">Organization</span><select className={selectClass} name="organizationId" defaultValue={selectedOrganizationId}>{data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select><FieldError message={state.fieldErrors?.organizationId?.[0]} /></label>
-          <label className="space-y-2"><span className="text-sm font-bold">Parent gym</span><select className={selectClass} name="gymId" defaultValue={branch?.branch.gym_id ?? defaultGymId ?? ""}><option value="">No parent gym</option>{data.gyms.map((gym) => <option key={gym.gym.id} value={gym.gym.id}>{gym.gym.name}</option>)}</select><FieldError message={state.fieldErrors?.gymId?.[0]} /></label>
+          <label className="space-y-2"><span className="text-sm font-bold">Organization</span>
+            <select className={selectClass} name="organizationId" value={selectedOrgId} onChange={(e) => { setSelectedOrgId(e.target.value); }}>
+              <option value="">Select organization</option>
+              {data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+            </select>
+            <FieldError message={state.fieldErrors?.organizationId?.[0]} />
+          </label>
+          <label className="space-y-2"><span className="text-sm font-bold">Parent gym</span>
+            <select className={selectClass} name="gymId" defaultValue={branch?.branch.gym_id ?? defaultGymId ?? ""}>
+              <option value="">No parent gym</option>
+              {filteredGyms.map((gym) => <option key={gym.gym.id} value={gym.gym.id}>{gym.gym.name}</option>)}
+              {filteredGyms.length === 0 && selectedOrgId && <option value="" disabled>No gyms for this organization</option>}
+            </select>
+            <FieldError message={state.fieldErrors?.gymId?.[0]} />
+          </label>
           <label className="space-y-2"><span className="text-sm font-bold">Status</span><select className={selectClass} name="status" defaultValue={branch?.branch.status ?? "planned"}>{branchStatuses.map((status) => <option key={status} value={status}>{formatEnterpriseLabel(status)}</option>)}</select></label>
         </div>
         <BranchProfileFields branch={branch} state={state} />
@@ -771,7 +787,7 @@ function Field({ children, error, label }: { children: ReactNode; error?: string
 
 function SummaryCard({ detail, icon, label, value }: { detail: string; icon: ReactNode; label: string; value: string }) {
   return (
-    <Card>
+    <Card className="h-full">
       <CardContent className="flex items-center justify-between gap-4 p-5">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
@@ -786,7 +802,7 @@ function SummaryCard({ detail, icon, label, value }: { detail: string; icon: Rea
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-background p-3">
+    <div className="rounded-md border border-border bg-background p-3 h-full">
       <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
       <p className="mt-1 text-xl font-black">{value}</p>
     </div>

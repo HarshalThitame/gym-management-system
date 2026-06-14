@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* RTL support */
+[dir="rtl"] .rtl-flip { transform: scaleX(-1); }
+[dir="rtl"] .space-x-reverse > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
+
 @theme {
   --color-background: #f8f7f2;
   --color-foreground: #111214;

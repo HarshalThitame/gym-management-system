@@ -217,6 +217,23 @@ export async function saveSuperAdminOrganizationAction(_previousState: AuthActio
     return { status: "error", message: result.error?.message ?? "Organization save failed." };
   }
 
+  // Auto-assign organization_owner role if an owner was set on a new org
+  if (!organizationId && parsed.data.ownerUserId) {
+    try {
+      const { data: role } = await supabase.from("roles").select("id").eq("name", "organization_owner").maybeSingle();
+      if (role) {
+        await supabase.from("user_roles").upsert({
+          user_id: parsed.data.ownerUserId,
+          role_id: role.id,
+          gym_id: null,
+          assigned_by: context.userId
+        }).then(() => {});
+      }
+    } catch {
+      // Role assignment is best-effort - org creation already succeeded
+    }
+  }
+
   const beforeSnapshot = existing ? buildOrganizationSnapshot(existing) : null;
   const afterSnapshot = buildOrganizationSnapshot(result.data);
   await writeOrganizationAudit(context, result.data.id, organizationId ? "organization.updated" : "organization.created", organizationId ? "notice" : "info", {
