@@ -31,13 +31,15 @@ export type DataCardProps = {
   actions?: DataCardAction[] | undefined;
   sections?: DataCardSection[] | undefined;
   children?: ReactNode | undefined;
+  avatar?: ReactNode | undefined;
 };
 
-export function DataCard({ id, title, subtitle, meta, badge, badgeVariant = "neutral", status, selected = false, onSelect, actions, sections, children }: DataCardProps) {
+export function DataCard({ id, title, subtitle, meta, badge, badgeVariant = "neutral", status, selected = false, onSelect, actions, sections, children, avatar }: DataCardProps) {
   return (
     <div className="rounded-lg border border-border bg-surface shadow-[0_2px_12px_rgb(17_18_20/0.04)] transition-all hover:border-border-strong">
       <div className="flex flex-col gap-3 p-4 md:flex-row md:items-start md:justify-between md:gap-4 md:p-5">
         <div className="flex flex-1 items-start gap-3 md:gap-4">
+          {avatar ? <div className="mt-0.5 shrink-0">{avatar}</div> : null}
           {onSelect ? (
             <input
               aria-label={`Select ${title}`}

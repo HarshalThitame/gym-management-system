@@ -197,6 +197,7 @@ export function DataList({
               onSelect={selectable ? handleSelect : undefined}
               actions={cardActions}
               sections={cardSections}
+              avatar={(item as Record<string, unknown>).avatar as ReactNode | undefined}
             >
               {(item as Record<string, unknown>).children as ReactNode | undefined}
             </DataCard>

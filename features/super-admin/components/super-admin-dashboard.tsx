@@ -146,7 +146,7 @@ export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }:
     <div className="space-y-8">
       <DashboardFilterBar operations={operations} />
 
-      <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+      <section className="grid gap-5 grid-cols-1 xl:grid-cols-[1.35fr_0.65fr]">
         <Card>
           <CardContent className="p-6 md:p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -206,7 +206,7 @@ export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }:
         ))}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-3">
+      <section className="grid gap-5 grid-cols-1 md:grid-cols-3 xl:grid-cols-3">
         <FinanceIntegrityCard finance={operations.finance} />
         <SloMonitoringCard slo={operations.slo} thresholds={operations.thresholds} />
         <RoleActivityIntelligenceCard roleRisk={operations.roleRisk} />
@@ -299,7 +299,7 @@ export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }:
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-5 grid-cols-1 xl:grid-cols-2">
         <ChartPanel
           actionHref="/super-admin/analytics"
           description="Branch leaders for the selected period. Finance totals above come from payments, invoices, refunds, and provider events."
@@ -325,7 +325,7 @@ export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }:
         </ChartPanel>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+      <section className="grid gap-5 grid-cols-1 xl:grid-cols-[1.05fr_0.95fr]">
         <Card>
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
@@ -398,7 +398,7 @@ export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }:
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="grid gap-5 grid-cols-1 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
@@ -460,7 +460,7 @@ export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }:
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="grid gap-5 grid-cols-1 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
           <CardHeader>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Branch Leaders</p>

@@ -207,7 +207,7 @@ export function DrawerSubmitButton({ children = "Save", loading }: { children?: 
 
 type DrawerFormMessageProps = {
   status: "idle" | "success" | "error";
-  message?: string | null;
+  message?: string | null | undefined;
 };
 
 export function DrawerFormMessage({ status, message }: DrawerFormMessageProps) {

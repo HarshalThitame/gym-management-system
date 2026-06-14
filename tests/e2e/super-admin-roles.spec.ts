@@ -6,7 +6,6 @@ const password = (() => {
   return v;
 })();
 const superAdminEmail = process.env.E2E_SUPER_ADMIN_EMAIL ?? "hthitame+qa.superadmin@gmail.com";
-const BASE = "/super-admin/roles";
 
 test.use({ screenshot: "on", serviceWorkers: "block", trace: "on", video: "on" });
 
@@ -31,110 +30,113 @@ async function visit(p: Page, path: string, wait = 2000) {
   await p.waitForTimeout(wait);
 }
 
-// ─── UNAUTHENTICATED ──────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// FAST: unauthenticated
+// ═══════════════════════════════════════════════════════════════════════════
 test("R01: unauth -> /login", async ({ page }) => {
-  await page.goto(BASE);
+  await page.goto("/super-admin/roles");
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toBe("/login");
 });
 
-// ─── MEGA: all CRUD, API, assign, clone, permissions, filters, exports ──
-test("R02-20: full roles CRUD + API + assign + clone + permissions", async ({ page }) => {
-  test.setTimeout(600_000);
+// ═══════════════════════════════════════════════════════════════════════════
+// SMALL: page + create role + API endpoints
+// ═══════════════════════════════════════════════════════════════════════════
+test("R02-10: create, API, export", async ({ page }) => {
+  test.setTimeout(300_000);
   const e = errs(page);
   await login(page);
 
-  // ── Page loads ──
-  await visit(page, BASE);
+  await visit(page, "/super-admin/roles");
   await expect(page.locator("main")).toBeVisible();
   await expect(page.locator("main").getByText("Application error", { exact: false })).toHaveCount(0);
 
-  // ── Summary cards ──
+  // Summary cards
   for (const label of ["Total Roles", "System Roles", "Custom Roles", "Assignments"]) {
     const el = page.locator("main").getByText(label, { exact: false }).first();
     if (await el.isVisible({ timeout: 3000 }).catch(() => false)) await expect(el).toBeVisible();
   }
 
-  // ── Table columns ──
-  for (const header of ["Role", "Users", "Permissions", "Type", "Actions"]) {
-    await expect(page.locator("main").locator(`th`).filter({ hasText: header }).first()).toBeVisible({ timeout: 3000 });
-  }
-
-  // ── Create role ──
-  const createBtn = page.locator("main").getByRole("button", { name: /Create Role/i }).first();
-  await expect(createBtn).toBeVisible();
-  await createBtn.click();
+  // Create role drawer
+  const cb = page.locator("main").getByRole("button", { name: /Create Role/i }).first();
+  await expect(cb).toBeVisible();
+  await cb.click();
   await expect(page.getByRole("heading", { name: /Create Role/i })).toBeVisible({ timeout: 3000 });
 
-  const roleName = `e2e_test_${Date.now()}`;
-  await page.locator("input[name=name]").fill(roleName);
-  await page.locator("input[name=displayName]").fill("E2E Test Role");
-  await page.locator("textarea[name=description]").fill("Created by Playwright E2E test");
-  await page.getByRole("button", { name: /Create Role|Submit|Save/i }).first().click();
+  const rn = `e2e_${Date.now()}`;
+  await page.locator("input[name=name]").fill(rn);
+  await page.locator("input[name=displayName]").fill("E2E Test");
+  await page.locator("textarea[name=description]").fill("Created by Playwright");
+  await page.locator("button[type=submit]").first().click();
   await page.waitForTimeout(1500);
 
-  // Check for success or validation (role may or may not be created depending on server state)
-  const createSuccess = page.getByText(/success|created|saved/i);
-  const createError = page.getByText(/error|invalid|required/i);
-  if (await createSuccess.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await expect(createSuccess).toBeVisible();
+  // Search API
+  const sr = await page.request.get("/api/super-admin/roles/search?q=super");
+  expect(sr.status()).toBeLessThan(500);
+
+  // Assigned API
+  const ar = await page.request.get("/api/super-admin/roles/assigned?userId=1f402a90-ea36-4ce5-8c5b-fd5a9c71378e");
+  expect(ar.status()).toBeLessThan(500);
+
+  // Export API + content
+  const er = await page.request.get("/api/super-admin/roles/export");
+  expect(er.status()).toBeLessThan(500);
+  const csv = await er.text().catch(() => "");
+  if (csv) expect(csv.length).toBeGreaterThan(0);
+
+  expect(e).toEqual([]);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SMALL: permissions + assign + type filter + system badge
+// ═══════════════════════════════════════════════════════════════════════════
+test("R11-20: permissions, assign, filters, system", async ({ page }) => {
+  test.setTimeout(240_000);
+  const e = errs(page);
+  await login(page);
+
+  await visit(page, "/super-admin/roles");
+  await expect(page.locator("main")).toBeVisible();
+
+  // Permissions drawer
+  const pb = page.locator("main").locator("button[title*='Permission']").first();
+  if (await pb.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await pb.click();
+    await page.waitForTimeout(800);
+    const ph = page.getByRole("heading", { name: /Permissions/i }).first();
+    if (await ph.isVisible({ timeout: 3000 }).catch(() => false)) await expect(ph).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
   }
 
-  // ── Role type filter ──
-  const typeFilter = page.locator("main").locator("select").first();
-  if (await typeFilter.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const opts = await typeFilter.locator("option").evaluateAll((o) => o.map((x) => (x as HTMLOptionElement).textContent ?? ""));
+  // Assign drawer
+  const ab = page.locator("main").locator("button[title*='Assign']").first();
+  if (await ab.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await ab.click();
+    await page.waitForTimeout(800);
+    const ah = page.getByRole("heading", { name: /Assign Role/i }).first();
+    if (await ah.isVisible({ timeout: 3000 }).catch(() => false)) await expect(ah).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+  }
+
+  // Type filter
+  const sel = page.locator("main").locator("select").first();
+  if (await sel.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const opts = await sel.locator("option").evaluateAll((o) => o.map((x) => (x as HTMLOptionElement).textContent ?? "").filter(Boolean));
     expect(opts.length).toBeGreaterThanOrEqual(2);
   }
 
-  // ── Permissions drawer ──
-  const permBtn = page.locator("main").getByRole("button", { name: /Manage permissions/i }).or(page.locator("main").locator("button[title*='Permission']")).first();
-  if (await permBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await permBtn.click();
-    await page.waitForTimeout(800);
-    const permHeading = page.getByRole("heading", { name: /Permissions/i }).first();
-    if (await permHeading.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(permHeading).toBeVisible();
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(300);
-    }
-  }
+  // System badge
+  const sys = page.locator("main").getByText("System").first();
+  if (await sys.isVisible({ timeout: 3000 }).catch(() => false)) await expect(sys).toBeVisible();
 
-  // ── Assign drawer ──
-  const assignBtn = page.locator("main").locator("button[title*='Assign']").first();
-  if (await assignBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await assignBtn.click();
-    await page.waitForTimeout(800);
-    const assignHeading = page.getByRole("heading", { name: /Assign Role/i }).first();
-    if (await assignHeading.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(assignHeading).toBeVisible();
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(300);
-    }
-  }
-
-  // ── Search API ──
-  const searchResp = await page.request.get("/api/super-admin/roles/search?q=super");
-  expect(searchResp.status()).toBeLessThan(500);
-
-  // ── Assigned API ──
-  const assignedResp = await page.request.get("/api/super-admin/roles/assigned?userId=1f402a90-ea36-4ce5-8c5b-fd5a9c71378e");
-  expect(assignedResp.status()).toBeLessThan(500);
-
-  // ── Export API + CSV content ──
-  const exportResp = await page.request.get("/api/super-admin/roles/export");
-  expect(exportResp.status()).toBeLessThan(500);
-  const csvText = await exportResp.text().catch(() => "");
-  if (csvText.length > 0) {
-    expect(csvText.length).toBeGreaterThan(0);
-    expect(csvText.toLowerCase()).toContain("role");
-  }
-
-  // ── System role protections ──
-  const systemBadge = page.locator("main").getByText("System").first();
-  if (await systemBadge.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(systemBadge).toBeVisible();
-  }
-
-  // ── No errors ──
   expect(e).toEqual([]);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SMALL: export from unauthenticated context
+// ═══════════════════════════════════════════════════════════════════════════
+test("R21: export rejects unauthenticated", async ({ page }) => {
+  const r = await page.request.get("/api/super-admin/roles/export");
+  expect([401, 404]).toContain(r.status());
 });

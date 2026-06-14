@@ -128,6 +128,7 @@ input[type="radio"] {
 .container-page {
   width: min(100% - 32px, 1180px);
   margin-inline: auto;
+  overflow-x: hidden;
 }
 
 @media (min-width: 768px) {
