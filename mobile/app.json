@@ -1,0 +1,105 @@
+{
+  "expo": {
+    "name": "Apex Performance Club",
+    "slug": "apex-gym",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "apex",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#070809"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.apexperformance.club",
+      "associatedDomains": [
+        "applinks:apexperformance.club"
+      ],
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used for QR code check-in at the gym entrance.",
+        "NSPhotoLibraryUsageDescription": "Used to upload profile photos and progress pictures.",
+        "NSUserNotificationCenterUsageDescription": "Send you reminders for renewals, classes, and trainer messages."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#070809"
+      },
+      "package": "com.apexperformance.club",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "*.apexperformance.club",
+              "pathPrefix": "/member"
+            },
+            {
+              "scheme": "https",
+              "host": "*.apexperformance.club",
+              "pathPrefix": "/trainer"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Apex needs camera access to scan QR codes for attendance check-in."
+        }
+      ],
+      "expo-image-picker",
+      "expo-background-fetch",
+      "expo-splash-screen",
+      "@sentry/react-native",
+      "expo-localization",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "acb00ee9-26ae-4788-b51f-28443c27734f"
+      }
+    },
+    "owner": "harshalthitame",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/acb00ee9-26ae-4788-b51f-28443c27734f",
+      "fallbackToCacheTimeout": 30000
+    }
+  }
+}

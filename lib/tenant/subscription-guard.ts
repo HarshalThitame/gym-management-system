@@ -157,9 +157,17 @@ export async function requireFeature(
   return { ok: true };
 }
 
+const UPGRADE_MAP: Record<string, string> = {
+  max_members: "Upgrade to Growth for 5,000 members or Enterprise for unlimited.",
+  max_trainers: "Upgrade to Growth for 100 trainers or Enterprise for unlimited.",
+  max_staff: "Upgrade to Growth for 50 staff or Enterprise for unlimited.",
+  max_gyms: "Upgrade to Growth for 5 gyms or Enterprise for unlimited.",
+  max_branches: "Upgrade to Growth for 10 branches or Enterprise for unlimited.",
+};
+
 /**
  * Checks if an organization is within a specific limit.
- * Use before creating resources.
+ * Use before creating resources. Provides upgrade suggestions.
  */
 export async function requireWithinLimit(
   organizationId: string,
@@ -169,9 +177,10 @@ export async function requireWithinLimit(
   const result = await checkOrganizationLimit(organizationId, limitCode, currentUsage);
   if (!result.withinLimit) {
     const label = limitCode.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    const upgrade = UPGRADE_MAP[limitCode] ?? "Upgrade your plan to increase this limit.";
     return {
       ok: false,
-      error: `Your plan limits ${label} to ${result.limit}. You currently have ${result.usage}. Upgrade your plan to increase this limit.`,
+      error: `Your plan limits ${label} to ${result.limit}. You currently have ${result.usage}. ${upgrade}`,
       limit: result.limit,
     };
   }

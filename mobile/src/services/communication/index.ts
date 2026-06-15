@@ -1,0 +1,12 @@
+export { commTemplateService } from "./comm-templates";
+export type { MessageTemplate, CommChannel, TemplateCategory } from "./comm-templates";
+export { commCampaignService } from "./comm-campaigns";
+export type { Campaign, CampaignStatus, CampaignAudience } from "./comm-campaigns";
+export { commAutomationService } from "./comm-automation";
+export type { AutomationRule, AutomationTrigger } from "./comm-automation";
+export { commAnnouncementService } from "./comm-announcements";
+export type { Announcement, AnnouncementAudience, AnnouncementPriority } from "./comm-announcements";
+export { commPreferenceService } from "./comm-preferences";
+export type { NotificationPreferences } from "./comm-preferences";
+export { commAnalyticsService } from "./comm-analytics";
+export type { CommAnalytics } from "./comm-analytics";

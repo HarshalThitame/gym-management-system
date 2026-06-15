@@ -210,6 +210,7 @@ alter table public.analytics_ltv_snapshots enable row level security;
 alter table public.analytics_branch_scorecards enable row level security;
 
 -- RLS Policies
+drop policy if exists "analytics cohorts visible to super admin and org scope" on public.analytics_cohorts;
 create policy "analytics cohorts visible to super admin and org scope"
 on public.analytics_cohorts for select to authenticated
 using (
@@ -217,6 +218,7 @@ using (
   or (organization_id = public.current_user_organization_id() and public.has_any_role(array['organization_owner', 'gym_admin']))
 );
 
+drop policy if exists "marketing campaigns visible to super admin and org scope" on public.analytics_marketing_campaigns;
 create policy "marketing campaigns visible to super admin and org scope"
 on public.analytics_marketing_campaigns for select to authenticated
 using (
@@ -224,11 +226,13 @@ using (
   or (organization_id = public.current_user_organization_id() and public.has_any_role(array['organization_owner', 'gym_admin']))
 );
 
+drop policy if exists "marketing campaigns manageable by staff" on public.analytics_marketing_campaigns;
 create policy "marketing campaigns manageable by staff"
 on public.analytics_marketing_campaigns for all to authenticated
 using (public.is_super_admin() or (gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])))
 with check (public.is_super_admin() or (gym_id = public.current_user_gym_id() and public.has_any_role(array['gym_admin'])));
 
+drop policy if exists "churn predictions visible to super admin and org scope" on public.analytics_churn_predictions;
 create policy "churn predictions visible to super admin and org scope"
 on public.analytics_churn_predictions for select to authenticated
 using (
@@ -236,6 +240,7 @@ using (
   or (organization_id = public.current_user_organization_id() and public.has_any_role(array['organization_owner', 'gym_admin', 'trainer']))
 );
 
+drop policy if exists "analytics alerts visible to super admin and org scope" on public.analytics_alerts;
 create policy "analytics alerts visible to super admin and org scope"
 on public.analytics_alerts for select to authenticated
 using (
@@ -243,15 +248,18 @@ using (
   or (organization_id = public.current_user_organization_id() and public.has_any_role(array['organization_owner', 'gym_admin']))
 );
 
+drop policy if exists "analytics alerts manageable by org admin" on public.analytics_alerts;
 create policy "analytics alerts manageable by org admin"
 on public.analytics_alerts for all to authenticated
 using (public.is_super_admin() or (organization_id = public.current_user_organization_id() and public.has_any_role(array['organization_owner', 'gym_admin'])))
 with check (public.is_super_admin() or (organization_id = public.current_user_organization_id() and public.has_any_role(array['organization_owner', 'gym_admin'])));
 
+drop policy if exists "alert history visible to super admin and org scope" on public.analytics_alert_history;
 create policy "alert history visible to super admin and org scope"
 on public.analytics_alert_history for select to authenticated
 using (public.is_super_admin());
 
+drop policy if exists "ltv snapshots visible to super admin and org scope" on public.analytics_ltv_snapshots;
 create policy "ltv snapshots visible to super admin and org scope"
 on public.analytics_ltv_snapshots for select to authenticated
 using (
@@ -259,6 +267,7 @@ using (
   or (organization_id = public.current_user_organization_id() and public.has_any_role(array['organization_owner', 'gym_admin']))
 );
 
+drop policy if exists "branch scorecards visible to super admin and org scope" on public.analytics_branch_scorecards;
 create policy "branch scorecards visible to super admin and org scope"
 on public.analytics_branch_scorecards for select to authenticated
 using (

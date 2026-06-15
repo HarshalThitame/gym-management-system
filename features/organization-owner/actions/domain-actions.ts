@@ -5,18 +5,27 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
-import { requireOrgFeature } from "../lib/entitlement-guards";
+import { requireOrgFeature, requireOrgWithinLimit } from "../lib/entitlement-guards";
 
 type DomainInsert = Database["public"]["Tables"]["tenant_domains"]["Insert"];
 
 export async function addDomainAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/domains");
+    const supabase = await createSupabaseServerClient();
+
     // Custom domains require Enterprise plan feature
     const featureCheck = await requireOrgFeature(ctx.organizationId, "custom_domain", "add_domain");
     if (!featureCheck.ok) return { ...prevState, status: "error", message: featureCheck.error };
 
-    const supabase = await createSupabaseServerClient();
+    // Enforce domain limit from package_limits
+    const { count: existingDomains } = await supabase
+      .from("tenant_domains")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", ctx.organizationId);
+    const domainLimit = await requireOrgWithinLimit(ctx.organizationId, "max_domains", existingDomains ?? 0);
+    if (!domainLimit.ok) return { ...prevState, status: "error", message: domainLimit.error };
+
     const domain = formData.get("domain") as string;
     if (!domain) return { ...prevState, status: "error", message: "Domain is required." };
 
