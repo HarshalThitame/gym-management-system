@@ -20,7 +20,7 @@ import { formatCompactNumber, formatCurrency } from "@/features/enterprise/lib/b
 import type { GymRow } from "@/types/enterprise";
 import type { Database } from "@/types/database";
 
-type GymsModuleProps = {
+type BranchesModuleProps = {
   dashboard: OrganizationOwnerDashboard;
   moduleData?: { items: GymRow[]; total: number; page: number; pageSize: number; totalPages: number };
   moduleFilters?: Record<string, unknown>;
@@ -30,7 +30,7 @@ type BranchRow = Database["public"]["Tables"]["branches"]["Row"];
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function GymsModule({ dashboard, moduleData }: GymsModuleProps) {
+export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const { filters, navigate, currentPage } = useModuleFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [branchDrawerOpen, setBranchDrawerOpen] = useState(false);
@@ -51,11 +51,11 @@ export function GymsModule({ dashboard, moduleData }: GymsModuleProps) {
   // ── KPIs ──
   const activeGyms = gyms.filter((g) => g.status === "active").length;
   const suspendedGyms = gyms.filter((g) => g.status === "suspended").length;
-  const totalBranches = branches.length;
-  const activeBranches = branches.filter((b) => b.status === "active").length;
+  const totalLocations = branches.length;
+  const activeLocations = branches.filter((b) => b.status === "active").length;
   const totalCapacity = branches.reduce((s, b) => s + Number(b.capacity ?? 0), 0);
 
-  // ── Gym CRUD ──
+  // ── Location CRUD ──
   const openCreate = useCallback(() => { setEditingGym(null); setSavingStatus("idle"); setDrawerOpen(true); }, []);
   const openEdit = useCallback((gym: GymRow) => { setEditingGym(gym); setSavingStatus("idle"); setDrawerOpen(true); }, []);
   const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingGym(null); setSavingStatus("idle"); }, []);
@@ -181,10 +181,10 @@ export function GymsModule({ dashboard, moduleData }: GymsModuleProps) {
     <div className="space-y-6">
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="Total gym locations" icon={<Building2 className="size-5" />} label="Total Gyms" value={String(gyms.length)} />
-        <StatCard detail="Active gyms" icon={<Building2 className="size-5" />} label="Active" value={String(activeGyms)} />
-        <StatCard detail="Suspended gyms" icon={<Building2 className="size-5" />} label="Suspended" value={String(suspendedGyms)} />
-        <StatCard detail="Total branches across all gyms" icon={<Building2 className="size-5" />} label="Branches" value={`${activeBranches}/${totalBranches} active`} />
+        <StatCard detail="Total locations across your organization" icon={<Building2 className="size-5" />} label="Total Locations" value={String(gyms.length)} />
+        <StatCard detail="Active locations" icon={<Building2 className="size-5" />} label="Active" value={String(activeGyms)} />
+        <StatCard detail="Suspended locations" icon={<Building2 className="size-5" />} label="Suspended" value={String(suspendedGyms)} />
+        <StatCard detail="Total branches across all locations" icon={<Building2 className="size-5" />} label="Branches" value={`${activeLocations}/${totalLocations} active`} />
       </section>
 
       {/* ═══ FILTERS + DATA LIST ═══ */}
@@ -194,7 +194,7 @@ export function GymsModule({ dashboard, moduleData }: GymsModuleProps) {
             { value: "active", label: "Active" }, { value: "suspended", label: "Suspended" }, { value: "archived", label: "Archived" }
           ]}
         ]}
-        searchPlaceholder="Search by gym name, slug, timezone, or currency..."
+        searchPlaceholder="Search by location name, slug, timezone, or currency..."
         onApply={handleApplyFilters}
         activeFilters={filters as unknown as Record<string, string>}
       />
@@ -202,13 +202,13 @@ export function GymsModule({ dashboard, moduleData }: GymsModuleProps) {
       <DataList
         selectable
         bulkActions={[
-          { label: "Export CSV", onClick: (ids) => { const data = gyms.filter((g) => ids.includes(g.id)).map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })); exportToCSV(data, "gyms-export"); }, variant: "secondary" as const, icon: <Download className="size-3.5" /> },
-          { label: "Suspend", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "suspended"); showToast(`${ids.length} gym(s) suspended`, "success"); }, variant: "destructive" as const, icon: <ShieldAlert className="size-3.5" /> },
-          { label: "Activate", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "active"); showToast(`${ids.length} gym(s) activated`, "success"); }, variant: "primary" as const, icon: <ShieldCheck className="size-3.5" /> },
+          { label: "Export CSV", onClick: (ids) => { const data = gyms.filter((g) => ids.includes(g.id)).map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })); exportToCSV(data, "locations-export"); }, variant: "secondary" as const, icon: <Download className="size-3.5" /> },
+          { label: "Suspend", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "suspended"); showToast(`${ids.length} location(s) suspended`, "success"); }, variant: "destructive" as const, icon: <ShieldAlert className="size-3.5" /> },
+          { label: "Activate", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "active"); showToast(`${ids.length} location(s) activated`, "success"); }, variant: "primary" as const, icon: <ShieldCheck className="size-3.5" /> },
         ]}
-        onExportCSV={() => exportToCSV(gyms.map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })), "all-gyms")}
-        headerAction={<Button onClick={openCreate} size="sm" variant="primary"><Plus className="size-4" /> Create Gym</Button>}
-        headerTitle="Gyms"
+        onExportCSV={() => exportToCSV(gyms.map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })), "all-locations")}
+        headerAction={<Button onClick={openCreate} size="sm" variant="primary"><Plus className="size-4" /> Create Location</Button>}
+        headerTitle="Locations"
         items={items}
         totalItems={totalItems}
         totalPages={moduleData?.totalPages ?? Math.ceil(gyms.length / 12)}
@@ -217,17 +217,17 @@ export function GymsModule({ dashboard, moduleData }: GymsModuleProps) {
         pageSize={filters.pageSize ?? 12}
       />
 
-      {/* ═══ GYM DRAWER ═══ */}
-      <OrgOwnerDrawer description={editingGym ? `Editing ${editingGym.name}` : "Create a new gym"} onClose={closeDrawer} open={drawerOpen} title={editingGym ? "Edit Gym" : "Create Gym"} size="lg">
+      {/* ═══ LOCATION DRAWER ═══ */}
+      <OrgOwnerDrawer description={editingGym ? `Editing ${editingGym.name}` : "Create a new location"} onClose={closeDrawer} open={drawerOpen} title={editingGym ? "Edit Location" : "Create Location"} size="lg">
         <form ref={formRef} onSubmit={handleOptimisticSubmit} className="space-y-5">
           <DrawerFormMessage status={state.status} message={state.message} />
           {editingGym ? <input name="gymId" type="hidden" value={editingGym.id} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Gym Name" required>
-              <input className={selectClass} defaultValue={editingGym?.name ?? ""} name="name" placeholder="Apex Fitness Mumbai" required type="text" />
+            <DrawerField label="Location Name" required>
+              <input className={selectClass} defaultValue={editingGym?.name ?? ""} name="name" placeholder="Bandra West Fitness" required type="text" />
             </DrawerField>
             <DrawerField label="Slug">
-              <input className={selectClass} defaultValue={editingGym?.slug ?? ""} name="slug" placeholder="apex-fitness-mumbai" type="text" />
+              <input className={selectClass} defaultValue={editingGym?.slug ?? ""} name="slug" placeholder="bandra-west-fitness" type="text" />
             </DrawerField>
             <DrawerField label="Timezone">
               <input className={selectClass} defaultValue={editingGym?.timezone ?? "Asia/Kolkata"} name="timezone" type="text" />
@@ -243,7 +243,7 @@ export function GymsModule({ dashboard, moduleData }: GymsModuleProps) {
           </div>
           <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={closeDrawer} type="button">Cancel</button>
-            <DrawerSubmitButton loading={savingStatus === "saving"}>{editingGym ? "Update Gym" : "Create Gym"}</DrawerSubmitButton>
+            <DrawerSubmitButton loading={savingStatus === "saving"}>{editingGym ? "Update Location" : "Create Location"}</DrawerSubmitButton>
           </div>
         </form>
       </OrgOwnerDrawer>

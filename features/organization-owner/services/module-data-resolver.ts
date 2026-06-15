@@ -35,7 +35,8 @@ export async function resolveModuleData(
   const getGymIds = async () => (await gymIdsQuery()).data?.map((g) => g.id) ?? [];
 
   switch (slug) {
-    case "gyms": {
+    case "gyms":
+    case "branches": {
       const q = supabase.from("gyms").select("*", { count: "exact" }).eq("organization_id", orgId);
       if (params.status && params.status !== "all") q.eq("status", params.status as never);
       if (params.q) q.or(`name.ilike.%${params.q}%,slug.ilike.%${params.q}%`);
@@ -66,7 +67,7 @@ export async function resolveModuleData(
       const gymIds = await getGymIds();
       if (gymIds.length === 0) return { moduleData: { items: [] }, total: 0, page, pageSize, totalPages: 0 } as never;
       const targetGymIds = params.gymId && params.gymId !== "all" ? [params.gymId] : gymIds;
-      const q = supabase.from("payments").select("*", { count: "exact" }).in("gym_id", targetGymIds);
+      const q = supabase.from("payments").select("*", { count: "exact" }).in("gym_id", targetGymIds).not("gym_id", "is", null);
       if (params.status && params.status !== "all") q.eq("status", params.status as never);
       if (params.dateFrom) q.gte("created_at", params.dateFrom);
       if (params.dateTo) q.lte("created_at", params.dateTo);
@@ -77,7 +78,7 @@ export async function resolveModuleData(
     case "trainers": {
       const gymIds = await getGymIds();
       if (gymIds.length === 0) return { moduleData: { items: [] }, total: 0, page, pageSize, totalPages: 0 } as never;
-      const q = supabase.from("trainers").select("*", { count: "exact" }).in("gym_id", gymIds);
+      const q = supabase.from("trainers").select("*", { count: "exact" }).in("gym_id", gymIds).not("gym_id", "is", null);
       if (params.status && params.status !== "all") q.eq("status", params.status as never);
       if (params.q) q.or(`display_name.ilike.%${params.q}%,employee_code.ilike.%${params.q}%`);
       const { data, count } = await q.order("created_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
@@ -87,7 +88,7 @@ export async function resolveModuleData(
     case "memberships": {
       const gymIds = await getGymIds();
       if (gymIds.length === 0) return { moduleData: { items: [] }, total: 0, page, pageSize, totalPages: 0 } as never;
-      const q = supabase.from("membership_plans").select("*", { count: "exact" }).in("gym_id", gymIds);
+      const q = supabase.from("membership_plans").select("*", { count: "exact" }).in("gym_id", gymIds).not("gym_id", "is", null);
       if (params.status && params.status !== "all") q.eq("status", params.status as never);
       const { data, count } = await q.order("created_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
       return { moduleData: { items: data ?? [] }, total: count ?? 0, page, pageSize, totalPages: Math.ceil((count ?? 0) / pageSize) } as never;
@@ -96,7 +97,7 @@ export async function resolveModuleData(
     case "attendance": {
       const gymIds = await getGymIds();
       if (gymIds.length === 0) return { moduleData: { items: [] }, total: 0, page, pageSize, totalPages: 0 } as never;
-      const q = supabase.from("attendance_logs").select("*", { count: "exact" }).in("gym_id", gymIds);
+      const q = supabase.from("attendance_logs").select("*", { count: "exact" }).in("gym_id", gymIds).not("gym_id", "is", null);
       if (params.status && params.status !== "all") q.eq("result", params.status as never);
       if (params.q) q.or(`action.ilike.%${params.q}%,message.ilike.%${params.q}%`);
       const { data, count } = await q.order("occurred_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
@@ -106,7 +107,7 @@ export async function resolveModuleData(
     case "classes": {
       const gymIds = await getGymIds();
       if (gymIds.length === 0) return { moduleData: { items: [] }, total: 0, page, pageSize, totalPages: 0 } as never;
-      const q = supabase.from("class_sessions").select("*", { count: "exact" }).in("gym_id", gymIds);
+      const q = supabase.from("class_sessions").select("*", { count: "exact" }).in("gym_id", gymIds).not("gym_id", "is", null);
       if (params.status && params.status !== "all") q.eq("status", params.status as never);
       const { data, count } = await q.order("session_date", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
       return { moduleData: { items: data ?? [] }, total: count ?? 0, page, pageSize, totalPages: Math.ceil((count ?? 0) / pageSize) } as never;

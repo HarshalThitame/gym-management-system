@@ -109,7 +109,7 @@ export function TrainersEnterpriseModule({ dashboard, moduleData }: TrainersEnte
           { key: "status", label: "Status", options: [
             { value: "active", label: "Active" }, { value: "on_leave", label: "On Leave" }, { value: "inactive", label: "Inactive" }
           ]},
-          { key: "gymId", label: "Gym", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
+          { key: "gymId", label: "Branch", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
         ]}
         searchPlaceholder="Search by name, code, email, or phone..."
         onApply={handleApplyFilters}
@@ -145,7 +145,7 @@ export function TrainersEnterpriseModule({ dashboard, moduleData }: TrainersEnte
           {editingTrainer ? <input name="trainerId" type="hidden" value={editingTrainer.id} /> : null}
           {editingTrainer ? <TrainerAvatar name={editingTrainer.display_name} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Gym" required>
+            <DrawerField label="Branch" required>
               <select className={selectClass} defaultValue={editingTrainer?.gym_id ?? ""} name="gymId" required>
                 <option value="">Select gym</option>{dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>

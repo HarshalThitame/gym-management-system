@@ -1,7 +1,6 @@
 export interface OrgFeatureFlags {
   maxMembers: number;
   maxBranches: number;
-  maxGyms: number;
   maxTrainers: number;
   maxStaff: number;
   maxStorageGb: number;

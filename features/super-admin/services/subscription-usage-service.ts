@@ -39,7 +39,6 @@ export async function getOrgUsage(organizationId: string): Promise<OrgUsage | nu
 
   const memberLimit = limitMap.get("max_members") ?? 0;
   const branchLimit = limitMap.get("max_branches") ?? 0;
-  const gymLimit = limitMap.get("max_gyms") ?? 0;
   const trainerLimit = limitMap.get("max_trainers") ?? 0;
   const storageLimit = limitMap.get("max_storage_gb") ?? 0;
   const apiCallLimit = limitMap.get("max_api_calls") ?? 0;
@@ -54,7 +53,6 @@ export async function getOrgUsage(organizationId: string): Promise<OrgUsage | nu
     branchCount,
     memberLimit,
     branchLimit,
-    gymLimit,
     trainerLimit,
     storageLimit,
     apiCallLimit,
@@ -78,10 +76,10 @@ async function getMemberCount(supabase: SbClient, organizationId: string): Promi
 
 async function getBranchCount(supabase: SbClient, organizationId: string): Promise<number> {
   const { count } = await supabase
-    .from("gyms")
+    .from("branches")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("status", "active");
+    .in("status", ["active", "planned", "maintenance"]);
 
   return count ?? 0;
 }

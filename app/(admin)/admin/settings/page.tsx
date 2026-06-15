@@ -16,8 +16,8 @@ type TenantDomainRow = Database["public"]["Tables"]["tenant_domains"]["Row"];
 type HealthCheckRow = Database["public"]["Tables"]["system_health_checks"]["Row"];
 
 export const metadata: Metadata = createMetadata({
-  title: "Gym Settings",
-  description: "Branch and gym-scoped operational settings for gym administrators.",
+  title: "Branch Settings",
+  description: "Branch-scoped operational settings for branch administrators.",
   path: "/admin/settings"
 });
 
@@ -58,18 +58,18 @@ export default async function AdminSettingsPage() {
   return (
     <div className="space-y-8">
       <section>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Gym Settings</p>
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Branch Settings</p>
         <h2 className="mt-2 text-3xl font-black">Branch-scoped settings and governance</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          This page is limited to the current gym scope. Organization management, global SaaS settings, subscriptions, backups, and platform monitoring remain in Super Admin or Organization Owner portals.
+          This page is limited to the current branch scope. Organization management, global SaaS settings, subscriptions, backups, and platform monitoring remain in Super Admin or Organization Owner portals.
         </p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail={gym?.status ? `Gym status: ${formatEnterpriseLabel(gym.status)}` : "Current authenticated gym scope"} icon={<Building2 className="size-5" />} label="Gym" value={gym?.name ?? "Current Gym"} />
+        <StatCard detail={gym?.status ? `Branch status: ${formatEnterpriseLabel(gym.status)}` : "Current authenticated branch scope"} icon={<Building2 className="size-5" />} label="Branch" value={gym?.name ?? "Current Branch"} />
         <StatCard detail={`${activeBranches} active branch records`} icon={<Gauge className="size-5" />} label="Branches" value={String(branches.length)} />
         <StatCard detail={`${enabledFlags} enabled branch-level flags`} icon={<Flag className="size-5" />} label="Feature Flags" value={String(flags.length)} />
-        <StatCard detail={`${verifiedDomains} verified gym domains`} icon={<Globe2 className="size-5" />} label="Domains" value={String(domains.length)} />
+        <StatCard detail={`${verifiedDomains} verified branch domains`} icon={<Globe2 className="size-5" />} label="Domains" value={String(domains.length)} />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
@@ -79,7 +79,7 @@ export default async function AdminSettingsPage() {
               <Building2 className="size-5" />
               <h3 className="text-2xl font-black">Branches</h3>
             </div>
-            <p className="text-sm leading-6 text-muted-foreground">Branches attached to the current gym only.</p>
+            <p className="text-sm leading-6 text-muted-foreground">Branches attached to the current scope only.</p>
           </CardHeader>
           <CardContent>
             <BranchList branches={branches} />
@@ -242,7 +242,7 @@ function HealthList({ healthChecks, branches }: { healthChecks: HealthCheckRow[]
 }
 
 function branchName(branches: BranchRow[], branchId: string | null) {
-  return branches.find((branch) => branch.id === branchId)?.name ?? "Gym branch";
+  return branches.find((branch) => branch.id === branchId)?.name ?? "Current branch";
 }
 
 function formatDate(value: string) {

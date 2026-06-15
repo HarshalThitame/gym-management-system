@@ -200,12 +200,8 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
                     <Input id="pkg-members" name="maxMembers" type="number" defaultValue={editingPkg?.max_members ?? 0} />
                   </div>
                   <div className="rounded-lg border border-border bg-background p-3">
-                    <label className="text-sm font-semibold" htmlFor="pkg-branches">Max Branches (-1 = unlimited)</label>
+                    <label className="text-sm font-semibold" htmlFor="pkg-branches">Max Branches / Locations (-1 = unlimited)</label>
                     <Input id="pkg-branches" name="maxBranches" type="number" defaultValue={editingPkg?.max_branches ?? 0} />
-                  </div>
-                  <div className="rounded-lg border border-border bg-background p-3">
-                    <label className="text-sm font-semibold" htmlFor="pkg-gyms">Max Gyms (-1 = unlimited)</label>
-                    <Input id="pkg-gyms" name="maxGyms" type="number" defaultValue={editingPkg?.max_gyms ?? 1} />
                   </div>
                   <div className="rounded-lg border border-border bg-background p-3">
                     <label className="text-sm font-semibold" htmlFor="pkg-trainers">Max Trainers (-1 = unlimited)</label>

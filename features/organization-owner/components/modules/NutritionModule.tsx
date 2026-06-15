@@ -191,7 +191,7 @@ export function NutritionEnterpriseModule({ dashboard }: NutritionEnterpriseModu
                 ))}
               </select>
             </DrawerField>
-            <DrawerField label="Gym">
+            <DrawerField label="Branch">
               <select className={selectClass} defaultValue={editingPlan?.gym_id ?? ""} name="gymId">
                 <option value="">All</option>
                 {dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}

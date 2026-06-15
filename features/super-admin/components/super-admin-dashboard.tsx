@@ -796,10 +796,10 @@ function buildExecutiveMetrics(dashboard: EnterpriseDashboard, insights: Dashboa
       value: formatCompactNumber(dashboard.organizations.length)
     },
     {
-      detail: `${formatCompactNumber(insights.totalActiveBranches)} active branches across ${formatCompactNumber(dashboard.gyms.length)} gyms`,
-      href: "/super-admin/gyms",
+      detail: `${formatCompactNumber(insights.totalActiveBranches)} active branches across ${formatCompactNumber(dashboard.gyms.length)} locations`,
+      href: "/super-admin/branches",
       icon: <Building2 className="size-5" />,
-      label: "Gyms and Branches",
+      label: "Branches and Locations",
       status: "good",
       value: formatCompactNumber(dashboard.branches.length)
     },

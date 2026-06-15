@@ -91,7 +91,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
   return (
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-stretch">
-        <SummaryCard icon={<Building2 className="size-5" />} label="Gyms" value={formatCompactNumber(data.summary.gyms)} detail={`${formatCompactNumber(data.summary.activeGyms)} active`} />
+        <SummaryCard icon={<Building2 className="size-5" />} label="Locations" value={formatCompactNumber(data.summary.gyms)} detail={`${formatCompactNumber(data.summary.activeGyms)} active`} />
         <SummaryCard icon={<GitBranch className="size-5" />} label="Branches" value={formatCompactNumber(data.summary.branches)} detail={`${formatCompactNumber(data.summary.activeBranches)} active`} />
         <SummaryCard icon={<UserRoundCog className="size-5" />} label="Missing Admins" value={formatCompactNumber(data.summary.branchesWithoutAdmins)} detail="Branches without active gym admin" />
         <SummaryCard icon={<ShieldAlert className="size-5" />} label="Warnings" value={formatCompactNumber(data.summary.consistencyWarnings)} detail="Hierarchy and data consistency checks" />
@@ -103,7 +103,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
         <CardContent className="p-5 md:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <h3 className="text-2xl font-black">Gym and Branch Governance</h3>
+              <h3 className="text-2xl font-black">Branch and Location Governance</h3>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
                 Manage tenant location hierarchy, gym admin ownership, branch operating rules, lifecycle state, and cross-organization movement controls.
               </p>
@@ -118,8 +118,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
                 Export PDF
               </ButtonLink>
               <Button onClick={() => setDrawer({ type: "create_gym" })} variant="accent">
-                <Plus aria-hidden="true" className="size-4" />
-                Create Gym
+                <Plus aria-hidden="true" className="size-5" /> Create Location
               </Button>
               <Button onClick={() => setDrawer({ type: "create_branch" })} variant="secondary">
                 <Plus aria-hidden="true" className="size-4" />
@@ -169,7 +168,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
           <Card>
             <CardContent className="p-8 text-center">
               <p className="text-lg font-black">No gyms match these filters.</p>
-              <p className="mt-2 text-sm text-muted-foreground">Create a gym or clear filters to review the location hierarchy.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Create a location or clear filters to review the hierarchy.</p>
               <Button className="mt-5" onClick={() => setDrawer({ type: "create_gym" })} variant="accent">
                 <Plus aria-hidden="true" className="size-4" />
                 Create Gym
@@ -347,7 +346,7 @@ function GymForm({ data, gym, onClose, title }: { data: GymBranchManagementData;
         <FormMessage state={state} />
         <input name="gymId" type="hidden" value={gym?.gym.id ?? ""} />
         <div className="grid gap-4 md:grid-cols-2">
-          <Field error={state.fieldErrors?.name?.[0]} label="Gym name"><Input name="name" defaultValue={gym?.gym.name ?? ""} placeholder="Apex Fitness Mumbai" /></Field>
+          <Field error={state.fieldErrors?.name?.[0]} label="Location name"><Input name="name" defaultValue={gym?.gym.name ?? ""} placeholder="Apex Fitness Mumbai" /></Field>
           <Field error={state.fieldErrors?.slug?.[0]} label="Slug"><Input name="slug" defaultValue={gym?.gym.slug ?? ""} placeholder="apex-fitness-mumbai" /></Field>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -359,7 +358,7 @@ function GymForm({ data, gym, onClose, title }: { data: GymBranchManagementData;
           <Field error={state.fieldErrors?.currency?.[0]} label="Currency"><Input name="currency" defaultValue={gym?.gym.currency ?? "INR"} /></Field>
         </div>
         <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason"><Textarea className="min-h-24" name="reason" placeholder="Reason for this location change." /></Field>
-        <DrawerActions onClose={onClose} submitLabel={gym ? "Save Gym" : "Create Gym"} />
+        <DrawerActions onClose={onClose} submitLabel={gym ? "Save Location" : "Create Location"} />
       </form>
     </DrawerShell>
   );
@@ -433,7 +432,7 @@ function TransferAdminForm({ data, gym, onClose }: { data: GymBranchManagementDa
   useRefreshOnSuccess(state.status, router);
 
   return (
-    <DrawerShell onClose={onClose} title="Assign or Transfer Gym Admin">
+    <DrawerShell onClose={onClose} title="Assign or Transfer Branch Manager">
       <form action={formAction} className="space-y-5">
         <FormMessage state={state} />
         <input name="gymId" type="hidden" value={gym.gym.id} />
@@ -442,7 +441,7 @@ function TransferAdminForm({ data, gym, onClose }: { data: GymBranchManagementDa
           <p className="mt-2 text-sm text-muted-foreground">{gym.branches.length} branch scope · Current admin {gym.admins[0]?.profile?.full_name ?? gym.admins[0]?.profile?.email ?? "Unassigned"}</p>
         </div>
         <label className="space-y-2">
-          <span className="text-sm font-bold">New gym admin</span>
+          <span className="text-sm font-bold">New branch manager</span>
           <select className={selectClass} name="newAdminUserId" defaultValue="">
             <option value="">Select user</option>
             {data.adminCandidates.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name || profile.email || profile.id} · {profile.email ?? "No email"}</option>)}
@@ -520,7 +519,7 @@ function MoveGymForm({ data, gym, onClose }: { data: GymBranchManagementData; gy
   useRefreshOnSuccess(state.status, router);
 
   return (
-    <DrawerShell onClose={onClose} title="Move Gym Across Organization">
+    <DrawerShell onClose={onClose} title="Move Location Across Organization">
       <form action={formAction} className="space-y-5">
         <FormMessage state={state} />
         <input name="gymId" type="hidden" value={gym.gym.id} />

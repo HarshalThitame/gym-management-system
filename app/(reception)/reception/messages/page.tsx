@@ -11,7 +11,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Messages",
-  description: "Reception reminder and front desk communication workspace for assigned-gym operations.",
+  description: "Reception reminder and front desk communication workspace for assigned branch operations.",
   path: "/reception/messages"
 });
 
@@ -29,7 +29,7 @@ export default async function ReceptionMessagesPage() {
       <section>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Messages</p>
         <h2 className="mt-2 text-3xl font-black">Front desk messages</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Send assigned-gym renewal, payment, appointment, and support reminders through permitted communication channels.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Send assigned branch renewal, payment, appointment, and support reminders through permitted communication channels.</p>
       </section>
       <section className="grid gap-4 md:grid-cols-3">
         <StatCard detail="Email logs recorded today" icon={<Mail className="size-5" />} label="Email" value={String(dashboard.metrics.emailsToday)} />

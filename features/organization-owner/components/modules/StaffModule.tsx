@@ -150,7 +150,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total staff across all branches" icon={<UsersRound className="size-5" />} label="Total Staff" value={String(staffItems.length)} />
         <StatCard detail="Active staff members" icon={<ShieldCheck className="size-5" />} label="Active" value={String(activeCount)} />
-        <StatCard detail="Gym administrators" icon={<ShieldCheck className="size-5" />} label="Gym Admins" value={String(gymAdminCount)} />
+        <StatCard detail="Gym administrators" icon={<ShieldCheck className="size-5" />} label="Branch Managers" value={String(gymAdminCount)} />
         <StatCard detail="Pending invitations" icon={<Mail className="size-5" />} label="Invited" value={String(invitedCount)} />
         <StatCard detail="Front desk staff" icon={<UsersRound className="size-5" />} label="Reception" value={String(receptionCount)} />
         <StatCard detail="Fitness trainers" icon={<UsersRound className="size-5" />} label="Trainers" value={String(trainerCount)} />
@@ -160,12 +160,12 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       <FilterBar
         filterGroups={[
           { key: "role", label: "Role", options: [
-            { value: "gym_admin", label: "Gym Admin" }, { value: "reception_staff", label: "Reception" }, { value: "trainer", label: "Trainer" }
+            { value: "gym_admin", label: "Branch Manager" }, { value: "reception_staff", label: "Reception" }, { value: "trainer", label: "Trainer" }
           ]},
           { key: "status", label: "Status", options: [
             { value: "active", label: "Active" }, { value: "invited", label: "Invited" }, { value: "suspended", label: "Suspended" }
           ]},
-          { key: "gymId", label: "Gym", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
+          { key: "gymId", label: "Branch", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
         ]}
         searchPlaceholder="Search by name, email, or role..."
         onApply={handleApplyFilters}
@@ -226,12 +226,12 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
             <DrawerField label="Role" required>
               <select className={selectClass} defaultValue={editingStaff?.roleName ?? ""} name="roleName" required>
                 <option value="">Select role</option>
-                <option value="gym_admin">Gym Admin</option>
+                <option value="gym_admin">Branch Manager</option>
                 <option value="reception_staff">Reception Staff</option>
                 <option value="trainer">Trainer</option>
               </select>
             </DrawerField>
-            <DrawerField label="Gym" required>
+            <DrawerField label="Branch" required>
               <select className={selectClass} defaultValue={editingStaff?.gymId ?? ""} name="gymId" required>
                 <option value="">Select gym</option>
                 {dashboard.gyms.map((gym) => <option key={gym.id} value={gym.id}>{gym.name}</option>)}

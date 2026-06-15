@@ -10,7 +10,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Payments",
-  description: "Reception payment collection workspace for assigned-gym front desk operations.",
+  description: "Reception payment collection workspace for assigned branch front desk operations.",
   path: "/reception/payments"
 });
 
@@ -27,7 +27,7 @@ export default async function ReceptionPaymentsPage() {
       <section>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Payments</p>
         <h2 className="mt-2 text-3xl font-black">Payment collection</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">View assigned-gym payment history, pending dues, receipts, and front-desk collection state. Refunds and revenue analytics remain blocked.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">View assigned branch payment history, pending dues, receipts, and front-desk collection state. Refunds and revenue analytics remain blocked.</p>
       </section>
       <section className="grid gap-4 md:grid-cols-3">
         <StatCard detail="Paid payments collected today" icon={<CreditCard className="size-5" />} label="Today's Payments" value={String(todayPayments.length)} />

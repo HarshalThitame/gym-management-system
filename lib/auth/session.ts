@@ -37,7 +37,7 @@ export async function getAuthContext(): Promise<AuthContext> {
   const [{ data: profile }, { data: assignments }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,gym_id,full_name,email,phone,avatar_url,status,emergency_contact_name,emergency_contact_phone")
+      .select("id,gym_id,branch_id,full_name,email,phone,avatar_url,status,emergency_contact_name,emergency_contact_phone")
       .eq("id", userId)
       .maybeSingle(),
     supabase.from("user_roles").select("role_id").eq("user_id", userId)
@@ -52,7 +52,7 @@ export async function getAuthContext(): Promise<AuthContext> {
     .map((role) => role.name)
     .filter(isRoleName);
   const normalizedProfile = profile ? toAuthProfile(profile) : null;
-  const organizationId = await getUserOrganizationId(supabase, userId, normalizedProfile?.gym_id ?? null);
+  const organizationId = await getUserOrganizationId(supabase, userId, normalizedProfile?.gym_id ?? null, normalizedProfile?.branch_id ?? null);
   const primaryRole = getPrimaryRole(roles);
   const isActive = normalizedProfile?.status === "active" || normalizedProfile?.status === "invited";
 
@@ -72,9 +72,14 @@ function toAuthProfile(profile: AuthProfile): AuthProfile {
   return profile;
 }
 
-async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, gymId: string | null) {
+async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, gymId: string | null, branchId: string | null) {
   if (gymId) {
     const { data } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
+    if (data?.organization_id) return data.organization_id;
+  }
+
+  if (branchId) {
+    const { data } = await supabase.from("branches").select("organization_id").eq("id", branchId).maybeSingle();
     if (data?.organization_id) return data.organization_id;
   }
 

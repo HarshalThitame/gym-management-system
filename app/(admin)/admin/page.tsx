@@ -74,7 +74,7 @@ export default async function AdminDashboardPage() {
           <ButtonLink href="/admin/communications" variant="secondary">Communication Hub</ButtonLink>
           <ButtonLink href="/admin/ai" variant="secondary">AI Intelligence</ButtonLink>
           <ButtonLink href="/admin/reports" variant="secondary">Analytics Center</ButtonLink>
-          <ButtonLink href="/admin/settings" variant="secondary">Gym Settings</ButtonLink>
+          <ButtonLink href="/admin/settings" variant="secondary">Branch Settings</ButtonLink>
           <ButtonLink href="/admin/staff" variant="secondary">Manage Staff</ButtonLink>
           <form action={expireMembershipsFormAction}>
             <Button type="submit" variant="secondary">Process Expiries</Button>

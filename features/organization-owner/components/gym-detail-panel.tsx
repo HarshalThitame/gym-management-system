@@ -51,18 +51,18 @@ export function GymDetailPanel({ gym, dashboard, onClose }: GymDetailPanelProps)
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Gym Admin */}
+          {/* Branch Manager */}
           <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Gym Admin</p>
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Branch Manager</p>
             {gymAdmins.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No admin assigned</p>
+              <p className="text-sm text-muted-foreground">No manager assigned</p>
             ) : (
               <div className="space-y-2">
                 {gymAdmins.map((admin) => (
                   <div key={admin.id} className="flex items-center gap-3 rounded-md border border-border bg-background p-3">
                     <div className="rounded-full bg-accent/10 p-2"><UserRound className="size-4 text-accent" /></div>
                     <div>
-                      <p className="text-sm font-bold">Admin</p>
+                      <p className="text-sm font-bold">Manager</p>
                       <p className="text-xs text-muted-foreground">{admin.access_scope} scope · {admin.status}</p>
                     </div>
                   </div>

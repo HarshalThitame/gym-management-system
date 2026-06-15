@@ -108,8 +108,8 @@ export function MembershipsModule({ dashboard, moduleData }: MembershipsModulePr
           { key: "status", label: "Status", options: [
             { value: "active", label: "Active" }, { value: "archived", label: "Archived" }, { value: "draft", label: "Draft" }
           ]},
-          { key: "gymId", label: "Gym", options: [
-            { value: "all", label: "All Gyms" },
+          { key: "gymId", label: "Branch", options: [
+            { value: "all", label: "All Branches" },
             ...dashboard.gyms.map((g) => ({ value: g.id, label: g.name }))
           ]}
         ]}
@@ -138,7 +138,7 @@ export function MembershipsModule({ dashboard, moduleData }: MembershipsModulePr
           <DrawerFormMessage status={state.status} message={state.message} />
           {editingPlan ? <input name="planId" type="hidden" value={editingPlan.id} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Gym" required>
+            <DrawerField label="Branch" required>
               <select className={selectClass} defaultValue={editingPlan?.gym_id ?? ""} name="gymId" required>
                 <option value="">Select gym</option>
                 {dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}

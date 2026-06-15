@@ -34,14 +34,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <PortalShell
       branchName={tenantSite.branchName}
       context={scope}
-      eyebrow="Gym Admin Panel"
+      eyebrow="Admin Panel"
       navItems={adminNav}
       planContext={planContext}
       showPlanIndicator
       tenantInitial={tenantSite.brandInitial}
       tenantName={tenantSite.name}
       tenantShortName={tenantSite.shortName}
-      title="Gym Operations Dashboard"
+      title="Branch Operations Dashboard"
     >
       {children}
     </PortalShell>

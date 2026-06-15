@@ -14,7 +14,6 @@ export type OrgPlanContext = {
   features: OrgFeatureFlags;
   maxMembers: number;
   maxBranches: number;
-  maxGyms: number;
   maxTrainers: number;
   maxStaff: number;
   maxStorageGb: number;
@@ -79,7 +78,6 @@ function defaultPlanContext(features: OrgFeatureFlags): OrgPlanContext {
     features,
     maxMembers: features.maxMembers,
     maxBranches: features.maxBranches,
-    maxGyms: features.maxGyms,
     maxTrainers: features.maxTrainers,
     maxStaff: features.maxStaff,
     maxStorageGb: features.maxStorageGb,
@@ -106,7 +104,6 @@ function mapPlanContext(sub: Record<string, unknown>, features: OrgFeatureFlags)
     features,
     maxMembers: features.maxMembers,
     maxBranches: features.maxBranches,
-    maxGyms: features.maxGyms,
     maxTrainers: features.maxTrainers,
     maxStaff: features.maxStaff,
     maxStorageGb: features.maxStorageGb,

@@ -2,10 +2,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { organizationHasFeature } from "@/features/super-admin/services/entitlement-service";
 import type { OrgFeatureFlags, FeatureFlagKey } from "./feature-flags";
 
-type Sb = ReturnType<typeof createSupabaseServerClient> extends Promise<infer R> ? R : never;
-
 const SAFE_DEFAULT: OrgFeatureFlags = {
-  maxMembers: 0, maxBranches: 0, maxGyms: 0, maxTrainers: 0, maxStaff: 0, maxStorageGb: 0, maxApiCalls: 0,
+  maxMembers: 0, maxBranches: 0, maxTrainers: 0, maxStaff: 0, maxStorageGb: 0, maxApiCalls: 0,
   manualAttendance: false, qrAttendanceEnabled: false, dynamicQrAttendance: false,
   trainerAttendance: false, staffAttendance: false, branchAttendance: false,
   biometricAttendanceEnabled: false, fingerprintAttendance: false, faceRecognitionAttendance: false,
@@ -36,7 +34,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   // Limits
   maxMembers: { type: "limit", code: "max_members" },
   maxBranches: { type: "limit", code: "max_branches" },
-  maxGyms: { type: "limit", code: "max_gyms" },
   maxTrainers: { type: "limit", code: "max_trainers" },
   maxStaff: { type: "limit", code: "max_staff" },
   maxStorageGb: { type: "limit", code: "max_storage_gb" },

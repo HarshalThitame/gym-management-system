@@ -35,10 +35,10 @@ export async function GET(request: Request) {
   });
 
   if (format === "pdf") {
-    return pdfResponse(await buildPdf("Gym and Branch Governance Registry", rows), "gym-branch-registry.pdf");
+    return pdfResponse(await buildPdf("Branch and Location Registry", rows), "branch-location-registry.pdf");
   }
 
-  return csvResponse(rows, "gym-branch-registry.csv");
+  return csvResponse(rows, "branch-location-registry.csv");
 }
 
 async function getAllGymBranchRecords(filters: ReturnType<typeof normalizeGymBranchFilters>) {
@@ -72,12 +72,12 @@ async function getAllGymBranchRecords(filters: ReturnType<typeof normalizeGymBra
 
 function registryRows(data: Awaited<ReturnType<typeof getAllGymBranchRecords>>) {
   const rows = [
-    ["Type", "Organization/Gym", "Name", "Code/Slug", "Status", "Capacity", "Active Members", "Revenue", "Inside Now", "Warnings"]
+    ["Type", "Organization", "Name", "Code/Slug", "Status", "Capacity", "Active Members", "Revenue", "Inside Now", "Warnings"]
   ];
 
   for (const node of data.gyms) {
     rows.push([
-      "Gym",
+      "Location",
       node.organization?.name ?? "No organization",
       node.gym.name,
       node.gym.slug,
@@ -121,7 +121,7 @@ function registryRows(data: Awaited<ReturnType<typeof getAllGymBranchRecords>>) 
   }
 
   rows.push([]);
-  rows.push(["Pending Approval", "Organization", "Gym", "Branch", "Action", "Requested By", "Reason", "Expires"]);
+  rows.push(["Pending Approval", "Organization", "Location", "Branch", "Action", "Requested By", "Reason", "Expires"]);
   for (const approval of data.approvalRequests) {
     rows.push([
       "Pending Approval",

@@ -45,14 +45,14 @@ export const superAdminModules = [
     safeguards: ["Every ownership or status change is audited", "Tenant data remains scoped by organization id", "Destructive changes require confirmation"]
   },
   {
-    slug: "gyms",
-    href: "/super-admin/gyms",
-    label: "Gyms",
-    title: "Gym and Branch Management",
-    description: "Manage gyms, branches, status, assignment, branch capacity, and tenant-level operational visibility.",
+    slug: "branches",
+    href: "/super-admin/branches",
+    label: "Branches",
+    title: "Branch and Location Management",
+    description: "Manage branches, locations, status, assignments, capacity, and tenant-level operational visibility.",
     icon: <Building2 className="size-5" />,
     iconKey: "users",
-    responsibilities: ["Create and assign gyms to organizations", "Activate, suspend, or delete gyms", "View branch members, staff, trainers, revenue, and usage", "Track gym codes, cities, timezones, and currencies"],
+    responsibilities: ["Create and assign branches to organizations", "Activate, suspend, or archive branches", "View branch members, staff, trainers, revenue, and usage", "Track branch codes, cities, timezones, and currencies"],
     safeguards: ["Cross-tenant access is allowed only for Super Admin", "Branch changes are written to activity logs", "Operational edits remain auditable"]
   },
   {

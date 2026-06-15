@@ -42,6 +42,7 @@ export type ProfileStatus = "active" | "invited" | "suspended" | "archived";
 export type AuthProfile = {
   id: string;
   gym_id: string | null;
+  branch_id: string | null;
   full_name: string;
   email: string | null;
   phone: string | null;

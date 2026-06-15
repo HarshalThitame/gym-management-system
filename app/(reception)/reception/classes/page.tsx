@@ -10,7 +10,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Class Bookings",
-  description: "Reception class booking workspace for assigned-gym front desk operations.",
+  description: "Reception class booking workspace for assigned branch front desk operations.",
   path: "/reception/classes"
 });
 

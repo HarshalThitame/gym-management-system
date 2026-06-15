@@ -11,7 +11,7 @@ import { LanguageSwitcher } from "@/features/organization-owner/components/langu
 import { ThemePreview } from "@/features/organization-owner/components/modules/ThemePreview";
 import { EnterpriseDashboard } from "@/features/organization-owner/components/enterprise-dashboard";
 import { AnalyticsIntelligence } from "@/features/organization-owner/components/analytics/advanced-analytics";
-import { GymsModule } from "@/features/organization-owner/components/modules/GymsModule";
+import { BranchesModule } from "@/features/organization-owner/components/modules/GymsModule";
 import { StaffModule } from "@/features/organization-owner/components/modules/StaffModule";
 import { MembersModule } from "@/features/organization-owner/components/modules/MembersModule";
 import { MembershipsModule } from "@/features/organization-owner/components/modules/MembershipsModule";
@@ -83,7 +83,8 @@ function ModuleHero({ dashboard, module }: { dashboard: OrganizationOwnerDashboa
 }
 
 const MODULE_FEATURE_MAP: Record<string, { feature: string; name: string; plan: string }> = {
-  gyms: { feature: "member_management", name: "Gym Management", plan: "Starter" },
+  gyms: { feature: "member_management", name: "Branch Management", plan: "Starter" },
+  branches: { feature: "member_management", name: "Branch Management", plan: "Starter" },
   staff: { feature: "staff_management", name: "Staff Management", plan: "Growth" },
   members: { feature: "member_management", name: "Member Management", plan: "Starter" },
   memberships: { feature: "member_management", name: "Membership Management", plan: "Starter" },
@@ -119,7 +120,8 @@ function ModuleContent({ dashboard, module, moduleData, moduleFilters, planConte
 
   const common = { dashboard, moduleData, moduleFilters };
   switch (module.slug) {
-    case "gyms": return <GymsModule dashboard={dashboard} />;
+    case "gyms":
+    case "branches": return <BranchesModule dashboard={dashboard} />;
     case "staff": return <StaffModule dashboard={dashboard} />;
     case "members": return <MembersModule dashboard={dashboard} />;
     case "memberships": return <MembershipsModule dashboard={dashboard} />;

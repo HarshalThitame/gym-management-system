@@ -46,7 +46,7 @@ export function ProfileEnterpriseModule({ dashboard }: ProfileEnterpriseModulePr
 
   // ── Usage vs Plan limits ──
   const usageItems = [
-    { label: "Gyms", current: dashboard.gyms.length, limit: "Unlimited" },
+    { label: "Locations", current: dashboard.gyms.length, limit: "Unlimited" },
     { label: "Branches", current: dashboard.branches.length, limit: "Unlimited" },
     { label: "Members", current: dashboard.metrics.activeMembers, limit: "Unlimited" },
     { label: "Staff", current: dashboard.branchUsers.length, limit: "Unlimited" },

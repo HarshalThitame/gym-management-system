@@ -12,7 +12,7 @@ type WidgetId = "total_gyms" | "total_members" | "revenue" | "attendance" | "sta
 type Widget = { id: WidgetId; label: string; enabled: boolean; order: number };
 
 const ALL_WIDGETS: Widget[] = [
-  { id: "total_gyms", label: "Total Gyms", enabled: true, order: 0 },
+  { id: "total_gyms", label: "Total Locations", enabled: true, order: 0 },
   { id: "total_members", label: "Active Members", enabled: true, order: 1 },
   { id: "revenue", label: "Revenue", enabled: true, order: 2 },
   { id: "attendance", label: "Attendance", enabled: true, order: 3 },
@@ -73,7 +73,7 @@ export function CustomizableDashboard({ dashboard }: CustomizableDashboardProps)
   const hiddenWidgets = widgets.filter((w) => !w.enabled);
 
   const kpis: Record<WidgetId, { value: string; detail: string; icon: React.ReactNode }> = {
-    total_gyms: { value: String(dashboard.gyms.length), detail: "Gym records owned by this organization", icon: <Building2 className="size-5" /> },
+    total_gyms: { value: String(dashboard.gyms.length), detail: "Total locations owned by this organization", icon: <Building2 className="size-5" /> },
     total_members: { value: formatCompactNumber(dashboard.metrics.activeMembers), detail: "Active member profiles", icon: <UsersRound className="size-5" /> },
     revenue: { value: formatCurrency(dashboard.metrics.totalRevenue), detail: "Total revenue from metrics", icon: <CreditCard className="size-5" /> },
     attendance: { value: formatCompactNumber(dashboard.metrics.totalAttendance), detail: "Attendance from metrics", icon: <Activity className="size-5" /> },

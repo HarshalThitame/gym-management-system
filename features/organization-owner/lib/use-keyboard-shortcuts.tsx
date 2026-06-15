@@ -12,7 +12,7 @@ export function useKeyboardShortcuts() {
 
   const shortcuts: ShortcutMap = {
     "g+h": "/organization",
-    "g+g": "/organization/gyms",
+    "g+g": "/organization/branches",
     "g+m": "/organization/members",
     "g+s": "/organization/staff",
     "g+p": "/organization/memberships",
@@ -76,7 +76,7 @@ export function ShortcutGuide({ open, onClose, shortcuts }: { open: boolean; onC
     { keys: "Ctrl+K", action: "Toggle shortcut guide" },
     { keys: "?", action: "Toggle shortcut guide" },
     { keys: "g + d", action: "Dashboard" },
-    { keys: "g + g", action: "Gyms" },
+    { keys: "g + g", action: "Branches" },
     { keys: "g + m", action: "Members" },
     { keys: "g + s", action: "Staff" },
     { keys: "g + p", action: "Memberships" },

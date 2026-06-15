@@ -91,7 +91,7 @@ export function AttendanceEnterpriseModule({ dashboard, moduleData }: Attendance
       sections: [
         { label: "Member", value: member?.full_name ?? "—" },
         { label: "Action", value: formatEnterpriseLabel(log.action) },
-        { label: "Gym", value: gym?.name ?? "—" },
+        { label: "Branch", value: gym?.name ?? "—" },
         { label: "Time", value: new Date(log.occurred_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) },
       ],
       actions: [

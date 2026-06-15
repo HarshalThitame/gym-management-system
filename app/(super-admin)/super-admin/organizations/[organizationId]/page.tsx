@@ -188,7 +188,7 @@ function ProfileTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getO
         <Line label="Address" value={profile.address || "Not configured"} />
       </InfoCard>
       <InfoCard title="Usage Summary" icon={<Activity className="size-5" />}>
-        <Line label="Gyms" value={formatCompactNumber(data.record.usage.gyms)} />
+        <Line label="Locations" value={formatCompactNumber(data.record.usage.gyms)} />
         <Line label="Branches" value={`${data.record.usage.activeBranches}/${data.record.usage.branches}`} />
         <Line label="Active members" value={formatCompactNumber(data.record.usage.activeMembers)} />
         <Line label="Staff" value={formatCompactNumber(data.record.usage.staff)} />
@@ -222,7 +222,7 @@ function GymsTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrga
   return (
     <section className="grid gap-5 xl:grid-cols-2">
       <div className="space-y-3">
-        <RecordGrid emptyText="No gyms were found." title="Gyms">
+        <RecordGrid emptyText="No locations were found." title="Locations">
           {data.gyms.map((gym) => (
             <div className="rounded-md border border-border bg-background p-4" key={gym.id}>
               <div className="flex flex-wrap items-center gap-2">

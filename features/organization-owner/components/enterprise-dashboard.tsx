@@ -376,7 +376,7 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Quick Actions</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <ButtonLink href="/organization/members" size="sm" variant="secondary"><Plus className="size-3.5" /> Add Member</ButtonLink>
-          <ButtonLink href="/organization/gyms" size="sm" variant="secondary"><Plus className="size-3.5" /> Create Gym</ButtonLink>
+          <ButtonLink href="/organization/branches" size="sm" variant="secondary"><Plus className="size-3.5" /> Create Location</ButtonLink>
           <ButtonLink href="/organization/memberships" size="sm" variant="secondary"><Plus className="size-3.5" /> New Plan</ButtonLink>
           <ButtonLink href="/organization/trainers" size="sm" variant="secondary"><Plus className="size-3.5" /> Add Trainer</ButtonLink>
           <ButtonLink href="/organization/revenue" size="sm" variant="secondary"><Download className="size-3.5" /> Revenue Report</ButtonLink>

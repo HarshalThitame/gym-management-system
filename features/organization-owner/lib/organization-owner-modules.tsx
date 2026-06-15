@@ -33,11 +33,11 @@ export type OrganizationOwnerModule = {
 
 export const organizationOwnerModules = [
   {
-    slug: "gyms",
-    href: "/organization/gyms",
-    label: "Gyms",
-    title: "Gym and Branch Operations",
-    description: "View every gym and branch inside your organization with status, capacity, staff assignments, and branch performance.",
+    slug: "branches",
+    href: "/organization/branches",
+    label: "Branches",
+    title: "Branch and Location Operations",
+    description: "View every branch and location inside your organization with status, capacity, staff assignments, and performance metrics.",
     icon: <Building2 className="size-5" />,
     iconKey: "briefcase"
   },
@@ -208,5 +208,6 @@ export const organizationOwnerNavItems = [
 ] satisfies PortalNavItem[];
 
 export function getOrganizationOwnerModule(slug: string) {
+  if (slug === "gyms") slug = "branches";
   return organizationOwnerModules.find((module) => module.slug === slug) ?? null;
 }

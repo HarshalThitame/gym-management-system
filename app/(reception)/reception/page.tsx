@@ -32,7 +32,7 @@ export default async function ReceptionDashboardPage() {
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Front Desk Operations</p>
         <h2 className="mt-2 text-3xl font-black">Today at reception</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Reception access is limited to assigned-gym operational workflows: member lookup, registration, check-ins, payments, classes, reminders, and daily work queues.
+          Reception access is limited to assigned branch operational workflows: member lookup, registration, check-ins, payments, classes, reminders, and daily work queues.
         </p>
       </section>
 
@@ -81,7 +81,7 @@ export default async function ReceptionDashboardPage() {
         <Card>
           <CardHeader>
             <h3 className="text-2xl font-black">Recent activity</h3>
-            <p className="text-sm leading-6 text-muted-foreground">Reception activity is audited and scoped to the assigned gym.</p>
+            <p className="text-sm leading-6 text-muted-foreground">Reception activity is audited and scoped to the assigned branch.</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

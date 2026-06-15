@@ -7,7 +7,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Registration",
-  description: "Reception member registration workspace for assigned-gym front desk operations.",
+  description: "Reception member registration workspace for assigned branch front desk operations.",
   path: "/reception/register"
 });
 
@@ -21,7 +21,7 @@ export default async function ReceptionRegisterPage() {
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Registration</p>
         <h2 className="mt-2 text-3xl font-black">Member registration</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Create assigned-gym member records, capture emergency contacts and medical notes, attach a membership plan, and generate billing-ready membership records.
+          Create assigned branch member records, capture emergency contacts and medical notes, attach a membership plan, and generate billing-ready membership records.
         </p>
       </section>
       <Card>

@@ -243,12 +243,11 @@ export async function downgradePlanAction(input: unknown): Promise<AuthActionSta
       return { status: "error", message: "Cannot downgrade to an inactive package." };
     }
 
-    const pkgRow = newPkg as unknown as { max_members: number; max_branches: number; max_gyms: number; max_trainers: number };
+    const pkgRow = newPkg as unknown as { max_members: number; max_branches: number; max_trainers: number };
     const usage = await checkUsage(
       sub.organization_id as string,
       pkgRow.max_members,
       pkgRow.max_branches,
-      pkgRow.max_gyms,
       pkgRow.max_trainers,
     );
     if (!usage.ok) return usage.error;
@@ -313,7 +312,6 @@ async function checkUsage(
   organizationId: string,
   memberLimit: number,
   branchLimit: number,
-  gymLimit?: number,
   trainerLimit?: number,
 ): Promise<{ ok: true } | { ok: false; error: AuthActionState }> {
   const supabase = await createSupabaseServerClient();
@@ -325,28 +323,17 @@ async function checkUsage(
     .eq("organization_id", organizationId);
 
   const { count: branchCount } = await supabase
-    .from("gyms")
+    .from("branches")
     .select("id", { count: "exact", head: true })
     .eq("organization_id", organizationId)
-    .eq("status", "active");
+    .in("status", ["active", "planned", "maintenance"]);
 
   if (memberLimit !== -1 && (memberCount ?? 0) > memberLimit) {
     return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${memberCount} members but new plan limits to ${memberLimit}. Remove ${(memberCount ?? 0) - memberLimit} members first.` } };
   }
 
   if (branchLimit !== -1 && (branchCount ?? 0) > branchLimit) {
-    return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${branchCount} branches but new plan limits to ${branchLimit}. Deactivate ${(branchCount ?? 0) - branchLimit} branches first.` } };
-  }
-
-  if (gymLimit !== undefined && gymLimit !== -1) {
-    const { count: gymCount } = await supabase
-      .from("gyms")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId);
-
-    if ((gymCount ?? 0) > gymLimit) {
-      return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${gymCount} gyms but new plan limits to ${gymLimit}.` } };
-    }
+    return { ok: false, error: { status: "error", message: `Cannot downgrade: organization has ${branchCount} branches/locations but new plan limits to ${branchLimit}. Deactivate ${(branchCount ?? 0) - branchLimit} branches first.` } };
   }
 
   if (trainerLimit !== undefined && trainerLimit !== -1) {

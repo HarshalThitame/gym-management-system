@@ -79,7 +79,7 @@ function renderModuleBody(superModule: SuperAdminModule, dashboard: EnterpriseDa
     case "gyms":
       return gymBranchManagement
         ? <GymBranchManagementWorkspace data={gymBranchManagement} />
-        : <EmptyState text="Gym and branch management data is not available." />;
+        : <EmptyState text="Branch and location management data is not available." />;
 
     case "domains":
       return (
@@ -364,7 +364,7 @@ function ModuleShell({ children, stats, superModule }: { children: ReactNode; st
 function getModuleStats(slug: string, dashboard: EnterpriseDashboard, context: ModuleContext, organizationManagement: OrganizationManagementData | null = null): SummaryStat[] {
   const base = [
     stat("Organizations", dashboard.organizations.length, "Tenant organizations", <Building2 className="size-5" />),
-    stat("Gyms", dashboard.gyms.length, "Gym records", <Building2 className="size-5" />),
+    stat("Locations", dashboard.gyms.length, "Location records", <Building2 className="size-5" />),
     stat("Branches", dashboard.branches.length, "Operational branches", <Activity className="size-5" />),
     stat("Revenue", context.totalRevenue, "Latest metric revenue", <CreditCard className="size-5" />, "currency")
   ];
@@ -379,7 +379,7 @@ function getModuleStats(slug: string, dashboard: EnterpriseDashboard, context: M
       ];
     case "gyms":
       return [
-        stat("Gyms", dashboard.gyms.length, "Gym records", <Building2 className="size-5" />),
+        stat("Locations", dashboard.gyms.length, "Location records", <Building2 className="size-5" />),
         stat("Branches", dashboard.branches.length, "Branch records", <Activity className="size-5" />),
         stat("Active Branches", dashboard.branches.filter((item) => item.status === "active").length, "Operational now", <ShieldCheck className="size-5" />),
         stat("Capacity", dashboard.branches.reduce((total, branch) => total + Number(branch.capacity ?? 0), 0), "Total branch capacity", <UsersRound className="size-5" />)
@@ -403,7 +403,7 @@ function getModuleStats(slug: string, dashboard: EnterpriseDashboard, context: M
       return [
         stat("Assignments", dashboard.branchUsers.length, "Branch user records", <UsersRound className="size-5" />),
         stat("Org Owners", dashboard.branchUsers.filter((item) => item.role_name === "organization_owner").length, "Organization-level owners", <ShieldCheck className="size-5" />),
-        stat("Admins", dashboard.branchUsers.filter((item) => item.role_name === "gym_admin").length, "Gym admins", <LockKeyhole className="size-5" />),
+        stat("Admins", dashboard.branchUsers.filter((item) => item.role_name === "gym_admin").length, "Branch managers", <LockKeyhole className="size-5" />),
         stat("Suspended", dashboard.branchUsers.filter((item) => item.status === "suspended" || item.status === "revoked").length, "Restricted access", <AlertTriangle className="size-5" />)
       ];
     case "roles":

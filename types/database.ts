@@ -1469,6 +1469,8 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
+          organization_id: string | null;
           full_name: string;
           email: string | null;
           phone: string | null;
@@ -1484,6 +1486,8 @@ export type Database = {
         Insert: {
           id: string;
           gym_id?: string | null;
+          branch_id?: string | null;
+          organization_id?: string | null;
           full_name?: string;
           email?: string | null;
           phone?: string | null;
@@ -5433,6 +5437,8 @@ export type Database = {
         Row: {
           id: string;
           gym_id: string | null;
+          branch_id: string | null;
+          organization_id: string | null;
           actor_id: string | null;
           action: string;
           entity_type: string;
@@ -5445,6 +5451,8 @@ export type Database = {
         Insert: {
           id?: string;
           gym_id?: string | null;
+          branch_id?: string | null;
+          organization_id?: string | null;
           actor_id?: string | null;
           action: string;
           entity_type: string;
@@ -5881,6 +5889,10 @@ export type Database = {
         Returns: boolean;
       };
       current_user_gym_id: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
+      current_user_branch_id: {
         Args: Record<string, never>;
         Returns: string | null;
       };

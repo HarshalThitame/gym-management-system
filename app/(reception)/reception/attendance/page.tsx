@@ -11,7 +11,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Attendance",
-  description: "Reception attendance and check-in workspace for assigned-gym front desk operations.",
+  description: "Reception attendance and check-in workspace for assigned branch front desk operations.",
   path: "/reception/attendance"
 });
 
@@ -34,7 +34,7 @@ export default async function ReceptionAttendancePage({ searchParams }: Receptio
       <section>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Attendance</p>
         <h2 className="mt-2 text-3xl font-black">Attendance desk</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Run assigned-gym QR check-ins, manual check-ins, checkout, duplicate prevention, and visit tracking from the front desk.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Run assigned branch QR check-ins, manual check-ins, checkout, duplicate prevention, and visit tracking from the front desk.</p>
       </section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Validated member entries today" icon={<CalendarCheck className="size-5" />} label="Today's Check-Ins" value={String(dashboard.metrics.todayCheckIns)} />

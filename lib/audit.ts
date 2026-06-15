@@ -5,6 +5,7 @@ import type { Json } from "@/types/database";
 type AuditLogInput = {
   actorId: string | null;
   gymId?: string | null;
+  branchId?: string | null;
   action: string;
   entityType: string;
   entityId?: string | null;
@@ -25,6 +26,7 @@ export async function writeAuditLog(input: AuditLogInput) {
   await supabase.from("audit_logs").insert({
     actor_id: input.actorId,
     gym_id: input.gymId ?? null,
+    branch_id: input.branchId ?? null,
     action: input.action,
     entity_type: input.entityType,
     entity_id: input.entityId ?? null,

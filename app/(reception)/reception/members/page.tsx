@@ -6,7 +6,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Member Support",
-  description: "Reception member lookup and support workspace for assigned-gym front desk operations.",
+  description: "Reception member lookup and support workspace for assigned branch front desk operations.",
   path: "/reception/members"
 });
 
@@ -31,7 +31,7 @@ export default async function ReceptionMembersPage({ searchParams }: ReceptionMe
       <section>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Member Support</p>
         <h2 className="mt-2 text-3xl font-black">Member support desk</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Search assigned-gym members, verify membership status, contact details, attendance readiness, and payment follow-up needs.</p>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Search assigned branch members, verify membership status, contact details, attendance readiness, and payment follow-up needs.</p>
       </section>
       <Card>
         <CardContent className="p-5 md:p-6">

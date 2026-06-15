@@ -139,7 +139,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
           { key: "status", label: "Status", options: [
             { value: "scheduled", label: "Scheduled" }, { value: "completed", label: "Completed" }, { value: "cancelled", label: "Cancelled" }
           ]},
-          { key: "gymId", label: "Gym", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
+          { key: "gymId", label: "Branch", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
         ]}
         searchPlaceholder="Search by date, location, or trainer..."
         onApply={handleApply}
@@ -165,7 +165,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
           <DrawerFormMessage status={state.status} message={state.message} />
           {editingSession ? <input name="sessionId" type="hidden" value={editingSession.id} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Gym" required>
+            <DrawerField label="Branch" required>
               <select className={selectClass} defaultValue={editingSession?.gym_id ?? ""} name="gymId" required>
                 <option value="">Select gym</option>{dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
