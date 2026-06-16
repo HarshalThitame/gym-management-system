@@ -32,7 +32,7 @@ type PackageModal = {
 };
 
 export function PackageManagementClient({ data }: { data: { organizations: any[]; packages: any[]; subscriptions: any[] } }) {
-  const [editor, setEditor] = useState<PackageModal>({ pkg: null, mode: "create" });
+  const [editor, setEditor] = useState<PackageModal | null>(null);
   const [deletingPkg, setDeletingPkg] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [search, setSearch] = useState("");
@@ -48,7 +48,7 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
 
   function openCreate() { setEditor({ pkg: null, mode: "create" }); }
   function openEdit(pkg: any) { setEditor({ pkg, mode: "edit" }); }
-  function closeEditor() { setEditor({ pkg: null, mode: "create" }); }
+  function closeEditor() { setEditor(null); }
 
   // Toast save results
   useEffect(() => {
@@ -166,15 +166,17 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
         </div>
       </div>
 
-      {/* Package Editor Modal */}
-      <PackageEditorModal
-        open={editor.pkg !== null || editor.mode === "create"}
-        pkg={editor.pkg}
-        mode={editor.mode}
-        savePending={savePending}
-        formAction={formAction}
-        onClose={closeEditor}
-      />
+      {/* Package Editor Modal — opens only on explicit button click */}
+      {editor !== null && (
+        <PackageEditorModal
+          open
+          pkg={editor.pkg}
+          mode={editor.mode}
+          savePending={savePending}
+          formAction={formAction}
+          onClose={closeEditor}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
