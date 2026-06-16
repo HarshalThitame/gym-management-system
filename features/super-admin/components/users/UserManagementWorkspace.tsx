@@ -103,12 +103,22 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-        <SummaryCard label="Total Users" value={formatCompactNumber(data.summary.totalUsers)} icon={<UsersRound className="size-5" />} />
-        <SummaryCard label="Active" value={formatCompactNumber(data.summary.activeUsers)} icon={<UserCheck className="size-5 text-emerald-600" />} />
-        <SummaryCard label="Invited" value={formatCompactNumber(data.summary.invitedUsers)} icon={<Mail className="size-5 text-amber-600" />} />
-        <SummaryCard label="Suspended" value={formatCompactNumber(data.summary.suspendedUsers)} icon={<Ban className="size-5 text-red-600" />} />
-        <SummaryCard label="Super Admins" value={formatCompactNumber(data.summary.superAdmins)} icon={<ShieldCheck className="size-5 text-indigo-600" />} />
+      {/* KPI Row 1 — Core Metrics */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <KpiCard icon={<UsersRound className="size-5" />} label="Total Users" value={formatCompactNumber(data.summary.totalUsers)} />
+        <KpiCard icon={<UserCheck className="size-5 text-green-600" />} label="Active" value={formatCompactNumber(data.summary.activeUsers)} />
+        <KpiCard icon={<Mail className="size-5 text-amber-600" />} label="Invited / Pending" value={formatCompactNumber(data.summary.invitedUsers)} />
+        <KpiCard icon={<Ban className="size-5 text-red-600" />} label="Suspended" value={formatCompactNumber(data.summary.suspendedUsers)} />
+        <KpiCard icon={<ShieldCheck className="size-5 text-indigo-600" />} label="Super Admins" value={formatCompactNumber(data.summary.superAdmins)} />
+        <KpiCard icon={<Building2 className="size-5 text-blue-600" />} label="Org Owners" value={formatCompactNumber(data.summary.orgOwners)} />
+      </section>
+
+      {/* KPI Row 2 — Role Breakdown */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <KpiCard icon={<UserCog className="size-5 text-cyan-600" />} label="Branch Managers" value={formatCompactNumber(data.summary.gymAdmins)} />
+        <KpiCard icon={<UserCog className="size-5 text-purple-600" />} label="Reception Staff" value={formatCompactNumber(data.summary.receptionStaff)} />
+        <KpiCard icon={<UserCog className="size-5 text-orange-600" />} label="Trainers" value={formatCompactNumber(data.summary.trainers)} />
+        <KpiCard icon={<UsersRound className="size-5 text-teal-600" />} label="Members" value={formatCompactNumber(data.summary.members)} />
       </section>
 
       {pendingInvites.length > 0 && (
@@ -237,17 +247,15 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
   );
 }
 
-function SummaryCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function KpiCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between gap-4 p-5">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-3xl font-black">{value}</p>
-        </div>
+    <div className="rounded-xl border border-border bg-surface p-5 shadow-xs transition-all hover:shadow-sm hover:border-border-strong">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
         {icon}
-      </CardContent>
-    </Card>
+      </div>
+      <p className="mt-3 text-3xl font-black">{value}</p>
+    </div>
   );
 }
 
