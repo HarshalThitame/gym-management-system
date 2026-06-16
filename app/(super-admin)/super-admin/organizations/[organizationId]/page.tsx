@@ -172,28 +172,63 @@ function ProfileTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getO
   const profile = businessProfile(data.record.organization.settings);
 
   return (
-    <section className="grid gap-5 xl:grid-cols-3">
-      <InfoCard title="Organization Profile" icon={<Building2 className="size-5" />}>
-        <Line label="Name" value={data.record.organization.name} />
-        <Line label="Slug" value={data.record.organization.slug} />
-        <Line label="Status" value={formatEnterpriseLabel(data.record.organization.status)} />
-        <Line label="Primary domain" value={data.record.organization.primary_domain ?? "Not configured"} />
-      </InfoCard>
-      <InfoCard title="Business Details" icon={<CreditCard className="size-5" />}>
-        <Line label="Legal name" value={profile.legalName || "Not configured"} />
-        <Line label="GST" value={profile.gstNumber || "Not configured"} />
-        <Line label="Billing email" value={data.record.organization.billing_email ?? "Not configured"} />
-        <Line label="Phone" value={profile.phone || "Not configured"} />
-        <Line label="Address" value={profile.address || "Not configured"} />
-      </InfoCard>
-      <InfoCard title="Usage Summary" icon={<Activity className="size-5" />}>
-        <Line label="Locations" value={formatCompactNumber(data.record.usage.gyms)} />
-        <Line label="Branches" value={`${data.record.usage.activeBranches}/${data.record.usage.branches}`} />
-        <Line label="Active members" value={formatCompactNumber(data.record.usage.activeMembers)} />
-        <Line label="Staff" value={formatCompactNumber(data.record.usage.staff)} />
-        <Line label="Trainers" value={formatCompactNumber(data.record.usage.trainers)} />
-      </InfoCard>
+    <section className="space-y-5">
+      <div className="grid gap-5 xl:grid-cols-4">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Locations</p>
+          <p className="mt-2 text-3xl font-black">{formatCompactNumber(data.record.usage.gyms)}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Branches</p>
+          <p className="mt-2 text-3xl font-black">{data.record.usage.activeBranches}/{data.record.usage.branches}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Active / Total</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Active Members</p>
+          <p className="mt-2 text-3xl font-black">{formatCompactNumber(data.record.usage.activeMembers)}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Revenue</p>
+          <p className="mt-2 text-3xl font-black">{formatCurrency(data.record.usage.revenue)}</p>
+        </div>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-xs">
+          <div className="flex items-center gap-2">
+            <Building2 className="size-5 text-muted-foreground" />
+            <h3 className="text-lg font-black">Organization Profile</h3>
+          </div>
+          <div className="mt-4 grid gap-4">
+            <DetailRow label="Name" value={data.record.organization.name} />
+            <DetailRow label="Slug" value={data.record.organization.slug} />
+            <DetailRow label="Status" value={formatEnterpriseLabel(data.record.organization.status)} />
+            <DetailRow label="Primary Domain" value={data.record.organization.primary_domain ?? "Not configured"} />
+            <DetailRow label="Billing Email" value={data.record.organization.billing_email ?? "Not configured"} />
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-xs">
+          <div className="flex items-center gap-2">
+            <CreditCard className="size-5 text-muted-foreground" />
+            <h3 className="text-lg font-black">Business Details</h3>
+          </div>
+          <div className="mt-4 grid gap-4">
+            <DetailRow label="Legal Name" value={profile.legalName || "Not configured"} />
+            <DetailRow label="GST Number" value={profile.gstNumber || "Not configured"} />
+            <DetailRow label="Phone" value={profile.phone || "Not configured"} />
+            <DetailRow label="Address" value={profile.address || "Not configured"} />
+          </div>
+        </div>
+      </div>
     </section>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between border-b border-border/50 pb-2 last:border-0">
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="text-sm font-bold text-foreground">{value}</span>
+    </div>
   );
 }
 
@@ -280,49 +315,92 @@ function BillingTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getO
 
 function AuditTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrganizationDetailData>>> }) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h3 className="text-2xl font-black">Audit Timeline</h3>
-            <p className="text-sm leading-6 text-muted-foreground">Filter by action, severity, source, actor, IP, device, or metadata. Exports include the current organization scope.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <ButtonLink href={`/api/super-admin/organizations/export?scope=audit&organizationId=${data.record.organization.id}&format=csv`} variant="secondary"><Download aria-hidden="true" className="size-4" />CSV</ButtonLink>
-            <ButtonLink href={`/api/super-admin/organizations/export?scope=audit&organizationId=${data.record.organization.id}&format=pdf`} variant="secondary"><Download aria-hidden="true" className="size-4" />PDF</ButtonLink>
-          </div>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight">Audit Timeline</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Filter and export organization audit events</p>
         </div>
-        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
-          <input name="tab" type="hidden" value="audit" />
-          <input className="h-11 rounded-md border border-border bg-surface px-3" name="auditQ" placeholder="Search audit events" defaultValue={data.auditFilters.query} />
-          <select className="h-11 rounded-md border border-border bg-surface px-3" name="severity" defaultValue={data.auditFilters.severity}>
-            {["all", "info", "notice", "warning", "critical"].map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
-          </select>
-          <select className="h-11 rounded-md border border-border bg-surface px-3" name="source" defaultValue={data.auditFilters.source}>
-            {["all", "activity_events", "audit_logs"].map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
-          </select>
-          <Button type="submit" variant="primary">Filter</Button>
-        </form>
-      </CardHeader>
-      <CardContent className="space-y-3">
+        <div className="flex gap-2">
+          <ButtonLink href={`/api/super-admin/organizations/export?scope=audit&organizationId=${data.record.organization.id}&format=csv`} variant="secondary" size="sm"><Download className="size-4" /> CSV</ButtonLink>
+          <ButtonLink href={`/api/super-admin/organizations/export?scope=audit&organizationId=${data.record.organization.id}&format=pdf`} variant="secondary" size="sm"><Download className="size-4" /> PDF</ButtonLink>
+        </div>
+      </div>
+      <form className="flex flex-wrap gap-3">
+        <input name="tab" type="hidden" value="audit" />
+        <input className="h-11 min-w-60 flex-1 rounded-lg border border-border bg-surface px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" name="auditQ" placeholder="Search events..." defaultValue={data.auditFilters.query} />
+        <select className="h-11 rounded-lg border border-border bg-surface px-4 text-sm outline-none focus:border-primary" name="severity" defaultValue={data.auditFilters.severity}>
+          {["all", "info", "notice", "warning", "critical"].map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
+        </select>
+        <select className="h-11 rounded-lg border border-border bg-surface px-4 text-sm outline-none focus:border-primary" name="source" defaultValue={data.auditFilters.source}>
+          {["all", "activity_events", "audit_logs"].map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
+        </select>
+        <Button type="submit" variant="primary">Filter</Button>
+      </form>
+      <div className="space-y-3">
         {data.auditTimeline.length > 0 ? data.auditTimeline.map((event) => (
-          <div className="rounded-md border border-border bg-background p-4" key={`${event.source}-${event.id}`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <EnterpriseStatusBadge status={event.severity} />
-              <EnterpriseStatusBadge status={event.source} />
-              <p className="font-black">{formatEnterpriseLabel(event.action)}</p>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">{formatDateTime(event.createdAt)} · {event.actorName ?? event.actorId ?? "System"} · {event.ipAddress ?? "No IP"}</p>
-            <p className="mt-1 break-words text-xs font-semibold text-muted-foreground">{event.userAgent ?? "No device captured"}</p>
-            <AuditDiffTable metadata={event.metadata} />
-            <details className="mt-3 rounded-md border border-border bg-surface p-3">
-              <summary className="cursor-pointer text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Technical metadata</summary>
-              <pre className="mt-3 max-h-40 overflow-auto text-xs text-muted-foreground">{JSON.stringify(event.metadata, null, 2)}</pre>
-            </details>
+          <AuditEventCard key={`${event.source}-${event.id}`} event={event} />
+        )) : (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-surface py-16">
+            <Activity className="size-12 text-muted-foreground/40" />
+            <p className="mt-4 text-lg font-bold text-muted-foreground">No audit events match these filters</p>
           </div>
-        )) : <EmptyState text="No audit events match these filters." />}
-      </CardContent>
-    </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AuditEventCard({ event }: { event: NonNullable<Awaited<ReturnType<typeof getOrganizationDetailData>>>["auditTimeline"][number] }) {
+  const severityColor: Record<string, string> = {
+    critical: "border-l-red-500 bg-red-50/50",
+    warning: "border-l-amber-500 bg-amber-50/50",
+    notice: "border-l-blue-500 bg-blue-50/50",
+    info: "border-l-gray-400 bg-surface",
+  };
+  const severityBadge: Record<string, string> = {
+    critical: "bg-red-100 text-red-700",
+    warning: "bg-amber-100 text-amber-700",
+    notice: "bg-blue-100 text-blue-700",
+    info: "bg-gray-100 text-gray-600",
+  };
+
+  return (
+    <div className={`rounded-xl border border-border border-l-4 ${severityColor[event.severity] ?? "border-l-gray-400 bg-surface"} p-5 shadow-xs transition-shadow hover:shadow-sm`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className={`rounded-md px-2.5 py-0.5 text-xs font-bold ${severityBadge[event.severity] ?? "bg-gray-100 text-gray-600"}`}>
+            {formatEnterpriseLabel(event.severity)}
+          </span>
+          <span className="rounded-md bg-surface-muted px-2.5 py-0.5 text-xs font-bold text-muted-foreground">
+            {formatEnterpriseLabel(event.source)}
+          </span>
+          <p className="text-sm font-black">{formatEnterpriseLabel(event.action)}</p>
+        </div>
+        <p className="shrink-0 text-xs text-muted-foreground">
+          {formatDateTime(event.createdAt)}
+        </p>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <UserIcon className="size-3" />
+          {event.actorName ?? event.actorId ?? "System"}
+        </span>
+        {event.ipAddress && (
+          <span className="flex items-center gap-1">
+            <GlobeIcon className="size-3" />
+            {event.ipAddress}
+          </span>
+        )}
+        {event.userAgent && (
+          <span className="flex items-center gap-1">
+            <MonitorIcon className="size-3" />
+            {compactUserAgent(event.userAgent)}
+          </span>
+        )}
+      </div>
+      <AuditDiffTable metadata={event.metadata} />
+    </div>
   );
 }
 
@@ -333,27 +411,50 @@ function AuditDiffTable({ metadata }: { metadata: Json }) {
   }
 
   return (
-    <div className="mt-3 overflow-x-auto rounded-md border border-border bg-surface">
+    <div className="mt-4 overflow-hidden rounded-lg border border-border">
       <table className="min-w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-border text-xs uppercase tracking-[0.12em] text-muted-foreground">
-            <th className="px-3 py-2">Field</th>
-            <th className="px-3 py-2">Before</th>
-            <th className="px-3 py-2">After</th>
+          <tr className="border-b border-border bg-surface-muted/50">
+            <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Field</th>
+            <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Before</th>
+            <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">After</th>
           </tr>
         </thead>
         <tbody>
-          {diff.map((item) => (
-            <tr className="border-b border-border last:border-0" key={item.field}>
-              <td className="px-3 py-2 font-black">{item.label}</td>
-              <td className="max-w-xs break-words px-3 py-2 text-muted-foreground">{item.before}</td>
-              <td className="max-w-xs break-words px-3 py-2 font-semibold">{item.after}</td>
+          {diff.map((item, idx) => (
+            <tr key={item.field} className={`${idx < diff.length - 1 ? "border-b border-border" : ""} transition-colors hover:bg-surface-muted/30`}>
+              <td className="px-4 py-3 font-bold text-foreground">{item.label}</td>
+              <td className="px-4 py-3">
+                <span className="inline-block rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 line-through decoration-red-400">{item.before}</span>
+              </td>
+              <td className="px-4 py-3">
+                <span className="inline-block rounded-md bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">{item.after}</span>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
   );
+}
+
+function UserIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+}
+
+function GlobeIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>;
+}
+
+function MonitorIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>;
+}
+
+function compactUserAgent(ua: string): string {
+  if (ua.length <= 60) return ua;
+  const parts = ua.split(" ");
+  if (parts.length > 3) return `${parts.slice(0, 3).join(" ")} ...`;
+  return ua.slice(0, 57) + "...";
 }
 
 function SecurityTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrganizationDetailData>>> }) {
