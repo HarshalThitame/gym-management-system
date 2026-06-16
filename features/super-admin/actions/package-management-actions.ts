@@ -7,6 +7,9 @@ import { requireApiRole } from "@/lib/auth/api-guards";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { z } from "zod";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SbClient = any;
+
 const packageSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(2).max(80),
@@ -106,24 +109,37 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     white_label_enabled: parsed.data.whiteLabelEnabled,
   };
 
-
-
   try {
     if (parsed.data.id) {
-      const { error } = await (supabase as any).from("packages").update(payload).eq("id", parsed.data.id);
+      const { error } = await (supabase as SbClient).from("packages").update(payload).eq("id", parsed.data.id);
       if (error) return { status: "error", message: error.message };
       await writeAuditLog({ actorId: auth.context.userId, action: "package.updated", entityType: "package", entityId: parsed.data.id });
     } else {
-      const { data, error } = await (supabase as any).from("packages").insert(payload).select("*").maybeSingle();
+      const { data, error } = await (supabase as SbClient).from("packages").insert(payload).select("*").maybeSingle();
       if (error || !data) return { status: "error", message: error?.message ?? "Create failed" };
       await writeAuditLog({ actorId: auth.context.userId, action: "package.created", entityType: "package", entityId: data.id });
     }
     revalidatePath("/super-admin/subscriptions");
     return { status: "success", message: parsed.data.id ? "Package updated." : "Package created." };
   } catch (err) {
-    return { status: "error", message: String(err) };
+    const message = err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong while processing this action. Please try again.";
+    return { status: "error", message };
   }
 }
+
+type DependencyCheck = {
+  table: string;
+  column: string;
+  label: string;
+  isRestricted: boolean;
+};
+
+const PACKAGE_DEPENDENCIES: DependencyCheck[] = [
+  { table: "organization_subscriptions", column: "package_id", label: "organization subscriptions", isRestricted: true },
+  { table: "subscription_addons", column: "addon_id", label: "subscription addon assignments", isRestricted: true },
+  { table: "package_subscription_changes", column: "from_package_id", label: "subscription changes (from)", isRestricted: true },
+  { table: "package_subscription_changes", column: "to_package_id", label: "subscription changes (to)", isRestricted: true },
+];
 
 export async function deletePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _prev;
@@ -138,39 +154,77 @@ export async function deletePackageAction(_prev: AuthActionState, formData: Form
   if (!supabase) return { status: "error", message: "Database connection failed." };
 
   try {
-    // Check for active subscriptions assigned to this package
-    const { data: assignedSubs } = await (supabase as any)
-      .from("organization_subscriptions")
-      .select("id, status")
-      .eq("package_id", packageId);
+    const sb = supabase as SbClient;
 
-    const activeCount = (assignedSubs ?? []).filter((s: any) => s.status === "active" || s.status === "trial").length;
-    const totalCount = (assignedSubs ?? []).length;
+    // Check all restricted FK dependencies in parallel
+    const depResults = await Promise.all(
+      PACKAGE_DEPENDENCIES.map(async (dep) => {
+        let query = sb.from(dep.table).select("id", { count: "exact", head: true }).eq(dep.column, packageId);
 
-    if (totalCount > 0 && !forceDeactivate) {
+        // subscription_addons.addon_id references package_addons, not packages directly
+        if (dep.table === "subscription_addons" && dep.column === "addon_id") {
+          query = sb.from("package_addons").select("id", { count: "exact", head: true }).eq("package_id", packageId);
+          const { count: addonCount } = await query;
+          if ((addonCount ?? 0) > 0) {
+            const addonIds = (await sb.from("package_addons").select("id").eq("package_id", packageId)).data ?? [];
+            const ids = addonIds.map((a: Record<string, unknown>) => a.id);
+            if (ids.length > 0) {
+              const { count: refCount } = await sb.from("subscription_addons").select("id", { count: "exact", head: true }).in("addon_id", ids);
+              return { ...dep, count: refCount ?? 0 };
+            }
+          }
+          return { ...dep, count: 0 };
+        }
+
+        const { count } = await query;
+        return { ...dep, count: count ?? 0 };
+      })
+    );
+
+    const totalRestricted = depResults.filter((d) => d.isRestricted).reduce((s, d) => s + d.count, 0);
+
+    // If any restricted FK references exist, block hard delete
+    if (totalRestricted > 0 && !forceDeactivate) {
+      const details = depResults
+        .filter((d) => d.count > 0)
+        .map((d) => `${d.count} ${d.label}`)
+        .join(", ");
       return {
         status: "error",
-        message: `Cannot delete: ${totalCount} organization(s) are assigned to this plan (${activeCount} active). Deactivate the plan instead. Orgs will keep working until their subscription expires. Submit again with force deactivation to proceed.`,
-        fieldErrors: { forceDeactivate: [`${totalCount} orgs assigned`] }
+        message: `Cannot delete: ${details}. Deactivate the plan instead. Existing subscriptions will keep working until they expire. Submit again with force deactivation to proceed.`,
+        fieldErrors: { forceDeactivate: [details] }
       };
     }
 
-    if (totalCount > 0) {
-      // Deactivate instead of delete — existing orgs keep working, new assign blocked
-      const { error } = await (supabase as any).from("packages").update({ is_active: false }).eq("id", packageId);
+    if (totalRestricted > 0) {
+      // Archive/deactivate instead of delete
+      const { error } = await sb.from("packages").update({ is_active: false }).eq("id", packageId);
       if (error) return { status: "error", message: error.message };
-      await writeAuditLog({ actorId: auth.context.userId, action: "package.deactivated", entityType: "package", entityId: packageId, metadata: { assignedOrgs: totalCount, message: "Package deactivated instead of deleted because orgs were assigned" } });
+      await writeAuditLog({
+        actorId: auth.context.userId,
+        action: "package.deactivated",
+        entityType: "package",
+        entityId: packageId,
+        metadata: {
+          dependencyDetails: depResults.filter((d) => d.count > 0).map((d) => ({ table: d.table, count: d.count })),
+          message: "Package deactivated because it has historical subscription/addon references. Hard delete blocked."
+        }
+      });
       revalidatePath("/super-admin/subscriptions");
-      return { status: "success", message: `Package deactivated — ${totalCount} org(s) will keep working until their subscription expires.` };
+      return {
+        status: "success",
+        message: `Package deactivated — ${totalRestricted} historical reference(s) exist. Existing subscriptions will keep working.`
+      };
     }
 
-    // No subscriptions — safe to hard delete
-    const { error } = await (supabase as any).from("packages").delete().eq("id", packageId);
+    // Zero references — safe to hard delete all related data via CASCADE
+    const { error } = await sb.from("packages").delete().eq("id", packageId);
     if (error) return { status: "error", message: error.message };
     await writeAuditLog({ actorId: auth.context.userId, action: "package.deleted", entityType: "package", entityId: packageId });
     revalidatePath("/super-admin/subscriptions");
     return { status: "success", message: "Package permanently deleted." };
   } catch (err) {
-    return { status: "error", message: String(err) };
+    const message = err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong while processing this action. Please try again.";
+    return { status: "error", message };
   }
 }

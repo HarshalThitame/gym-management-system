@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -117,7 +120,9 @@ const postureClasses: Record<EnterpriseKpi["status"], string> = {
 };
 
 export function SuperAdminDashboard({ dashboard, operations, orgSubscriptions }: SuperAdminDashboardProps) {
-  const insights = buildDashboardInsights(dashboard, operations, orgSubscriptions);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => { setNow(new Date()); }, []);
+  const insights = buildDashboardInsights(dashboard, operations, orgSubscriptions, now);
   const recentHealth = latestHealthByComponent(dashboard.healthChecks).slice(0, 8);
   const openSecurityEvents = dashboard.securityEvents
     .filter((event) => event.status === "open" || event.status === "investigating")
@@ -712,8 +717,7 @@ function SecurityWorkflowActions({ eventId, returnTo, severity }: { eventId: str
   );
 }
 
-function buildDashboardInsights(dashboard: EnterpriseDashboard, operations: SuperAdminDashboardOperations, orgSubscriptions: OrgSubscriptionSummary[]): DashboardInsights {
-  const now = new Date();
+function buildDashboardInsights(dashboard: EnterpriseDashboard, operations: SuperAdminDashboardOperations, orgSubscriptions: OrgSubscriptionSummary[], now: Date): DashboardInsights {
   const currentYear = now.getFullYear();
   const recentHealth = latestHealthByComponent(dashboard.healthChecks);
   const activeSubscriptions = orgSubscriptions.filter((subscription) => subscription.status === "active" || subscription.status === "trial").length;

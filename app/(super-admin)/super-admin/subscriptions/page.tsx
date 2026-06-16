@@ -3,15 +3,16 @@ import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
-import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { PackageManagementClient } from "./package-management-client";
+import { SubscriptionsClient } from "./subscriptions-client";
 
 export const metadata: Metadata = createMetadata({
   title: "Subscription Management",
   description: "Enterprise subscription lifecycle, package management, and plan assignment across all tenant organizations.",
   path: "/super-admin/subscriptions",
 });
+
+export const dynamic = "force-dynamic";
 
 async function getData() {
   const supabase = await createSupabaseServerClient();
@@ -24,8 +25,8 @@ async function getData() {
     return {
       error: null as string | null,
       organizations: orgsRes.data ?? [],
-      packages: pkgsRes.data ?? [],
-      subscriptions: subsRes.data ?? [],
+      packages: (pkgsRes.data ?? []).map((p: any) => ({ ...p, max_members: p.max_members ?? 0, max_branches: p.max_branches ?? 0, max_trainers: p.max_trainers ?? 0, max_storage_gb: p.max_storage_gb ?? 0, max_api_calls: p.max_api_calls ?? 0, price: p.price ?? 0, sort_order: p.sort_order ?? 0, trial_days: p.trial_days ?? 0 })),
+      subscriptions: (subsRes.data ?? []).map((s: any) => ({ ...s, started_at: s.started_at ?? null, expires_at: s.expires_at ?? null })),
     };
   } catch (err) {
     return {
@@ -52,5 +53,5 @@ export default async function SubscriptionsPage() {
     );
   }
 
-  return <PackageManagementClient data={data} />;
+  return <SubscriptionsClient data={data} />;
 }

@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   ArrowDown,
@@ -91,7 +94,8 @@ function EventRow({ event }: { event: RecentEvent }) {
 }
 
 function TimeLabel({ iso }: { iso: string }) {
-  const now = Date.now();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { setNow(Date.now()); }, []);
   const then = new Date(iso).getTime();
   const diffMs = now - then;
   if (Number.isNaN(diffMs)) return <>Unknown</>;

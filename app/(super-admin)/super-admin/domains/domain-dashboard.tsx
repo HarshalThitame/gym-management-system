@@ -651,9 +651,7 @@ function DomainDetailPanel({
                 <option value="aws">AWS Route53</option>
                 <option value="other">Other</option>
               </select>
-              <a href={`/api/enterprise/domains/zone-export?domainId=${domain.id as string}`} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                <Button size="sm" variant="ghost" type="button"><FileText className="h-4 w-4 mr-1" />Zone File</Button>
-              </a>
+              <a href={`/api/enterprise/domains/zone-export?domainId=${domain.id as string}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-semibold transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 h-11 px-3 text-foreground hover:bg-surface-muted shrink-0"><FileText className="h-4 w-4 mr-1" />Zone File</a>
             </div>
           </div>
 

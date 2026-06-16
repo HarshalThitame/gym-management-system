@@ -1,14 +1,20 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Languages } from "lucide-react";
 import { locales, localeNames, type Locale } from "@/features/organization-owner/lib/i18n/translations";
 
 export function LanguageSwitcher() {
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window === "undefined") return "en";
-    return (localStorage.getItem("org-owner-locale") as Locale) || "en";
-  });
+  const [mounted, setMounted] = useState(false);
+  const [locale, setLocaleState] = useState<Locale>("en");
+
+  useEffect(() => {
+    setMounted(true);
+    const stored = localStorage.getItem("org-owner-locale") as Locale | null;
+    if (stored && locales.includes(stored)) {
+      setLocaleState(stored);
+    }
+  }, []);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
@@ -17,6 +23,20 @@ export function LanguageSwitcher() {
   }, []);
 
   const [open, setOpen] = useState(false);
+
+  if (!mounted) {
+    return (
+      <div className="relative">
+        <button
+          className="flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          type="button"
+          aria-label="Switch language"
+        >
+          <Languages className="size-5" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">

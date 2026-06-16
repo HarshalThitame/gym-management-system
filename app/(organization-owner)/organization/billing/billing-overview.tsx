@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { CreditCard, Download, ReceiptText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { ButtonLink, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount / 100);
@@ -52,9 +52,7 @@ export function BillingOverview({
           <h1 className="text-2xl font-bold">Billing</h1>
           <p className="text-sm text-muted-foreground">Manage your subscription, invoices, and payment methods</p>
         </div>
-        <Link href="/organization/plan">
-          <Button variant="outline" size="sm" className="w-full sm:w-auto">View Plan Details</Button>
-        </Link>
+        <ButtonLink href="/organization/plan" variant="outline" size="sm" className="w-full sm:w-auto">View Plan Details</ButtonLink>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -127,10 +125,8 @@ export function BillingOverview({
                   <div className="flex items-center gap-2 shrink-0">
                     <StatusBadge status={inv.status as string} />
                     <span className="font-black">{formatCurrency((inv.total_amount as number) || 0)}</span>
-                    <a href={`/api/billing/subscription-invoices/pdf/${inv.id}`} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Download className="h-4 w-4" />
-                      </Button>
+                    <a href={`/api/billing/subscription-invoices/pdf/${inv.id}`} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 shrink-0")}>
+                      <Download className="h-4 w-4" />
                     </a>
                   </div>
                 </div>
