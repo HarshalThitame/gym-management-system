@@ -465,7 +465,7 @@ function TransferOwnerDrawer({ candidates, criticalSuperAdminEmail, onClose, rec
           <Input autoComplete="email" name="stepUpEmail" placeholder={`Type ${criticalSuperAdminEmail}`} type="email" />
         </Field>
         <CriticalActionMfaNotice criticalSuperAdminEmail={criticalSuperAdminEmail} />
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">This creates a maker-checker approval request. A different Super Admin must approve before ownership changes.</div>
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">This creates an MFA-protected approval request. Review it from the approvals inbox before ownership changes.</div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
           <SubmitButton>Request Transfer</SubmitButton>
@@ -537,7 +537,7 @@ function BulkActionDrawer({ criticalSuperAdminEmail, data, onClose, selectedIds 
           <Input autoComplete="email" name="stepUpEmail" placeholder={`Type ${criticalSuperAdminEmail}`} type="email" />
         </Field>
         <CriticalActionMfaNotice criticalSuperAdminEmail={criticalSuperAdminEmail} />
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">Bulk suspension and bulk package assignment create maker-checker approval requests per organization. Bulk delete is intentionally unavailable.</div>
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">Bulk suspension and bulk package assignment create MFA-protected approval requests per organization. Bulk delete is intentionally unavailable.</div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
           <SubmitButton variant={action === "suspend" ? "destructive" : "primary"}>Run Bulk Action</SubmitButton>

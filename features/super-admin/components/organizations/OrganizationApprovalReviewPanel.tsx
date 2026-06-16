@@ -5,13 +5,14 @@ import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, Loader2, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { HydrationSafeDate } from "@/components/ui/hydration-safe-date";
 import { Input, Textarea } from "@/components/ui/input";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { FormMessage } from "@/features/auth/components/form-message";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
+import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
 import { formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { reviewOrganizationApprovalAction } from "../../actions/organization-actions";
 import type { OrganizationApprovalRequest } from "../../services/organization-management-service";
@@ -20,12 +21,10 @@ const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3
 
 export function OrganizationApprovalReviewPanel({
   approvals,
-  criticalSuperAdminEmail,
   emptyText = "No governance approvals exist for this organization yet.",
   showOrganization = false
 }: {
   approvals: OrganizationApprovalRequest[];
-  criticalSuperAdminEmail: string;
   emptyText?: string;
   showOrganization?: boolean;
 }) {
@@ -46,10 +45,10 @@ export function OrganizationApprovalReviewPanel({
           <div>
             <div className="flex items-center gap-2">
               <ShieldCheck aria-hidden="true" className="size-5 text-secondary" />
-              <h3 className="text-2xl font-black">Maker-Checker Approvals</h3>
+              <h3 className="text-2xl font-black">MFA Approval Reviews</h3>
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Critical organization changes require approval from a different Super Admin with a fresh MFA session.
+              Critical organization changes require a fresh MFA session before review.
             </p>
           </div>
           <Badge variant={pendingApprovals.length > 0 ? "warning" : "success"}>{pendingApprovals.length} pending</Badge>
@@ -57,6 +56,7 @@ export function OrganizationApprovalReviewPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         <FormMessage state={state} />
+        <InlineMfaStepUp />
         {approvals.length > 0 ? approvals.map((approval) => (
           <div className="rounded-md border border-border bg-background p-4" key={approval.id}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -116,7 +116,7 @@ export function OrganizationApprovalReviewPanel({
             ) : null}
 
             {approval.status === "pending" ? (
-              <form action={formAction} className="mt-4 grid gap-3 lg:grid-cols-[160px_1fr_1fr_1fr_auto]">
+              <form action={formAction} className="mt-4 grid gap-3 lg:grid-cols-[160px_minmax(180px,260px)_1fr_auto]">
                 <input name="approvalId" type="hidden" value={approval.id} />
                 <select aria-label="Approval decision" className={selectClass} name="decision" defaultValue="approve">
                   <option value="approve">Approve</option>
@@ -124,7 +124,6 @@ export function OrganizationApprovalReviewPanel({
                   <option value="cancel">Cancel</option>
                 </select>
                 <Input name="confirmation" placeholder="Type APPROVE, REJECT, or CANCEL" />
-                <Input autoComplete="email" name="stepUpEmail" placeholder={`Type ${criticalSuperAdminEmail}`} type="email" />
                 <Textarea className="min-h-11" name="reviewNote" placeholder="Review note" />
                 <SubmitButton />
               </form>
@@ -135,12 +134,6 @@ export function OrganizationApprovalReviewPanel({
             {emptyText}
           </div>
         )}
-        <div className="flex flex-col gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900 md:flex-row md:items-center md:justify-between">
-          <span>Approval requires a different Super Admin, {criticalSuperAdminEmail}, and a fresh MFA verification.</span>
-          <ButtonLink href="/super-admin/security/mfa" target="_blank" rel="noreferrer" size="sm" variant="secondary">
-            Open MFA
-          </ButtonLink>
-        </div>
       </CardContent>
     </Card>
   );

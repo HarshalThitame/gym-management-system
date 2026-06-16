@@ -158,12 +158,12 @@ function GovernanceTab({ criticalSuperAdminEmail, data }: { criticalSuperAdminEm
         <InfoCard title="Control Requirements" icon={<ShieldCheck className="size-5" />}>
           <Line label="Step-up email" value={criticalSuperAdminEmail} />
           <Line label="MFA freshness" value="10 minutes" />
-          <Line label="Maker-checker" value="Required for transfer, suspend, delete, purge, bulk suspend, package assignment" />
-          <Line label="Requester approval" value="Blocked" />
+          <Line label="Approval review" value="Fresh MFA required for transfer, suspend, delete, purge, bulk suspend, package assignment" />
+          <Line label="Requester approval" value="Allowed after fresh MFA" />
         </InfoCard>
       </div>
       <OrganizationGovernanceControlPanel criticalSuperAdminEmail={criticalSuperAdminEmail} record={data.record} />
-      <OrganizationApprovalReviewPanel approvals={data.approvalRequests} criticalSuperAdminEmail={criticalSuperAdminEmail} />
+      <OrganizationApprovalReviewPanel approvals={data.approvalRequests} />
     </section>
   );
 }

@@ -337,7 +337,7 @@ export async function transferOrganizationOwnerAction(_previousState: AuthAction
     }
   });
   revalidateOrganizationPaths();
-  return { status: "success", message: "Ownership transfer approval requested. A different Super Admin must approve it before it takes effect." };
+  return { status: "success", message: "Ownership transfer approval requested. Review it from the approvals inbox after fresh MFA verification." };
 }
 
 export async function organizationLifecycleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -401,7 +401,7 @@ export async function organizationLifecycleAction(_previousState: AuthActionStat
       stepUp: { method: "super_admin_email_confirmation", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
     });
     revalidateOrganizationPaths();
-    return { status: "success", message: "Suspension approval requested. A different Super Admin must approve it before tenant access changes." };
+    return { status: "success", message: "Suspension approval requested. Review it from the approvals inbox after fresh MFA verification." };
   }
 
   if (parsed.data.action === "activate") {
@@ -544,7 +544,7 @@ export async function organizationLifecycleAction(_previousState: AuthActionStat
       stepUp: { method: "super_admin_email_confirmation", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
     });
     revalidateOrganizationPaths();
-    return { status: "success", message: "Permanent purge approval requested. A different Super Admin must approve before tenant data is purged to a retained governance tombstone." };
+    return { status: "success", message: "Permanent purge approval requested. Review it from the approvals inbox after fresh MFA verification before tenant data is purged to a retained governance tombstone." };
   }
 
   if (parsed.data.confirmation !== organization.slug) {
@@ -837,7 +837,6 @@ export async function reviewOrganizationApprovalAction(_previousState: AuthActio
     approvalId: formData.get("approvalId"),
     decision: formData.get("decision"),
     confirmation: formData.get("confirmation") ?? "",
-    stepUpEmail: formData.get("stepUpEmail") ?? "",
     reviewNote: formData.get("reviewNote") ?? ""
   });
 
@@ -851,9 +850,9 @@ export async function reviewOrganizationApprovalAction(_previousState: AuthActio
   }
 
   const supabase = await createSupabaseServerClient();
-  const criticalAccess = await verifyCriticalSuperAdminAccess(context, supabase, parsed.data.stepUpEmail);
-  if (!criticalAccess.ok) {
-    return criticalAccess.state;
+  const mfaAccess = await verifyCurrentSuperAdminMfaAccess(supabase);
+  if (!mfaAccess.ok) {
+    return mfaAccess.state;
   }
 
   const approval = await getApprovalRequest(supabase, parsed.data.approvalId);
@@ -874,10 +873,6 @@ export async function reviewOrganizationApprovalAction(_previousState: AuthActio
     });
     revalidateOrganizationPaths();
     return { status: "error", message: "This approval request has expired. Create a fresh request." };
-  }
-
-  if (parsed.data.decision === "approve" && approval.requested_by === context.userId) {
-    return { status: "error", message: "Maker-checker control blocked this approval. A different Super Admin must approve the request." };
   }
 
   const organization = await getOrganization(supabase, approval.organization_id);
@@ -908,7 +903,7 @@ export async function reviewOrganizationApprovalAction(_previousState: AuthActio
     return { status: "success", message: `Approval request ${nextStatus}.` };
   }
 
-  const applyResult = await applyApprovedOrganizationAction(supabase, context, organization, approval, criticalAccess.mfa, parsed.data.reviewNote || null);
+  const applyResult = await applyApprovedOrganizationAction(supabase, context, organization, approval, mfaAccess.mfa, parsed.data.reviewNote || null);
   if (applyResult.status === "error") {
     return applyResult;
   }
@@ -1226,6 +1221,44 @@ async function verifyCriticalSuperAdminAccess(
         message: "MFA verification is stale. Open Super Admin MFA, verify a fresh authenticator code, then retry this critical action.",
         fieldErrors: {
           stepUpEmail: ["Verify a fresh MFA challenge within the last 10 minutes."]
+        }
+      }
+    };
+  }
+
+  return { ok: true, mfa };
+}
+
+async function verifyCurrentSuperAdminMfaAccess(
+  supabase: SupabaseClient<Database>
+): Promise<
+  | { ok: true; mfa: { currentLevel: string | null; nextLevel: string | null } }
+  | { ok: false; state: AuthActionState }
+> {
+  const mfa = await getMfaAssuranceLevel(supabase);
+  if (mfa.currentLevel !== "aal2") {
+    return {
+      ok: false,
+      state: {
+        status: "error",
+        message: "MFA verification is required before reviewing this approval. Enter your authenticator code on this page, verify the session, then submit again.",
+        fieldErrors: {
+          confirmation: ["Verify MFA on this page before submitting the review."]
+        }
+      }
+    };
+  }
+
+  const cookieStore = await cookies();
+  const verifiedAt = cookieStore.get(criticalMfaFreshnessCookieName)?.value ?? null;
+  if (!isMfaFreshEnough(verifiedAt)) {
+    return {
+      ok: false,
+      state: {
+        status: "error",
+        message: "MFA verification is stale. Enter a fresh authenticator code on this page, verify the session, then submit again.",
+        fieldErrors: {
+          confirmation: ["Verify a fresh MFA challenge within the last 10 minutes."]
         }
       }
     };

@@ -82,7 +82,6 @@ export const reviewOrganizationApprovalSchema = z.object({
   approvalId: z.string().uuid(),
   decision: z.enum(["approve", "reject", "cancel"]),
   confirmation: z.string().trim(),
-  stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
   reviewNote: z.string().trim().max(500).optional()
 });
 

@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { OrganizationApprovalReviewPanel } from "@/features/super-admin/components/organizations/OrganizationApprovalReviewPanel";
-import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import { getOrganizationApprovalInboxData, normalizeApprovalInboxFilters } from "@/features/super-admin/services/organization-management-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -19,7 +18,7 @@ const approvalStatuses = ["all", "pending", "approved", "rejected", "cancelled",
 
 export const metadata: Metadata = createMetadata({
   title: "Organization Approval Inbox",
-  description: "Review maker-checker approvals for Super Admin organization governance.",
+  description: "Review MFA-protected approvals for Super Admin organization governance.",
   path: "/super-admin/approvals"
 });
 
@@ -33,7 +32,6 @@ export default async function SuperAdminApprovalsPage({ searchParams }: SuperAdm
     page: Number(stringParam(query.page) ?? 1),
     pageSize: Number(stringParam(query.pageSize) ?? 25)
   }));
-  const criticalSuperAdminEmail = getCriticalSuperAdminEmail();
 
   return (
     <div className="space-y-6">
@@ -52,7 +50,7 @@ export default async function SuperAdminApprovalsPage({ searchParams }: SuperAdm
                 <h1 className="text-3xl font-black md:text-4xl">Organization Approval Inbox</h1>
               </div>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-                Review high-risk tenant changes across all organizations. Approvals are maker-checker controlled, MFA-protected, and expire automatically.
+                Review high-risk tenant changes across all organizations. Approvals are protected by fresh MFA verification and expire automatically.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -80,11 +78,10 @@ export default async function SuperAdminApprovalsPage({ searchParams }: SuperAdm
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 text-sm font-semibold text-muted-foreground md:flex-row md:items-center md:justify-between">
             <span>Showing {data.pagination.from}-{data.pagination.to} of {formatCompactNumber(data.pagination.total)} approvals.</span>
-            <span>Step-up reviewer account: {criticalSuperAdminEmail}</span>
+            <span>Review requires fresh MFA verification.</span>
           </div>
           <OrganizationApprovalReviewPanel
             approvals={data.approvals}
-            criticalSuperAdminEmail={criticalSuperAdminEmail}
             emptyText="No approvals match these filters."
             showOrganization
           />

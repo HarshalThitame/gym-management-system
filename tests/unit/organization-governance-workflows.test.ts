@@ -39,20 +39,18 @@ describe("organization governance workflow contracts", () => {
     }).success).toBe(true);
   });
 
-  it("keeps maker-checker review decisions constrained", () => {
+  it("keeps approval review decisions constrained without email step-up", () => {
     expect(reviewOrganizationApprovalSchema.safeParse({
       approvalId,
       decision: "approve",
       confirmation: "APPROVE",
-      stepUpEmail: "hthitame@gmail.com",
       reviewNote: "Reviewed evidence."
     }).success).toBe(true);
 
     expect(reviewOrganizationApprovalSchema.safeParse({
       approvalId,
       decision: "self_approve",
-      confirmation: "APPROVE",
-      stepUpEmail: "hthitame@gmail.com"
+      confirmation: "APPROVE"
     }).success).toBe(false);
   });
 });
