@@ -220,56 +220,155 @@ function OrganizationCard({
   const canSuspend = organization.status === "active" || organization.status === "trial";
   const canRestore = organization.status === "archived" && record.softDelete.restoreAvailable;
   const canPurge = organization.status === "archived" && record.purgeEligibility.eligible;
+  const detailUrl = `/super-admin/organizations/${organization.id}`;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
-          <div className="flex min-w-0 gap-3">
+    <div
+      className="group relative rounded-xl border border-border bg-surface shadow-xs transition-all hover:shadow-md hover:border-border-strong"
+    >
+      {/* Clickable header banner */}
+      <a
+        href={detailUrl}
+        className="block rounded-t-xl border-b border-border bg-gradient-to-r from-background to-surface-muted/30 transition-colors hover:from-accent/5 hover:to-accent/10"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
             <input
               aria-label={`Select ${organization.name}`}
               checked={selected}
-              className="mt-2 size-5 rounded border-border"
+              className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+              onClick={(e) => e.stopPropagation()}
               onChange={onToggleSelected}
               type="checkbox"
             />
-            <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="break-words text-2xl font-black">{organization.name}</h3>
-              <EnterpriseStatusBadge status={organization.status} />
-              <HealthBadge record={record} />
-              {!record.deletionProtection.canDelete ? <Badge variant="warning"><Lock aria-hidden="true" className="mr-1 size-3" />Protected</Badge> : null}
-              {record.pendingApprovalCount > 0 ? <Badge variant="warning"><ShieldAlert aria-hidden="true" className="mr-1 size-3" />{record.pendingApprovalCount} Approval</Badge> : null}
-              {record.softDelete.restoreAvailable ? <Badge variant="premium"><RotateCcw aria-hidden="true" className="mr-1 size-3" />Restorable</Badge> : null}
-            </div>
-            <p className="mt-2 break-words text-sm leading-6 text-muted-foreground">
-              {organization.primary_domain ?? organization.slug} · {organization.billing_email ?? "No billing email"} · Owner {record.owner?.fullName ?? "Unassigned"}
-            </p>
-            {record.tags.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {record.tags.map((tag) => <Badge key={tag} variant="neutral">{tag}</Badge>)}
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg font-black group-hover:text-primary transition-colors">
+                  {organization.name}
+                </h3>
+                <EnterpriseStatusBadge status={organization.status} />
+                <HealthBadge record={record} />
               </div>
-            ) : null}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>{organization.primary_domain ?? organization.slug}</span>
+                <span className="text-border-strong">|</span>
+                <span>{record.owner?.fullName ?? "Unassigned owner"}</span>
+                {organization.billing_email ? (
+                  <>
+                    <span className="text-border-strong">|</span>
+                    <span>{organization.billing_email}</span>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <ButtonLink href={`/super-admin/organizations/${organization.id}`} size="sm" variant="primary"><ExternalLink aria-hidden="true" className="size-4" />Details</ButtonLink>
-            <Button onClick={onEdit} size="sm" variant="secondary"><Edit3 aria-hidden="true" className="size-4" />Edit</Button>
-            <Button onClick={onTransfer} size="sm" variant="secondary"><UserRoundCog aria-hidden="true" className="size-4" />Transfer</Button>
-            {canSuspend ? <Button onClick={() => onLifecycle("suspend")} size="sm" variant="destructive"><AlertTriangle aria-hidden="true" className="size-4" />Suspend</Button> : null}
-            {canActivate ? <Button onClick={() => onLifecycle("activate")} size="sm" variant="secondary"><CheckCircle2 aria-hidden="true" className="size-4" />Activate</Button> : null}
-            {canRestore ? <Button onClick={() => onLifecycle("restore")} size="sm" variant="secondary"><RotateCcw aria-hidden="true" className="size-4" />Restore</Button> : null}
-            {organization.status !== "archived" ? <Button onClick={onDelete} size="sm" variant="secondary"><Trash2 aria-hidden="true" className="size-4" />Soft Delete</Button> : null}
-            {canPurge ? <Button onClick={() => onLifecycle("purge")} size="sm" variant="destructive"><Trash2 aria-hidden="true" className="size-4" />Purge</Button> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {!record.deletionProtection.canDelete && (
+              <Badge variant="warning" className="shrink-0">
+                <Lock className="mr-1 size-3" />Protected
+              </Badge>
+            )}
+            {record.pendingApprovalCount > 0 && (
+              <Badge variant="warning" className="shrink-0">
+                <ShieldAlert className="mr-1 size-3" />{record.pendingApprovalCount} Pending
+              </Badge>
+            )}
+            {record.softDelete.restoreAvailable && (
+              <Badge variant="premium" className="shrink-0">
+                <RotateCcw className="mr-1 size-3" />Restorable
+              </Badge>
+            )}
+            {record.tags.length > 0 && record.tags.slice(0, 2).map((tag) => (
+              <Badge key={tag} variant="neutral" className="shrink-0">{tag}</Badge>
+            ))}
+            {record.tags.length > 2 && (
+              <Badge variant="neutral" className="shrink-0">+{record.tags.length - 2}</Badge>
+            )}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="grid gap-5 xl:grid-cols-[1fr_1fr_1.05fr]">
-        <UsageSummary record={record} />
-        <SubscriptionSummary record={record} />
-        <AuditTimeline record={record} />
-      </CardContent>
-    </Card>
+      </a>
+
+      {/* Metrics grid */}
+      <div className="grid gap-px bg-border xl:grid-cols-3">
+        <div className="bg-surface p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Usage</p>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <MetricBlock label="Branches" value={`${record.usage.activeBranches}/${record.usage.branches}`} />
+            <MetricBlock label="Members" value={formatCompactNumber(record.usage.activeMembers)} />
+            <MetricBlock label="Revenue" value={formatCurrency(record.usage.revenue)} />
+          </div>
+        </div>
+        <div className="bg-surface p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Subscription</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <PackageBadge packageName={record.subscription.packageName} />
+            {record.subscription.status ? (
+              <span className="text-xs font-semibold text-muted-foreground">
+                {formatEnterpriseLabel(record.subscription.status)}
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-muted-foreground">No plan</span>
+            )}
+          </div>
+          {record.subscription.expiresAt && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Expires <HydrationSafeDate date={record.subscription.expiresAt} />
+            </p>
+          )}
+        </div>
+        <div className="bg-surface p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Quick Actions</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <a
+              href={detailUrl}
+              className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20"
+            >
+              <ExternalLink className="size-3" /> Open
+            </a>
+            <button onClick={onEdit} type="button" className="inline-flex items-center gap-1 rounded-md bg-surface-muted px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-border hover:text-foreground">
+              <Edit3 className="size-3" /> Edit
+            </button>
+            <button onClick={onTransfer} type="button" className="inline-flex items-center gap-1 rounded-md bg-surface-muted px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-border hover:text-foreground">
+              <UserRoundCog className="size-3" /> Transfer
+            </button>
+            {canSuspend && (
+              <button onClick={() => onLifecycle("suspend")} type="button" className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 transition-colors hover:bg-red-100">
+                <AlertTriangle className="size-3" /> Suspend
+              </button>
+            )}
+            {canActivate && (
+              <button onClick={() => onLifecycle("activate")} type="button" className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-bold text-green-700 transition-colors hover:bg-green-100">
+                <CheckCircle2 className="size-3" /> Activate
+              </button>
+            )}
+            {canRestore && (
+              <button onClick={() => onLifecycle("restore")} type="button" className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100">
+                <RotateCcw className="size-3" /> Restore
+              </button>
+            )}
+            {organization.status !== "archived" && (
+              <button onClick={onDelete} type="button" className="inline-flex items-center gap-1 rounded-md bg-surface-muted px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-700">
+                <Trash2 className="size-3" /> Delete
+              </button>
+            )}
+            {canPurge && (
+              <button onClick={() => onLifecycle("purge")} type="button" className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-800 transition-colors hover:bg-red-100">
+                <Trash2 className="size-3" /> Purge
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-base font-black">{value}</p>
+    </div>
   );
 }
 
