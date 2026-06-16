@@ -178,10 +178,10 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
   }
 
   const kpiCards = [
-    { label: "Total Configs", value: stats.total, icon: <FileText className="size-4 text-muted-foreground" />, color: "" },
-    { label: "Active", value: stats.active, icon: <CheckCircle2 className="size-4 text-green-600" />, color: "text-green-600" },
-    { label: "Enterprise", value: stats.enterprise, icon: <Shield className="size-4 text-purple-600" />, color: "text-purple-600" },
-    { label: "Custom Domain", value: stats.withCustomDomain, icon: <Globe2 className="size-4 text-amber-600" />, color: "text-amber-600" },
+    { label: "Total Configs", value: stats.total, icon: <PaintBucket className="size-5 text-muted-foreground" /> },
+    { label: "Active", value: stats.active, icon: <CheckCircle2 className="size-5 text-green-600" /> },
+    { label: "Enterprise", value: stats.enterprise, icon: <Shield className="size-5 text-purple-600" /> },
+    { label: "Custom Domain", value: stats.withCustomDomain, icon: <Globe2 className="size-5 text-amber-600" /> },
   ];
 
   const healthChecks = [
@@ -232,16 +232,16 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
   return (
     <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Enterprise Branding</p>
-          <h1 className="mt-2 text-3xl font-black">{module.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{module.description}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Enterprise Branding</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight">{module.title}</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{module.description}</p>
         </div>
         <div className="flex items-center gap-2">
           {selectedConfig && (
-            <a href={`/api/enterprise/branding/export?configId=${selectedConfig.id}`} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="ghost"><Download className="h-4 w-4 mr-1" />Export</Button>
+            <a href={`/api/enterprise/branding/export?configId=${selectedConfig.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition hover:bg-surface-muted">
+              <Download className="size-4" /> Export
             </a>
           )}
           <Badge variant="neutral" className="text-xs">{module.slug}</Badge>
@@ -249,17 +249,17 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpiCards.map((kpi) => (
-          <Card key={kpi.label} className="p-4 flex flex-col gap-1">
-            <div className="flex items-center gap-2">
+          <div key={kpi.label} className="rounded-xl border border-border bg-surface p-5 shadow-xs transition-all hover:shadow-sm hover:border-border-strong">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">{kpi.label}</p>
               {kpi.icon}
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{kpi.label}</span>
             </div>
-            <span className={`text-2xl font-black ${kpi.color}`}>{kpi.value}</span>
-          </Card>
+            <p className="mt-3 text-3xl font-black">{kpi.value}</p>
+          </div>
         ))}
-      </div>
+      </section>
 
       {/* Search + Filter */}
       <div className="flex flex-col gap-3 sm:flex-row">
