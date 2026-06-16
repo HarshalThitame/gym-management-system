@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, LockKeyhole, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Loader2, LockKeyhole, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ type AssuranceLevel = {
 const codeInputPattern = "[0-9]*";
 const criticalMfaFreshnessCookieName = "super_admin_mfa_verified_at";
 
-export function InlineMfaStepUp() {
+export function InlineMfaStepUp({ compact }: { compact?: boolean }) {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [factors, setFactors] = useState<MfaFactor[]>([]);
@@ -34,6 +34,8 @@ export function InlineMfaStepUp() {
   const [refreshing, setRefreshing] = useState(true);
   const verifiedFactors = factors.filter((factor) => factor.status === "verified");
   const primaryFactor = verifiedFactors[0] ?? null;
+
+  const isAal2 = assurance.currentLevel === "aal2";
 
   const refreshState = useCallback(async () => {
     setRefreshing(true);
@@ -115,32 +117,53 @@ export function InlineMfaStepUp() {
     }
   }
 
+  if (refreshing) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border bg-surface p-4 text-sm font-semibold text-muted-foreground">
+        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+        Loading MFA state...
+      </div>
+    );
+  }
+
+  // MFA is already active at aal2 — show green status
+  if (isAal2) {
+    return (
+      <div className={`rounded-md border border-green-200 bg-green-50 ${compact ? "p-3" : "p-4"}`}>
+        <div className="flex items-center gap-2">
+          <CheckCircle2 aria-hidden="true" className="size-4 text-green-600" />
+          <p className="text-sm font-bold text-green-800">MFA: Active</p>
+          <Badge variant="success">aal2</Badge>
+        </div>
+        <p className="mt-1 text-xs text-green-700">
+          Authenticator verified. Fresh verification lasts 10 minutes.
+        </p>
+      </div>
+    );
+  }
+
+  // MFA not active — show step-up card
   return (
-    <div className="rounded-md border border-border bg-surface p-4">
+    <div className={`rounded-md border border-border bg-surface ${compact ? "p-3" : "p-4"}`}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <ShieldAlert aria-hidden="true" className="size-4 text-secondary" />
-            <p className="text-sm font-black">MFA Step-Up</p>
+            <p className="text-sm font-black">MFA Step-Up Required</p>
           </div>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             Verify your authenticator code here before approving, rejecting, or cancelling requests.
           </p>
         </div>
         <Badge variant={assurance.currentLevel === "aal2" ? "success" : "warning"}>
-          Current assurance: {assurance.currentLevel ?? "unknown"}
+          Current assurance: {assurance.currentLevel ?? "none"}
         </Badge>
       </div>
 
       {message ? <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">{message}</p> : null}
       {error ? <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
 
-      {refreshing ? (
-        <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-          Loading MFA state...
-        </div>
-      ) : primaryFactor ? (
+      {primaryFactor ? (
         <div className="mt-4 grid gap-3 md:grid-cols-[minmax(180px,260px)_auto_1fr] md:items-end">
           <label className="space-y-2">
             <span className="text-sm font-bold">Authenticator code</span>

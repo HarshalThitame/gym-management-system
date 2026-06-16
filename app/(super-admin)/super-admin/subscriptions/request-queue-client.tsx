@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
+import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
 import { cn } from "@/lib/utils";
 import {
   approveRequestAction,
@@ -322,12 +323,15 @@ export function RequestQueueClient() {
       {/* Approve Modal */}
       {approveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => { setApproveModal(null); setApproveNote(""); }}>
-          <div className="w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-black">Approve Request</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {REQUEST_TYPE_LABELS[approveModal.request_type as SubscriptionRequestType]} request
               {approveModal.requested_package_name ? ` for ${approveModal.requested_package_name}` : ""}
             </p>
+            <div className="mt-4">
+              <InlineMfaStepUp compact />
+            </div>
             {approveModal.reason && (
               <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-800">
                 <strong>Reason:</strong> {approveModal.reason}
