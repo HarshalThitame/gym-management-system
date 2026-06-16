@@ -6,7 +6,6 @@ const DB_NAME = "apex-pwa-store";
 const DB_VERSION = 1;
 const OUTBOX_STORE = "outbox";
 
-
 const APP_SHELL_URLS = [
   "/",
   OFFLINE_URL,
