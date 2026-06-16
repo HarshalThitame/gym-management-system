@@ -57,7 +57,7 @@ export default async function SuperAdminApprovalsPage({ searchParams }: SuperAdm
             </div>
             <div className="flex flex-wrap gap-2">
               <ButtonLink href="/super-admin/organizations" variant="secondary">Organization Registry</ButtonLink>
-              <ButtonLink href="/api/super-admin/organizations/export?scope=audit&format=csv" variant="secondary">
+              <ButtonLink href={buildApprovalExportUrl(data.filters)} variant="secondary">
                 <Download aria-hidden="true" className="size-4" />
                 Audit CSV
               </ButtonLink>
@@ -130,6 +130,22 @@ function buildApprovalsUrl(filters: ReturnType<typeof normalizeApprovalInboxFilt
   params.set("page", String(nextPage));
   params.set("pageSize", String(filters.pageSize));
   return `/super-admin/approvals?${params.toString()}`;
+}
+
+function buildApprovalExportUrl(filters: ReturnType<typeof normalizeApprovalInboxFilters>) {
+  const params = new URLSearchParams();
+  params.set("scope", "approvals");
+  params.set("format", "csv");
+  if (filters.query) {
+    params.set("q", filters.query);
+  }
+  if (filters.status !== "all") {
+    params.set("status", filters.status);
+  }
+  if (filters.action !== "all") {
+    params.set("action", filters.action);
+  }
+  return `/api/super-admin/organizations/export?${params.toString()}`;
 }
 
 function stringParam(value: string | string[] | undefined) {

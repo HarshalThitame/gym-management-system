@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getOrgOwnerContext } from "./action-utils";
+import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import { submitSubscriptionRequest } from "@/features/subscription/org-owner-actions";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
@@ -91,9 +92,10 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
 }
 
 // Org Owner can only REQUEST cancellation now, not directly cancel
+// Cancellation is allowed regardless of subscription status (active, expired, suspended, etc.)
 export async function cancelSubscriptionAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const ctx = await getOrgOwnerContext("/organization/plan");
+    const ctx = await requireOrganizationOwner("/organization/plan");
     const reason = formData.get("reason") as string;
     const confirmation = formData.get("confirmation") as string;
 

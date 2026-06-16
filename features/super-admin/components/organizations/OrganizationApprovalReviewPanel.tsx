@@ -7,6 +7,7 @@ import { CheckCircle2, Clock, Loader2, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HydrationSafeDate } from "@/components/ui/hydration-safe-date";
 import { Input, Textarea } from "@/components/ui/input";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { FormMessage } from "@/features/auth/components/form-message";
@@ -66,7 +67,7 @@ export function OrganizationApprovalReviewPanel({
                   <p className="font-black">{formatEnterpriseLabel(approval.action)}</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Requested {formatDateTime(approval.requestedAt)} by {approval.requestedByName ?? approval.requestedBy ?? "Unknown"}.
+                  Requested <HydrationSafeDate date={approval.requestedAt} format="datetime" /> by {approval.requestedByName ?? approval.requestedBy ?? "Unknown"}.
                 </p>
                 {showOrganization ? (
                   <p className="mt-1 text-sm font-semibold text-muted-foreground">
@@ -75,13 +76,18 @@ export function OrganizationApprovalReviewPanel({
                 ) : null}
                 <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
                   <Clock aria-hidden="true" className="size-3" />
-                  Expires {formatDateTime(approval.expiresAt)}
+                  Expires <HydrationSafeDate date={approval.expiresAt} format="datetime" />
                 </p>
                 {approval.reason ? <p className="mt-2 text-sm font-semibold text-muted-foreground">Reason: {approval.reason}</p> : null}
               </div>
               {approval.status !== "pending" ? (
                 <div className="rounded-md border border-border bg-surface p-3 text-sm font-semibold text-muted-foreground">
-                  Reviewed by {approval.reviewedByName ?? approval.reviewedBy ?? "Unknown"} {approval.reviewedAt ? `on ${formatDateTime(approval.reviewedAt)}` : ""}.
+                  Reviewed by {approval.reviewedByName ?? approval.reviewedBy ?? "Unknown"}{" "}
+                  {approval.reviewedAt ? (
+                    <>
+                      on <HydrationSafeDate date={approval.reviewedAt} format="datetime" />
+                    </>
+                  ) : null}.
                 </div>
               ) : null}
             </div>
@@ -148,10 +154,6 @@ function SubmitButton() {
       Review
     </Button>
   );
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 export default OrganizationApprovalReviewPanel;

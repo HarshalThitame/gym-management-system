@@ -1,11 +1,14 @@
 import { formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import {
   getOrganizationDetailData,
+  getOrganizationApprovalInboxData,
   getOrganizationManagementData,
+  normalizeApprovalInboxFilters,
   normalizeAuditFilters,
   normalizeOrganizationFilters,
   type OrganizationSortOption,
-  type OrganizationAuditTimelineItem
+  type OrganizationAuditTimelineItem,
+  type OrganizationApprovalRequest
 } from "@/features/super-admin/services/organization-management-service";
 import { writeAuditLog } from "@/lib/audit";
 import { requireApiRole } from "@/lib/auth/api-guards";
@@ -18,7 +21,8 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const format = url.searchParams.get("format") === "pdf" ? "pdf" : "csv";
-  const scope = url.searchParams.get("scope") === "audit" ? "audit" : "registry";
+  const requestedScope = url.searchParams.get("scope");
+  const scope = requestedScope === "audit" || requestedScope === "approvals" ? requestedScope : "registry";
 
   if (scope === "audit") {
     const organizationId = url.searchParams.get("organizationId");
@@ -51,6 +55,33 @@ export async function GET(request: Request) {
     }
 
     return csvResponse(rows, `organization-audit-${data.record.organization.slug}.csv`);
+  }
+
+  if (scope === "approvals") {
+    const filters = normalizeApprovalInboxFilters({
+      query: url.searchParams.get("q") ?? "",
+      status: url.searchParams.get("status") ?? "all",
+      action: url.searchParams.get("action") ?? "all",
+      page: 1,
+      pageSize: 5000
+    }, 5000);
+    const data = await getOrganizationApprovalInboxData(filters);
+    const rows = approvalRows(data.approvals);
+
+    await writeAuditLog({
+      actorId: auth.context.userId,
+      gymId: auth.context.profile?.gym_id ?? null,
+      action: "organization.approvals_exported",
+      entityType: "organization",
+      entityId: null,
+      metadata: { format, filters, rows: rows.length }
+    });
+
+    if (format === "pdf") {
+      return pdfResponse(await buildPdf("Organization Approval Inbox", rows), "organization-approvals.pdf");
+    }
+
+    return csvResponse(rows, "organization-approvals.csv");
   }
 
   const baseFilters = normalizeOrganizationFilters({
@@ -113,6 +144,25 @@ function auditRows(events: OrganizationAuditTimelineItem[]) {
       event.userAgent ?? "",
       `${event.entityType}:${event.entityId ?? ""}`,
       JSON.stringify(event.metadata)
+    ])
+  ];
+}
+
+function approvalRows(approvals: OrganizationApprovalRequest[]) {
+  return [
+    ["Requested At", "Organization", "Slug", "Action", "Status", "Requested By", "Reviewed By", "Reviewed At", "Expires At", "Reason", "Review Note"],
+    ...approvals.map((approval) => [
+      approval.requestedAt,
+      approval.organizationName ?? approval.organizationId,
+      approval.organizationSlug ?? "",
+      formatEnterpriseLabel(approval.action),
+      formatEnterpriseLabel(approval.status),
+      approval.requestedByName ?? approval.requestedBy ?? "Unknown",
+      approval.reviewedByName ?? approval.reviewedBy ?? "",
+      approval.reviewedAt ?? "",
+      approval.expiresAt,
+      approval.reason ?? "",
+      approval.reviewNote ?? ""
     ])
   ];
 }
