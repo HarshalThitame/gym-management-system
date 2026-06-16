@@ -180,7 +180,16 @@ function shouldApplySubscriptionStatusGate(pathname: string) {
     return false;
   }
 
-  return pathname !== "/member/plan" && !pathname.startsWith("/member/plan/");
+  return !isSubscriptionManagementPath(pathname);
+}
+
+function isSubscriptionManagementPath(pathname: string) {
+  return (
+    pathname === "/member/plan" ||
+    pathname.startsWith("/member/plan/") ||
+    pathname === "/organization/plan" ||
+    pathname.startsWith("/organization/plan/")
+  );
 }
 
 async function hasHardBlockedSubscription(supabase: SubscriptionGateClient, organizationId: string) {
