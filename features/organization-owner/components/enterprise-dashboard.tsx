@@ -186,7 +186,7 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-black md:text-3xl lg:text-4xl">{dashboard.organization.name}</h1>
                 <EnterpriseStatusBadge status={dashboard.organization.status} />
-                <EnterpriseStatusBadge status={dashboard.organization.organization_type} />
+                <EnterpriseStatusBadge status="active" />
               </div>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 Tenant command center · {dashboard.gyms.length} gym{dashboard.gyms.length !== 1 ? "s" : ""} · {dashboard.branches.length} branche{dashboard.branches.length !== 1 ? "s" : ""}

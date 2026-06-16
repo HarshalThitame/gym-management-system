@@ -53,7 +53,7 @@ const diffLabels: Record<keyof Omit<OrganizationGovernanceSnapshot, "id">, strin
   name: "Name",
   slug: "Slug",
   status: "Status",
-  organizationType: "Type",
+  organizationType: "Category",
   primaryDomain: "Primary domain",
   billingEmail: "Billing email",
   ownerUserId: "Owner",

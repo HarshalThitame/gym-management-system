@@ -1606,7 +1606,7 @@ function snapshotFromJson(value: Json): OrganizationGovernanceSnapshot | null {
   const status = stringValue(record.status);
   const organizationType = stringValue(record.organizationType);
 
-  if (!id || !name || !slug || !status || !organizationType) {
+  if (!id || !name || !slug || !status) {
     return null;
   }
 
@@ -1615,7 +1615,7 @@ function snapshotFromJson(value: Json): OrganizationGovernanceSnapshot | null {
     name,
     slug,
     status,
-    organizationType,
+    organizationType: organizationType || "subscription_based",
     primaryDomain: nullableStringValue(record.primaryDomain),
     billingEmail: nullableStringValue(record.billingEmail),
     ownerUserId: nullableStringValue(record.ownerUserId),

@@ -35,7 +35,7 @@ import { FieldError, FormMessage } from "@/features/auth/components/form-message
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
-import { organizationStatuses, organizationTypes } from "@/types/enterprise";
+import { organizationStatuses } from "@/types/enterprise";
 import type { Json } from "@/types/database";
 import {
   bulkOrganizationAction,
@@ -236,7 +236,6 @@ function OrganizationCard({
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="break-words text-2xl font-black">{organization.name}</h3>
               <EnterpriseStatusBadge status={organization.status} />
-              <EnterpriseStatusBadge status={organization.organization_type} />
               <HealthBadge record={record} />
               {!record.deletionProtection.canDelete ? <Badge variant="warning"><Lock aria-hidden="true" className="mr-1 size-3" />Protected</Badge> : null}
               {record.pendingApprovalCount > 0 ? <Badge variant="warning"><ShieldAlert aria-hidden="true" className="mr-1 size-3" />{record.pendingApprovalCount} Approval</Badge> : null}
@@ -394,8 +393,7 @@ function OrganizationEditDrawer({ data, onClose, record }: { data: OrganizationM
             <Input name="slug" placeholder="apex-fitness-group" defaultValue={record?.organization.slug ?? ""} />
           </Field>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <SelectField defaultValue={record?.organization.organization_type ?? "single_gym"} label="Type" name="organizationType" options={organizationTypes} />
+        <div className="grid gap-4 md:grid-cols-2">
           <SelectField defaultValue={record?.organization.status ?? "active"} label="Status" name="status" options={organizationStatuses} />
           <Field error={state.fieldErrors?.billingEmail?.[0]} label="Billing email">
             <Input name="billingEmail" placeholder="billing@apexfit.com" type="email" defaultValue={record?.organization.billing_email ?? ""} />

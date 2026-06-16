@@ -133,7 +133,6 @@ export async function saveSuperAdminOrganizationAction(_previousState: AuthActio
     organizationId: formData.get("organizationId") ?? "",
     name: formData.get("name"),
     slug: formData.get("slug") ?? "",
-    organizationType: formData.get("organizationType") ?? "single_gym",
     status: formData.get("status") ?? "active",
     primaryDomain: formData.get("primaryDomain") ?? "",
     billingEmail: formData.get("billingEmail") ?? "",
@@ -201,7 +200,6 @@ export async function saveSuperAdminOrganizationAction(_previousState: AuthActio
   const payload: Database["public"]["Tables"]["organizations"]["Update"] = {
     name: parsed.data.name,
     slug,
-    organization_type: parsed.data.organizationType,
     status: parsed.data.status,
     primary_domain: primaryDomain,
     billing_email: parsed.data.billingEmail || null,

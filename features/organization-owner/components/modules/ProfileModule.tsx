@@ -57,7 +57,7 @@ export function ProfileEnterpriseModule({ dashboard }: ProfileEnterpriseModulePr
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Your organization's legal name" icon={<Building2 className="size-5" />} label="Organization" value={dashboard.organization.name} />
-        <StatCard detail="Organization operational structure" icon={<Building2 className="size-5" />} label="Type" value={formatEnterpriseLabel(dashboard.organization.organization_type)} />
+        <StatCard detail="Determined by subscription package" icon={<Building2 className="size-5" />} label="Type" value="Subscription Based" />
         <StatCard detail="Current account status" icon={<ShieldCheck className="size-5" />} label="Status" value={dashboard.organization.status} />
         <StatCard detail="Organization slug identifier" icon={<Globe2 className="size-5" />} label="Slug" value={dashboard.organization.slug} />
       </section>
@@ -167,7 +167,7 @@ export function ProfileEnterpriseModule({ dashboard }: ProfileEnterpriseModulePr
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Type</p>
-                <p className="mt-1 text-sm font-bold capitalize">{dashboard.organization.organization_type.replace(/_/g, " ")}</p>
+                <p className="mt-1 text-sm font-bold capitalize">Based on Plan</p>
               </div>
             </div>
           </div>
@@ -200,13 +200,6 @@ export function ProfileEnterpriseModule({ dashboard }: ProfileEnterpriseModulePr
           <div className="grid gap-5 md:grid-cols-2">
             <DrawerField label="Organization Name" required>
               <input className={selectClass} defaultValue={dashboard.organization.name} name="name" required type="text" />
-            </DrawerField>
-            <DrawerField label="Organization Type">
-              <select className={selectClass} defaultValue={dashboard.organization.organization_type} name="organizationType">
-                <option value="single_gym">Single Gym</option>
-                <option value="multi_branch">Multi Branch</option>
-                <option value="franchise">Franchise</option>
-              </select>
             </DrawerField>
             <DrawerField label="Legal Name">
               <input className={selectClass} defaultValue={legalName ?? ""} name="legalName" type="text" placeholder="Apex Fitness Pvt Ltd" />

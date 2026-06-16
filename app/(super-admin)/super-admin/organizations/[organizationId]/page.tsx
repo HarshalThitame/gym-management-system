@@ -176,7 +176,6 @@ function ProfileTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getO
       <InfoCard title="Organization Profile" icon={<Building2 className="size-5" />}>
         <Line label="Name" value={data.record.organization.name} />
         <Line label="Slug" value={data.record.organization.slug} />
-        <Line label="Type" value={formatEnterpriseLabel(data.record.organization.organization_type)} />
         <Line label="Status" value={formatEnterpriseLabel(data.record.organization.status)} />
         <Line label="Primary domain" value={data.record.organization.primary_domain ?? "Not configured"} />
       </InfoCard>

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { organizationStatuses, organizationTypes } from "@/types/enterprise";
+import { organizationStatuses } from "@/types/enterprise";
 
 const optionalUuid = z.string().uuid().or(z.literal("")).optional();
 
@@ -7,7 +7,6 @@ export const saveSuperAdminOrganizationSchema = z.object({
   organizationId: optionalUuid,
   name: z.string().trim().min(2, "Organization name is required.").max(140),
   slug: z.string().trim().max(80).optional(),
-  organizationType: z.enum(organizationTypes),
   status: z.enum(organizationStatuses),
   primaryDomain: z.string().trim().max(160).optional(),
   billingEmail: z.string().trim().email("Enter a valid billing email.").or(z.literal("")).optional(),

@@ -39,7 +39,6 @@ export async function saveOrganizationAction(_previousState: AuthActionState, fo
     organizationId: formData.get("organizationId") ?? "",
     name: formData.get("name"),
     slug: formData.get("slug"),
-    organizationType: formData.get("organizationType") ?? "single_gym",
     status: formData.get("status") ?? "active",
     primaryDomain: formData.get("primaryDomain") ?? "",
     billingEmail: formData.get("billingEmail") ?? "",
@@ -59,7 +58,6 @@ export async function saveOrganizationAction(_previousState: AuthActionState, fo
   const payload = {
     name: parsed.data.name,
     slug: parsed.data.slug || slugifyEnterpriseName(parsed.data.name),
-    organization_type: parsed.data.organizationType,
     status: parsed.data.status,
     primary_domain: parsed.data.primaryDomain ? normalizeDomain(parsed.data.primaryDomain) : null,
     billing_email: parsed.data.billingEmail || null,
@@ -76,7 +74,7 @@ export async function saveOrganizationAction(_previousState: AuthActionState, fo
 
   await writeEnterpriseAudit(context, parsed.data.organizationId ? "organization.updated" : "organization.created", "organization", result.data.id, {
     name: parsed.data.name,
-    type: parsed.data.organizationType
+    type: "subscription_based"
   });
   revalidateEnterprisePaths();
   return { status: "success", message: parsed.data.organizationId ? "Organization updated." : "Organization created." };

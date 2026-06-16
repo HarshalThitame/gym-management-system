@@ -22,7 +22,6 @@ import {
   healthComponents,
   healthStatuses,
   organizationStatuses,
-  organizationTypes,
   planTiers,
   retentionActions,
   retentionCategories,
@@ -61,8 +60,7 @@ export function OrganizationForm({ organizations }: { organizations: Organizatio
         <Field id="org-name" label="Name" name="name" state={state}><Input id="org-name" name="name" placeholder="Apex Fitness Group" /></Field>
         <Field id="org-slug" label="Slug" name="slug" state={state}><Input id="org-slug" name="slug" placeholder="apex-fitness-group" /></Field>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <SelectField label="Type" name="organizationType" options={organizationTypes} />
+      <div className="grid gap-4 md:grid-cols-2">
         <SelectField label="Status" name="status" options={organizationStatuses} />
         <Field id="org-billing" label="Billing email" name="billingEmail" state={state}><Input id="org-billing" name="billingEmail" type="email" placeholder="finance@apexfit.com" /></Field>
       </div>
