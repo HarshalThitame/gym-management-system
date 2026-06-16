@@ -302,7 +302,7 @@ function baseContentSecurityPolicy(upgradeInsecureRequests: boolean) {
 
 function buildSensitiveContentSecurityPolicy(nonce: string, upgradeInsecureRequests: boolean) {
   const scriptSource = process.env.NODE_ENV === "development"
-    ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' https://checkout.razorpay.com`
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com"
     : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com`;
   const styleSource = `style-src 'self' 'unsafe-inline'`;
 

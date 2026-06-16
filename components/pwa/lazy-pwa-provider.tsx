@@ -10,8 +10,35 @@ type IdleCapableWindow = Window & {
 
 export function LazyPwaProvider() {
   const [Provider, setProvider] = useState<PwaProviderComponent | null>(null);
+  const enablePwa = process.env.NODE_ENV === "production";
 
   useEffect(() => {
+    if (enablePwa) {
+      return;
+    }
+
+    navigator.serviceWorker?.getRegistrations()
+      .then((registrations) => {
+        registrations
+          .filter((registration) => registration.active?.scriptURL.includes("/sw.js"))
+          .forEach((registration) => { registration.unregister().catch(() => undefined); });
+      })
+      .catch(() => undefined);
+
+    caches?.keys()
+      .then((keys) => {
+        keys
+          .filter((key) => key.startsWith("apex-pwa-"))
+          .forEach((key) => { caches.delete(key).catch(() => undefined); });
+      })
+      .catch(() => undefined);
+  }, [enablePwa]);
+
+  useEffect(() => {
+    if (!enablePwa) {
+      return;
+    }
+
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let idleId: number | null = null;
@@ -47,7 +74,7 @@ export function LazyPwaProvider() {
         globalThis.clearTimeout(timeoutId);
       }
     };
-  }, []);
+  }, [enablePwa]);
 
-  return Provider ? <Provider /> : null;
+  return enablePwa && Provider ? <Provider /> : null;
 }
