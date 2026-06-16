@@ -326,5 +326,43 @@ function stringifyDiffValue(value: Json | string | null): string {
     return value || "Not set";
   }
 
+  // Format governance JSON into human-readable text
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    const parts: string[] = [];
+
+    if (obj.softDelete && typeof obj.softDelete === "object") {
+      const sd = obj.softDelete as Record<string, unknown>;
+      parts.push("Soft-deleted");
+      if (sd.reason) parts.push(`Reason: ${sd.reason}`);
+      if (sd.deletedAt) parts.push(`Deleted: ${String(sd.deletedAt)}`);
+      if (sd.restoreUntil) parts.push(`Restore by: ${String(sd.restoreUntil)}`);
+      if (sd.restoredAt) parts.push(`Restored: ${String(sd.restoredAt)}`);
+      if (sd.deletedBy) parts.push(`Deleted by: ${String(sd.deletedBy)}`);
+      if (sd.restoredBy) parts.push(`Restored by: ${String(sd.restoredBy)}`);
+      if (sd.approvalId) parts.push(`Approval: ${String(sd.approvalId)}`);
+    }
+
+    if (obj.legalHold && typeof obj.legalHold === "object") {
+      const lh = obj.legalHold as Record<string, unknown>;
+      parts.push(`Legal hold: ${lh.active ? "Active" : "Inactive"}`);
+      if (lh.reason) parts.push(`Legal hold reason: ${lh.reason}`);
+    }
+
+    if (obj.permanentPurge && typeof obj.permanentPurge === "object") {
+      parts.push("Permanently purged");
+    }
+
+    if (parts.length > 0) {
+      return parts.join(" | ");
+    }
+
+    // Fallback: flatten top-level keys only
+    const entries = Object.entries(obj)
+      .filter(([, v]) => v !== null && typeof v !== "object")
+      .map(([k, v]) => `${k}: ${String(v)}`);
+    if (entries.length > 0) return entries.join(" | ");
+  }
+
   return JSON.stringify(value);
 }
