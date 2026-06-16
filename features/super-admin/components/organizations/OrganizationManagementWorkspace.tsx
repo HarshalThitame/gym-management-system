@@ -35,6 +35,7 @@ import { FieldError, FormMessage } from "@/features/auth/components/form-message
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
 import { organizationStatuses } from "@/types/enterprise";
 import type { Json } from "@/types/database";
 import {
@@ -449,6 +450,7 @@ function TransferOwnerDrawer({ candidates, criticalSuperAdminEmail, onClose, rec
       <form action={formAction} className="space-y-5">
         <FormMessage state={state} />
         <input name="organizationId" suppressHydrationWarning type="hidden" value={record.organization.id} />
+        <InlineMfaStepUp />
         <div className="rounded-md border border-border bg-background p-4">
           <p className="text-sm font-black">{record.organization.name}</p>
           <p className="mt-2 text-sm text-muted-foreground">Current owner: {record.owner?.fullName ?? "Unassigned"}</p>
@@ -460,11 +462,6 @@ function TransferOwnerDrawer({ candidates, criticalSuperAdminEmail, onClose, rec
         <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation">
           <Input name="confirmation" placeholder="Type TRANSFER" />
         </Field>
-        <Field error={state.fieldErrors?.stepUpEmail?.[0]} label="Step-up identity check">
-          <Input autoComplete="email" name="stepUpEmail" placeholder={`Type ${criticalSuperAdminEmail}`} type="email" />
-        </Field>
-        <CriticalActionMfaNotice criticalSuperAdminEmail={criticalSuperAdminEmail} />
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">This creates an MFA-protected approval request. Review it from the approvals inbox before ownership changes.</div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
           <SubmitButton>Request Transfer</SubmitButton>
@@ -532,10 +529,7 @@ function BulkActionDrawer({ criticalSuperAdminEmail, data, onClose, selectedIds 
         <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation">
           <Input name="confirmation" placeholder="Type BULK" />
         </Field>
-        <Field error={state.fieldErrors?.stepUpEmail?.[0]} label="Step-up identity check">
-          <Input autoComplete="email" name="stepUpEmail" placeholder={`Type ${criticalSuperAdminEmail}`} type="email" />
-        </Field>
-        <CriticalActionMfaNotice criticalSuperAdminEmail={criticalSuperAdminEmail} />
+        <InlineMfaStepUp />
         <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">Bulk suspension and bulk package assignment create MFA-protected approval requests per organization. Bulk delete is intentionally unavailable.</div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
@@ -577,10 +571,7 @@ function LifecycleConfirmDrawer({ action, criticalSuperAdminEmail, onClose, reco
         <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation">
           <Input name="confirmation" placeholder={`Type ${confirmation}`} />
         </Field>
-        <Field error={state.fieldErrors?.stepUpEmail?.[0]} label="Step-up identity check">
-          <Input autoComplete="email" name="stepUpEmail" placeholder={`Type ${criticalSuperAdminEmail}`} type="email" />
-        </Field>
-        <CriticalActionMfaNotice criticalSuperAdminEmail={criticalSuperAdminEmail} />
+        <InlineMfaStepUp />
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-800">
           {isDelete
             ? "Soft delete creates an approval request. If approved, the tenant is archived and can be restored for 30 days."
@@ -611,17 +602,6 @@ function DrawerShell({ children, onClose, title }: { children: ReactNode; onClos
         </div>
         <div className="flex-1 overflow-y-auto p-5 md:p-6">{children}</div>
       </div>
-    </div>
-  );
-}
-
-function CriticalActionMfaNotice({ criticalSuperAdminEmail }: { criticalSuperAdminEmail: string }) {
-  return (
-    <div className="flex flex-col gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900 md:flex-row md:items-center md:justify-between">
-      <span>Critical actions require {criticalSuperAdminEmail} plus a fresh MFA verification within 10 minutes.</span>
-      <ButtonLink href="/super-admin/security/mfa" size="sm" target="_blank" rel="noreferrer" variant="secondary">
-        Open MFA Setup
-      </ButtonLink>
     </div>
   );
 }
