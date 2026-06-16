@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { showToast, ToastContainer } from "@/components/ui/toast";
+import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
@@ -502,6 +503,8 @@ function InviteUserForm({ onClose, criticalSuperAdminEmail, data }: { onClose: (
         Create a new user account with role-based access. The user will receive an email with login instructions.
       </p>
 
+      <InlineMfaStepUp compact />
+
       <FormField label="Email address" error={state.fieldErrors?.email}>
         <Input name="email" placeholder="user@example.com" required />
       </FormField>
@@ -605,6 +608,8 @@ function UserStatusForm({ record, action, onClose, criticalSuperAdminEmail }: { 
       <input name="userId" type="hidden" value={record.user.id} />
       <input name="action" type="hidden" value={action} />
 
+      <InlineMfaStepUp compact />
+
       <Card>
         <CardContent className="space-y-3 p-5">
           <p className="font-black">{record.user.full_name}</p>
@@ -615,10 +620,6 @@ function UserStatusForm({ record, action, onClose, criticalSuperAdminEmail }: { 
 
       <FormField label={`Type ${actionLabels[action].toUpperCase()} to confirm`} error={state.fieldErrors?.confirmation}>
         <Input name="confirmation" placeholder={actionLabels[action].toUpperCase()} required />
-      </FormField>
-
-      <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
-        <Input name="stepUpEmail" placeholder={criticalSuperAdminEmail} required />
       </FormField>
 
       <FormField label="Reason (optional)" error={state.fieldErrors?.reason}>
@@ -645,6 +646,8 @@ function UserForceLogoutForm({ record, onClose, criticalSuperAdminEmail }: { rec
     <form action={formAction} className="space-y-5">
       <input name="userId" type="hidden" value={record.user.id} />
 
+      <InlineMfaStepUp compact />
+
       <Card className="border-red-300 bg-red-50">
         <CardContent className="space-y-3 p-5">
           <div className="flex items-center gap-2">
@@ -660,10 +663,6 @@ function UserForceLogoutForm({ record, onClose, criticalSuperAdminEmail }: { rec
 
       <FormField label="Type FORCE_LOGOUT to confirm" error={state.fieldErrors?.confirmation}>
         <Input name="confirmation" placeholder="FORCE_LOGOUT" required />
-      </FormField>
-
-      <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
-        <Input name="stepUpEmail" placeholder={criticalSuperAdminEmail} required />
       </FormField>
 
       <FormField label="Reason (required)" error={state.fieldErrors?.reason}>
@@ -734,6 +733,8 @@ function UserTransferRoleForm({ record, onClose, criticalSuperAdminEmail, data }
     <form action={formAction} className="space-y-5">
       <input name="userId" type="hidden" value={record.user.id} />
 
+      <InlineMfaStepUp compact />
+
       <Card>
         <CardContent className="space-y-2 p-5">
           <p className="font-black">{record.user.full_name}</p>
@@ -773,10 +774,6 @@ function UserTransferRoleForm({ record, onClose, criticalSuperAdminEmail, data }
 
       <FormField label="Type TRANSFER_ROLE to confirm" error={state.fieldErrors?.confirmation}>
         <Input name="confirmation" placeholder="TRANSFER_ROLE" required />
-      </FormField>
-
-      <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
-        <Input name="stepUpEmail" placeholder={criticalSuperAdminEmail} required />
       </FormField>
 
       <FormField label="Reason (optional)" error={state.fieldErrors?.reason}>
