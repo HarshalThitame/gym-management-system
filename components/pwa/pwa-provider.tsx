@@ -92,7 +92,7 @@ export function PwaProvider() {
     };
 
     const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
+      // Save the event for later use via custom install button
       setInstallEvent(event as BeforeInstallPromptEvent);
       trackPwaEvent("install_prompt_shown", { platform }).catch(() => undefined);
     };
