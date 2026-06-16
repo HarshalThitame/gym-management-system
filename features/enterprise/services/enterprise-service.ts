@@ -17,7 +17,6 @@ import {
 
 type BranchLatestRow = Database["public"]["Views"]["enterprise_branch_metrics_latest"]["Row"];
 type TenantUsageRow = Database["public"]["Views"]["enterprise_tenant_usage_summary"]["Row"];
-type HealthCheckRow = Database["public"]["Tables"]["system_health_checks"]["Row"];
 
 export async function getEnterpriseDashboard(): Promise<EnterpriseDashboard> {
   const supabase = await createSupabaseServerClient();
@@ -191,14 +190,4 @@ function kpi(key: string, label: string, value: string, detail: string, status: 
 
 function sum(values: number[]) {
   return values.reduce((total, value) => total + value, 0);
-}
-
-export function latestHealthByComponent(checks: HealthCheckRow[]) {
-  const byComponent = new Map<string, HealthCheckRow>();
-  for (const check of checks) {
-    if (!byComponent.has(check.component)) {
-      byComponent.set(check.component, check);
-    }
-  }
-  return Array.from(byComponent.values());
 }

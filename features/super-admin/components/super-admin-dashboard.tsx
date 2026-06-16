@@ -31,7 +31,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { BranchPerformanceChart, TenantUsageChart } from "@/features/enterprise/components/lazy-enterprise-charts";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
-import { latestHealthByComponent } from "@/features/enterprise/services/enterprise-service";
+import { latestHealthByComponent } from "@/features/enterprise/lib/health";
 import type { EnterpriseDashboard, EnterpriseKpi } from "@/types/enterprise";
 import { scheduleDashboardSummaryEmailAction, updateDashboardSecurityEventAction } from "../actions/dashboard-actions";
 import type { DashboardThresholds, SuperAdminDashboardOperations } from "../services/dashboard-service";

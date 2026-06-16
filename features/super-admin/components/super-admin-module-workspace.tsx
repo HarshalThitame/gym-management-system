@@ -33,7 +33,7 @@ import { BranchPerformanceChart, TenantUsageChart } from "@/features/enterprise/
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { TenantDomainCenter } from "@/features/enterprise/components/tenant-domain-center";
 import { buildRecoveryPointLabel, formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
-import { latestHealthByComponent } from "@/features/enterprise/services/enterprise-service";
+import { latestHealthByComponent } from "@/features/enterprise/lib/health";
 import { ROLE_PERMISSIONS, rolePriority } from "@/lib/rbac";
 import type { EnterpriseDashboard } from "@/types/enterprise";
 import type { SuperAdminModule } from "../lib/super-admin-modules";
