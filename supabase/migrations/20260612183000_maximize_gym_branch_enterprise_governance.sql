@@ -438,7 +438,7 @@ create table if not exists public.gym_branch_approval_requests (
 );
 
 comment on table public.gym_branch_approval_requests is
-  'Maker-checker approval queue for high-risk Super Admin gym and branch governance actions.';
+  'Approval queue for high-risk Super Admin gym and branch governance actions.';
 
 create index if not exists gym_branch_approval_requests_org_status_idx
 on public.gym_branch_approval_requests (organization_id, status, requested_at desc);

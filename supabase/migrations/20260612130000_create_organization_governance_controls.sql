@@ -1,6 +1,6 @@
 -- Enterprise governance controls for Super Admin organization operations.
 -- Destructive or high-risk tenant actions are requested first, then approved
--- by a different Super Admin with fresh MFA before they are applied.
+-- by a Super Admin with fresh MFA before they are applied.
 
 create table if not exists public.organization_approval_requests (
   id uuid primary key default gen_random_uuid(),
@@ -33,7 +33,7 @@ create table if not exists public.organization_approval_requests (
 );
 
 comment on table public.organization_approval_requests is
-  'Maker-checker approval queue for high-risk Super Admin organization actions.';
+  'Approval queue for high-risk Super Admin organization actions.';
 comment on column public.organization_approval_requests.before_snapshot is
   'Governed organization state captured when the request is created.';
 comment on column public.organization_approval_requests.after_snapshot is

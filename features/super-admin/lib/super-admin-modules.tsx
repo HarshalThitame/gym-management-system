@@ -308,7 +308,7 @@ export const superAdminModules = [
       "Monitor operational risk KPIs: high-risk actions today, pending approvals, destructive actions blocked, emergency overrides, permission violations, audit events, security escalations, policy violations",
       "Track operational risk score across 4 dimensions: tenant risk, user risk, system risk, compliance risk with overall composite score",
       "Enforce destructive action protection framework: 15 protected actions (delete tenant, delete branch, delete user, delete membership, delete backups, bulk operations, data purges, restore operations, refunds, subscriptions, transfers, exports, bulk suspend, bulk assign, permission changes)",
-      "Manage multi-level confirmation workflow: Level 1 (simple confirm), Level 2 (type-to-confirm), Level 3 (password), Level 4 (MFA), Level 5 (dual approval) with progressive risk escalation",
+      "Manage multi-level confirmation workflow: Level 1 (simple confirm), Level 2 (type-to-confirm), Level 3 (password), Level 4 (MFA), Level 5 (MFA + approval) with progressive risk escalation",
       "Provide change impact analysis: records affected, tenants affected, branches affected, reversibility status, and risk warnings for every destructive operation",
       "Display permission transparency: allowed, restricted, requires approval, and read-only status badges with resource/action context",
       "Monitor rate limiting & abuse prevention: login attempts, API calls, bulk imports, exports, notifications, AI requests with usage percentage and remaining quota",
@@ -318,7 +318,7 @@ export const superAdminModules = [
     ],
     safeguards: [
       "No destructive operation can execute without explicit protection - all 15 protected actions require confirmation with the correct keyword",
-      "High-risk actions (tenant deletion, data purge, restore) require MFA verification + type-to-confirm + dual approval workflow",
+      "High-risk actions (tenant deletion, data purge, restore) require MFA verification + type-to-confirm + Super Admin approval workflow",
       "Financial operations (refunds, payment reversals, revenue adjustments) require audit preview + MFA + approval + immutable audit trail",
       "Emergency overrides are time-limited (default 60 minutes) with mandatory reason entry and full audit logging",
       "Rate limiting is enforced across all categories with clear user feedback showing remaining requests and retry windows",

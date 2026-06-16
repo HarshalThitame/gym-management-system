@@ -161,7 +161,7 @@ describe("super admin organization governance rules", () => {
     });
   });
 
-  it("captures permanent purge request metadata before maker-checker review", () => {
+  it("captures permanent purge request metadata before approval review", () => {
     const settings = mergePermanentPurgeRequestedSettings({}, {
       requestedAt: "2026-06-12T00:00:00.000Z",
       requestedBy: "00000000-0000-0000-0000-000000000008",

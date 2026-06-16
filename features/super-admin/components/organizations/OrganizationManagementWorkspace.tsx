@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HydrationSafeDate } from "@/components/ui/hydration-safe-date";
 import { Input, Textarea } from "@/components/ui/input";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
@@ -312,8 +313,8 @@ function SubscriptionSummary({ record }: { record: OrganizationManagementRecord 
       </div>
       <div className="mt-4 space-y-3">
         <SummaryLine label="Status" value={record.subscription.status ? formatEnterpriseLabel(record.subscription.status) : "Unassigned"} />
-        <SummaryLine label="Started" value={formatDate(record.subscription.startedAt)} />
-        <SummaryLine label="Expires" value={record.subscription.expiresAt ? formatDate(record.subscription.expiresAt) : "Never"} />
+        <SummaryLine label="Started" value={record.subscription.startedAt ? <HydrationSafeDate date={record.subscription.startedAt} /> : "No date"} />
+        <SummaryLine label="Expires" value={record.subscription.expiresAt ? <HydrationSafeDate date={record.subscription.expiresAt} /> : "Never"} />
         <SummaryLine label="Member limit" value={limitLabel(record.subscription.maxMembers)} />
         <SummaryLine label="Branch limit" value={limitLabel(record.subscription.maxBranches)} />
         <SummaryLine label="Enabled features" value={`${record.subscription.enabledFeatures}/11`} />
@@ -334,7 +335,7 @@ function AuditTimeline({ record }: { record: OrganizationManagementRecord }) {
               <p className="text-sm font-black">{formatEnterpriseLabel(event.action)}</p>
             </div>
             <p className="mt-2 text-xs font-semibold text-muted-foreground">
-              {formatDateTime(event.createdAt)} · {event.actorName ?? event.actorId ?? "System"}
+              <HydrationSafeDate date={event.createdAt} format="datetime" /> · {event.actorName ?? event.actorId ?? "System"}
             </p>
             <p className="mt-1 break-words text-xs font-semibold text-muted-foreground">
               {event.ipAddress ?? "No IP"} · {event.userAgent ? compactUserAgent(event.userAgent) : "No device"}
@@ -682,7 +683,7 @@ function UsageMetric({ label, value }: { label: string; value: number | string }
   );
 }
 
-function SummaryLine({ label, value }: { label: string; value: string }) {
+function SummaryLine({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border pb-2 last:border-0 last:pb-0">
       <span className="text-sm font-semibold text-muted-foreground">{label}</span>
@@ -771,17 +772,6 @@ function limitLabel(value: number | null) {
     return "Not configured";
   }
   return value === -1 ? "Unlimited" : formatCompactNumber(value);
-}
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return "No date";
-  }
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function compactUserAgent(value: string) {

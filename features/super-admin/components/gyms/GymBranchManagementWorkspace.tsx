@@ -95,7 +95,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
         <SummaryCard icon={<GitBranch className="size-5" />} label="Branches" value={formatCompactNumber(data.summary.branches)} detail={`${formatCompactNumber(data.summary.activeBranches)} active`} />
         <SummaryCard icon={<UserRoundCog className="size-5" />} label="Missing Admins" value={formatCompactNumber(data.summary.branchesWithoutAdmins)} detail="Branches without active gym admin" />
         <SummaryCard icon={<ShieldAlert className="size-5" />} label="Warnings" value={formatCompactNumber(data.summary.consistencyWarnings)} detail="Hierarchy and data consistency checks" />
-        <SummaryCard icon={<ShieldAlert className="size-5" />} label="Approvals" value={formatCompactNumber(data.summary.pendingApprovals)} detail="Pending maker-checker requests" />
+        <SummaryCard icon={<ShieldAlert className="size-5" />} label="Approvals" value={formatCompactNumber(data.summary.pendingApprovals)} detail="Pending approval requests" />
         <SummaryCard icon={<AlertTriangle className="size-5" />} label="Unresolved Scope" value={formatCompactNumber(data.summary.unresolvedBranchRecords)} detail="Gym-scoped operational records" />
       </section>
 
@@ -625,7 +625,7 @@ function ApprovalReviewPanel({ approvals }: { approvals: GymBranchManagementData
           <div>
             <h3 className="text-2xl font-black">Maker-Checker Approvals</h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Critical admin transfer, lifecycle, and move requests require a different Super Admin with fresh MFA before they are applied.
+              Critical admin transfer, lifecycle, and move requests require a Super Admin with fresh MFA before they are applied.
             </p>
           </div>
           <Badge variant="warning">{approvals.length} pending</Badge>

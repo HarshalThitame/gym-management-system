@@ -1074,7 +1074,7 @@ async function applyApprovedOrganizationAction(
       after: afterSnapshot,
       diff: buildOrganizationDiff(beforeSnapshot, afterSnapshot),
       notifications: notificationResult,
-      stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
+      stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
     });
     return { status: "success", message: "Ownership transfer applied." };
   }
@@ -1096,7 +1096,7 @@ async function applyApprovedOrganizationAction(
       after: afterSnapshot,
       diff: buildOrganizationDiff(beforeSnapshot, afterSnapshot),
       notifications: notificationResult,
-      stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
+      stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
     });
     return { status: "success", message: "Organization suspended." };
   }
@@ -1120,7 +1120,7 @@ async function applyApprovedOrganizationAction(
       after: afterSnapshot,
       diff: buildOrganizationDiff(beforeSnapshot, afterSnapshot),
       notifications: notificationResult,
-      stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
+      stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
     });
     return { status: "success", message: "Organization soft-deleted." };
   }
@@ -1138,7 +1138,7 @@ async function applyApprovedOrganizationAction(
       packageId,
       subscriptionStatus: status,
       reason: approval.reason,
-      stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
+      stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
     });
     return { status: "success", message: "Package assignment applied." };
   }
@@ -1161,7 +1161,7 @@ async function applyApprovedOrganizationAction(
       diff: buildOrganizationDiff(beforeSnapshot, afterSnapshot),
       notifications: notificationResult,
       retentionMode: "retained_governance_tombstone",
-      stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
+      stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
     });
     return { status: "success", message: "Organization purged to retained governance tombstone." };
   }

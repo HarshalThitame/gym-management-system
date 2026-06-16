@@ -8,6 +8,7 @@ import { AlertTriangle, Gavel, Loader2, Lock, ShieldCheck, Trash2 } from "lucide
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HydrationSafeDate } from "@/components/ui/hydration-safe-date";
 import { Input, Textarea } from "@/components/ui/input";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
@@ -61,7 +62,7 @@ function LegalHoldCard({ criticalSuperAdminEmail, record }: OrganizationGovernan
         <div className="rounded-md border border-border bg-background p-4">
           <Line label="Current state" value={legalHoldActive ? "Active" : "Inactive"} />
           <Line label="Reason" value={record.legalHold.reason ?? "Not recorded"} />
-          <Line label="Updated" value={record.legalHold.updatedAt ? formatDateTime(record.legalHold.updatedAt) : "Not recorded"} />
+          <Line label="Updated" value={record.legalHold.updatedAt ? <HydrationSafeDate date={record.legalHold.updatedAt} format="datetime" /> : "Not recorded"} />
         </div>
         <form action={formAction} className="grid gap-4">
           <input name="organizationId" type="hidden" value={record.organization.id} />
@@ -117,7 +118,7 @@ function PermanentPurgeCard({ criticalSuperAdminEmail, record }: OrganizationGov
         <FormMessage state={state} />
         <div className="rounded-md border border-border bg-background p-4">
           <Line label="Tenant status" value={formatEnterpriseLabel(record.organization.status)} />
-          <Line label="Restore until" value={record.softDelete.restoreUntil ? formatDateTime(record.softDelete.restoreUntil) : "No restore window"} />
+          <Line label="Restore until" value={record.softDelete.restoreUntil ? <HydrationSafeDate date={record.softDelete.restoreUntil} format="datetime" /> : "No restore window"} />
           <Line label="Legal hold" value={record.legalHold.active ? "Active" : "Inactive"} />
         </div>
         <div className={eligible ? "rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900" : "rounded-md border border-border bg-background p-4 text-sm font-semibold leading-6 text-muted-foreground"}>
@@ -181,17 +182,13 @@ function SubmitButton({ children, disabled = false, variant }: { children: strin
   );
 }
 
-function Line({ label, value }: { label: string; value: string }) {
+function Line({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-border pb-2 last:border-0">
       <span className="text-sm font-semibold text-muted-foreground">{label}</span>
       <span className="max-w-[65%] break-words text-right text-sm font-black">{value}</span>
     </div>
   );
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 export default OrganizationGovernanceControlPanel;

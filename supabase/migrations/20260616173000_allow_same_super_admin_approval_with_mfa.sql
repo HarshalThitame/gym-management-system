@@ -1,4 +1,4 @@
--- Organization approval reviews now require fresh MFA, not a second Super Admin reviewer.
+-- [SUPERSEDED by 20260624000000] Organization approval reviews now require fresh MFA, not a second Super Admin reviewer.
 
 do $$
 declare

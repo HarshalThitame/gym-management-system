@@ -356,7 +356,7 @@ export async function transferGymAdminAction(_previousState: AuthActionState, fo
     stepUp: criticalAccess.mfa
   });
   revalidateGymBranchPaths();
-  return { status: "success", message: "Gym admin transfer approval requested. A different Super Admin must approve it before access changes." };
+  return { status: "success", message: "Gym admin transfer approval requested. A Super Admin must approve it before access changes." };
 }
 
 export async function updateLocationLifecycleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -420,7 +420,7 @@ export async function updateLocationLifecycleAction(_previousState: AuthActionSt
       }
       await writeGymBranchAudit(context, "gym.lifecycle_requested", "gym", gym.id, { previousStatus: gym.status, nextStatus: parsed.data.nextStatus, reason: parsed.data.reason, approvalId: approval.approvalId, stepUp: criticalAccess?.mfa ?? null });
       revalidateGymBranchPaths();
-      return { status: "success", message: "Gym lifecycle approval requested. A different Super Admin must approve it before the status changes." };
+      return { status: "success", message: "Gym lifecycle approval requested. A Super Admin must approve it before the status changes." };
     }
     const result = await supabase.from("gyms").update({ status: parsed.data.nextStatus as GymRow["status"] }).eq("id", gym.id).select("*").maybeSingle();
     if (result.error || !result.data) {
@@ -460,7 +460,7 @@ export async function updateLocationLifecycleAction(_previousState: AuthActionSt
       }
       await writeGymBranchAudit(context, "branch.lifecycle_requested", "branch", branch.id, { previousStatus: branch.status, nextStatus: parsed.data.nextStatus, reason: parsed.data.reason, approvalId: approval.approvalId, stepUp: criticalAccess?.mfa ?? null });
       revalidateGymBranchPaths();
-      return { status: "success", message: "Branch lifecycle approval requested. A different Super Admin must approve it before the status changes." };
+      return { status: "success", message: "Branch lifecycle approval requested. A Super Admin must approve it before the status changes." };
     }
     const result = await supabase.from("branches").update({ status: parsed.data.nextStatus as BranchRow["status"] }).eq("id", branch.id).select("*").maybeSingle();
     if (result.error || !result.data) {
@@ -594,7 +594,7 @@ export async function moveGymToOrganizationAction(_previousState: AuthActionStat
     stepUp: criticalAccess.mfa
   });
   revalidateGymBranchPaths();
-  return { status: "success", message: "Gym move approval requested. A different Super Admin must approve it before the hierarchy changes." };
+  return { status: "success", message: "Gym move approval requested. A Super Admin must approve it before the hierarchy changes." };
 }
 
 export async function moveBranchToGymAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -671,7 +671,7 @@ export async function moveBranchToGymAction(_previousState: AuthActionState, for
     stepUp: criticalAccess.mfa
   });
   revalidateGymBranchPaths();
-  return { status: "success", message: "Branch move approval requested. A different Super Admin must approve it before the hierarchy changes." };
+  return { status: "success", message: "Branch move approval requested. A Super Admin must approve it before the hierarchy changes." };
 }
 
 export async function reviewGymBranchApprovalAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -714,10 +714,6 @@ export async function reviewGymBranchApprovalAction(_previousState: AuthActionSt
       return update;
     }
     return { status: "error", message: "This approval request has expired. Create a fresh request." };
-  }
-
-  if (parsed.data.decision === "approve" && approval.requested_by === context.userId) {
-    return { status: "error", message: "Maker-checker control blocked this approval. A different Super Admin must approve the request." };
   }
 
   if (parsed.data.decision === "reject") {
@@ -1012,7 +1008,7 @@ async function applyGymAdminTransfer(
     newAdminEmail: profile.email,
     reason: input.reason,
     reviewNote: input.reviewNote,
-    stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
+    stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
   });
   return { status: "success", message: "Gym admin transfer approved and applied." };
 }
@@ -1053,7 +1049,7 @@ async function applyLocationLifecycle(
       nextStatus: input.nextStatus,
       reason: input.reason,
       reviewNote: input.reviewNote,
-      stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
+      stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
     });
     return { status: "success", message: "Gym lifecycle approval applied." };
   }
@@ -1080,7 +1076,7 @@ async function applyLocationLifecycle(
     nextStatus: input.nextStatus,
     reason: input.reason,
     reviewNote: input.reviewNote,
-    stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
+    stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
   });
   return { status: "success", message: "Branch lifecycle approval applied." };
 }
@@ -1119,7 +1115,7 @@ async function applyGymMove(
     targetOrganizationId: input.targetOrganizationId,
     reason: input.reason,
     reviewNote: input.reviewNote,
-    stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
+    stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
   });
   return { status: "success", message: "Gym move approval applied." };
 }
@@ -1165,7 +1161,7 @@ async function applyBranchMove(
     targetOrganizationId,
     reason: input.reason,
     reviewNote: input.reviewNote,
-    stepUp: { method: "maker_checker_mfa", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
+    stepUp: { method: "mfa_verified", email: context.email, mfaCurrentLevel: input.mfa.currentLevel, mfaNextLevel: input.mfa.nextLevel }
   });
   return { status: "success", message: "Branch move approval applied." };
 }
