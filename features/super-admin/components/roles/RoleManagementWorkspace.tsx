@@ -256,15 +256,13 @@ export function RoleManagementWorkspace({
 
 function SummaryCard({ icon, label, value }: { icon: ReactNode; label: string; value: number | string }) {
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between gap-4 p-5">
-        <div className="space-y-1">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-          <p className="text-3xl font-black">{value}</p>
-        </div>
-        <div className="shrink-0 text-muted-foreground">{icon}</div>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-border bg-surface p-5 shadow-xs transition-all hover:shadow-sm hover:border-border-strong">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
+        {icon}
+      </div>
+      <p className="mt-3 text-3xl font-black">{value}</p>
+    </div>
   );
 }
 
