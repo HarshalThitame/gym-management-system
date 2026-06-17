@@ -111,7 +111,11 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
         continue;
       }
 
-      const billingEmail = (org.billing_email as string) || (org.name as string).toLowerCase().replace(/\s+/g, "") + "@example.com";
+      const billingEmail = org.billing_email as string | null;
+      if (!billingEmail) {
+        result.errors.push(`Missing billing email for org ${sub.organization_id}. subscription ${sub.id} skipped`);
+        continue;
+      }
       const priceOverride = sub.price_override as number | null;
       const price = priceOverride ?? (pkg.price as number);
       const billingPeriod = (sub.billing_period as string) || (pkg.billing_period as string) || "monthly";
