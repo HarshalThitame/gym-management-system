@@ -32,8 +32,6 @@ export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
 export const BILLING_PERIODS = [
   "monthly",
-  "quarterly",
-  "half_yearly",
   "annual",
 ] as const;
 

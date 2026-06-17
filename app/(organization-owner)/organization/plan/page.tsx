@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getActivePackagesAction, getOrgSubscriptionAction, getUsageHistoryAction, getOrgUsageAction } from "@/features/organization-owner/actions/plan-data-actions";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
@@ -20,7 +21,7 @@ export const metadata: Metadata = createMetadata({
 const orgOwnerRole = ["organization_owner"] as const satisfies readonly RoleName[];
 
 async function PlanContent() {
-  const ctx = await requireRole(orgOwnerRole, "/organization/plan") as { organizationId?: string };
+  const ctx = await requireRole(orgOwnerRole, "/organization/plan") as { organizationId?: string; email?: string };
   const organizationId = ctx.organizationId ?? null;
   if (!organizationId) redirect("/unauthorized?reason=organization_scope");
 
@@ -31,6 +32,17 @@ async function PlanContent() {
     getUsageHistoryAction(),
     getOrgUsageAction(),
   ]);
+
+  // Get org name and billing email
+  const supabase = await createSupabaseServerClient();
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name, billing_email")
+    .eq("id", organizationId as never)
+    .maybeSingle();
+  const orgRecord = org as unknown as { name: string; billing_email: string | null } | null;
+  const organizationName = orgRecord?.name ?? "Your Organization";
+  const customerEmail = orgRecord?.billing_email ?? ctx.email ?? "";
 
   const { EnterprisePlanManagement } = await import("@/features/organization-owner/components/enterprise-plan-management");
 
@@ -44,6 +56,8 @@ async function PlanContent() {
         currentSubscription={currentSubscription}
         usageHistory={usageHistory}
         orgUsage={orgUsage}
+        organizationName={organizationName}
+        customerEmail={customerEmail}
       />
     </div>
   );

@@ -12,6 +12,7 @@ import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { formatCurrency } from "@/features/enterprise/lib/business-rules";
 import { requestPlanChangeAction, toggleAutoRenewAction, cancelSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
+import { RazorpayCheckout } from "@/features/organization-owner/components/razorpay-checkout";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import type { PackageWithMeta, SubscriptionWithPackage, UsageHistoryPoint, OrgUsageData } from "@/features/organization-owner/actions/plan-data-actions";
 import { FeatureCard, FeatureCategorySection, LimitBar } from "@/components/ui/feature-card";
@@ -25,6 +26,8 @@ type EnterprisePlanManagementProps = {
   currentSubscription: SubscriptionWithPackage | null;
   usageHistory: UsageHistoryPoint[];
   orgUsage: OrgUsageData | null;
+  organizationName?: string;
+  customerEmail?: string;
 };
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -39,8 +42,8 @@ const CATEGORY_ICONS: Record<string, any> = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage }: EnterprisePlanManagementProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "billing" | "features" | "timeline">("overview");
+export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "" }: EnterprisePlanManagementProps) {
+  const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "pay" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
   const [showUpgradeForm, setShowUpgradeForm] = useState<string | null>(null);
@@ -126,9 +129,9 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
 
       {/* Tab Bar */}
       <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1" role="tablist">
-        {(["overview", "usage", "features", "compare", "billing", "timeline"] as const).map((tab) => (
+        {(["overview", "usage", "features", "compare", "pay", "billing", "timeline"] as const).map((tab) => (
           <button key={tab} className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-bold transition ${activeTab === tab ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setActiveTab(tab)} role="tab" aria-selected={activeTab === tab} type="button">
-            {tab === "overview" ? "Overview" : tab === "usage" ? "Usage" : tab === "features" ? "Features" : tab === "compare" ? "Compare Plans" : tab === "billing" ? "Billing" : "Timeline"}
+            {tab === "overview" ? "Overview" : tab === "usage" ? "Usage" : tab === "features" ? "Features" : tab === "compare" ? "Compare Plans" : tab === "pay" ? "Pay" : tab === "billing" ? "Billing" : "Timeline"}
           </button>
         ))}
       </div>
@@ -388,6 +391,20 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
               </CardContent>
             </Card>
           )}
+        </div>
+      )}
+
+      {/* ═══ TAB: PAY ═══ */}
+      {activeTab === "pay" && (
+        <div className="space-y-6">
+          <RazorpayCheckout
+            organizationId={organizationId}
+            organizationName={organizationName}
+            customerEmail={customerEmail}
+            allPackages={allPackages}
+            currentPackageId={currentPkg?.id ?? null}
+            currentSubscriptionId={currentSubscription?.id ?? null}
+          />
         </div>
       )}
 

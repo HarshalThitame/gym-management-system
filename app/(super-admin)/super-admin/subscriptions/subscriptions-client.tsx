@@ -45,7 +45,7 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   // Normalize MRR by billing period
   const computeMrr = (price: number, period: string) => {
     if (!price) return 0;
-    const divisors: Record<string, number> = { monthly: 1, annual: 12, quarterly: 3, half_yearly: 6 };
+    const divisors: Record<string, number> = { monthly: 1, annual: 12 };
     return Math.round(price / (divisors[period] || 1));
   };
 

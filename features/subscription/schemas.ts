@@ -48,7 +48,7 @@ export type MarkUnderReviewInput = z.infer<typeof markUnderReviewSchema>;
 export const createRazorpayOrderSchema = z.object({
   organizationId: z.string().uuid(),
   packageId: z.string().uuid(),
-  billingCycle: z.enum(["monthly", "annual", "quarterly", "half_yearly"]),
+  billingCycle: z.enum(["monthly", "annual"]),
   subscriptionId: z.string().uuid().optional(),
   invoiceId: z.string().uuid().optional(),
 });

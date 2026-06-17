@@ -94,7 +94,7 @@ export async function createSubscriptionRazorpayOrderAction(
 
     // 5. Generate idempotency key and billing period
     const periodStart = new Date().toISOString().slice(0, 10);
-    const daysMap: Record<string, number> = { monthly: 30, annual: 365, quarterly: 90, half_yearly: 180 };
+    const daysMap: Record<string, number> = { monthly: 30, annual: 365 };
     const periodEnd = new Date(Date.now() + (daysMap[billingCycle] || 30) * 86400000).toISOString().slice(0, 10);
     const idempotencyKey = `sub_${organizationId}_${packageId}_${billingCycle}_${periodStart}`;
 
