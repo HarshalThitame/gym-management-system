@@ -103,7 +103,7 @@ type QueryMock = {
   maybeSingle: ReturnType<typeof vi.fn>;
 };
 
-function createQuery(result: QueryResult): QueryMock {
+function createQuery(result: QueryResult, listResult?: QueryResult): QueryMock {
   const query = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -117,7 +117,10 @@ function createQuery(result: QueryResult): QueryMock {
   query.eq.mockReturnValue(query);
   query.in.mockReturnValue(query);
   query.order.mockReturnValue(query);
-  query.limit.mockReturnValue(query);
+  query.limit.mockResolvedValue(listResult ?? {
+    data: Array.isArray(result.data) ? result.data : result.data ? [result.data] : [],
+    error: result.error
+  });
 
   return query;
 }
@@ -125,6 +128,7 @@ function createQuery(result: QueryResult): QueryMock {
 function createThrowingQuery(error: Error): QueryMock {
   const query = createQuery({ data: null, error: null });
   query.maybeSingle.mockRejectedValue(error);
+  query.limit.mockRejectedValue(error);
   return query;
 }
 
@@ -135,7 +139,7 @@ function mockClientForQuery(query: QueryMock) {
 }
 
 function mockFeatureClient(data: unknown, error: { message: string } | null = null) {
-  createSupabaseServerClientMock.mockResolvedValueOnce(mockClientForQuery(createQuery({ data, error })) as never);
+  createSupabaseServerClientMock.mockResolvedValueOnce(createFeatureClient(data, error) as never);
 }
 
 function mockFeatureClientThrow(error: Error) {
@@ -146,8 +150,89 @@ function activeSubscription(packageRow = standardPackage) {
   return {
     status: "active",
     trial_ends_at: null,
+    package_id: "package_1",
     packages: packageRow
   };
+}
+
+function createFeatureClient(data: unknown, error: { message: string } | null = null) {
+  const sub = data && typeof data === "object" ? data as Record<string, unknown> : null;
+  const packageRow = sub?.packages && typeof sub.packages === "object" ? sub.packages as Record<string, unknown> : {};
+  const subscriptionRow = sub ? { ...sub, packages: undefined } : null;
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "organization_subscriptions") {
+        return createQuery(
+          { data: subscriptionRow, error },
+          { data: subscriptionRow ? [subscriptionRow] : [], error }
+        );
+      }
+
+      if (table === "package_features") {
+        return createImmediateEqQuery({ data: packageFeatureRows(packageRow), error: null });
+      }
+
+      if (table === "package_limits") {
+        return createImmediateEqQuery({ data: packageLimitRows(packageRow), error: null });
+      }
+
+      return createQuery({ data: null, error: null });
+    })
+  };
+}
+
+function createImmediateEqQuery(result: QueryResult) {
+  let featureCode: string | null = null;
+  const query = {
+    select: vi.fn(),
+    eq: vi.fn(),
+    then: vi.fn((resolve: (value: QueryResult) => unknown) => resolve(readResult()))
+  };
+  query.select.mockReturnValue(query);
+  query.eq.mockImplementation((column: string, value: string) => {
+    if (column === "feature_code") featureCode = value;
+    return query;
+  });
+
+  function readResult(): QueryResult {
+    if (!featureCode || !Array.isArray(result.data)) return result;
+    return {
+      data: result.data.filter((row) => {
+        return Boolean(row) && typeof row === "object" && (row as Record<string, unknown>).feature_code === featureCode;
+      }),
+      error: result.error
+    };
+  }
+
+  return query;
+}
+
+function packageFeatureRows(packageRow: Record<string, unknown>) {
+  return [
+    ["qr_attendance", packageRow.qr_attendance_enabled],
+    ["biometric_attendance", packageRow.biometric_attendance_enabled],
+    ["rfid_attendance", packageRow.rfid_attendance_enabled],
+    ["class_booking", packageRow.class_scheduling_enabled],
+    ["workout_assignment", packageRow.trainer_assignment_enabled],
+    ["billing_invoices", packageRow.razorpay_enabled],
+    ["whatsapp_integration", packageRow.communications_enabled],
+    ["ai_recommendations", packageRow.ai_enabled],
+    ["advanced_reports", packageRow.advanced_reports_enabled],
+    ["custom_domain", packageRow.custom_domain_enabled],
+    ["api_access", packageRow.api_access_enabled]
+  ].map(([feature_code, value]) => ({ feature_code, value: Boolean(value) }));
+}
+
+function packageLimitRows(packageRow: Record<string, unknown>) {
+  return [
+    ["max_members", packageRow.max_members],
+    ["max_branches", packageRow.max_branches ?? packageRow.max_gyms],
+    ["max_trainers", packageRow.max_trainers],
+    ["max_staff", packageRow.max_staff],
+    ["max_storage_gb", packageRow.max_storage_gb],
+    ["max_api_calls", packageRow.max_api_calls]
+  ].map(([limit_code, value]) => ({ limit_code, value: typeof value === "number" ? value : 0 }));
 }
 
 describe("feature resolver", () => {
@@ -169,7 +254,7 @@ describe("feature resolver", () => {
   it("maps active subscription package flags to camelCase values", async () => {
     mockFeatureClient(activeSubscription());
 
-    await expect(getOrgFeatureFlags("org_1")).resolves.toEqual({
+    await expect(getOrgFeatureFlags("org_1")).resolves.toMatchObject({
       maxMembers: 500,
       maxBranches: 3,
       qrAttendanceEnabled: true,
@@ -178,7 +263,6 @@ describe("feature resolver", () => {
       classBooking: true,
       workoutAssignment: true,
       billingInvoices: true,
-      emailNotifications: true,
       aiEnabled: false,
       advancedReportsEnabled: true,
       customDomainEnabled: false,

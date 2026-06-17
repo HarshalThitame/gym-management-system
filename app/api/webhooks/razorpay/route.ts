@@ -6,6 +6,36 @@ import { finalizeSubscriptionPayment } from "@/features/billing/services/finaliz
 
 const WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000;
 
+type WebhookRow = {
+  id?: string;
+  status?: string;
+  invoice_id?: string | null;
+  organization_id?: string | null;
+};
+
+type WebhookSelectQuery = PromiseLike<{ data: WebhookRow[] | null; error: { message: string } | null }> & {
+  eq(column: string, value: unknown): WebhookSelectQuery;
+  or(filter: string): WebhookSelectQuery;
+};
+
+type WebhookInsertQuery = PromiseLike<{ data: unknown; error: { message: string } | null }> & {
+  select(columns: string): {
+    maybeSingle(): Promise<{ data: WebhookRow | null; error: { message: string } | null }>;
+  };
+};
+
+type WebhookUpdateQuery = {
+  eq(column: string, value: unknown): PromiseLike<{ data: unknown; error: { message: string } | null }>;
+};
+
+type WebhookDb = {
+  from(table: string): {
+    select(columns: string): WebhookSelectQuery;
+    insert(row: Record<string, unknown>): WebhookInsertQuery;
+    update(row: Record<string, unknown>): WebhookUpdateQuery;
+  };
+};
+
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const rawBody = await request.text();
@@ -22,8 +52,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         const eventId = payload?.entity?.id || "unknown";
         const adminDb = getSupabaseAdminClient();
         if (adminDb) {
-          await (adminDb as any).from("payment_provider_events").insert({
+          const webhookDb = adminDb as unknown as WebhookDb;
+          await webhookDb.from("payment_provider_events").insert({
             provider: "razorpay",
+            provider_environment: getRazorpayEnvironment(),
             event_id: eventId,
             event_type: "signature_verification_failed",
             signature,
@@ -63,7 +95,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!adminDb) {
       return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
     }
-    const d = adminDb as any;
+    const d = adminDb as unknown as WebhookDb;
 
     if (eventId) {
       const { data: existingEvents } = await d
@@ -79,6 +111,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { data: webhookRow } = await d.from("payment_provider_events").insert({
       provider: "razorpay",
+      provider_environment: getRazorpayEnvironment(),
       event_id: eventId,
       event_type: eventName,
       signature: signature,
@@ -117,6 +150,11 @@ export async function POST(request: Request): Promise<NextResponse> {
           if (!result.success) {
             processingError = result.error || "Payment finalization failed";
             processingStatus = "failed";
+          } else if (webhookDbId) {
+            await d.from("payment_provider_events").update({
+              invoice_id: result.invoiceId || null,
+              subscription_id: result.subscriptionId || null,
+            }).eq("id", webhookDbId);
           }
           break;
         }
@@ -124,10 +162,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         case "payment.failed": {
           const failureReason = (paymentEntity?.error_description as string) || (paymentEntity?.status as string) || "Unknown";
           if (razorpayPaymentId) {
-            const { data: pmts } = await d
+            let paymentQuery = d
               .from("org_subscription_payments")
               .select("id, invoice_id, organization_id")
               .eq("provider_payment_id", razorpayPaymentId);
+            if (razorpayOrderId) {
+              paymentQuery = d
+                .from("org_subscription_payments")
+                .select("id, invoice_id, organization_id")
+                .or(`provider_payment_id.eq.${razorpayPaymentId},provider_order_id.eq.${razorpayOrderId}`);
+            }
+            const { data: pmts } = await paymentQuery;
 
             const pmt = (pmts ?? [])[0];
             if (pmt) {

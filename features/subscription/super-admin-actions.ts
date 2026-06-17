@@ -10,6 +10,7 @@ import {
   type ApproveRejectRequestInput,
   type MarkUnderReviewInput,
 } from "./schemas";
+import { syncOrganizationEntitlements, syncOrganizationUsageLimits } from "./entitlement-sync-service";
 import type { SubscriptionRequest, SubscriptionRequestWithDetails } from "./types";
 
 function db() {
@@ -129,101 +130,12 @@ export async function syncEntitlementsAction(
   organizationId: string
 ): Promise<{ ok: boolean; error?: string }> {
   await requireRole(["super_admin"], "/super-admin");
-
-  const { data: subscription } = await db()
-    .from("organization_subscriptions")
-    .select("id, package_id")
-    .eq("organization_id", organizationId)
-    .single();
-
-  if (!subscription) {
-    return { ok: false, error: "No subscription found." };
-  }
-
-  // Fetch all features for this package and upsert into org_entitlements
-  const { data: features } = await db()
-    .from("package_features")
-    .select("feature_code, value, min_value, max_value")
-    .eq("package_id", subscription.package_id);
-
-  if (features && features.length > 0) {
-    for (const f of features) {
-      await db()
-        .from("organization_entitlements")
-        .upsert(
-          {
-            organization_id: organizationId,
-            feature_code: f.feature_code,
-            value: f.value,
-            min_value: f.min_value,
-            max_value: f.max_value,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "organization_id, feature_code" }
-        );
-    }
-  }
-
-  // Audit
-  await db().from("subscription_events").insert({
-    organization_id: organizationId,
-    subscription_id: subscription.id,
-    event_type: "plan_changed",
-    new_state: { entitlementsSyncedAt: new Date().toISOString() },
-    actor_id: null,
-    reason: "Entitlements manually synced by Super Admin.",
-  });
-
-  return { ok: true };
+  return syncOrganizationEntitlements(organizationId, "Entitlements manually synced by Super Admin.");
 }
 
 export async function syncUsageLimitsAction(
   organizationId: string
 ): Promise<{ ok: boolean; error?: string }> {
   await requireRole(["super_admin"], "/super-admin");
-
-  const { data: subscription } = await db()
-    .from("organization_subscriptions")
-    .select("id, package_id")
-    .eq("organization_id", organizationId)
-    .single();
-
-  if (!subscription) {
-    return { ok: false, error: "No subscription found." };
-  }
-
-  // Fetch all limits for this package and upsert into org_usage_limits
-  const { data: limits } = await db()
-    .from("package_limits")
-    .select("limit_code, value, label, description")
-    .eq("package_id", subscription.package_id);
-
-  if (limits && limits.length > 0) {
-    for (const l of limits) {
-      await db()
-        .from("organization_usage_limits")
-        .upsert(
-          {
-            organization_id: organizationId,
-            limit_code: l.limit_code,
-            value: l.value,
-            label: l.label,
-            description: l.description,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "organization_id, limit_code" }
-        );
-    }
-  }
-
-  await db().from("subscription_events").insert({
-    organization_id: organizationId,
-    subscription_id: subscription.id,
-    event_type: "plan_changed",
-    new_state: { usageLimitsSyncedAt: new Date().toISOString() },
-    actor_id: null,
-    reason: "Usage limits manually synced by Super Admin.",
-  });
-
-  return { ok: true };
+  return syncOrganizationUsageLimits(organizationId, "Usage limits manually synced by Super Admin.");
 }

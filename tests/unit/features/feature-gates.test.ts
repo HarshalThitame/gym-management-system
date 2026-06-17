@@ -98,11 +98,13 @@ describe("service feature gates", () => {
     getSupabaseAdminClientMock.mockReturnValue(createMockSupabaseClient() as never);
     createRazorpayOrderMock.mockResolvedValue({
       ok: true,
-      order: {
+      data: {
         id: "order_test",
         amount: 120000,
         currency: "INR",
-        status: "created"
+        receipt: "PAY-001",
+        status: "created",
+        created_at: Math.floor(Date.now() / 1000)
       }
     } as never);
     requireGymAdminScopeMock.mockResolvedValue(createScope(["gym_admin"]) as never);
@@ -341,6 +343,8 @@ function createQueryBuilder(table: string) {
     eq: vi.fn(() => builder),
     neq: vi.fn(() => builder),
     in: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    limit: vi.fn(() => builder),
     update: vi.fn(() => builder),
     upsert: vi.fn(() => builder),
     insert: vi.fn(() => builder),

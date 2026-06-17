@@ -51,6 +51,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_sub_period_unique
 -- 3. WEBHOOK EVENTS — Unique event id per provider + environment
 -- ════════════════════════════════════════════════════════════════════════════
 
+ALTER TABLE payment_provider_events
+  ADD COLUMN IF NOT EXISTS provider_environment text CHECK (provider_environment IN ('test', 'live')) DEFAULT 'test';
+
+DO $$
+DECLARE
+  constraint_name text;
+BEGIN
+  FOR constraint_name IN
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = 'public'
+      AND t.relname = 'payment_provider_events'
+      AND c.contype = 'u'
+      AND pg_get_constraintdef(c.oid) ILIKE '%provider%'
+      AND pg_get_constraintdef(c.oid) ILIKE '%event_id%'
+      AND pg_get_constraintdef(c.oid) NOT ILIKE '%provider_environment%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.payment_provider_events DROP CONSTRAINT IF EXISTS %I', constraint_name);
+  END LOOP;
+END $$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_provider_event
   ON payment_provider_events (provider, provider_environment, event_id)
   WHERE event_id IS NOT NULL;

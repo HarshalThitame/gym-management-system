@@ -9,6 +9,12 @@ import type {
   PaymentAcknowledgementResult,
 } from "@/features/billing/razorpay/razorpay-types";
 
+const SUBSCRIPTION_MANAGER_ROLES = new Set(["organization_owner", "owner", "admin", "manager", "gym_admin"]);
+
+function canManageSubscription(role: string | null | undefined, ownerUserId: string | null | undefined, userId: string): boolean {
+  return ownerUserId === userId || (role ? SUBSCRIPTION_MANAGER_ROLES.has(role) : false);
+}
+
 export async function acknowledgeRazorpayCheckoutResultAction(
   input: PaymentAcknowledgementInput,
 ): Promise<PaymentAcknowledgementResult> {
@@ -33,6 +39,16 @@ export async function acknowledgeRazorpayCheckoutResultAction(
 
     const organizationId = profile.organization_id;
 
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("id, owner_user_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+
+    if (!organization) {
+      return { success: false, error: "Organization not found." };
+    }
+
     const { data: branchUser } = await supabase
       .from("branch_users")
       .select("role_name")
@@ -41,7 +57,7 @@ export async function acknowledgeRazorpayCheckoutResultAction(
       .maybeSingle();
 
     const role = branchUser?.role_name;
-    if (role === "member" || role === "reception_staff" || role === "trainer") {
+    if (!canManageSubscription(role, organization.owner_user_id, user.id)) {
       return { success: false, error: "You do not have permission to verify payments." };
     }
 
@@ -53,7 +69,7 @@ export async function acknowledgeRazorpayCheckoutResultAction(
 
     const { data: payments } = await d
       .from("org_subscription_payments")
-      .select("id, invoice_id, organization_id, status, provider_environment")
+      .select("id, invoice_id, organization_id, subscription_id, status, provider_environment, provider_payment_id")
       .eq("provider_order_id", razorpay_order_id);
 
     const payment = (payments ?? [])[0] as Record<string, unknown> | undefined;
@@ -68,6 +84,10 @@ export async function acknowledgeRazorpayCheckoutResultAction(
 
     if (payment.provider_environment !== getRazorpayEnvironment()) {
       return { success: false, error: "Provider environment mismatch." };
+    }
+
+    if (payment.provider_payment_id && payment.provider_payment_id !== razorpay_payment_id) {
+      return { success: false, error: "Payment ID does not match this order." };
     }
 
     const { data: invoice } = await d
@@ -185,6 +205,16 @@ export async function getSubscriptionPaymentStatusAction(
 
     const organizationId = profile.organization_id;
 
+    const sigResult = verifyRazorpayPaymentSignature({
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
+    });
+
+    if (!sigResult.isValid) {
+      return { success: false, error: "Payment signature verification failed." };
+    }
+
     const adminDb = getSupabaseAdminClient();
     if (!adminDb) {
       return { success: false, error: "Database connection failed." };
@@ -193,7 +223,7 @@ export async function getSubscriptionPaymentStatusAction(
 
     const { data: payments } = await d
       .from("org_subscription_payments")
-      .select("id, invoice_id, organization_id, status, provider_environment")
+      .select("id, invoice_id, organization_id, status, provider_environment, provider_payment_id")
       .eq("provider_order_id", razorpay_order_id);
 
     const payment = (payments ?? [])[0] as Record<string, unknown> | undefined;
@@ -204,6 +234,14 @@ export async function getSubscriptionPaymentStatusAction(
 
     if (payment.organization_id !== organizationId) {
       return { success: false, error: "Payment does not belong to your organization." };
+    }
+
+    if (payment.provider_environment !== getRazorpayEnvironment()) {
+      return { success: false, error: "Provider environment mismatch." };
+    }
+
+    if (payment.provider_payment_id && payment.provider_payment_id !== razorpay_payment_id) {
+      return { success: false, error: "Payment ID does not match this order." };
     }
 
     const { data: invoice } = await d

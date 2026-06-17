@@ -10,6 +10,12 @@ import type {
   SecureCheckoutIntentResult,
 } from "@/features/billing/razorpay/razorpay-types";
 
+const SUBSCRIPTION_MANAGER_ROLES = new Set(["organization_owner", "owner", "admin", "manager", "gym_admin"]);
+
+function canManageSubscription(role: string | null | undefined, ownerUserId: string | null | undefined, userId: string): boolean {
+  return ownerUserId === userId || (role ? SUBSCRIPTION_MANAGER_ROLES.has(role) : false);
+}
+
 export async function createSecureSubscriptionCheckoutOrderAction(
   input: SecureCheckoutIntentInput,
 ): Promise<SecureCheckoutIntentResult> {
@@ -37,6 +43,16 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       return { success: false, error: "User is not associated with an organization." };
     }
 
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("id, name, owner_user_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+
+    if (!organization) {
+      return { success: false, error: "Organization not found." };
+    }
+
     const { data: branchUser } = await supabase
       .from("branch_users")
       .select("role_name")
@@ -45,7 +61,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       .maybeSingle();
 
     const role = branchUser?.role_name;
-    if (role === "member" || role === "reception_staff" || role === "trainer") {
+    if (!canManageSubscription(role, organization.owner_user_id, user.id)) {
       return { success: false, error: "You do not have permission to manage subscriptions." };
     }
 
@@ -115,7 +131,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const { data: existingInvs } = await d
       .from("org_subscription_invoices")
-      .select("id, razorpay_order_id, status, total_amount")
+      .select("id, razorpay_order_id, status, total_amount, currency, organization_id, package_id")
       .eq("idempotency_key", idempotencyKey);
 
     const existingInv = (existingInvs ?? [])[0];
@@ -124,18 +140,23 @@ export async function createSecureSubscriptionCheckoutOrderAction(
     let existingOrderId: string | null = null;
 
     if (existingInv) {
+      if (existingInv.organization_id !== organizationId || existingInv.package_id !== targetPackageId) {
+        return { success: false, error: "Existing invoice ownership mismatch." };
+      }
+
       invoiceId = existingInv.id;
       if (existingInv.razorpay_order_id && existingInv.status !== "cancelled") {
         existingOrderId = existingInv.razorpay_order_id;
+        const existingAmountPaise = existingInv.total_amount ?? totalAmountPaise;
         return {
           success: true,
           razorpayKeyId: getRazorpayPublicKeyId(),
           razorpayOrderId: existingOrderId!,
-          amountPaise: totalAmountPaise,
-          currency,
+          amountPaise: existingAmountPaise,
+          currency: existingInv.currency ?? currency,
           invoiceId,
           packageDisplayName: pkg.name,
-          organizationDisplayName: "",
+          organizationDisplayName: organization.name ?? "",
           billingCycle,
           isTestMode: getRazorpayEnvironment() === "test",
           environmentLabel: getRazorpayEnvironment() === "test" ? "Test Mode" : "Live",
@@ -245,7 +266,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       currency,
       invoiceId,
       packageDisplayName: pkg.name,
-      organizationDisplayName: (org as { name: string } | null)?.name ?? "",
+      organizationDisplayName: (org as { name: string } | null)?.name ?? organization.name ?? "",
       billingCycle,
       isTestMode: getRazorpayEnvironment() === "test",
       environmentLabel: getRazorpayEnvironment() === "test" ? "Test Mode" : "Live",
