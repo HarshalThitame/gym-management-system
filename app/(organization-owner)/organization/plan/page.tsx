@@ -33,16 +33,30 @@ async function PlanContent() {
     getOrgUsageAction(),
   ]);
 
-  // Get org name and billing email
+  // Get org name, billing email, invoices, subscription events
   const supabase = await createSupabaseServerClient();
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("name, billing_email")
-    .eq("id", organizationId as never)
-    .maybeSingle();
-  const orgRecord = org as unknown as { name: string; billing_email: string | null } | null;
+  const sb = supabase as never as {
+    from(t: string): {
+      select(c: string): {
+        eq(k: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null }>;
+        order(k: string, o: { ascending: boolean }): {
+          limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null }>;
+        };
+      };
+    };
+  };
+
+  const [orgData, invoicesData, eventsData] = await Promise.all([
+    supabase.from("organizations").select("name, billing_email").eq("id", organizationId as never).maybeSingle(),
+    sb.from("org_subscription_invoices").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
+    sb.from("subscription_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
+  ]);
+
+  const orgRecord = orgData as unknown as { name: string; billing_email: string | null } | null;
   const organizationName = orgRecord?.name ?? "Your Organization";
   const customerEmail = orgRecord?.billing_email ?? ctx.email ?? "";
+  const orgInvoices = (invoicesData.data ?? []) as any[];
+  const orgEvents = (eventsData.data ?? []) as any[];
 
   const { EnterprisePlanManagement } = await import("@/features/organization-owner/components/enterprise-plan-management");
 
@@ -58,6 +72,8 @@ async function PlanContent() {
         orgUsage={orgUsage}
         organizationName={organizationName}
         customerEmail={customerEmail}
+        invoices={orgInvoices}
+        events={orgEvents}
       />
     </div>
   );

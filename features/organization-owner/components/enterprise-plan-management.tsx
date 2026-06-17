@@ -28,6 +28,8 @@ type EnterprisePlanManagementProps = {
   orgUsage: OrgUsageData | null;
   organizationName?: string;
   customerEmail?: string;
+  invoices?: any[];
+  events?: any[];
 };
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -42,7 +44,7 @@ const CATEGORY_ICONS: Record<string, any> = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "" }: EnterprisePlanManagementProps) {
+export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], events = [] }: EnterprisePlanManagementProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "pay" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
@@ -116,6 +118,29 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
           </div>
         </div>
       ) : null}
+
+      {/* Failed Payment Banner */}
+      {(() => {
+        const failedInv = invoices.find((i: any) => i.status === "failed" || i.dunning_status === "payment_failed" || i.dunning_status === "overdue");
+        if (!failedInv || isSuspended) return null;
+        const dunningLabel = failedInv.dunning_status === "overdue" ? "Overdue" : failedInv.dunning_status === "grace_period" ? "Grace Period" : "Failed";
+        return (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4" role="alert">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-500" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-red-800">Payment {dunningLabel}</p>
+                <p className="text-xs text-red-700 mt-0.5">
+                  Invoice {failedInv.invoice_number ?? ""} — ₹{Intl.NumberFormat("en-IN").format(Math.round((failedInv.total_amount ?? failedInv.subtotal_amount ?? 0) / 100))}
+                  {failedInv.due_at ? ` · Due ${new Date(failedInv.due_at).toLocaleDateString("en-IN")}` : ""}
+                  {failedInv.dunning_grace_period_ends_at ? ` · Grace until ${new Date(failedInv.dunning_grace_period_ends_at).toLocaleDateString("en-IN")}` : ""}
+                </p>
+              </div>
+              <button onClick={() => setActiveTab("pay")} className="shrink-0 rounded-md bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-red-700" type="button">Pay Now</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Suspended Banner */}
       {isSuspended ? (
@@ -542,27 +567,43 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
       {/* ═══ TAB: BILLING ═══ */}
       {activeTab === "billing" && (
         <div className="space-y-5">
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card>
-              <CardHeader><h2 className="text-2xl font-black">Invoices</h2></CardHeader>
-              <CardContent>
+          <Card>
+            <CardHeader><h2 className="text-2xl font-black">Invoices ({invoices.length})</h2></CardHeader>
+            <CardContent>
+              {invoices.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border bg-surface-muted p-6 text-center">
                   <ReceiptText className="mx-auto size-8 text-muted-foreground" />
                   <p className="mt-3 text-sm font-semibold text-muted-foreground">No invoices yet</p>
                   <p className="mt-1 text-xs text-muted-foreground">Invoices will appear after your first billing cycle.</p>
                 </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><h2 className="text-2xl font-black">Payment Method</h2><p className="text-sm text-muted-foreground">Managed via Razorpay</p></CardHeader>
-              <CardContent>
-                <div className="rounded-md border border-dashed border-border bg-surface-muted p-6 text-center">
-                  <CreditCard className="mx-auto size-8 text-muted-foreground" />
-                  <p className="mt-3 text-sm font-semibold text-muted-foreground">No payment method configured</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                      <th className="px-3 py-2">Invoice</th><th className="px-3 py-2">Plan</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Due</th><th className="px-3 py-2">Paid</th>
+                    </tr></thead>
+                    <tbody>
+                      {invoices.slice(0, 10).map((inv: any) => (
+                        <tr key={inv.id} className="border-b border-border hover:bg-accent/5">
+                          <td className="px-3 py-2 text-xs font-semibold">{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
+                          <td className="px-3 py-2 text-xs">{inv.billing_cycle ?? "—"}</td>
+                          <td className="px-3 py-2 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))}</td>
+                          <td className="px-3 py-2">{(() => {
+                            if (inv.paid_at) return <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 border border-green-200">Paid</span>;
+                            if (inv.status === "failed" || inv.dunning_status === "payment_failed") return <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 border border-red-200">Failed</span>;
+                            if (inv.dunning_status === "overdue") return <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 border border-red-200">Overdue</span>;
+                            return <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">{inv.status ?? "Pending"}</span>;
+                          })()}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground" suppressHydrationWarning>{inv.due_at ? new Date(inv.due_at).toLocaleDateString("en-IN") : "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground" suppressHydrationWarning>{inv.paid_at ? new Date(inv.paid_at).toLocaleDateString("en-IN") : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader><h2 className="text-2xl font-black">Subscription Settings</h2></CardHeader>
