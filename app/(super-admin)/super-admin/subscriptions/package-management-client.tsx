@@ -565,7 +565,7 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price-m">Monthly Price (paise)</label>
+                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price-m">Monthly Price (₹)</label>
                 <Input
                   id="pkg-price-m"
                   name="priceMonthly"
@@ -579,7 +579,7 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
                 </p>
               </div>
               <div>
-                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price-a">Annual Price (paise)</label>
+                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price-a">Annual Price (₹)</label>
                 <Input
                   id="pkg-price-a"
                   name="priceAnnual"
