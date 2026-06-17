@@ -43,14 +43,12 @@ describe("organization governance workflow contracts", () => {
     expect(reviewOrganizationApprovalSchema.safeParse({
       approvalId,
       decision: "approve",
-      confirmation: "APPROVE",
       reviewNote: "Reviewed evidence."
     }).success).toBe(true);
 
     expect(reviewOrganizationApprovalSchema.safeParse({
       approvalId,
       decision: "self_approve",
-      confirmation: "APPROVE"
     }).success).toBe(false);
   });
 });

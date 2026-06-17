@@ -80,7 +80,6 @@ export const bulkOrganizationActionSchema = z.object({
 export const reviewOrganizationApprovalSchema = z.object({
   approvalId: z.string().uuid(),
   decision: z.enum(["approve", "reject", "cancel"]),
-  confirmation: z.string().trim(),
   reviewNote: z.string().trim().max(500).optional()
 });
 

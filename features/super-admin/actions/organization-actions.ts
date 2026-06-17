@@ -834,17 +834,11 @@ export async function reviewOrganizationApprovalAction(_previousState: AuthActio
   const parsed = reviewOrganizationApprovalSchema.safeParse({
     approvalId: formData.get("approvalId"),
     decision: formData.get("decision"),
-    confirmation: formData.get("confirmation") ?? "",
     reviewNote: formData.get("reviewNote") ?? ""
   });
 
   if (!parsed.success) {
     return validationState(parsed.error.flatten().fieldErrors);
-  }
-
-  const expectedConfirmation = parsed.data.decision === "approve" ? "APPROVE" : parsed.data.decision === "reject" ? "REJECT" : "CANCEL";
-  if (parsed.data.confirmation !== expectedConfirmation) {
-    return fieldError("confirmation", `Type ${expectedConfirmation} to continue.`);
   }
 
   const supabase = await createSupabaseServerClient();
