@@ -505,7 +505,10 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
   onClose: () => void;
 }) {
   const [activeFeatureTab, setActiveFeatureTab] = useState<string>("members");
-  const [price, setPrice] = useState(pkg?.price ?? 0);
+  const pkgMeta = typeof pkg?.metadata === "object" ? (pkg.metadata ?? {}) : {};
+  const [priceMonthly, setPriceMonthly] = useState(pkgMeta?.price_monthly ?? pkg?.price ?? 0);
+  const [priceAnnual, setPriceAnnual] = useState(pkgMeta?.price_annual ?? (pkg?.price ?? 0) * 10);
+  const [annualDiscountLabel, setAnnualDiscountLabel] = useState(pkgMeta?.annual_discount_label ?? "2 months free");
   const [billingPeriod, setBillingPeriod] = useState(pkg?.billing_period ?? "monthly");
 
   if (!open) return null;
@@ -532,36 +535,48 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
               <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-name">Package Name</label>
               <Input id="pkg-name" name="name" defaultValue={pkg?.name ?? ""} required placeholder="e.g. Starter, Professional, Enterprise" disabled={savePending} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price">Price (paise)</label>
+                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price-m">Monthly Price (paise)</label>
                 <Input
-                  id="pkg-price"
-                  name="price"
+                  id="pkg-price-m"
+                  name="priceMonthly"
                   type="number"
-                  value={price}
-                  onChange={(e) => setPrice(Number(e.target.value))}
+                  value={priceMonthly}
+                  onChange={(e) => setPriceMonthly(Number(e.target.value))}
                   disabled={savePending}
                 />
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  ₹{Intl.NumberFormat("en-IN").format(Math.round(price / 100))} / month
+                  ₹{Intl.NumberFormat("en-IN").format(Math.round(priceMonthly / 100))} / month
                 </p>
               </div>
               <div>
-                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-billing">Billing</label>
-                <select
-                  id="pkg-billing"
-                  name="billingPeriod"
-                  value={billingPeriod}
-                  onChange={(e) => setBillingPeriod(e.target.value)}
+                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price-a">Annual Price (paise)</label>
+                <Input
+                  id="pkg-price-a"
+                  name="priceAnnual"
+                  type="number"
+                  value={priceAnnual}
+                  onChange={(e) => setPriceAnnual(Number(e.target.value))}
                   disabled={savePending}
-                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm disabled:opacity-50"
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="half_yearly">Half Yearly</option>
-                  <option value="annual">Annual</option>
-                </select>
+                />
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  ₹{Intl.NumberFormat("en-IN").format(Math.round(priceAnnual / 100))} / yr · ₹{Intl.NumberFormat("en-IN").format(Math.round(priceAnnual / 1200))}/mo eff.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-disc-label">Annual Discount Label</label>
+                <Input
+                  id="pkg-disc-label"
+                  name="annualDiscountLabel"
+                  defaultValue={annualDiscountLabel}
+                  disabled={savePending}
+                />
+                {priceAnnual > 0 && priceMonthly > 0 && (
+                  <p className="mt-0.5 text-[11px] text-green-600 font-semibold">
+                    Save ₹{Intl.NumberFormat("en-IN").format(Math.round((priceMonthly * 12 - priceAnnual) / 100))} · {annualDiscountLabel || "2 months free"}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -582,7 +597,34 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
               <LimitField label="Storage GB (-1 = ∞)" name="maxStorage" value={pkg?.max_storage_gb ?? pkg?._limits?.max_storage_gb ?? 0} disabled={savePending} />
               <LimitField label="Monthly API Calls (-1 = ∞)" name="maxApiCalls" value={pkg?.max_api_calls ?? pkg?._limits?.max_api_calls ?? 0} disabled={savePending} />
               <LimitField label="Sort Order" name="sortOrder" value={pkg?.sort_order ?? 0} disabled={savePending} />
-              <LimitField label="Trial Days" name="trialDays" value={pkg?.trial_days ?? 0} disabled={savePending} />
+            </div>
+          </div>
+
+          {/* Trial & Billing Settings */}
+          <div className="rounded-xl border border-border bg-background p-4">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground mb-3">Trial & Billing Settings</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-lg border border-border bg-background p-3">
+                <label className="text-sm font-semibold" htmlFor="pkg-trial-days">Trial Days</label>
+                <Input id="pkg-trial-days" name="trialDays" type="number" defaultValue={pkg?.trial_days ?? 0} disabled={savePending} />
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Set 0 to disable free trial</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background p-3 flex items-center gap-3">
+                <input type="checkbox" name="isTrialAvailable" defaultChecked={pkgMeta?.is_trial_available !== false} disabled={savePending} className="size-4 rounded border-border text-primary" />
+                <div>
+                  <p className="text-sm font-semibold">Free Trial Available</p>
+                  <p className="text-[11px] text-muted-foreground">Allow organizations to start a free trial</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-background p-3">
+                <label className="text-sm font-semibold" htmlFor="pkg-billing-cycle">Default Billing Cycle</label>
+                <select id="pkg-billing-cycle" name="billingPeriod" defaultValue={pkg?.billing_period ?? "monthly"} disabled={savePending} className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm">
+                  <option value="monthly">Monthly</option>
+                  <option value="annual">Annual</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="half_yearly">Half Yearly</option>
+                </select>
+              </div>
             </div>
           </div>
 

@@ -26,6 +26,10 @@ const packageSchema = z.object({
   billingPeriod: z.enum(["monthly", "quarterly", "half_yearly", "annual"]).default("monthly"),
   isActive: z.coerce.boolean().default(true),
   recommended: z.coerce.boolean().default(false),
+  priceMonthly: z.coerce.number().int().min(0).default(0),
+  priceAnnual: z.coerce.number().int().min(0).default(0),
+  annualDiscountLabel: z.string().trim().max(100).optional().or(z.literal("")).default("2 months free"),
+  isTrialAvailable: z.coerce.boolean().default(true),
   // Feature toggles (checkbox fields from editor)
   qrAttendance: z.coerce.boolean().default(false),
   classScheduling: z.coerce.boolean().default(false),
@@ -153,6 +157,10 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     sortOrder: formData.get("sortOrder") ?? "0",
     price: formData.get("price") ?? "0",
     billingPeriod: formData.get("billingPeriod") ?? "monthly",
+    priceMonthly: formData.get("priceMonthly") ?? "0",
+    priceAnnual: formData.get("priceAnnual") ?? "0",
+    annualDiscountLabel: formData.get("annualDiscountLabel") ?? "2 months free",
+    isTrialAvailable: formData.get("isTrialAvailable") === "on",
     isActive: formData.get("isActive") === "on",
     recommended: formData.get("recommended") === "on",
   };
@@ -245,11 +253,37 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
       );
     }
 
-    // Save pricing to package_pricing table
-    await sb.from("package_pricing").upsert(
-      { package_id: packageId, billing_period: parsed.data.billingPeriod, price: parsed.data.price, currency: "INR" },
-      { onConflict: "package_id, billing_period" }
-    );
+    // Save pricing to package_pricing table (monthly + annual + other periods)
+    const pricingPeriods: Array<{ billing_period: string; price: number }> = [
+      { billing_period: "monthly", price: parsed.data.priceMonthly || parsed.data.price },
+      { billing_period: "annual", price: parsed.data.priceAnnual || parsed.data.price * 10 },
+    ];
+    // Also keep quarterly and half_yearly if they exist (auto-calculate)
+    for (const existingPrice of (await sb.from("package_pricing").select("billing_period, price").eq("package_id", packageId)).data ?? []) {
+      const bp = existingPrice.billing_period as string;
+      if (bp !== "monthly" && bp !== "annual") {
+        pricingPeriods.push({ billing_period: bp, price: existingPrice.price as number });
+      }
+    }
+    for (const pp of pricingPeriods) {
+      await sb.from("package_pricing").upsert(
+        { package_id: packageId, billing_period: pp.billing_period, price: pp.price, currency: "INR" },
+        { onConflict: "package_id, billing_period" }
+      );
+    }
+
+    // Save pricing labels to package metadata
+    const pkgMeta = parsed.data.annualDiscountLabel
+      ? {
+          price_monthly: parsed.data.priceMonthly || parsed.data.price,
+          price_annual: parsed.data.priceAnnual || parsed.data.price * 10,
+          annual_discount_label: parsed.data.annualDiscountLabel,
+          trial_days: parsed.data.trialDays || 0,
+          is_trial_available: parsed.data.isTrialAvailable,
+        }
+      : { trial_days: parsed.data.trialDays || 0, is_trial_available: parsed.data.isTrialAvailable };
+
+    await sb.from("packages").update({ metadata: pkgMeta }).eq("id", packageId);
 
     revalidatePath("/super-admin/subscriptions");
     return { status: "success", message: parsed.data.id ? "Package updated." : "Package created." };
