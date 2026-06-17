@@ -90,3 +90,12 @@ export type ConvertTrialInput = z.infer<typeof convertTrialSchema>;
 export type AssignAddonInput = z.infer<typeof assignAddonSchema>;
 export type ScheduleChangeInput = z.infer<typeof scheduleChangeSchema>;
 export type BulkUpdateStatusInput = z.infer<typeof bulkUpdateSubscriptionStatusSchema>;
+
+export const overridePriceSchema = z.object({
+  subscriptionId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  price: z.number().int().min(0),
+  reason: z.string().trim().min(5, "Please provide a reason.").max(500),
+});
+
+export type OverridePriceInput = z.infer<typeof overridePriceSchema>;

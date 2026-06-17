@@ -17,6 +17,7 @@ import {
   upgradePlanAction, downgradePlanAction, cancelSubscriptionAction,
   reactivateSubscriptionAction, extendTrialAction, convertTrialAction,
   assignAddonAction, removeAddonAction, scheduleChangeAction, cancelScheduledChangeAction,
+  overrideSubscriptionPriceAction,
 } from "@/features/super-admin/actions/subscription-enterprise-actions";
 
 type Data = { error: string | null; organizations: any[]; packages: any[]; subscriptions: any[]; invoicesByOrg: Record<string, any[]>; eventsByOrg: Record<string, any[]>; };
@@ -401,13 +402,12 @@ function ConvertTrialModal({ sub, packages, onClose, execAction, actionLoading }
   );
 }
 
-function OverridePriceModal({ sub, onClose, execAction, actionLoading }: any) {
+function OverridePriceModal({ sub, orgId, onClose, execAction, actionLoading }: any) {
   const [price, setPrice] = useState(sub?.price_override ?? ""); const [reason, setReason] = useState("");
-  const handleSubmit = async () => {
-    const { getSupabaseAdminClient } = await import("@/lib/supabase/admin");
-    const supabase = getSupabaseAdminClient(); if (!supabase) { showToast("DB connection failed", "error"); return; }
-    await (supabase as any).from("organization_subscriptions").update({ price_override: Number(price), notes: reason || null }).eq("id", sub.id);
-    showToast("Price updated", "success"); onClose();
+  const handleSubmit = () => {
+    if (!price || !reason.trim()) return;
+    execAction(overrideSubscriptionPriceAction, { subscriptionId: sub.id, organizationId: orgId, price: Number(price), reason }, "override_price", "Price updated");
+    onClose();
   };
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -444,14 +444,10 @@ function ScheduleModal({ sub, pkg, packages, orgId, onClose, execAction, actionL
 
 function AssignAddonModal({ sub, onClose, execAction, actionLoading }: any) {
   const [addonId, setAddonId] = useState(""); const [qty, setQty] = useState(1);
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!addonId) return;
-    const { getSupabaseAdminClient } = await import("@/lib/supabase/admin");
-    const supabase = getSupabaseAdminClient(); if (!supabase) { showToast("DB error", "error"); return; }
-    const { data: addon } = await (supabase as any).from("package_addons").select("*").eq("id", addonId).single();
-    if (!addon) { showToast("Add-on not found", "error"); return; }
-    await (supabase as any).from("subscription_addons").insert({ subscription_id: sub.id, addon_id: addonId, quantity: qty, unit_price: addon.unit_price || 0 });
-    showToast("Add-on assigned", "success"); onClose();
+    execAction(assignAddonAction, { subscriptionId: sub.id, addonId, quantity: qty }, "assign_addon", "Add-on assigned");
+    onClose();
   };
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>

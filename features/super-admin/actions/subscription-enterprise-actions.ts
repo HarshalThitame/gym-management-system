@@ -10,6 +10,8 @@ import { checkRateLimit } from "@/lib/rate-limiter";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
+import { overridePriceSchema } from "../schemas/subscription-enterprise-schemas";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { validateTransition } from "../services/subscription-state-machine";
 import { assignPackageToOrg } from "../services/subscription-service";
 import { recordSubscriptionEvent } from "../services/subscription-events-service";
@@ -653,5 +655,48 @@ export async function bulkUpdateSubscriptionStatusAction(input: unknown): Promis
     return { status: "success", message: `Updated ${rows.length} subscription(s).` };
   } catch (e) {
     return { status: "error", message: e instanceof Error ? e.message : "Bulk update failed." };
+  }
+}
+
+export async function overrideSubscriptionPriceAction(input: unknown): Promise<AuthActionState> {
+  const parsed = overridePriceSchema.safeParse(input);
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const auth = await requireApiRole(superAdminRoles);
+  if (!auth.ok) return { status: "error", message: "Super Admin access required." };
+
+  try {
+    const sb = getSupabaseAdminClient() as any;
+    if (!sb) return { status: "error", message: "Database connection failed." };
+
+    const { data: sub } = await sb
+      .from("organization_subscriptions")
+      .select("id, organization_id, price_override")
+      .eq("id", parsed.data.subscriptionId)
+      .single();
+    if (!sub) return { status: "error", message: "Subscription not found." };
+
+    const oldPrice = sub.price_override as number | null;
+
+    await sb.from("organization_subscriptions").update({
+      price_override: parsed.data.price,
+      notes: parsed.data.reason,
+      updated_at: new Date().toISOString(),
+    }).eq("id", parsed.data.subscriptionId);
+
+    await recordSubscriptionEvent({
+      organizationId: parsed.data.organizationId,
+      subscriptionId: parsed.data.subscriptionId,
+      eventType: "price_override_set",
+      previousState: { price_override: oldPrice },
+      newState: { price_override: parsed.data.price },
+      actorId: auth.context.userId,
+      reason: parsed.data.reason,
+    });
+
+    revalidatePaths();
+    return { status: "success", message: "Price override applied." };
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : "Price override failed." };
   }
 }
