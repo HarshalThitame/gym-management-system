@@ -101,6 +101,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       const { data: existingEvents } = await d
         .from("payment_provider_events")
         .select("id, status")
+        .eq("provider", "razorpay")
+        .eq("provider_environment", getRazorpayEnvironment())
         .eq("event_id", eventId);
 
       const existingEvent = (existingEvents ?? [])[0];

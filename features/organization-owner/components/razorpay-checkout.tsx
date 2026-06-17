@@ -23,6 +23,9 @@ type PackageInfo = {
   price: number;
 };
 
+type RazorpayConstructor = new (options: Record<string, unknown>) => { open(): void };
+type RazorpayWindow = Window & typeof globalThis & { Razorpay?: RazorpayConstructor };
+
 type RazorpayCheckoutProps = {
   organizationId: string;
   organizationName: string;
@@ -51,6 +54,7 @@ export function RazorpayCheckout({
     currency: string;
     keyId: string;
     isTestMode: boolean;
+    environmentLabel: string;
   } | null>(null);
 
   const activePackages = allPackages.filter((p) => p.is_active);
@@ -80,7 +84,8 @@ export function RazorpayCheckout({
 
   const handlePay = useCallback(async () => {
     if (!selectedPkgId) return;
-    if (scriptStatus !== "loaded" || !(window as any).Razorpay) {
+    const Razorpay = (window as RazorpayWindow).Razorpay;
+    if (scriptStatus !== "loaded" || !Razorpay) {
       showToast("Razorpay is not loaded. Please refresh and try again.", "error");
       return;
     }
@@ -112,6 +117,7 @@ export function RazorpayCheckout({
       currency: result.currency,
       keyId: result.razorpayKeyId,
       isTestMode: result.isTestMode,
+      environmentLabel: result.environmentLabel,
     });
 
     const options = {
@@ -175,7 +181,7 @@ export function RazorpayCheckout({
     };
 
     try {
-      const rzp = new (window as any).Razorpay(options);
+      const rzp = new Razorpay(options);
       rzp.open();
       setPaymentState("checkout_open");
     } catch {
@@ -203,9 +209,20 @@ export function RazorpayCheckout({
         </div>
       )}
 
-      <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+      <div className={cn(
+        "flex items-center gap-2 rounded-lg border p-3 text-xs",
+        orderResult?.isTestMode
+          ? "border-amber-200 bg-amber-50 text-amber-800"
+          : orderResult
+            ? "border-green-200 bg-green-50 text-green-800"
+            : "border-border bg-surface text-muted-foreground"
+      )}>
         <Shield className="size-4" />
-        <span><strong>Test Mode:</strong> Razorpay is in test mode. No real charges will be made.</span>
+        <span>
+          {orderResult
+            ? <><strong>{orderResult.environmentLabel}:</strong> {orderResult.isTestMode ? "No real charges will be made." : "Live Razorpay charges are enabled."}</>
+            : "Razorpay checkout mode will be confirmed before payment opens."}
+        </span>
       </div>
 
       <div className="flex items-center gap-3">
@@ -237,6 +254,9 @@ export function RazorpayCheckout({
           const pkgMonthlyPrice = pkg._pricing?.find((p) => p.billing_period === "monthly")?.price ?? pkg.price;
           const isSelected = selectedPkgId === pkg.id;
           const limits = pkg._limits ?? {};
+          const maxMembers = readNumericLimit(limits, "max_members");
+          const maxBranches = readNumericLimit(limits, "max_branches");
+          const maxStaff = readNumericLimit(limits, "max_staff");
 
           return (
             <button
@@ -271,19 +291,19 @@ export function RazorpayCheckout({
               )}
 
               <div className="mt-4 flex flex-wrap gap-1.5">
-                {(limits as any).max_members > 0 && (
+                {isVisibleLimit(maxMembers) && (
                   <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold">
-                    {(limits as any).max_members === -1 ? "Unlimited" : (limits as any).max_members} members
+                    {formatLimit(maxMembers)} members
                   </span>
                 )}
-                {(limits as any).max_branches > 0 && (
+                {isVisibleLimit(maxBranches) && (
                   <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold">
-                    {(limits as any).max_branches === -1 ? "Unlimited" : (limits as any).max_branches} branches
+                    {formatLimit(maxBranches)} branches
                   </span>
                 )}
-                {(limits as any).max_staff > 0 && (
+                {isVisibleLimit(maxStaff) && (
                   <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold">
-                    {(limits as any).max_staff === -1 ? "Unlimited" : (limits as any).max_staff} staff
+                    {formatLimit(maxStaff)} staff
                   </span>
                 )}
               </div>
@@ -390,4 +410,17 @@ export function RazorpayCheckout({
       )}
     </div>
   );
+}
+
+function readNumericLimit(limits: Record<string, unknown>, key: string): number | null {
+  const value = limits[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function isVisibleLimit(value: number | null): value is number {
+  return value === -1 || (value !== null && value > 0);
+}
+
+function formatLimit(value: number): string {
+  return value === -1 ? "Unlimited" : Intl.NumberFormat("en-IN").format(value);
 }

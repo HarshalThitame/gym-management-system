@@ -51,6 +51,171 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_provider_env_event
   ON public.payment_provider_events (provider, provider_environment, event_id)
   WHERE event_id IS NOT NULL;
 
+CREATE OR REPLACE FUNCTION public.attach_razorpay_subscription_order(
+  p_invoice_id uuid,
+  p_organization_id uuid,
+  p_subscription_id uuid,
+  p_provider_environment text,
+  p_provider_order_id text,
+  p_amount integer,
+  p_currency text,
+  p_idempotency_key text,
+  p_payment_number text,
+  p_actor_id uuid,
+  p_package_name text,
+  p_billing_cycle text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_invoice record;
+  v_payment_id uuid;
+  v_now timestamptz := now();
+BEGIN
+  IF p_invoice_id IS NULL OR p_organization_id IS NULL OR coalesce(p_provider_order_id, '') = '' THEN
+    RETURN jsonb_build_object('success', false, 'code', 'INVALID_INPUT', 'error', 'Invoice, organization, and provider order are required.');
+  END IF;
+
+  IF coalesce(p_provider_environment, '') NOT IN ('test', 'live') THEN
+    RETURN jsonb_build_object('success', false, 'code', 'INVALID_ENVIRONMENT', 'error', 'Provider environment must be test or live.');
+  END IF;
+
+  SELECT *
+  INTO v_invoice
+  FROM public.org_subscription_invoices
+  WHERE id = p_invoice_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'code', 'INVOICE_NOT_FOUND', 'error', 'Invoice not found.');
+  END IF;
+
+  IF v_invoice.organization_id <> p_organization_id THEN
+    RETURN jsonb_build_object('success', false, 'code', 'ORG_MISMATCH', 'error', 'Invoice does not belong to the organization.');
+  END IF;
+
+  IF coalesce(v_invoice.provider_environment, 'test') <> p_provider_environment THEN
+    RETURN jsonb_build_object('success', false, 'code', 'ENVIRONMENT_MISMATCH', 'error', 'Invoice provider environment mismatch.');
+  END IF;
+
+  IF v_invoice.razorpay_order_id IS NOT NULL AND v_invoice.razorpay_order_id <> p_provider_order_id THEN
+    RETURN jsonb_build_object('success', false, 'code', 'ORDER_MISMATCH', 'error', 'Invoice already has a different Razorpay order.');
+  END IF;
+
+  IF coalesce(v_invoice.total_amount, v_invoice.subtotal_amount, 0) <> p_amount THEN
+    RETURN jsonb_build_object('success', false, 'code', 'AMOUNT_MISMATCH', 'error', 'Order amount does not match invoice total.');
+  END IF;
+
+  IF coalesce(v_invoice.currency, 'INR') <> coalesce(p_currency, 'INR') THEN
+    RETURN jsonb_build_object('success', false, 'code', 'CURRENCY_MISMATCH', 'error', 'Order currency does not match invoice currency.');
+  END IF;
+
+  IF v_invoice.status = 'paid' THEN
+    SELECT id
+    INTO v_payment_id
+    FROM public.org_subscription_payments
+    WHERE invoice_id = p_invoice_id
+      AND provider = 'razorpay'
+      AND provider_order_id = p_provider_order_id
+      AND coalesce(provider_environment, 'test') = p_provider_environment
+    ORDER BY created_at DESC
+    LIMIT 1;
+
+    RETURN jsonb_build_object(
+      'success', true,
+      'invoiceId', p_invoice_id,
+      'paymentId', v_payment_id,
+      'providerOrderId', p_provider_order_id,
+      'alreadyPaid', true
+    );
+  END IF;
+
+  UPDATE public.org_subscription_invoices
+  SET razorpay_order_id = p_provider_order_id,
+      status = 'issued',
+      updated_at = v_now
+  WHERE id = p_invoice_id;
+
+  INSERT INTO public.org_subscription_payments (
+    organization_id,
+    subscription_id,
+    invoice_id,
+    payment_number,
+    status,
+    provider,
+    provider_environment,
+    provider_order_id,
+    amount,
+    currency,
+    idempotency_key,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    p_organization_id,
+    p_subscription_id,
+    p_invoice_id,
+    p_payment_number,
+    'created',
+    'razorpay',
+    p_provider_environment,
+    p_provider_order_id,
+    p_amount,
+    p_currency,
+    p_idempotency_key,
+    v_now,
+    v_now
+  )
+  ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+  DO UPDATE SET
+    organization_id = EXCLUDED.organization_id,
+    subscription_id = EXCLUDED.subscription_id,
+    invoice_id = EXCLUDED.invoice_id,
+    provider = EXCLUDED.provider,
+    provider_environment = EXCLUDED.provider_environment,
+    provider_order_id = EXCLUDED.provider_order_id,
+    amount = EXCLUDED.amount,
+    currency = EXCLUDED.currency,
+    status = CASE
+      WHEN public.org_subscription_payments.status = 'paid' THEN public.org_subscription_payments.status
+      ELSE EXCLUDED.status
+    END,
+    updated_at = v_now
+  RETURNING id INTO v_payment_id;
+
+  INSERT INTO public.subscription_events (
+    organization_id,
+    subscription_id,
+    event_type,
+    actor_id,
+    new_state,
+    metadata,
+    reason,
+    created_at
+  )
+  VALUES (
+    p_organization_id,
+    p_subscription_id,
+    'razorpay_order_created',
+    p_actor_id,
+    jsonb_build_object('invoiceId', p_invoice_id, 'orderId', p_provider_order_id, 'amount', p_amount, 'currency', p_currency, 'billingCycle', p_billing_cycle),
+    jsonb_build_object('provider', 'razorpay', 'environment', p_provider_environment, 'orderId', p_provider_order_id),
+    format('Razorpay order %s created for %s %s', p_provider_order_id, coalesce(p_package_name, 'subscription'), coalesce(p_billing_cycle, 'billing')),
+    v_now
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'invoiceId', p_invoice_id,
+    'paymentId', v_payment_id,
+    'providerOrderId', p_provider_order_id
+  );
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.finalize_razorpay_subscription_payment(
   p_provider_order_id text,
   p_provider_payment_id text,
@@ -138,6 +303,40 @@ BEGIN
     END IF;
 
     v_subscription_id := v_subscription.id;
+  END IF;
+
+  IF v_already_finalized THEN
+    INSERT INTO public.subscription_events (
+      organization_id,
+      subscription_id,
+      event_type,
+      new_state,
+      reason,
+      metadata,
+      created_at
+    )
+    VALUES (
+      v_payment.organization_id,
+      v_subscription_id,
+      'payment_duplicate_ignored',
+      jsonb_build_object(
+        'providerOrderId', p_provider_order_id,
+        'providerPaymentId', p_provider_payment_id,
+        'invoiceId', v_invoice.id,
+        'amount', v_payment.amount
+      ),
+      'Duplicate Razorpay payment event ignored.',
+      jsonb_build_object('eventId', p_event_id, 'providerEnvironment', coalesce(p_provider_environment, 'test')),
+      v_now
+    );
+
+    RETURN jsonb_build_object(
+      'success', true,
+      'invoiceId', v_invoice.id,
+      'paymentId', v_payment.id,
+      'subscriptionId', v_subscription_id,
+      'wasAlreadyFinalized', true
+    );
   END IF;
 
   IF v_invoice.billing_cycle = 'annual' THEN
@@ -265,4 +464,5 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.attach_razorpay_subscription_order(uuid, uuid, uuid, text, text, integer, text, text, text, uuid, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.finalize_razorpay_subscription_payment(text, text, text, text) TO service_role;
