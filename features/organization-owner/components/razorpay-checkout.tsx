@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { useRazorpayScript } from "@/features/billing/razorpay/use-razorpay-script";
 import { createSubscriptionRazorpayOrderAction } from "@/features/subscription/razorpay-order-action";
+import { verifySubscriptionRazorpayPaymentAction } from "@/features/subscription/razorpay-verify-action";
 import type { RazorpayCheckoutResponse, PaymentState } from "@/features/billing/razorpay/razorpay-checkout-types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,11 +127,32 @@ export function RazorpayCheckout({
         },
         confirm_close: true,
       },
-      handler: (response: any) => {
+      handler: async (response: any) => {
         setRazorpayResponse(response as RazorpayCheckoutResponse);
-        setPaymentState("success_pending_verification");
-        showToast("Payment completed. Verification is pending.", "info");
-        if (onPaymentSuccess) onPaymentSuccess({ ...response, invoiceId: result.invoiceId, packageId: selectedPkgId || "", billingCycle });
+        setPaymentState("creating_order");
+        showToast("Verifying payment...", "info");
+
+        const verifyInput: any = {
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+          invoiceId: result.invoiceId,
+          organizationId,
+          packageId: (selectedPkgId as string) || "",
+        };
+        if (currentSubscriptionId) verifyInput.subscriptionId = currentSubscriptionId;
+        const verifyResult = await verifySubscriptionRazorpayPaymentAction(verifyInput);
+
+        if (verifyResult.success) {
+          setPaymentState("success_pending_verification");
+          showToast("Payment verified! Your subscription is now active.", "success");
+          if (onPaymentSuccess) onPaymentSuccess({ ...response, invoiceId: result.invoiceId, packageId: selectedPkgId || "", billingCycle });
+          // Refresh the page to show updated subscription
+          window.location.reload();
+        } else {
+          setPaymentState("failed");
+          showToast(verifyResult.error || "Payment verification failed. Please contact support.", "error");
+        }
       },
     };
 
