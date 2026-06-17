@@ -35,27 +35,21 @@ async function PlanContent() {
 
   // Get org name, billing email, invoices, subscription events
   const supabase = await createSupabaseServerClient();
-  const sb = supabase as never as {
-    from(t: string): {
-      select(c: string): {
-        eq(k: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null }>;
-        order(k: string, o: { ascending: boolean }): {
-          limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null }>;
-        };
-      };
-    };
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb2 = supabase as any;
 
   const [orgData, invoicesData, eventsData] = await Promise.all([
     supabase.from("organizations").select("name, billing_email").eq("id", organizationId as never).maybeSingle(),
-    sb.from("org_subscription_invoices").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
-    sb.from("subscription_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
+    sb2.from("org_subscription_invoices").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
+    sb2.from("subscription_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
   ]);
 
   const orgRecord = orgData as unknown as { name: string; billing_email: string | null } | null;
   const organizationName = orgRecord?.name ?? "Your Organization";
   const customerEmail = orgRecord?.billing_email ?? ctx.email ?? "";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orgInvoices = (invoicesData.data ?? []) as any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orgEvents = (eventsData.data ?? []) as any[];
 
   const { EnterprisePlanManagement } = await import("@/features/organization-owner/components/enterprise-plan-management");
