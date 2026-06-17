@@ -150,7 +150,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
 
       const razorpayReceipt = `SUB-${sub.organization_id?.toString().slice(0, 8)}-${Date.now()}`;
       const orderResult = await createRazorpayOrder({
-        amount: price,
+        amountInRupees: price,
         currency,
         receipt: razorpayReceipt,
         notes: {
@@ -167,7 +167,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
       }
       result.ordersCreated++;
 
-      const razorpayOrderId = orderResult.order.id;
+      const razorpayOrderId = orderResult.data.id;
       await db.from("org_subscription_invoices").update({
         razorpay_order_id: razorpayOrderId,
       }).eq("id", invoice.id as string);
@@ -233,23 +233,22 @@ export async function processDunningRetry(subscriptionId: string, organizationId
 
   try {
     const orderResult = await createRazorpayOrder({
-      amount: price,
+      amountInRupees: price,
       currency: currency || "INR",
       receipt: `DUN-${organizationId.slice(0, 8)}-${Date.now()}`,
       notes: {
         organization_id: organizationId,
         subscription_id: subscriptionId,
         type: "dunning_retry",
+        environment: "test",
       },
     });
 
-    if (!orderResult.ok) {
-      return { success: false, error: orderResult.message };
-    }
+    if (!orderResult.ok) return { success: false, error: orderResult.message };
 
     return {
       success: true,
-      orderId: orderResult.order.id,
+      orderId: orderResult.data.id,
       amount: price,
     };
   } catch (err) {

@@ -54,3 +54,74 @@ export type RazorpayHealthStatus = {
   hasWebhookSecret: boolean;
   publicKeyMatchesServerKey: boolean;
 };
+
+export type SecureCheckoutIntentInput = {
+  targetPackageId: string;
+  billingCycle: "monthly" | "annual";
+  upgradeRequestId?: string;
+};
+
+export type SecureCheckoutIntentResult = {
+  success: true;
+  razorpayKeyId: string;
+  razorpayOrderId: string;
+  amountPaise: number;
+  currency: string;
+  invoiceId: string;
+  packageDisplayName: string;
+  organizationDisplayName: string;
+  billingCycle: string;
+  isTestMode: boolean;
+  environmentLabel: string;
+} | {
+  success: false;
+  error: string;
+};
+
+export type PaymentAcknowledgementInput = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+export type PaymentAcknowledgementResult = {
+  success: true;
+  status: "signature_acknowledged" | "payment_confirmed" | "already_processed";
+  invoiceId: string;
+  subscriptionStatus?: string;
+  warning?: string;
+} | {
+  success: false;
+  error: string;
+};
+
+export type FinalizePaymentInput = {
+  providerOrderId: string;
+  providerPaymentId: string;
+  providerEnvironment: RazorpayEnvironment;
+  eventId: string;
+};
+
+export type FinalizePaymentResult = {
+  success: true;
+  invoiceId: string;
+  paymentId: string;
+  subscriptionId: string;
+  wasAlreadyFinalized: boolean;
+  entitlementSyncStatus: "completed" | "failed" | "skipped";
+} | {
+  success: false;
+  error: string;
+  code?: string;
+};
+
+export type CheckoutOrderState =
+  | "idle"
+  | "creating_order"
+  | "checkout_open"
+  | "payment_callback_received"
+  | "waiting_for_webhook"
+  | "payment_confirmed"
+  | "payment_failed"
+  | "checkout_cancelled"
+  | "verification_failed";

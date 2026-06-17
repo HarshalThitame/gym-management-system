@@ -50,3 +50,14 @@ export type PaymentState =
   | "failed"
   | "cancelled"
   | "script_error";
+
+export type CheckoutOrderState =
+  | "idle"
+  | "creating_order"
+  | "checkout_open"
+  | "payment_callback_received"
+  | "waiting_for_webhook"
+  | "payment_confirmed"
+  | "payment_failed"
+  | "checkout_cancelled"
+  | "verification_failed";

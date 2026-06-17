@@ -80,7 +80,7 @@ export async function createRazorpayOrderForPayment(context: AuthContext, paymen
   }
 
   const orderResult = await createRazorpayOrder({
-    amount: payment.amount,
+    amountInRupees: payment.amount / 100,
     currency: payment.currency,
     receipt: payment.payment_number.slice(0, 40),
     notes: compactStringRecord({
@@ -95,7 +95,7 @@ export async function createRazorpayOrderForPayment(context: AuthContext, paymen
     return { ok: false, status: 503, code: "RAZORPAY_NOT_CONFIGURED", message: orderResult.message };
   }
 
-  const order = normalizeRazorpayOrder(orderResult.order);
+  const order = normalizeRazorpayOrder(orderResult.data);
   if (!order) {
     return { ok: false, status: 502, code: "RAZORPAY_ORDER_INVALID", message: "Razorpay returned an invalid order response." };
   }

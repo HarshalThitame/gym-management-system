@@ -229,7 +229,7 @@ async function processPaymentRetry(
 
   try {
     const orderResult = await createRazorpayOrder({
-      amount: price,
+      amountInRupees: price,
       currency: currency || "INR",
       receipt: `DUN-${organizationId.slice(0, 8)}-${Date.now()}`,
       notes: {
@@ -243,7 +243,7 @@ async function processPaymentRetry(
 
     return {
       success: true,
-      orderId: orderResult.order.id,
+      orderId: orderResult.data.id,
       amount: price,
     };
   } catch {
