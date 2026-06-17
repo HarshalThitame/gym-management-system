@@ -296,7 +296,7 @@ function baseContentSecurityPolicy(upgradeInsecureRequests: boolean) {
     "frame-ancestors 'none'",
     "object-src 'none'",
     "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://fonts.gstatic.com",
     connectSource,
     "frame-src https://*.razorpay.com",
     "worker-src 'self' blob:"
@@ -313,7 +313,7 @@ function buildSensitiveContentSecurityPolicy(nonce: string, upgradeInsecureReque
   const scriptSource = process.env.NODE_ENV === "development"
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.razorpay.com"
     : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://*.razorpay.com`;
-  const styleSource = `style-src 'self' 'unsafe-inline'`;
+  const styleSource = `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`;
 
   return [
     ...baseContentSecurityPolicy(upgradeInsecureRequests),
@@ -327,7 +327,7 @@ function buildPublicContentSecurityPolicy(upgradeInsecureRequests: boolean) {
   return [
     ...baseContentSecurityPolicy(upgradeInsecureRequests),
     "script-src 'self' 'unsafe-inline' https://*.razorpay.com",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "style-src-attr 'unsafe-inline'"
   ].join("; ");
 }

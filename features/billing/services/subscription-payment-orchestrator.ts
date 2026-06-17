@@ -116,20 +116,16 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const { data: pkg } = await supabase
       .from("packages")
-      .select("id, name, is_active, trial_days")
+      .select("id, name, is_active")
       .eq("id", targetPackageId)
       .maybeSingle();
 
     if (!pkg) {
       return { success: false, error: "Package not found." };
     }
-    if (!(pkg as unknown as Record<string, unknown> | null)?.is_active) {
+    if (!pkg.is_active) {
       return { success: false, error: "Package is not active." };
     }
-
-    const pkgRow = pkg as unknown as Record<string, unknown>;
-    const trialDays = typeof pkgRow.trial_days === "number" && pkgRow.trial_days as number > 0 ? pkgRow.trial_days as number : 14;
-    const trialEndsAt = new Date(Date.now() + trialDays * 86400000).toISOString();
 
     const readDb = supabase as unknown as CheckoutDb;
     const { data: pricingRows } = await readDb
@@ -149,7 +145,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const { data: currentSubscriptions } = await readDb
       .from("organization_subscriptions")
-      .select("id, status, package_id, price_override, billing_period")
+      .select("id, status, price_override")
       .eq("organization_id", organizationId)
       .order("started_at", { ascending: false })
       .limit(1);
@@ -195,7 +191,6 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const existingInv = (existingInvs ?? [])[0];
 
-    let subId = currentSubId;
     let invoiceId: string | undefined;
     let existingOrderId: string | null = null;
 
@@ -207,14 +202,14 @@ export async function createSecureSubscriptionCheckoutOrderAction(
         const attach = await attachSubscriptionOrder(d, {
           invoiceId: invoiceId!,
           organizationId,
-          subscriptionId: subId ?? null,
+          subscriptionId: currentSubId ?? null,
           providerEnvironment,
           providerOrderId: existingOrderId,
           amount: existingAmountPaise,
           currency: typeof existingInv.currency === "string" ? existingInv.currency : currency,
           idempotencyKey,
           actorId: user.id,
-          packageName: pkgRow.name as string,
+          packageName: pkg.name as string,
           billingCycle,
         });
         if (!attach.success) {
@@ -227,7 +222,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
           amountPaise: existingAmountPaise,
           currency: typeof existingInv.currency === "string" ? existingInv.currency : currency,
           invoiceId: invoiceId!,
-          packageDisplayName: pkgRow.name as string,
+          packageDisplayName: pkg.name as string,
           organizationDisplayName: organization.name ?? "",
           billingCycle,
           isTestMode: providerEnvironment === "test",
@@ -236,69 +231,10 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       }
     }
 
-    if (!subId) {
-      const existingSub = currentSubscription;
-      if (existingSub) {
-        const updater = d as unknown as {
-          from(table: string): {
-            update(row: Record<string, unknown>): {
-              eq(col: string, val: string): Promise<{ error: { message: string } | null }>;
-            };
-          };
-        };
-        const { error: updError } = await updater
-          .from("organization_subscriptions")
-          .update({
-            package_id: targetPackageId,
-            status: "trial",
-            trial_ends_at: trialEndsAt,
-            started_at: new Date().toISOString(),
-            billing_period: billingCycle,
-            provider: "razorpay",
-            provider_environment: providerEnvironment,
-            expires_at: null,
-            cancelled_at: null,
-            cancellation_reason: null,
-            cancellation_category: null,
-            dunning_attempts: 0,
-            dunning_next_retry: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", String(existingSub.id));
-        if (updError) {
-          return { success: false, error: updError.message ?? "Failed to reactivate subscription." };
-        }
-        subId = String(existingSub.id);
-      } else {
-        const { data: newSub, error: subError } = await d
-          .from("organization_subscriptions")
-          .insert({
-            organization_id: organizationId,
-            package_id: targetPackageId,
-            status: "trial",
-            trial_ends_at: trialEndsAt,
-            started_at: new Date().toISOString(),
-            billing_period: billingCycle,
-            provider: "razorpay",
-            provider_environment: providerEnvironment,
-          })
-          .select("id")
-          .maybeSingle();
-        if (subError) {
-          return { success: false, error: subError.message ?? "Failed to create subscription." };
-        }
-        if (newSub) {
-          subId = String(newSub.id);
-        } else {
-          return { success: false, error: "Failed to create subscription." };
-        }
-      }
-    }
-
     if (!invoiceId) {
       const invoicePayload: Record<string, unknown> = {
         organization_id: organizationId,
-        subscription_id: subId,
+        subscription_id: currentSubId ?? null,
         invoice_number: `SUB-${organizationId.slice(0, 8)}-${String(Date.now()).slice(-6)}`,
         status: "draft",
         currency,
@@ -353,14 +289,14 @@ export async function createSecureSubscriptionCheckoutOrderAction(
     const attach = await attachSubscriptionOrder(d, {
       invoiceId: invoiceId!,
       organizationId,
-      subscriptionId: subId ?? null,
+      subscriptionId: currentSubId ?? null,
       providerEnvironment,
       providerOrderId: order.id,
       amount: totalAmountPaise,
       currency,
       idempotencyKey,
       actorId: user.id,
-      packageName: pkgRow.name as string,
+      packageName: pkg.name as string,
       billingCycle,
     });
     if (!attach.success) {
@@ -380,7 +316,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       amountPaise: totalAmountPaise,
       currency,
       invoiceId: invoiceId!,
-      packageDisplayName: pkgRow.name as string,
+      packageDisplayName: pkg.name as string,
       organizationDisplayName: (org as { name: string } | null)?.name ?? organization.name ?? "",
       billingCycle,
       isTestMode: providerEnvironment === "test",
