@@ -32,10 +32,14 @@ export interface OrgFeatureFlags {
   goalTracking: boolean;
   progressPhotos: boolean;
   membershipPauseFreeze: boolean;
+  memberTaggingSegments: boolean;
+  memberProgressTracking: boolean;
 
   // CRM
   leadManagement: boolean;
   trialManagement: boolean;
+  leadFollowupReminders: boolean;
+  reEngagementAutomation: boolean;
 
   // Trainer
   trainerManagement: boolean;
@@ -47,6 +51,9 @@ export interface OrgFeatureFlags {
   crossBranchClassBooking: boolean;
   trainerCommissionsPayroll: boolean;
   staffAttendanceLeave: boolean;
+  classAttendanceTracking: boolean;
+  payrollExport: boolean;
+  roleBasedPermissions: boolean;
 
   // Billing
   billingInvoices: boolean;
@@ -57,11 +64,19 @@ export interface OrgFeatureFlags {
   autoBilling: boolean;
   discountPromoCodes: boolean;
   corporateBulkMemberships: boolean;
+  paymentFailureHandling: boolean;
+  partialPaymentDues: boolean;
+  razorpayPayuIntegration: boolean;
 
   // Reports
   basicReports: boolean;
   advancedReportsEnabled: boolean;
   customDashboards: boolean;
+  trainerPerformanceReport: boolean;
+  classOccupancyReport: boolean;
+  leadConversionReport: boolean;
+  branchRevenueComparison: boolean;
+  franchiseRollupReports: boolean;
 
   // Communication
   emailNotifications: boolean;
@@ -71,12 +86,15 @@ export interface OrgFeatureFlags {
   birthdayGreetings: boolean;
   broadcastMessages: boolean;
   emailCampaigns: boolean;
+  whatsappBusinessApi: boolean;
 
   // Platform
   memberPortal: boolean;
   trainerPortal: boolean;
   brandedMobileApp: boolean;
   dietWorkoutPlans: boolean;
+  whiteLabelMobileApp: boolean;
+  googleCalendarSync: boolean;
 
   // AI
   aiEnabled: boolean;
@@ -98,6 +116,8 @@ export interface OrgFeatureFlags {
   advancedRbac: boolean;
   prioritySupport: boolean;
   staffManagement: boolean;
+  tallyZohoBooksIntegration: boolean;
+  restApiAccess: boolean;
 
   // Legacy aliases
   classSchedulingEnabled: boolean;

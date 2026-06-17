@@ -700,11 +700,16 @@ function DeleteConfirmationModal({ pkg, deleteContext, deleteState, deletePendin
               <div className="mt-2 space-y-2 text-sm">
                 <p className="text-muted-foreground"><span className="font-semibold text-foreground">{pkg.name}</span> has <span className="font-black text-amber-600">{assignedCount}</span> assigned organization(s).</p>
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800">
-                  <p className="font-semibold">This package has active subscriptions, so it cannot be deleted. It will be archived instead.</p>
+                  <p className="font-semibold">
+                    {activeCount > 0 ? `${activeCount} subscription(s) are active or in trial. ` : ""}
+                    This package will be archived so subscription history stays intact.
+                  </p>
                 </div>
               </div>
             ) : (
-              <p className="mt-1 text-sm text-muted-foreground">No organizations are assigned to <span className="font-semibold text-foreground">{pkg.name}</span>.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                No organizations are currently assigned to <span className="font-semibold text-foreground">{pkg.name}</span>. If historical billing or request records exist, it will be archived instead.
+              </p>
             )}
           </div>
         </div>
@@ -718,7 +723,6 @@ function DeleteConfirmationModal({ pkg, deleteContext, deleteState, deletePendin
 
         <form action={deleteAction} className="mt-5 space-y-4">
           <input type="hidden" name="packageId" value={pkg.id} />
-          <input type="hidden" name="forceDeactivate" value={hasSubscribers ? "true" : "false"} />
           <div>
             <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="delete-confirm">
               Type <span className={hasSubscribers ? "text-amber-600" : "text-red-600"}>DELETE</span> to confirm
@@ -729,7 +733,7 @@ function DeleteConfirmationModal({ pkg, deleteContext, deleteState, deletePendin
             <Button type="button" variant="secondary" onClick={onClose} disabled={deletePending}>Cancel</Button>
             <Button type="submit" variant={hasSubscribers ? "secondary" : "destructive"} disabled={deleteConfirm !== "DELETE" || deletePending} className="gap-2">
               {deletePending ? <Loader2 className="size-4 animate-spin" /> : null}
-              {deletePending ? "Processing..." : hasSubscribers ? "Archive Package" : "Permanently Delete"}
+              {deletePending ? "Processing..." : hasSubscribers ? "Archive Package" : "Delete Package"}
             </Button>
           </div>
         </form>

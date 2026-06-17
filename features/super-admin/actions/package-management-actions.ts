@@ -7,6 +7,7 @@ import { requireApiRole } from "@/lib/auth/api-guards";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { z } from "zod";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SbClient = any;
 
 const packageSchema = z.object({
@@ -74,6 +75,27 @@ const FEATURE_FIELD_MAP: Record<string, string> = {
   email_notifications: "emailNotifications",
   in_app_notifications: "notificationsEnabled",
   trainer_portal: "trainerPortal",
+  // Growth-specific features
+  member_tagging_segments: "memberTaggingSegments",
+  member_progress_tracking: "memberProgressTracking",
+  payment_failure_handling: "paymentFailureHandling",
+  partial_payment_dues: "partialPaymentDues",
+  razorpay_payu_integration: "razorpayPayuIntegration",
+  class_attendance_tracking: "classAttendanceTracking",
+  payroll_export: "payrollExport",
+  role_based_permissions: "roleBasedPermissions",
+  lead_followup_reminders: "leadFollowupReminders",
+  re_engagement_automation: "reEngagementAutomation",
+  trainer_performance_report: "trainerPerformanceReport",
+  class_occupancy_report: "classOccupancyReport",
+  lead_conversion_report: "leadConversionReport",
+  branch_revenue_comparison: "branchRevenueComparison",
+  franchise_rollup_reports: "franchiseRollupReports",
+  whatsapp_business_api: "whatsappBusinessApi",
+  google_calendar_sync: "googleCalendarSync",
+  white_label_mobile_app: "whiteLabelMobileApp",
+  tally_zoho_books_integration: "tallyZohoBooksIntegration",
+  rest_api_access: "restApiAccess",
 };
 
 export async function savePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -203,18 +225,51 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
 }
 
 type DependencyCheck = {
-  table: string;
+  table: "organization_subscriptions" | "scheduled_plan_changes" | "subscription_requests" | "subscription_addons";
   column: string;
   label: string;
-  isRestricted: boolean;
 };
 
-const PACKAGE_DEPENDENCIES: DependencyCheck[] = [
-  { table: "organization_subscriptions", column: "package_id", label: "organization subscriptions", isRestricted: true },
-  { table: "subscription_addons", column: "addon_id", label: "subscription addon assignments", isRestricted: true },
-  { table: "package_subscription_changes", column: "from_package_id", label: "subscription changes (from)", isRestricted: true },
-  { table: "package_subscription_changes", column: "to_package_id", label: "subscription changes (to)", isRestricted: true },
+type DependencyResult = DependencyCheck & {
+  count: number;
+};
+
+const PACKAGE_REFERENCE_CHECKS: DependencyCheck[] = [
+  { table: "organization_subscriptions", column: "package_id", label: "organization subscriptions" },
+  { table: "scheduled_plan_changes", column: "from_package_id", label: "scheduled plan changes (from)" },
+  { table: "scheduled_plan_changes", column: "to_package_id", label: "scheduled plan changes (to)" },
+  { table: "subscription_requests", column: "current_package_id", label: "subscription requests (current)" },
+  { table: "subscription_requests", column: "requested_package_id", label: "subscription requests (requested)" },
 ];
+
+async function countPackageReference(sb: SbClient, dep: DependencyCheck, packageId: string): Promise<DependencyResult> {
+  const { count, error } = await sb.from(dep.table).select("id", { count: "exact", head: true }).eq(dep.column, packageId);
+  if (error) throw new Error(`Could not verify ${dep.label}: ${error.message}`);
+  return { ...dep, count: count ?? 0 };
+}
+
+async function countAssignedPackageAddons(sb: SbClient, packageId: string): Promise<DependencyResult> {
+  const dep: DependencyCheck = { table: "subscription_addons", column: "addon_id", label: "subscription addon assignments" };
+  const { data: addons, error: addonsError } = await sb.from("package_addons").select("id").eq("package_id", packageId);
+  if (addonsError) throw new Error(`Could not verify package add-ons: ${addonsError.message}`);
+
+  const addonIds = (addons ?? [])
+    .map((addon: Record<string, unknown>) => addon.id)
+    .filter((id: unknown): id is string => typeof id === "string" && id.length > 0);
+
+  if (addonIds.length === 0) return { ...dep, count: 0 };
+
+  const { count, error } = await sb.from("subscription_addons").select("id", { count: "exact", head: true }).in("addon_id", addonIds);
+  if (error) throw new Error(`Could not verify ${dep.label}: ${error.message}`);
+  return { ...dep, count: count ?? 0 };
+}
+
+function getDependencyDetails(depResults: DependencyResult[]) {
+  return depResults
+    .filter((dep) => dep.count > 0)
+    .map((dep) => `${dep.count} ${dep.label}`)
+    .join(", ");
+}
 
 export async function deletePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _prev;
@@ -223,7 +278,6 @@ export async function deletePackageAction(_prev: AuthActionState, formData: Form
 
   const packageId = formData.get("packageId");
   if (!packageId || typeof packageId !== "string") return { status: "error", message: "Package ID required." };
-  const forceDeactivate = formData.get("forceDeactivate") === "true";
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) return { status: "error", message: "Database connection failed." };
@@ -231,57 +285,28 @@ export async function deletePackageAction(_prev: AuthActionState, formData: Form
   try {
     const sb = supabase as SbClient;
 
-    const depResults = await Promise.all(
-      PACKAGE_DEPENDENCIES.map(async (dep) => {
-        let query = sb.from(dep.table).select("id", { count: "exact", head: true }).eq(dep.column, packageId);
+    const depResults = await Promise.all([
+      ...PACKAGE_REFERENCE_CHECKS.map((dep) => countPackageReference(sb, dep, packageId)),
+      countAssignedPackageAddons(sb, packageId),
+    ]);
 
-        if (dep.table === "subscription_addons" && dep.column === "addon_id") {
-          query = sb.from("package_addons").select("id", { count: "exact", head: true }).eq("package_id", packageId);
-          const { count: addonCount } = await query;
-          if ((addonCount ?? 0) > 0) {
-            const addonIds = (await sb.from("package_addons").select("id").eq("package_id", packageId)).data ?? [];
-            const ids = addonIds.map((a: Record<string, unknown>) => a.id);
-            if (ids.length > 0) {
-              const { count: refCount } = await sb.from("subscription_addons").select("id", { count: "exact", head: true }).in("addon_id", ids);
-              return { ...dep, count: refCount ?? 0 };
-            }
-          }
-          return { ...dep, count: 0 };
-        }
-
-        const { count } = await query;
-        return { ...dep, count: count ?? 0 };
-      })
-    );
-
-    const totalRestricted = depResults.filter((d) => d.isRestricted).reduce((s, d) => s + d.count, 0);
-
-    if (totalRestricted > 0 && !forceDeactivate) {
-      const details = depResults
-        .filter((d) => d.count > 0)
-        .map((d) => `${d.count} ${d.label}`)
-        .join(", ");
-      return {
-        status: "error",
-        message: `Cannot delete: ${details}. Deactivate the plan instead.`,
-        fieldErrors: { forceDeactivate: [details] }
-      };
-    }
+    const totalRestricted = depResults.reduce((sum, dep) => sum + dep.count, 0);
 
     if (totalRestricted > 0) {
       const { error } = await sb.from("packages").update({ is_active: false }).eq("id", packageId);
       if (error) return { status: "error", message: error.message };
+      const details = getDependencyDetails(depResults);
       await writeAuditLog({
         actorId: auth.context.userId,
         action: "package.deactivated",
         entityType: "package",
         entityId: packageId,
         metadata: {
-          dependencyDetails: depResults.filter((d) => d.count > 0).map((d) => ({ table: d.table, count: d.count })),
+          dependencyDetails: depResults.filter((d) => d.count > 0).map((d) => ({ table: d.table, column: d.column, count: d.count })),
         }
       });
       revalidatePath("/super-admin/subscriptions");
-      return { status: "success", message: `Package deactivated — ${totalRestricted} historical reference(s) exist.` };
+      return { status: "success", message: `Package archived because it has historical references: ${details}.` };
     }
 
     const { error } = await sb.from("packages").delete().eq("id", packageId);

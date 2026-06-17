@@ -12,23 +12,32 @@ const SAFE_DEFAULT: OrgFeatureFlags = {
   attendanceApi: false, attendanceReports: false,
   memberManagement: false, membershipRenewals: false, expiryTracking: false,
   goalTracking: false, progressPhotos: false, membershipPauseFreeze: false,
+  memberTaggingSegments: false, memberProgressTracking: false,
   leadManagement: false, trialManagement: false,
+  leadFollowupReminders: false, reEngagementAutomation: false,
   trainerManagement: false, workoutAssignment: false, nutritionPlans: false,
   ptSessions: false, classBooking: false, waitlistManagement: false,
   crossBranchClassBooking: false, trainerCommissionsPayroll: false, staffAttendanceLeave: false,
+  classAttendanceTracking: false, payrollExport: false, roleBasedPermissions: false,
   billingInvoices: false, receipts: false, paymentTracking: false,
   onlinePaymentLinks: false, renewalReminders: false,
   autoBilling: false, discountPromoCodes: false, corporateBulkMemberships: false,
+  paymentFailureHandling: false, partialPaymentDues: false, razorpayPayuIntegration: false,
   basicReports: false, advancedReportsEnabled: false, customDashboards: false,
+  trainerPerformanceReport: false, classOccupancyReport: false, leadConversionReport: false,
+  branchRevenueComparison: false, franchiseRollupReports: false,
   emailNotifications: false, inAppNotifications: false,
   whatsappIntegration: false, smsIntegration: false,
   birthdayGreetings: false, broadcastMessages: false, emailCampaigns: false,
+  whatsappBusinessApi: false,
   memberPortal: false, trainerPortal: false, brandedMobileApp: false, dietWorkoutPlans: false,
+  whiteLabelMobileApp: false, googleCalendarSync: false,
   aiEnabled: false, aiCoach: false, aiRetentionAnalysis: false, aiRevenueInsights: false,
   whiteLabelEnabled: false, customDomainEnabled: false, customBranding: false,
   multiBranchManagement: false, franchiseManagement: false,
   apiAccessEnabled: false, webhooks: false, auditLogs: false,
   advancedRbac: false, prioritySupport: false, staffManagement: false,
+  tallyZohoBooksIntegration: false, restApiAccess: false,
   classSchedulingEnabled: false, communicationsEnabled: false,
   trainerAssignmentEnabled: false, razorpayEnabled: false,
 };
@@ -68,10 +77,14 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   goalTracking: { type: "feature", code: "goal_tracking" },
   progressPhotos: { type: "feature", code: "progress_photos" },
   membershipPauseFreeze: { type: "feature", code: "membership_pause_freeze" },
+  memberTaggingSegments: { type: "feature", code: "member_tagging_segments" },
+  memberProgressTracking: { type: "feature", code: "member_progress_tracking" },
 
   // CRM
   leadManagement: { type: "feature", code: "lead_management" },
   trialManagement: { type: "feature", code: "trial_management" },
+  leadFollowupReminders: { type: "feature", code: "lead_followup_reminders" },
+  reEngagementAutomation: { type: "feature", code: "re_engagement_automation" },
 
   // Trainer
   trainerManagement: { type: "feature", code: "trainer_management" },
@@ -85,6 +98,9 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   crossBranchClassBooking: { type: "feature", code: "cross_branch_class_booking" },
   trainerCommissionsPayroll: { type: "feature", code: "trainer_commissions_payroll" },
   staffAttendanceLeave: { type: "feature", code: "staff_attendance_leave" },
+  classAttendanceTracking: { type: "feature", code: "class_attendance_tracking" },
+  payrollExport: { type: "feature", code: "payroll_export" },
+  roleBasedPermissions: { type: "feature", code: "role_based_permissions" },
 
   // Billing
   billingInvoices: { type: "feature", code: "billing_invoices" },
@@ -96,11 +112,19 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   autoBilling: { type: "feature", code: "auto_billing" },
   discountPromoCodes: { type: "feature", code: "discount_promo_codes" },
   corporateBulkMemberships: { type: "feature", code: "corporate_bulk_memberships" },
+  paymentFailureHandling: { type: "feature", code: "payment_failure_handling" },
+  partialPaymentDues: { type: "feature", code: "partial_payment_dues" },
+  razorpayPayuIntegration: { type: "feature", code: "razorpay_payu_integration" },
 
   // Reports
   basicReports: { type: "feature", code: "basic_reports" },
   advancedReportsEnabled: { type: "feature", code: "advanced_reports" },
   customDashboards: { type: "feature", code: "custom_dashboards" },
+  trainerPerformanceReport: { type: "feature", code: "trainer_performance_report" },
+  classOccupancyReport: { type: "feature", code: "class_occupancy_report" },
+  leadConversionReport: { type: "feature", code: "lead_conversion_report" },
+  branchRevenueComparison: { type: "feature", code: "branch_revenue_comparison" },
+  franchiseRollupReports: { type: "feature", code: "franchise_rollup_reports" },
 
   // Communication
   emailNotifications: { type: "feature", code: "email_notifications" },
@@ -111,12 +135,15 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   birthdayGreetings: { type: "feature", code: "birthday_greetings" },
   broadcastMessages: { type: "feature", code: "broadcast_messages" },
   emailCampaigns: { type: "feature", code: "email_campaigns" },
+  whatsappBusinessApi: { type: "feature", code: "whatsapp_business_api" },
 
   // Portals
   memberPortal: { type: "feature", code: "member_portal" },
   trainerPortal: { type: "feature", code: "trainer_portal" },
   brandedMobileApp: { type: "feature", code: "branded_mobile_app" },
   dietWorkoutPlans: { type: "feature", code: "diet_workout_plans" },
+  whiteLabelMobileApp: { type: "feature", code: "white_label_mobile_app" },
+  googleCalendarSync: { type: "feature", code: "google_calendar_sync" },
 
   // AI
   aiEnabled: { type: "feature", code: "ai_recommendations" },
@@ -138,6 +165,8 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   advancedRbac: { type: "feature", code: "advanced_rbac" },
   prioritySupport: { type: "feature", code: "priority_support" },
   staffManagement: { type: "feature", code: "staff_management" },
+  tallyZohoBooksIntegration: { type: "feature", code: "tally_zoho_books_integration" },
+  restApiAccess: { type: "feature", code: "rest_api_access" },
 };
 
 export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFeatureFlags> {

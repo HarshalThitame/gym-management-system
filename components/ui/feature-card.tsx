@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Lock, Minus } from "lucide-react";
+import { Check, Lock, Minus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
@@ -11,9 +11,10 @@ type FeatureCardProps = {
   upgradeLabel?: string;
   limitLabel?: string;
   compact?: boolean;
+  isNewInGrowth?: boolean;
 };
 
-export function FeatureCard({ label, description, included, upgradeLabel, limitLabel, compact = false }: FeatureCardProps) {
+export function FeatureCard({ label, description, included, upgradeLabel, limitLabel, compact = false, isNewInGrowth }: FeatureCardProps) {
   if (compact) {
     return (
       <div className={cn(
@@ -26,6 +27,11 @@ export function FeatureCard({ label, description, included, upgradeLabel, limitL
           <Lock className="size-3 shrink-0 text-muted-foreground" />
         )}
         <span className="truncate">{label}</span>
+        {isNewInGrowth && included && (
+          <span className="ml-auto shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
+            <Sparkles className="size-2.5 inline mr-0.5" />New
+          </span>
+        )}
         {!included && upgradeLabel && (
           <span className="ml-auto shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
             {upgradeLabel}
@@ -38,11 +44,12 @@ export function FeatureCard({ label, description, included, upgradeLabel, limitL
   return (
     <div className={cn(
       "rounded-lg border p-3.5 transition-all",
-      included ? "border-border bg-background" : "border-dashed border-border bg-surface-muted/30"
+      included ? "border-border bg-background" : "border-dashed border-border bg-surface-muted/30",
+      isNewInGrowth && included && "border-blue-200/50 bg-blue-50/10"
     )}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className={cn("text-sm font-semibold", included ? "text-foreground" : "text-muted-foreground")}>
               {label}
             </p>
@@ -57,6 +64,11 @@ export function FeatureCard({ label, description, included, upgradeLabel, limitL
             ) : (
               <span className="flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
                 <Minus className="size-3" /> Locked
+              </span>
+            )}
+            {isNewInGrowth && included && (
+              <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                <Sparkles className="size-3" /> New in Growth
               </span>
             )}
           </div>
@@ -109,7 +121,7 @@ export function LimitBar({ label, current, limit, limitLabel }: LimitBarProps) {
       <div className="rounded-lg border border-border bg-background p-3">
         <div className="flex items-center justify-between text-sm">
           <span className="font-semibold">{label}</span>
-          <span className="text-xs text-muted-foreground">Unlimited</span>
+          <span className="text-xs inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700">Unlimited</span>
         </div>
         {limitLabel && <p className="mt-0.5 text-[11px] text-muted-foreground">{limitLabel}</p>}
       </div>
