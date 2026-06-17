@@ -43,3 +43,14 @@ export const markUnderReviewSchema = z.object({
 });
 
 export type MarkUnderReviewInput = z.infer<typeof markUnderReviewSchema>;
+
+// Phase 4: Razorpay subscription order creation
+export const createRazorpayOrderSchema = z.object({
+  organizationId: z.string().uuid(),
+  packageId: z.string().uuid(),
+  billingCycle: z.enum(["monthly", "annual", "quarterly", "half_yearly"]),
+  subscriptionId: z.string().uuid().optional(),
+  invoiceId: z.string().uuid().optional(),
+});
+
+export type CreateRazorpayOrderInput = z.infer<typeof createRazorpayOrderSchema>;
