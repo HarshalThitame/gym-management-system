@@ -558,9 +558,6 @@ function TransferOwnerDrawer({ candidates, criticalSuperAdminEmail, onClose, rec
         <Field error={state.fieldErrors?.reason?.[0]} label="Transfer reason">
           <Textarea className="min-h-24" name="reason" placeholder="Reason for audit trail." />
         </Field>
-        <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation">
-          <Input name="confirmation" placeholder="Type TRANSFER" />
-        </Field>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
           <SubmitButton>Request Transfer</SubmitButton>
@@ -625,9 +622,6 @@ function BulkActionDrawer({ criticalSuperAdminEmail, data, onClose, selectedIds 
         <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason">
           <Textarea className="min-h-24" name="reason" placeholder="Reason for bulk operation." />
         </Field>
-        <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation">
-          <Input name="confirmation" placeholder="Type BULK" />
-        </Field>
         <InlineMfaStepUp />
         <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">Bulk suspension and bulk package assignment create MFA-protected approval requests per organization. Bulk delete is intentionally unavailable.</div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -666,9 +660,6 @@ function LifecycleConfirmDrawer({ action, criticalSuperAdminEmail, onClose, reco
         </div>
         <Field error={state.fieldErrors?.reason?.[0]} label="Reason">
           <Textarea className="min-h-24" name="reason" placeholder="Reason for audit trail." />
-        </Field>
-        <Field error={state.fieldErrors?.confirmation?.[0]} label="Confirmation">
-          <Input name="confirmation" placeholder={`Type ${confirmation}`} />
         </Field>
         <InlineMfaStepUp />
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-800">
