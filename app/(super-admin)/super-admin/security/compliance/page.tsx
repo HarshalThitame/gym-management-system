@@ -1,19 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ChevronLeft, Shield, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
+import { ChevronLeft, Shield, FileText, Info } from "lucide-react";
 import { requireRole } from "@/lib/auth/guards";
 import { getComplianceStatus, listComplianceReports } from "@/features/security/services/security-compliance-service";
 
 async function ComplianceContent() {
   await requireRole(["super_admin"], "/super-admin");
   const [status, reports] = await Promise.all([getComplianceStatus(), listComplianceReports()]);
-
-  const frameworks = [
-    { name: "GDPR", compliant: true, icon: Shield, desc: `${status.gdprRequests} requests this year` },
-    { name: "SOC 2", compliant: status.soc2Reports > 0, icon: Shield, desc: `${status.soc2Reports} reports generated` },
-    { name: "ISO 27001", compliant: false, icon: Shield, desc: "Framework alignment in progress" },
-    { name: "HIPAA", compliant: false, icon: Shield, desc: "Architecture ready — certification pending" },
-  ];
 
   return (
     <div className="space-y-6">
@@ -24,18 +17,34 @@ async function ComplianceContent() {
         <div>
           <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Governance</p>
           <h2 className="mt-2 text-2xl font-black md:text-3xl">Compliance & Governance</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground max-w-2xl">Monitor compliance status, generate reports, and manage governance requirements for GDPR, SOC 2, ISO 27001, and HIPAA.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground max-w-2xl">Compliance status monitoring, report generation, and reference frameworks. Automated compliance checks are not yet configured for all frameworks.</p>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="flex items-start gap-3">
+          <Info className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <p className="font-bold">Compliance Framework Monitoring Not Fully Configured</p>
+            <p className="mt-1 text-amber-700">The frameworks listed below are reference labels only. Automated compliance checks (RLS coverage, RBAC role coverage, audit log coverage, storage policies) are partially implemented. Compliance scores will appear once end-to-end automated checks are configured.</p>
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {frameworks.map((fw) => (
-          <div key={fw.name} className={`rounded-xl border p-5 shadow-sm ${fw.compliant ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
+        {[
+          { name: "GDPR", desc: `${status.gdprRequests} requests this year`, icon: Shield },
+          { name: "SOC 2", desc: `${status.soc2Reports} reports generated`, icon: Shield },
+          { name: "ISO 27001", desc: "Reference framework", icon: Shield },
+          { name: "HIPAA", desc: "Reference framework", icon: Shield },
+        ].map((fw) => (
+          <div key={fw.name} className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center gap-2">
-              {fw.compliant ? <CheckCircle2 className="size-5 text-green-600" /> : <AlertTriangle className="size-5 text-amber-600" />}
+              <fw.icon className="size-5 text-muted-foreground" />
               <p className="text-lg font-black">{fw.name}</p>
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{fw.desc}</p>
+            <Badge className="mt-2">Reference framework</Badge>
           </div>
         ))}
       </div>
@@ -94,7 +103,8 @@ async function ComplianceContent() {
             </div>
           </div>
           <div className="mt-6 pt-4 border-t border-border">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">Supported Standards</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">Reference Frameworks</p>
+            <p className="mt-1 text-xs text-muted-foreground">The following standards are shown as reference labels only. Automated compliance checks are not yet configured for these frameworks.</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {["GDPR", "SOC 2", "ISO 27001", "HIPAA", "PCI DSS"].map((s) => (
                 <span key={s} className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">{s}</span>
@@ -106,6 +116,8 @@ async function ComplianceContent() {
     </div>
   );
 }
+
+import { Badge } from "@/components/ui/badge";
 
 export default function CompliancePage() {
   return <Suspense fallback={<div className="space-y-6"><div className="h-5 w-32 bg-muted rounded animate-pulse" /><div className="h-8 w-48 bg-muted rounded-lg animate-pulse" /><div className="grid grid-cols-4 gap-4"><div className="h-24 bg-muted rounded-xl animate-pulse" /><div className="h-24 bg-muted rounded-xl animate-pulse" /><div className="h-24 bg-muted rounded-xl animate-pulse" /><div className="h-24 bg-muted rounded-xl animate-pulse" /></div></div>}><ComplianceContent /></Suspense>;

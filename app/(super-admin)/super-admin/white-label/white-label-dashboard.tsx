@@ -627,7 +627,10 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <h3 className="text-sm font-bold">Email Preview</h3>
-                  <DevicePreviewToggle device={previewDevice} onChange={setPreviewDevice} />
+                  <div className="flex items-center gap-2">
+                    <Badge variant="warning">Preview</Badge>
+                    <DevicePreviewToggle device={previewDevice} onChange={setPreviewDevice} />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="mx-auto overflow-hidden rounded-lg border border-border shadow-sm transition-all" style={{ maxWidth: getDeviceWidth(previewDevice) }}>
@@ -637,6 +640,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                     const brandName = editingConfig.brand_name as string ?? "Brand";
                     return (
                       <div className="rounded-lg border border-border overflow-hidden bg-white max-w-sm mx-auto">
+                        <div className="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-center text-[10px] font-semibold text-amber-700 uppercase tracking-wider">Sample Preview</div>
                         <div className="p-3 text-center" style={{ backgroundColor: primary }}>
                           {editingConfig.logo_url ? (
                             <img src={editingConfig.logo_url as string} alt="" className="h-8 mx-auto" />
@@ -646,7 +650,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                         </div>
                         <div className="p-4 space-y-3 text-left">
                           <h4 className="text-sm font-bold text-gray-900">Welcome to {brandName}!</h4>
-                          <p className="text-xs text-gray-600">Hi there, we&apos;re excited to have you on board. Get started by exploring your new branded dashboard.</p>
+                          <p className="text-xs text-gray-600">This is a sample preview of how branded emails will appear. Actual email content will be generated from real system events.</p>
                           <div className="text-center">
                             <span className="inline-block px-4 py-2 rounded text-xs font-bold text-white" style={{ backgroundColor: primary }}>Get Started</span>
                           </div>
@@ -733,7 +737,10 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <h3 className="text-sm font-bold">Login Page Preview</h3>
-                  <DevicePreviewToggle device={previewDevice} onChange={setPreviewDevice} />
+                  <div className="flex items-center gap-2">
+                    <Badge variant="warning">Preview</Badge>
+                    <DevicePreviewToggle device={previewDevice} onChange={setPreviewDevice} />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="mx-auto overflow-hidden rounded-lg border border-border shadow-sm transition-all" style={{ maxWidth: getDeviceWidth(previewDevice) }}>
@@ -743,6 +750,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                     const brandName = editingConfig.brand_name as string ?? "Brand";
                     return (
                       <div className="rounded-lg border border-border overflow-hidden bg-white max-w-sm mx-auto">
+                        <div className="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-center text-[10px] font-semibold text-amber-700 uppercase tracking-wider">Sample Preview</div>
                         <div className="p-6 text-center" style={{ backgroundColor: primary }}>
                           <div className="h-12 w-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
                             {editingConfig.logo_url ? (
@@ -752,12 +760,12 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                             )}
                           </div>
                           <h3 className="mt-3 text-lg font-bold text-white">{brandName}</h3>
-                          <p className="text-xs text-white/70">Sign in to your account</p>
+                          <p className="text-xs text-white/70">Sample login screen preview</p>
                         </div>
                         <div className="p-4 space-y-3">
                           <div>
                             <label className="text-xs font-semibold text-gray-700">Email</label>
-                            <div className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-gray-50 px-3 text-sm text-gray-400 flex items-center">john@example.com</div>
+                            <div className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-gray-50 px-3 text-sm text-gray-400 flex items-center">member@example.com</div>
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-gray-700">Password</label>
@@ -773,6 +781,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                             Forgot password? <span style={{ color: primary }}>Reset</span>
                           </p>
                         </div>
+                        <div className="border-t border-gray-200 bg-gray-50 px-3 py-2 text-center text-[10px] text-gray-400">This is a sample preview. Actual login page will use the organization&apos;s branded theme.</div>
                       </div>
                     );
                   })()}

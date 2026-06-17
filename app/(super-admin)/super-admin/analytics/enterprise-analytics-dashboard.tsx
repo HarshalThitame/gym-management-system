@@ -57,14 +57,7 @@ export function EnterpriseAnalyticsDashboardClient({ context: _ctx, dashboard }:
     }
   }, []);
 
-  const suggestions = [
-    "Show revenue trends for last 30 days",
-    "Compare churn rates between branches",
-    "Which trainers generated the highest retention?",
-    "Show membership growth by month",
-    "What is our current MRR and ARR?",
-    "Predict churn risk for next month"
-  ];
+  const suggestions: string[] = [];
 
   const exportFormats = [
     { label: "CSV", icon: <FileSpreadsheet className="size-4" />, href: "/api/analytics/export?format=csv&dataset=executive" },

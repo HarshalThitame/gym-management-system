@@ -85,17 +85,12 @@ export function SecurityAnalyticsCharts({
 
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">User Risk Distribution</p>
-          <div className="h-64"><ResponsiveContainer width="100%" height="100%">
-            <BarChart data={[{ name: "High Risk", value: 3 }, { name: "Medium Risk", value: 7 }, { name: "Low Risk", value: 45 }]} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={100} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={24}>
-                {[{ fill: "#dc2626" }, { fill: "#d97706" }, { fill: "#16a34a" }].map((entry, i) => <Cell key={i} {...entry} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer></div>
+          <div className="flex h-64 items-center justify-center">
+            <div className="text-center">
+              <p className="text-sm font-semibold text-muted-foreground">No user risk data available</p>
+              <p className="text-xs text-muted-foreground mt-1">Risk distribution data appears once security events are tracked.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

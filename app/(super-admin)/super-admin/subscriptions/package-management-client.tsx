@@ -10,7 +10,12 @@ import { savePackageAction, deletePackageAction } from "@/features/super-admin/a
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { showToast } from "@/components/ui/toast";
 
-const ALL_FEATURES = [
+// Feature catalog loaded from the database feature_registry table.
+// This is populated by the monitoring service at build/startup time.
+// The ALL_FEATURES array below is a fallback for display/label lookup only
+// when the database feature_registry table is not yet populated.
+// Feature enablement is always determined by organization_entitlements in the DB.
+const FALLBACK_FEATURES: Array<[string, string, string]> = [
   ["qrAttendance", "QR Attendance", "qr_attendance_enabled"],
   ["biometricAttendance", "Biometric", "biometric_attendance_enabled"],
   ["rfidAttendance", "RFID", "rfid_attendance_enabled"],
@@ -25,6 +30,19 @@ const ALL_FEATURES = [
   ["notificationsEnabled", "Notifications", "notifications_enabled"],
   ["whiteLabelEnabled", "White Label", "white_label_enabled"],
 ];
+
+// Try to use DB-backed features if available, fall back to static labels otherwise
+function getFeatureList(pkg: any): Array<[string, string, string]> {
+  if (pkg?.features && Array.isArray(pkg.features) && pkg.features.length > 0) {
+    return pkg.features.map((f: any) => {
+      const key = typeof f === "string" ? f : f.feature_key ?? f.key ?? "";
+      const label = typeof f === "object" ? (f.feature_name ?? f.name ?? key) : key;
+      const dbCol = typeof f === "object" ? (f.db_column ?? "") : "";
+      return [key, label, dbCol] as [string, string, string];
+    });
+  }
+  return FALLBACK_FEATURES;
+}
 
 type PackageModal = {
   pkg: any | null;
@@ -227,7 +245,7 @@ function PackageCard({ pkg, onEdit, onDelete }: { pkg: any; onEdit: () => void; 
         <div className="rounded-md border border-border bg-background p-2"><p className="text-[10px] text-muted-foreground">Max Branches</p><p className="font-black">{String(pkg.max_branches ?? "-")}</p></div>
       </div>
       <div className="mt-3 flex flex-wrap gap-1">
-        {ALL_FEATURES.filter((f) => pkg[f[2] as string]).map((f) => (
+        {getFeatureList(pkg).filter((f) => pkg[f[2] as string]).map((f) => (
           <Badge key={f[0]} variant="info" className="text-[10px]">{f[1]}</Badge>
         ))}
       </div>
@@ -307,12 +325,17 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
           <div>
             <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground mb-2">Features</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {ALL_FEATURES.map((f) => (
-                <label key={f[0]} className="flex items-center gap-2.5 rounded-lg border border-border bg-background p-3 text-sm cursor-pointer hover:bg-accent/10 transition-colors has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
-                  <input type="checkbox" name={f[0]} defaultChecked={pkg ? pkg[f[2] as string] : false} disabled={savePending} className="size-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50" />
-                  {f[1]}
-                </label>
-              ))}
+              {(pkg?.features?.length > 0 ? pkg.features : FALLBACK_FEATURES).map((f: any) => {
+                const key = Array.isArray(f) ? f[0] : (f.feature_key ?? f.key ?? f);
+                const label = Array.isArray(f) ? f[1] : (f.feature_name ?? f.name ?? key);
+                const dbCol = Array.isArray(f) ? (f[2] ?? "") : (f.db_column ?? "");
+                return (
+                  <label key={key} className="flex items-center gap-2.5 rounded-lg border border-border bg-background p-3 text-sm cursor-pointer hover:bg-accent/10 transition-colors has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
+                    <input type="checkbox" name={key} defaultChecked={pkg ? (pkg[dbCol as string] ?? false) : false} disabled={savePending} className="size-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50" />
+                    {label}
+                  </label>
+                );
+              })}
             </div>
           </div>
 

@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  Accessibility, Activity, BookOpen, CheckCircle2, Eye, Gauge, Globe, Grid3x3,
-  Keyboard, Layout, Palette, Search, Settings, ShieldCheck, Sliders, Type, Zap
-} from "lucide-react";
+import { Accessibility, Activity, BookOpen, CheckCircle2, Eye, Gauge, Globe, Grid3x3, Keyboard, Layout, Palette, Search, Settings, ShieldCheck, Sliders, Type, Zap, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
@@ -45,7 +42,7 @@ const sections = [
   {
     id: "shortcuts", icon: <Keyboard className="size-5" />, title: "Keyboard Productivity",
     description: "Global keyboard shortcuts and productivity features",
-    items: ["Ctrl+K: Open command palette (global search)", "Ctrl+/: Show shortcut guide", "Ctrl+S: Save current form", "Escape: Close dialog / cancel", "Ctrl+1-3: Navigate to Dashboard/Members/Analytics", "Mac support: Cmd key detection, Mac-specific display (⌘)", "CommandPalette: searchable, categorized, keyboard-navigable", "Portal sidebar: Escape key to close", "PWA shortcuts: Check In, Book a Class, Log Workout"]
+    items: ["Ctrl+K: Open command palette (global search)", "Ctrl+/: Show shortcut guide", "Ctrl+S: Save current form", "Escape: Close dialog / cancel", "Ctrl+1-3: Navigate to Dashboard/Members/Analytics", "Mac support: Cmd key detection, Mac-specific display (\u2318)", "CommandPalette: searchable, categorized, keyboard-navigable", "Portal sidebar: Escape key to close", "PWA shortcuts: Check In, Book a Class, Log Workout"]
   },
   {
     id: "responsive", icon: <Globe className="size-5" />, title: "Responsive Architecture",
@@ -74,28 +71,32 @@ export function UxGovernanceDashboard({ context: _ctx }: Props) {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-3">
-                <Badge className="border-indigo-200 bg-indigo-50 text-indigo-800"><Palette className="mr-1 size-3" />UX Governance Center</Badge>
-                <Badge className="border-green-200 bg-green-50 text-green-700">WCAG 2.2 AA</Badge>
+                <Badge className="border-indigo-200 bg-indigo-50 text-indigo-800"><Palette className="mr-1 size-3" />UX Governance Reference</Badge>
+                <Badge variant="info">Architecture Documentation</Badge>
               </div>
               <h1 className="mt-4 text-3xl font-black leading-tight md:text-5xl">
                 UX Quality, Design System &<br />
-                <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Experience Governance</span>
+                <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Experience Reference</span>
               </h1>
               <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
-                Complete design system with {sections.reduce((s, sec) => s + sec.items.length, 0)} components, patterns, and standards governing every screen across 6 portals, 10,000+ tenants, and millions of users.
+                This page documents the design system architecture, component library, and UX standards used across the platform.
+                Automated UX governance monitoring is not yet configured.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <ButtonLink href="/components/ui/button" variant="primary" className="gap-2"><Eye className="size-4" /> Component Preview</ButtonLink>
               <ButtonLink href="/super-admin/white-label" variant="secondary" className="gap-2"><Palette className="size-4" /> Theme Editor</ButtonLink>
             </div>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <ScoreCard label="Components" value="16" detail="Shared UI components" status="good" />
-            <ScoreCard label="WCAG Score" value="AA" detail="WCAG 2.2 AA compliance" status="good" />
-            <ScoreCard label="Design Tokens" value="28" detail="CSS custom properties" status="good" />
-            <ScoreCard label="Pages Governed" value="80+" detail="Across 6 portals" status="good" />
-            <ScoreCard label="UX Score" value="94%" detail="Quality governance score" status="good" />
+          <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 size-5 shrink-0" />
+              <div>
+                <p className="font-bold">Automated UX Governance Not Configured</p>
+                <p className="mt-1 text-amber-700">Automated UX quality scoring, accessibility auditing, and design system compliance monitoring are not yet active.
+                The information below is a static reference of the current architecture. To enable live UX governance, configure:
+                automated Lighthouse CI audits, accessibility regression testing, design system violation tracking, and user feedback collection.</p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -127,9 +128,4 @@ export function UxGovernanceDashboard({ context: _ctx }: Props) {
       </div>
     </div>
   );
-}
-
-function ScoreCard({ label, value, detail, status }: { label: string; value: string; detail: string; status: "good" | "watch" | "risk" }) {
-  const c = { good: "text-green-600 border-green-200 bg-green-50", watch: "text-amber-600 border-amber-200 bg-amber-50", risk: "text-red-600 border-red-200 bg-red-50" };
-  return <div className={`rounded-xl border ${c[status]} p-4 dark:bg-background`}><p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p><p className={`mt-2 text-3xl font-black ${c[status].split(" ")[0]}`}>{value}</p><p className="mt-1 text-xs">{detail}</p></div>;
 }
