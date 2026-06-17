@@ -96,7 +96,9 @@ async function getOrganizationIdForAccount(email: string) {
 async function ensureSubscriptionStatus(organizationId: string, status: "active" | "suspended") {
   const subscription = await getSubscriptionForOrganization(organizationId);
   if (subscription) {
-    await servicePatch("organization_subscriptions", [eq("id", subscription.id)], { status });
+    if (subscription.status !== status) {
+      await servicePatch("organization_subscriptions", [eq("id", subscription.id)], { status });
+    }
     return;
   }
 
@@ -118,10 +120,13 @@ async function ensurePackageWithFeatureState(organizationId: string, input: { cl
   const subscription = await getSubscriptionForOrganization(organizationId);
 
   if (subscription) {
-    await servicePatch("organization_subscriptions", [eq("id", subscription.id)], {
-      package_id: packageId,
-      status: "active"
-    });
+    const needsUpdate = subscription.package_id !== packageId || subscription.status !== "active";
+    if (needsUpdate) {
+      await servicePatch("organization_subscriptions", [eq("id", subscription.id)], {
+        package_id: packageId,
+        status: "active"
+      });
+    }
     return;
   }
 
@@ -133,7 +138,7 @@ async function ensurePackageWithFeatureState(organizationId: string, input: { cl
 }
 
 async function getSubscriptionForOrganization(organizationId: string) {
-  const subscriptions = await serviceSelect<Array<{ id: string }>>("organization_subscriptions", "id", [eq("organization_id", organizationId), limit(1)]);
+  const subscriptions = await serviceSelect<Array<{ id: string; status: string; package_id: string }>>("organization_subscriptions", "id,status,package_id", [eq("organization_id", organizationId), limit(1)]);
   return subscriptions[0] ?? null;
 }
 
