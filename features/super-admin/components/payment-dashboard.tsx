@@ -26,7 +26,7 @@ function computeMrr(price: number, period: string): number {
 }
 
 export function PaymentDashboard({ organizations, packages, subscriptions, invoicesByOrg, eventsByOrg }: PaymentDashboardProps) {
-  const [tab, setTab] = useState<"overview" | "invoices" | "webhooks" | "dunning" | "risks">("overview");
+  const [tab, setTab] = useState<"overview" | "invoices" | "webhooks" | "dunning" | "reconciliation" | "risks">("overview");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState("");
@@ -113,7 +113,7 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
 
       {/* Tab Bar */}
       <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1" role="tablist">
-        {([{ key: "overview" as const, label: "Revenue & Metrics" }, { key: "invoices" as const, label: `Invoices (${allInvoices.length})` }, { key: "dunning" as const, label: `Dunning (${dunningCases.length})` }, { key: "webhooks" as const, label: `Webhooks (${webhookEvents.length})` }, { key: "risks" as const, label: `Risks (${risks.length})` }]).map((t) => (
+        {([{ key: "overview" as const, label: "Revenue & Metrics" }, { key: "invoices" as const, label: `Invoices (${allInvoices.length})` }, { key: "dunning" as const, label: `Dunning (${dunningCases.length})` }, { key: "reconciliation" as const, label: "Reconciliation" }, { key: "webhooks" as const, label: `Webhooks (${webhookEvents.length})` }, { key: "risks" as const, label: `Risks (${risks.length})` }]).map((t) => (
           <button key={t.key} className={cn("whitespace-nowrap rounded-md px-4 py-2 text-sm font-bold transition", tab === t.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} onClick={() => setTab(t.key)} role="tab" type="button">{t.label}</button>
         ))}
       </div>
@@ -233,6 +233,47 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
                     <td className="px-4 py-3 text-[10px] text-muted-foreground max-w-[120px] truncate">{inv.dunning_last_failure_reason ?? "—"}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ RECONCILIATION ═══ */}
+      {tab === "reconciliation" && (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4"><p className="text-xs font-black uppercase text-green-700">Matched</p><p className="text-2xl font-black mt-1 text-green-700">{paidInvoices.length}</p></div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-black uppercase text-amber-700">Pending Review</p><p className="text-2xl font-black mt-1 text-amber-700">{pendingInvoices.length}</p></div>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4"><p className="text-xs font-black uppercase text-red-700">Mismatch / Failed</p><p className="text-2xl font-black mt-1 text-red-700">{failedInvoices.length + overdueInvoices.length}</p></div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-background overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Org</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Payment</th><th className="px-4 py-3">Order ID</th><th className="px-4 py-3">Recon</th>
+              </tr></thead>
+              <tbody>
+                {allInvoices.slice(0, 50).length === 0 ? <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No invoices</td></tr> :
+                allInvoices.slice(0, 50).map((inv: any) => {
+                  const isMatched = inv.paid_at && inv.razorpay_payment_id;
+                  const isUnmatched = inv.razorpay_order_id && !inv.paid_at;
+                  return (
+                    <tr key={inv.id} className="border-b border-border hover:bg-accent/5">
+                      <td className="px-4 py-3 text-xs">{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
+                      <td className="px-4 py-3 text-xs">{getOrgName(inv.organization_id)}</td>
+                      <td className="px-4 py-3 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))}</td>
+                      <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
+                      <td className="px-4 py-3"><StatusBadge status={inv.paid_at ? "paid" : inv.status} /></td>
+                      <td className="px-4 py-3 text-[10px] font-mono">{inv.razorpay_order_id?.slice(0, 16) ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        {isMatched ? <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 border border-green-200">Matched</span> :
+                         isUnmatched ? <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 border border-red-200">Unmatched</span> :
+                         <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-bold text-gray-500 border border-gray-200">Pending</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
