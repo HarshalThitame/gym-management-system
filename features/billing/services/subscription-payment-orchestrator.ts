@@ -116,16 +116,20 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const { data: pkg } = await supabase
       .from("packages")
-      .select("id, name, is_active")
+      .select("id, name, is_active, trial_days")
       .eq("id", targetPackageId)
       .maybeSingle();
 
     if (!pkg) {
       return { success: false, error: "Package not found." };
     }
-    if (!pkg.is_active) {
+    if (!(pkg as unknown as Record<string, unknown> | null)?.is_active) {
       return { success: false, error: "Package is not active." };
     }
+
+    const pkgRow = pkg as unknown as Record<string, unknown>;
+    const trialDays = typeof pkgRow.trial_days === "number" && pkgRow.trial_days as number > 0 ? pkgRow.trial_days as number : 14;
+    const trialEndsAt = new Date(Date.now() + trialDays * 86400000).toISOString();
 
     const readDb = supabase as unknown as CheckoutDb;
     const { data: pricingRows } = await readDb
@@ -210,7 +214,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
           currency: typeof existingInv.currency === "string" ? existingInv.currency : currency,
           idempotencyKey,
           actorId: user.id,
-          packageName: pkg.name,
+          packageName: pkgRow.name as string,
           billingCycle,
         });
         if (!attach.success) {
@@ -223,7 +227,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
           amountPaise: existingAmountPaise,
           currency: typeof existingInv.currency === "string" ? existingInv.currency : currency,
           invoiceId: invoiceId!,
-          packageDisplayName: pkg.name,
+          packageDisplayName: pkgRow.name as string,
           organizationDisplayName: organization.name ?? "",
           billingCycle,
           isTestMode: providerEnvironment === "test",
@@ -247,6 +251,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
           .update({
             package_id: targetPackageId,
             status: "trial",
+            trial_ends_at: trialEndsAt,
             started_at: new Date().toISOString(),
             billing_period: billingCycle,
             provider: "razorpay",
@@ -271,6 +276,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
             organization_id: organizationId,
             package_id: targetPackageId,
             status: "trial",
+            trial_ends_at: trialEndsAt,
             started_at: new Date().toISOString(),
             billing_period: billingCycle,
             provider: "razorpay",
@@ -354,7 +360,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       currency,
       idempotencyKey,
       actorId: user.id,
-      packageName: pkg.name,
+      packageName: pkgRow.name as string,
       billingCycle,
     });
     if (!attach.success) {
@@ -374,7 +380,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       amountPaise: totalAmountPaise,
       currency,
       invoiceId: invoiceId!,
-      packageDisplayName: pkg.name,
+      packageDisplayName: pkgRow.name as string,
       organizationDisplayName: (org as { name: string } | null)?.name ?? organization.name ?? "",
       billingCycle,
       isTestMode: providerEnvironment === "test",
