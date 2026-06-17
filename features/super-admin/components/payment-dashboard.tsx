@@ -168,15 +168,16 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
           <div className="rounded-xl border border-border bg-background overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Organization</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Razorpay ID</th><th className="px-4 py-3">Due</th><th className="px-4 py-3"></th>
+                <th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Organization</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Env</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Razorpay ID</th><th className="px-4 py-3">Due</th><th className="px-4 py-3"></th>
               </tr></thead>
               <tbody>
-                {pagedInvoices.length === 0 ? <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No invoices match your filters</td></tr> :
+                {pagedInvoices.length === 0 ? <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No invoices match your filters</td></tr> :
                 pagedInvoices.map((inv: any) => (
                   <tr key={inv.id} className="border-b border-border hover:bg-accent/5">
                     <td className="px-4 py-3 font-semibold text-xs">{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
                     <td className="px-4 py-3 text-xs">{getOrgName(inv.organization_id)}</td>
                     <td className="px-4 py-3 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))}</td>
+                    <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold border", (inv.provider_environment ?? "test") === "live" ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700")}>{inv.provider_environment ?? "test"}</span></td>
                     <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">

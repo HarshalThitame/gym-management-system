@@ -2,7 +2,8 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getRazorpayPublicKeyId, getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
+import { getRazorpayPublicKeyId, getRazorpayEnvironment, isRazorpayLiveMode } from "@/features/billing/razorpay/razorpay-config";
+import { validateRazorpayEnvironmentConfig } from "@/features/billing/razorpay/razorpay-health";
 import { createRazorpayOrder } from "@/features/billing/razorpay/razorpay-service";
 import { calculateTax } from "@/features/billing/services/tax-service";
 import { createRazorpayOrderSchema, type CreateRazorpayOrderInput } from "./schemas";
@@ -38,6 +39,17 @@ export async function createSubscriptionRazorpayOrderAction(
     // 1. Auth: user must be org owner (from profile org) OR super admin
     const supabase = await createSupabaseServerClient();
     const adminDb = getSupabaseAdminClient() as any;
+
+    // Production safety gate for live mode
+    if (isRazorpayLiveMode()) {
+      const validation = validateRazorpayEnvironmentConfig();
+      if (!validation.valid) {
+        return { success: false, error: `Live mode configuration is incomplete. ${validation.errors.join(" ")}` };
+      }
+      if (!validation.publicKeyMatchesEnvironment) {
+        return { success: false, error: "Live mode public key mismatch. Contact support." };
+      }
+    }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: "Authentication required." };
 
