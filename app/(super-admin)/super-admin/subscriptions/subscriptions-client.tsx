@@ -292,18 +292,17 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, onAction, onSync, action
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="secondary" onClick={() => { setConfirmAction(null); setConfirmReason(""); }} disabled={confirmLoading}>Cancel</Button>
               <Button type="button" variant="primary" onClick={() => execWithConfirm(
-                confirmAction === "upgrade" ? upgradePlanAction :
-                confirmAction === "downgrade" ? downgradePlanAction :
                 confirmAction === "cancel" ? cancelSubscriptionAction :
                 confirmAction === "reactivate" ? reactivateSubscriptionAction :
                 confirmAction === "extend_trial" ? extendTrialAction :
-                convertTrialAction,
-                confirmAction === "cancel" ? { subscriptionId: sub?.id, organizationId: org.id } :
-                confirmAction === "reactivate" ? { subscriptionId: sub?.id, organizationId: org.id } :
-                confirmAction === "extend_trial" ? { subscriptionId: sub?.id, organizationId: org.id, additionalDays: 14 } :
-                confirmAction === "convert_trial" ? { subscriptionId: sub?.id, organizationId: org.id, billingPeriod: "monthly" } :
-                { subscriptionId: sub?.id, organizationId: org.id, targetPackageId: pkg?.id },
-                confirmAction, `${confirmAction} successful`
+                confirmAction === "convert_trial" ? convertTrialAction :
+                cancelSubscriptionAction,
+                confirmAction === "cancel" ? { subscriptionId: sub?.id, organizationId: org.id, cancelType: "end_of_period", reason: confirmReason, dataRetentionDays: 90, stepUpEmail: prompt("Enter your Super Admin email for step-up verification:") || "" } :
+                confirmAction === "reactivate" ? { subscriptionId: sub?.id, organizationId: org.id, stepUpEmail: prompt("Enter your Super Admin email for step-up verification:") || "", reason: confirmReason } :
+                confirmAction === "extend_trial" ? { subscriptionId: sub?.id, organizationId: org.id, newTrialEndDate: new Date(Date.now() + 14 * 86400000).toISOString(), reason: confirmReason } :
+                confirmAction === "convert_trial" ? { subscriptionId: sub?.id, packageId: pkg?.id } :
+                { subscriptionId: sub?.id, organizationId: org.id, cancelType: "end_of_period", reason: confirmReason, dataRetentionDays: 90, stepUpEmail: "" },
+                confirmAction, `${confirmAction} action submitted`
               )} disabled={!confirmReason.trim() || confirmLoading} className="gap-2">
                 {confirmLoading ? <Loader2 className="size-4 animate-spin" /> : null}
                 {confirmLoading ? "Processing..." : `Confirm ${confirmAction}`}
