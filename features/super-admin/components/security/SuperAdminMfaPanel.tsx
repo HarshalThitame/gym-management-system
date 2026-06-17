@@ -7,6 +7,7 @@ import { CheckCircle2, KeyRound, Loader2, LockKeyhole, ShieldAlert, Smartphone, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { HydrationSafeDate } from "@/components/ui/hydration-safe-date";
 import { Input } from "@/components/ui/input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -384,7 +385,7 @@ export function SuperAdminMfaPanel({ currentEmail, requiredEmail }: SuperAdminMf
                 <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3" key={factor.id}>
                   <div>
                     <p className="text-sm font-bold">{factor.friendly_name || "Authenticator app"}</p>
-                    <p className="mt-1 text-xs font-semibold text-muted-foreground">Created {factor.created_at ? new Date(factor.created_at).toLocaleDateString() : "recently"}</p>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">Created {factor.created_at ? <HydrationSafeDate date={factor.created_at} format="date" /> : "recently"}</p>
                   </div>
                   <Button aria-label="Remove MFA factor" disabled={loading} onClick={() => void unenrollFactor(factor.id)} size="sm" type="button" variant="secondary">
                     <Trash2 aria-hidden="true" className="size-4" />

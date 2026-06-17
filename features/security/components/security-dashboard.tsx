@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Shield, AlertTriangle, Users, LogIn, Fingerprint, Monitor, Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { HydrationSafeDate } from "@/components/ui/hydration-safe-date";
 import type { EnterpriseSecurityDashboard } from "@/types/enterprise";
 
 function KpiCard({ icon, label, value, status, trend, detail }: {
@@ -114,7 +115,7 @@ export function SecurityDashboard({
                   <p className="mt-1 text-sm font-medium truncate">{event.description as string}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {event.actor_id ? `User ${String(event.actor_id).slice(0, 8)}` : "System"}
-                    {" · "}{event.created_at ? new Date(event.created_at as string).toLocaleString() : ""}
+                    {" · "}{event.created_at ? <HydrationSafeDate date={event.created_at as string} format="datetime" /> : ""}
                   </p>
                 </div>
                 {event.source_ip ? <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{String(event.source_ip)}</span> : null}
