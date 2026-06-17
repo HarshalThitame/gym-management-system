@@ -18,13 +18,11 @@ export type OrgPlanContext = {
   maxStaff: number;
   maxStorageGb: number;
   maxApiCalls: number;
+  membershipPlanTypes: number;
+  weeklyClasses: number;
+  smsMonthly: number;
 };
 
-
-/**
- * Resolves organization package metadata and feature flags.
- * Uses the new package_features/package_limits entitlement system.
- */
 export async function getOrgPlanContext(organizationId: string): Promise<OrgPlanContext> {
   const features = await getOrgFeatureFlags(organizationId);
 
@@ -82,6 +80,9 @@ function defaultPlanContext(features: OrgFeatureFlags): OrgPlanContext {
     maxStaff: features.maxStaff,
     maxStorageGb: features.maxStorageGb,
     maxApiCalls: features.maxApiCalls,
+    membershipPlanTypes: features.membershipPlanTypes,
+    weeklyClasses: features.weeklyClasses,
+    smsMonthly: features.smsMonthly,
   };
 }
 
@@ -108,6 +109,9 @@ function mapPlanContext(sub: Record<string, unknown>, features: OrgFeatureFlags)
     maxStaff: features.maxStaff,
     maxStorageGb: features.maxStorageGb,
     maxApiCalls: features.maxApiCalls,
+    membershipPlanTypes: features.membershipPlanTypes,
+    weeklyClasses: features.weeklyClasses,
+    smsMonthly: features.smsMonthly,
   };
 }
 

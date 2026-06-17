@@ -1,48 +1,29 @@
 "use client";
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { Pencil, Plus, Trash2, X, AlertTriangle, Loader2, Search, Archive } from "lucide-react";
-import { useActionState, useState, useEffect } from "react";
+import { Pencil, Plus, Trash2, X, AlertTriangle, Loader2, Search, Archive, Check, Eye, Users, CreditCard, Calendar, Briefcase, MessageSquare, BarChart3, Smartphone } from "lucide-react";
+import { useActionState, useState, useEffect, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { savePackageAction, deletePackageAction } from "@/features/super-admin/actions/package-management-actions";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
-import { showToast } from "@/components/ui/toast";
+import { showToast, ToastContainer } from "@/components/ui/toast";
+import { FeatureCard, FeatureCategorySection } from "@/components/ui/feature-card";
+import { FEATURE_CATEGORIES } from "@/features/subscription/feature-definitions";
+import { cn } from "@/lib/utils";
+import { StatCard } from "@/components/ui/stat-card";
 
-// Feature catalog loaded from the database feature_registry table.
-// This is populated by the monitoring service at build/startup time.
-// The ALL_FEATURES array below is a fallback for display/label lookup only
-// when the database feature_registry table is not yet populated.
-// Feature enablement is always determined by organization_entitlements in the DB.
-const FALLBACK_FEATURES: Array<[string, string, string]> = [
-  ["qrAttendance", "QR Attendance", "qr_attendance_enabled"],
-  ["biometricAttendance", "Biometric", "biometric_attendance_enabled"],
-  ["rfidAttendance", "RFID", "rfid_attendance_enabled"],
-  ["classScheduling", "Class Scheduling", "class_scheduling_enabled"],
-  ["trainerAssignment", "Trainer Assignment", "trainer_assignment_enabled"],
-  ["razorpayEnabled", "Payments", "razorpay_enabled"],
-  ["communicationsEnabled", "Communications", "communications_enabled"],
-  ["aiEnabled", "AI Features", "ai_enabled"],
-  ["advancedReports", "Advanced Reports", "advanced_reports_enabled"],
-  ["customDomain", "Custom Domain", "custom_domain_enabled"],
-  ["apiAccess", "API Access", "api_access_enabled"],
-  ["notificationsEnabled", "Notifications", "notifications_enabled"],
-  ["whiteLabelEnabled", "White Label", "white_label_enabled"],
-];
-
-// Try to use DB-backed features if available, fall back to static labels otherwise
-function getFeatureList(pkg: any): Array<[string, string, string]> {
-  if (pkg?.features && Array.isArray(pkg.features) && pkg.features.length > 0) {
-    return pkg.features.map((f: any) => {
-      const key = typeof f === "string" ? f : f.feature_key ?? f.key ?? "";
-      const label = typeof f === "object" ? (f.feature_name ?? f.name ?? key) : key;
-      const dbCol = typeof f === "object" ? (f.db_column ?? "") : "";
-      return [key, label, dbCol] as [string, string, string];
-    });
-  }
-  return FALLBACK_FEATURES;
-}
+const CATEGORY_ICONS: Record<string, any> = {
+  members: Users,
+  billing: CreditCard,
+  classes: Calendar,
+  staff: Briefcase,
+  communication: MessageSquare,
+  reports: BarChart3,
+  portal: Smartphone,
+};
 
 type PackageModal = {
   pkg: any | null;
@@ -54,21 +35,43 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
   const [deletingPkg, setDeletingPkg] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedPkg, setSelectedPkg] = useState<any | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [saveState, formAction, savePending] = useActionState(savePackageAction, initialAuthActionState);
   const [deleteState, deleteAction, deletePending] = useActionState(deletePackageAction, initialAuthActionState);
-  const subs: any[] = data.subscriptions;
-  const pkgs: any[] = data.packages;
-  const orgs: any[] = data.organizations;
 
-  const activeSubs = subs.filter((s) => s.status === "active").length;
-  const trialSubs = subs.filter((s) => s.status === "trial").length;
-  const expiredSubs = subs.filter((s) => s.status === "expired").length;
+  const subs = data.subscriptions;
+  const pkgs = data.packages;
+  const orgs = data.organizations;
+
+  const activeSubs = subs.filter((s: any) => s.status === "active").length;
+  const trialSubs = subs.filter((s: any) => s.status === "trial").length;
+  const expiredSubs = subs.filter((s: any) => s.status === "expired").length;
+
+  // Build feature map from package_features/package_limits (from DB)
+  function getPackageFeatureValue(pkg: any, featureCode: string): boolean {
+    const features = pkg._features ?? {};
+    return features[featureCode] === true || features[featureCode] === "true";
+  }
+
+  function getPackageLimitValue(pkg: any, limitCode: string): number {
+    const limits = pkg._limits ?? {};
+    return limits[limitCode] ?? 0;
+  }
+
+  const filteredPkgs = useMemo(() => {
+    if (!search) return pkgs;
+    const q = search.toLowerCase();
+    return pkgs.filter((p: any) =>
+      p.name?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q)
+    );
+  }, [pkgs, search]);
 
   function openCreate() { setEditor({ pkg: null, mode: "create" }); }
   function openEdit(pkg: any) { setEditor({ pkg, mode: "edit" }); }
-  function closeEditor() { setEditor(null); }
+  function closeEditor() { setEditor(null); setSelectedPkg(null); }
 
-  // Toast save results
   useEffect(() => {
     if (saveState.status === "success") {
       showToast(saveState.message || "Package saved successfully.", "success");
@@ -78,11 +81,9 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
     }
   }, [saveState]);
 
-  // Toast delete results
   useEffect(() => {
     if (deleteState.status === "success") {
-      const isArchived = deleteState.message?.toLowerCase().includes("deactivated") || deleteState.message?.toLowerCase().includes("archived");
-      showToast(deleteState.message || "Package deleted.", isArchived ? "info" : "success");
+      showToast(deleteState.message || "Package deleted.", "success");
       setDeletingPkg(null);
       setDeleteConfirm("");
     } else if (deleteState.status === "error" && deleteState.message) {
@@ -90,101 +91,152 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
     }
   }, [deleteState]);
 
-  // Determine if package has subscribers for the delete modal
   function getDeleteContext(pkg: any) {
-    const assignedOrgs = subs.filter((s) => s.package_id === pkg.id);
+    const assignedOrgs = subs.filter((s: any) => s.package_id === pkg.id);
     const assignedCount = assignedOrgs.length;
-    const activeCount = assignedOrgs.filter((s) => s.status === "active" || s.status === "trial").length;
+    const activeCount = assignedOrgs.filter((s: any) => s.status === "active" || s.status === "trial").length;
     return { assignedCount, activeCount, hasSubscribers: assignedCount > 0 };
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <ToastContainer />
+
+      {/* Package Management Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Super Admin</p>
-          <h1 className="mt-2 text-3xl font-black md:text-4xl">Subscription Management</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-            {orgs.length} organizations &middot; {pkgs.length} packages &middot; {subs.length} subscriptions
+          <h2 className="text-xl font-black">Package Management</h2>
+          <p className="text-sm text-muted-foreground">
+            {filteredPkgs.length} packages · {activeSubs} active subscriptions · {trialSubs} trial
           </p>
         </div>
-        <ButtonLink href="/super-admin/billing" variant="secondary">Billing Dashboard</ButtonLink>
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex overflow-hidden rounded-lg border border-border">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={cn("px-3 py-2 text-xs font-bold transition", viewMode === "grid" ? "bg-accent/10 text-foreground" : "text-muted-foreground hover:text-foreground")}
+              type="button"
+            >
+              Grid
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={cn("px-3 py-2 text-xs font-bold transition border-l border-border", viewMode === "list" ? "bg-accent/10 text-foreground" : "text-muted-foreground hover:text-foreground")}
+              type="button"
+            >
+              List
+            </button>
+          </div>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search packages..."
+              className="h-10 w-56 rounded-lg border border-border bg-surface pl-9 pr-3 text-sm"
+              aria-label="Search packages"
+            />
+          </div>
+          <Button onClick={openCreate} size="sm" className="gap-2">
+            <Plus className="size-4" /> Create Package
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Active" value={String(activeSubs)} color="green" />
-        <KpiCard label="Trial" value={String(trialSubs)} color="blue" />
-        <KpiCard label="Expired" value={String(expiredSubs)} color="red" />
-        <KpiCard label="Unassigned" value={String(orgs.length - subs.length)} color="muted" />
+        <StatCard label="Total Packages" value={String(pkgs.length)} detail={`${pkgs.filter((p: any) => p.is_active).length} active`} />
+        <StatCard label="Active Subscriptions" value={String(activeSubs)} detail={`${trialSubs} in trial`} status={activeSubs > 0 ? "good" : "watch"} />
+        <StatCard label="Expired / Suspended" value={String(expiredSubs)} detail="Need attention" status={expiredSubs > 0 ? "risk" : "good"} />
+        <StatCard label="Unassigned Organizations" value={String(orgs.length - subs.length)} detail="No plan assigned" status={orgs.length > subs.length ? "watch" : "good"} />
       </div>
 
-      {/* Packages Section */}
-      <div className="rounded-xl border border-border bg-background">
-        <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-          <h2 className="text-lg font-black">Packages</h2>
-          <Button onClick={openCreate} size="sm" className="gap-2"><Plus className="size-4" /> Create Package</Button>
-        </div>
-        <div className="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
-          {pkgs.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center gap-3 py-12 text-center">
-              <p className="text-4xl">&#128230;</p>
-              <p className="font-semibold text-muted-foreground">No packages yet</p>
-              <Button onClick={openCreate} variant="primary">Create your first package</Button>
-            </div>
-          ) : (
-            pkgs.map((pkg) => (
-              <PackageCard
-                key={pkg.id}
-                pkg={pkg}
-                onEdit={() => openEdit(pkg)}
-                onDelete={() => { setDeletingPkg(pkg); setDeleteConfirm(""); }}
-              />
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Organizations Table */}
-      <div className="rounded-xl border border-border bg-background">
-        <div className="border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-black">Organizations</h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search organizations..." className="h-10 w-64 rounded-lg border border-border bg-surface pl-9 pr-3 text-sm" aria-label="Search" />
-            </div>
+      {/* Package Cards / List */}
+      {filteredPkgs.length === 0 ? (
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-surface-muted py-16 text-center">
+          <PackageIcon className="size-12 text-muted-foreground" />
+          <div>
+            <p className="text-lg font-black text-muted-foreground">No packages found</p>
+            {search ? (
+              <p className="text-sm text-muted-foreground">No packages matching &quot;{search}&quot;</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Create your first subscription package to get started</p>
+            )}
           </div>
+          {!search && <Button onClick={openCreate} variant="primary"><Plus className="size-4" /> Create Package</Button>}
         </div>
-        <div className="overflow-x-auto">
+      ) : viewMode === "grid" ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {filteredPkgs.map((pkg: any) => (
+            <PackageCard
+              key={pkg.id}
+              pkg={pkg}
+              subsCount={subs.filter((s: any) => s.package_id === pkg.id).length}
+              activeSubsCount={subs.filter((s: any) => s.package_id === pkg.id && s.status === "active").length}
+              onEdit={() => openEdit(pkg)}
+              onDelete={() => { setDeletingPkg(pkg); setDeleteConfirm(""); }}
+              onView={() => setSelectedPkg(pkg)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border bg-background overflow-hidden">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-              <th className="px-6 py-3">Organization</th><th className="px-6 py-3">Package</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Started</th><th className="px-6 py-3">Expires</th>
-            </tr></thead>
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-5 py-3">Package</th>
+                <th className="px-5 py-3">Price</th>
+                <th className="px-5 py-3">Members</th>
+                <th className="px-5 py-3">Branches</th>
+                <th className="px-5 py-3">Staff</th>
+                <th className="px-5 py-3">Subscriptions</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              {orgs.filter((o) => o.name.toLowerCase().includes(search.toLowerCase())).map((org: any) => {
-                const orgSub = subs.find((s) => s.organization_id === org.id);
-                const pkg = orgSub ? pkgs.find((p) => p.id === orgSub.package_id) : null;
-                return (
-                  <tr key={org.id} className="border-b border-border hover:bg-accent/10">
-                    <td className="px-6 py-3 font-semibold">{org.name}</td>
-                    <td className="px-6 py-3"><Badge className="border-indigo-200 bg-indigo-50 text-indigo-700">{pkg?.name ?? "No plan"}</Badge></td>
-                    <td className="px-6 py-3">{orgSub ? <StatusBadge status={orgSub.status} /> : <Badge variant="neutral">Unassigned</Badge>}</td>
-                    <td className="px-6 py-3 text-muted-foreground" suppressHydrationWarning>{orgSub?.started_at ? new Date(orgSub.started_at).toLocaleDateString() : "-"}</td>
-                    <td className="px-6 py-3 text-muted-foreground" suppressHydrationWarning>{orgSub?.expires_at ? new Date(orgSub.expires_at).toLocaleDateString() : "-"}</td>
-                  </tr>
-                );
-              })}
-              {orgs.filter((o) => o.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
-                <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No organizations found</td></tr>
-              )}
+              {filteredPkgs.map((pkg: any) => (
+                <tr key={pkg.id} className="border-b border-border hover:bg-accent/5 transition-colors">
+                  <td className="px-5 py-3 font-semibold">{pkg.name}</td>
+                  <td className="px-5 py-3">₹{Intl.NumberFormat("en-IN").format(pkg.price ?? 0)}</td>
+                  <td className="px-5 py-3">{getPackageLimitValue(pkg, "max_members") === -1 ? "Unlimited" : getPackageLimitValue(pkg, "max_members")}</td>
+                  <td className="px-5 py-3">{getPackageLimitValue(pkg, "max_branches") === -1 ? "Unlimited" : getPackageLimitValue(pkg, "max_branches")}</td>
+                  <td className="px-5 py-3">{getPackageLimitValue(pkg, "max_staff") === -1 ? "Unlimited" : getPackageLimitValue(pkg, "max_staff")}</td>
+                  <td className="px-5 py-3">{subs.filter((s: any) => s.package_id === pkg.id).length}</td>
+                  <td className="px-5 py-3">
+                    <span className={cn(
+                      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold",
+                      pkg.is_active ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-50 text-gray-500 border border-gray-200"
+                    )}>
+                      {pkg.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(pkg)} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10" type="button" aria-label="Edit"><Pencil className="size-4" /></button>
+                      <button onClick={() => { setDeletingPkg(pkg); setDeleteConfirm(""); }} className="rounded-md p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600" type="button" aria-label="Delete"><Trash2 className="size-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      )}
 
-      {/* Package Editor Modal — opens only on explicit button click */}
+      {/* Package Detail View */}
+      {selectedPkg && (
+        <PackageDetailView
+          pkg={selectedPkg}
+          onClose={() => setSelectedPkg(null)}
+          onEdit={() => { openEdit(selectedPkg); setSelectedPkg(null); }}
+          subs={subs}
+        />
+      )}
+
+      {/* Package Editor Modal */}
       {editor !== null && (
         <PackageEditorModal
           open
@@ -197,65 +249,252 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
       )}
 
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
-        pkg={deletingPkg}
-        deleteContext={deletingPkg ? getDeleteContext(deletingPkg) : null}
-        deleteState={deleteState}
-        deletePending={deletePending}
-        deleteConfirm={deleteConfirm}
-        onDeleteConfirmChange={setDeleteConfirm}
-        onClose={() => { setDeletingPkg(null); setDeleteConfirm(""); }}
-        deleteAction={deleteAction}
-      />
+      {deletingPkg && (
+        <DeleteConfirmationModal
+          pkg={deletingPkg}
+          deleteContext={getDeleteContext(deletingPkg)}
+          deleteState={deleteState}
+          deletePending={deletePending}
+          deleteConfirm={deleteConfirm}
+          onDeleteConfirmChange={setDeleteConfirm}
+          onClose={() => { setDeletingPkg(null); setDeleteConfirm(""); }}
+          deleteAction={deleteAction}
+        />
+      )}
     </div>
   );
 }
 
-/* ─── Sub-components ─── */
+/* ─── Package Card ─── */
 
-function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
-  const colorMap: Record<string, string> = {
-    green: "to-green-50/50 text-green-600",
-    blue: "to-blue-50/50 text-blue-600",
-    red: "to-red-50/50 text-red-600",
-    muted: "to-accent/5 text-muted-foreground",
+function PackageCard({ pkg, subsCount, activeSubsCount, onEdit, onDelete, onView }: {
+  pkg: any; subsCount: number; activeSubsCount: number; onEdit: () => void; onDelete: () => void; onView: () => void;
+}) {
+  const features = pkg._features ?? {};
+  const limits = pkg._limits ?? {};
+
+  const memberLimit = limits["max_members"] ?? 0;
+  const branchLimit = limits["max_branches"] ?? 0;
+  const staffLimit = limits["max_staff"] ?? 0;
+
+  return (
+    <div className="group relative rounded-xl border border-border bg-gradient-to-br from-background to-accent/5 transition-all hover:shadow-lg hover:border-primary/20 overflow-hidden">
+      {/* Gradient header */}
+      <div className={cn("h-1.5 w-full bg-gradient-to-r", pkg.is_active ? "from-primary/60 to-primary/20" : "from-gray-300 to-gray-100")} />
+
+      <div className="p-5">
+        {/* Package name & status */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-black text-lg">{pkg.name}</p>
+            {pkg.description && <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{pkg.description}</p>}
+          </div>
+          <span className={cn(
+            "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold border",
+            pkg.is_active
+              ? "bg-green-50 text-green-700 border-green-200"
+              : "bg-gray-50 text-gray-500 border-gray-200"
+          )}>
+            {pkg.is_active ? "Active" : "Inactive"}
+          </span>
+        </div>
+
+        {/* Pricing */}
+        <div className="mt-3 flex items-baseline gap-1">
+          <span className="text-2xl font-black">₹{Intl.NumberFormat("en-IN").format(pkg.price ?? 0)}</span>
+          <span className="text-xs text-muted-foreground">/ {pkg.billing_period ?? "month"}</span>
+        </div>
+
+        {/* Limits */}
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <LimitBadge
+            label="Members"
+            value={memberLimit === -1 ? "∞" : memberLimit}
+            color="green"
+          />
+          <LimitBadge
+            label="Branches"
+            value={branchLimit === -1 ? "∞" : branchLimit}
+            color="blue"
+          />
+          <LimitBadge
+            label="Staff"
+            value={staffLimit === -1 ? "∞" : staffLimit}
+            color="purple"
+          />
+        </div>
+
+        {/* Features summary */}
+        <div className="mt-3 space-y-1">
+          {FEATURE_CATEGORIES.slice(0, 4).map((cat) => {
+            const includedCount = cat.features.filter((f) => features[f.featureCode] === true || features[f.featureCode] === "true").length;
+            const totalCount = cat.features.length;
+            if (totalCount === 0) return null;
+            return (
+              <div key={cat.id} className="flex items-center gap-2 text-[11px]">
+                <span className="text-muted-foreground w-24 truncate">{cat.name}</span>
+                <div className="flex-1 h-1.5 rounded-full bg-accent/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary/40"
+                    style={{ width: `${(includedCount / totalCount) * 100}%` }}
+                  />
+                </div>
+                <span className="text-muted-foreground w-8 text-right">{includedCount}/{totalCount}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Subscription count */}
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Users className="size-3.5" />
+          <span>{subsCount} organizations ({activeSubsCount} active)</span>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button onClick={onView} size="sm" variant="secondary" className="flex-1 gap-1.5"><Eye className="size-3.5" /> View</Button>
+          <Button onClick={onEdit} size="sm" variant="secondary" className="flex-1 gap-1.5"><Pencil className="size-3.5" /> Edit</Button>
+          <Button onClick={onDelete} size="sm" variant="destructive" className="gap-1.5"><Trash2 className="size-3.5" /></Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LimitBadge({ label, value, color }: { label: string; value: string | number; color: string }) {
+  const colorClasses: Record<string, string> = {
+    green: "border-green-200 bg-green-50 text-green-700",
+    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    purple: "border-purple-200 bg-purple-50 text-purple-700",
   };
   return (
-    <div className={`rounded-xl border border-border bg-gradient-to-br from-background ${colorMap[color]?.split(" ")[0] ?? "to-accent/5"} p-5`}>
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className={`mt-2 text-3xl font-black ${colorMap[color]?.split(" ")[1] ?? ""}`}>{value}</p>
+    <div className={cn("rounded-lg border p-2 text-center", colorClasses[color] ?? "border-border bg-background")}>
+      <p className="text-[18px] font-black">{value}</p>
+      <p className="text-[10px] font-semibold opacity-80">{label}</p>
     </div>
   );
 }
 
-function PackageCard({ pkg, onEdit, onDelete }: { pkg: any; onEdit: () => void; onDelete: () => void }) {
+/* ─── Package Detail View ─── */
+
+function PackageDetailView({ pkg, onClose, onEdit, subs }: {
+  pkg: any;
+  onClose: () => void;
+  onEdit: () => void;
+  subs: any[];
+}) {
+
+  const features = pkg._features ?? {};
+  const limits = pkg._limits ?? {};
+  const orgAssigned = subs.filter((s: any) => s.package_id === pkg.id);
+  const activeOrgs = orgAssigned.filter((s: any) => s.status === "active").length;
+
   return (
-    <div className="group relative rounded-lg border border-border bg-gradient-to-br from-background to-accent/5 p-5 transition-all hover:shadow-md hover:border-primary/20">
-      {pkg.recommended && <Badge className="absolute -top-2.5 right-3 border-green-200 bg-green-50 text-green-700 shadow-sm">Popular</Badge>}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-black text-lg">{pkg.name}</p>
-          {pkg.price > 0 && <p className="text-sm text-muted-foreground">&#8377;{Intl.NumberFormat("en-IN").format(pkg.price)} / {pkg.billing_period ?? "month"}</p>}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-2xl font-black">{pkg.name}</h2>
+              <p className="text-sm text-muted-foreground">{pkg.description}</p>
+            </div>
+            <Badge variant={pkg.is_active ? "success" : "neutral"}>{pkg.is_active ? "Active" : "Inactive"}</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={onEdit} variant="primary" size="sm" className="gap-2"><Pencil className="size-4" /> Edit Package</Button>
+            <button onClick={onClose} className="rounded-md p-1.5 hover:bg-accent/10"><X className="size-5" /></button>
+          </div>
         </div>
-        <StatusBadge status={pkg.is_active ? "active" : "inactive"} suppressHydrationWarning />
-      </div>
-      {pkg.description && <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{pkg.description}</p>}
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-md border border-border bg-background p-2"><p className="text-[10px] text-muted-foreground">Max Members</p><p className="font-black">{String(pkg.max_members ?? "-")}</p></div>
-        <div className="rounded-md border border-border bg-background p-2"><p className="text-[10px] text-muted-foreground">Max Branches</p><p className="font-black">{String(pkg.max_branches ?? "-")}</p></div>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1">
-        {getFeatureList(pkg).filter((f) => pkg[f[2] as string]).map((f) => (
-          <Badge key={f[0]} variant="info" className="text-[10px]">{f[1]}</Badge>
-        ))}
-      </div>
-      <div className="mt-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button onClick={onEdit} size="sm" variant="secondary" className="flex-1 gap-1.5"><Pencil className="size-3.5" /> Edit</Button>
-        <Button onClick={onDelete} size="sm" variant="destructive" className="gap-1.5"><Trash2 className="size-3.5" /></Button>
+
+        {/* Pricing & Stats */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+          <StatCard label="Monthly Price" value={`₹${Intl.NumberFormat("en-IN").format(pkg.price ?? 0)}`} detail="Per month" />
+          <StatCard label="Organizations" value={String(orgAssigned.length)} detail={`${activeOrgs} active`} />
+          <StatCard label="Billing Period" value={pkg.billing_period ?? "monthly"} detail="Default cycle" />
+          <StatCard label="Trial Days" value={String(pkg.trial_days ?? 0)} detail="Free trial duration" />
+        </div>
+
+        {/* Limits */}
+        <div className="mb-6">
+          <h3 className="text-base font-black mb-3">Resource Limits</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(limits).map(([code, val]: [string, any]) => (
+              <div key={code} className="rounded-lg border border-border bg-background p-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{code.replace(/_/g, " ")}</p>
+                <p className="mt-1 text-xl font-black">{val === -1 ? "Unlimited" : val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Feature categories */}
+        <div className="space-y-5">
+          <h3 className="text-base font-black">Features</h3>
+          {FEATURE_CATEGORIES.map((cat) => {
+            const Icon = CATEGORY_ICONS[cat.id] ?? Check;
+            const catFeatures = cat.features.map((f) => ({
+              ...f,
+              included: features[f.featureCode] === true || features[f.featureCode] === "true",
+              limitVal: f.limitKey ? limits[f.limitKey] : undefined,
+            }));
+            return (
+              <FeatureCategorySection
+                key={cat.id}
+                name={cat.name}
+                description={cat.description}
+                icon={<Icon className="size-4" />}
+              >
+                {catFeatures.map((f, idx) => (
+                  <FeatureCard
+                    key={`${f.featureCode}-${idx}`}
+                    label={f.label}
+                    description={f.description}
+                    included={f.included}
+                    {...(f.included ? {} : { upgradeLabel: f.upgradeLabel ?? "Locked" })}
+                    {...(f.included && f.limitLabel ? { limitLabel: f.limitLabel } : {})}
+                  />
+                ))}
+              </FeatureCategorySection>
+            );
+          })}
+        </div>
+
+        {/* Assigned organizations */}
+        {orgAssigned.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-base font-black mb-3">Assigned Organizations ({orgAssigned.length})</h3>
+            <div className="space-y-2">
+              {orgAssigned.map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-background p-3">
+                  <span className="text-sm font-semibold">{s.organization_id}</span>
+                  <StatusBadge2 status={s.status} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+function StatusBadge2({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    active: "bg-green-50 text-green-700 border-green-200",
+    trial: "bg-blue-50 text-blue-700 border-blue-200",
+    expired: "bg-red-50 text-red-700 border-red-200",
+    suspended: "bg-orange-50 text-orange-800 border-orange-200",
+  };
+  return (
+    <span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", colors[status] ?? "bg-gray-50 text-gray-500 border-gray-200")}>
+      {status}
+    </span>
+  );
+}
+
+/* ─── Package Editor Modal ─── */
 
 function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose }: {
   open: boolean;
@@ -265,20 +504,26 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
   formAction: any;
   onClose: () => void;
 }) {
+  const [activeFeatureTab, setActiveFeatureTab] = useState<string>("members");
+  const [price, setPrice] = useState(pkg?.price ?? 0);
+  const [billingPeriod, setBillingPeriod] = useState(pkg?.billing_period ?? "monthly");
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-black">{mode === "edit" ? "Edit Package" : "Create Package"}</h2>
-            <p className="text-sm text-muted-foreground">{mode === "edit" ? "Modify plan settings, features, and limits." : "Define a new subscription plan tier."}</p>
+            <p className="text-sm text-muted-foreground">
+              {mode === "edit" ? "Modify plan settings, features, limits, and pricing." : "Define a new subscription plan tier with features and limits."}
+            </p>
           </div>
           <button onClick={onClose} disabled={savePending} className="rounded-md p-1.5 hover:bg-accent/10 disabled:opacity-50"><X className="size-5" /></button>
         </div>
 
-        <form action={formAction} className="space-y-5">
+        <form action={formAction} className="space-y-6">
           {pkg && <input type="hidden" name="id" value={pkg.id} />}
 
           {/* Basic Info */}
@@ -290,13 +535,32 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-price">Price (paise)</label>
-                <Input id="pkg-price" name="price" type="number" defaultValue={pkg?.price ?? 0} disabled={savePending} />
+                <Input
+                  id="pkg-price"
+                  name="price"
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(Number(e.target.value))}
+                  disabled={savePending}
+                />
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  ₹{Intl.NumberFormat("en-IN").format(Math.round(price / 100))} / month
+                </p>
               </div>
               <div>
                 <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="pkg-billing">Billing</label>
-                <select id="pkg-billing" name="billingPeriod" defaultValue={pkg?.billing_period ?? "monthly"} disabled={savePending} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm disabled:opacity-50">
-                  <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option>
-                  <option value="half_yearly">Half Yearly</option><option value="annual">Annual</option>
+                <select
+                  id="pkg-billing"
+                  name="billingPeriod"
+                  value={billingPeriod}
+                  onChange={(e) => setBillingPeriod(e.target.value)}
+                  disabled={savePending}
+                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm disabled:opacity-50"
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="half_yearly">Half Yearly</option>
+                  <option value="annual">Annual</option>
                 </select>
               </div>
             </div>
@@ -308,34 +572,68 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
           </div>
 
           {/* Limits */}
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground mb-2">Limits</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <LimitField label="Max Members (-1 = unlimited)" name="maxMembers" value={pkg?.max_members} disabled={savePending} />
-              <LimitField label="Max Branches / Locations (-1 = unlimited)" name="maxBranches" value={pkg?.max_branches} disabled={savePending} />
-              <LimitField label="Max Trainers (-1 = unlimited)" name="maxTrainers" value={pkg?.max_trainers} disabled={savePending} />
-              <LimitField label="Storage GB (-1 = unlimited)" name="maxStorage" value={pkg?.max_storage_gb} disabled={savePending} />
-              <LimitField label="Monthly API Calls (-1 = unlimited)" name="maxApiCalls" value={pkg?.max_api_calls} disabled={savePending} />
-              <LimitField label="Sort Order" name="sortOrder" value={pkg?.sort_order} disabled={savePending} />
-              <LimitField label="Trial Days" name="trialDays" value={pkg?.trial_days} disabled={savePending} />
+          <div className="rounded-xl border border-border bg-background p-4">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground mb-3">Resource Limits</p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <LimitField label="Max Members (-1 = ∞)" name="maxMembers" value={pkg?.max_members ?? pkg?._limits?.max_members ?? 0} disabled={savePending} />
+              <LimitField label="Max Branches (-1 = ∞)" name="maxBranches" value={pkg?.max_branches ?? pkg?._limits?.max_branches ?? 0} disabled={savePending} />
+              <LimitField label="Max Trainers (-1 = ∞)" name="maxTrainers" value={pkg?.max_trainers ?? pkg?._limits?.max_trainers ?? 0} disabled={savePending} />
+              <LimitField label="Max Staff (-1 = ∞)" name="maxStaff" value={pkg?.max_staff ?? pkg?._limits?.max_staff ?? 0} disabled={savePending} />
+              <LimitField label="Storage GB (-1 = ∞)" name="maxStorage" value={pkg?.max_storage_gb ?? pkg?._limits?.max_storage_gb ?? 0} disabled={savePending} />
+              <LimitField label="Monthly API Calls (-1 = ∞)" name="maxApiCalls" value={pkg?.max_api_calls ?? pkg?._limits?.max_api_calls ?? 0} disabled={savePending} />
+              <LimitField label="Sort Order" name="sortOrder" value={pkg?.sort_order ?? 0} disabled={savePending} />
+              <LimitField label="Trial Days" name="trialDays" value={pkg?.trial_days ?? 0} disabled={savePending} />
             </div>
           </div>
 
-          {/* Features Grid */}
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground mb-2">Features</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(pkg?.features?.length > 0 ? pkg.features : FALLBACK_FEATURES).map((f: any) => {
-                const key = Array.isArray(f) ? f[0] : (f.feature_key ?? f.key ?? f);
-                const label = Array.isArray(f) ? f[1] : (f.feature_name ?? f.name ?? key);
-                const dbCol = Array.isArray(f) ? (f[2] ?? "") : (f.db_column ?? "");
+          {/* Feature Categories - Tabbed */}
+          <div className="rounded-xl border border-border bg-background overflow-hidden">
+            <div className="border-b border-border bg-accent/5 px-4 py-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Feature Toggles</p>
+            </div>
+            <div className="flex gap-1 overflow-x-auto border-b border-border bg-surface-muted/50 px-4 py-2">
+              {FEATURE_CATEGORIES.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat.id] ?? Check;
                 return (
-                  <label key={key} className="flex items-center gap-2.5 rounded-lg border border-border bg-background p-3 text-sm cursor-pointer hover:bg-accent/10 transition-colors has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5">
-                    <input type="checkbox" name={key} defaultChecked={pkg ? (pkg[dbCol as string] ?? false) : false} disabled={savePending} className="size-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50" />
-                    {label}
-                  </label>
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setActiveFeatureTab(cat.id)}
+                    className={cn(
+                      "flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-bold transition",
+                      activeFeatureTab === cat.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/10"
+                    )}
+                  >
+                    <Icon className="size-3.5" />
+                    {cat.name}
+                  </button>
                 );
               })}
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {FEATURE_CATEGORIES.find((c) => c.id === activeFeatureTab)?.features.map((f, idx) => {
+                  const fieldName = `${f.featureCode}Enabled`;
+                  return (
+                    <label
+                      key={`${f.featureCode}-${idx}`}
+                      className="flex items-center gap-2.5 rounded-lg border border-border bg-background p-3 text-sm cursor-pointer hover:bg-accent/10 transition-colors has-[:checked]:border-primary/30 has-[:checked]:bg-primary/5"
+                    >
+                      <input
+                        type="checkbox"
+                        name={f.featureCode === "member_management" ? "memberManagement" : f.featureCode === "class_booking" ? "classScheduling" : f.featureCode === "whatsapp_integration" ? "communicationsEnabled" : f.featureCode === "biometric_attendance" ? "biometricAttendance" : f.featureCode === "api_access" ? "apiAccess" : f.featureCode === "qr_attendance" ? "qrAttendance" : f.featureCode === "multi_branch_management" ? "multiBranchManagement" : f.featureCode}
+                        defaultChecked={pkg ? (pkg._features?.[f.featureCode] === true || pkg._features?.[f.featureCode] === "true") : false}
+                        disabled={savePending}
+                        className="size-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate">{f.label}</p>
+                        {f.upgradeLabel && <p className="text-[10px] text-amber-600">{f.upgradeLabel}</p>}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -374,6 +672,8 @@ function LimitField({ label, name, value, disabled }: { label: string; name: str
   );
 }
 
+/* ─── Delete Confirmation Modal ─── */
+
 function DeleteConfirmationModal({ pkg, deleteContext, deleteState, deletePending, deleteConfirm, onDeleteConfirmChange, onClose, deleteAction }: {
   pkg: any;
   deleteContext: { assignedCount: number; activeCount: number; hasSubscribers: boolean } | null;
@@ -387,94 +687,64 @@ function DeleteConfirmationModal({ pkg, deleteContext, deleteState, deletePendin
   if (!pkg || !deleteContext) return null;
   const { assignedCount, activeCount, hasSubscribers } = deleteContext;
 
-  const isArchived = deleteState?.status === "success" && (deleteState.message?.toLowerCase().includes("deactivated") || deleteState.message?.toLowerCase().includes("archived"));
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { if (!deletePending) onClose(); }}>
       <div className="w-full max-w-md rounded-xl border-2 border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()} style={{ borderColor: hasSubscribers ? "#d97706" : "#dc2626" }}>
-        {isArchived ? (
-          /* Success state after archival */
-          <div className="text-center py-4">
-            <div className="mx-auto rounded-full bg-amber-50 p-3 w-fit">
-              <Archive className="size-8 text-amber-600" />
-            </div>
-            <h2 className="mt-4 text-lg font-black">Package Archived</h2>
-            <p className="mt-2 text-sm text-muted-foreground">{deleteState.message}</p>
-            <Button className="mt-6" onClick={onClose}>Done</Button>
+        <div className="flex items-start gap-4">
+          <div className={`rounded-full p-2 ${hasSubscribers ? "bg-amber-50" : "bg-red-50"}`}>
+            {hasSubscribers ? <Archive className="size-6 text-amber-600" /> : <AlertTriangle className="size-6 text-red-600" />}
           </div>
-        ) : (
-          <>
-            <div className="flex items-start gap-4">
-              <div className={`rounded-full p-2 ${hasSubscribers ? "bg-amber-50" : "bg-red-50"}`}>
-                {hasSubscribers ? <Archive className="size-6 text-amber-600" /> : <AlertTriangle className="size-6 text-red-600" />}
+          <div>
+            <h2 className="text-lg font-black">{hasSubscribers ? "Cannot Delete - Archive Instead" : "Delete Package"}</h2>
+            {hasSubscribers ? (
+              <div className="mt-2 space-y-2 text-sm">
+                <p className="text-muted-foreground"><span className="font-semibold text-foreground">{pkg.name}</span> has <span className="font-black text-amber-600">{assignedCount}</span> assigned organization(s).</p>
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800">
+                  <p className="font-semibold">This package has active subscriptions, so it cannot be deleted. It will be archived instead.</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-black">{hasSubscribers ? "Cannot Delete - Archive Instead" : "Delete Package"}</h2>
-                {hasSubscribers ? (
-                  <div className="mt-2 space-y-2 text-sm">
-                    <p className="text-muted-foreground"><span className="font-semibold text-foreground">{pkg.name}</span> has <span className="font-black text-amber-600">{assignedCount}</span> assigned organization(s) (<span className="font-black">{activeCount}</span> active).</p>
-                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800">
-                      <p className="font-semibold">This package has historical subscription records, so it cannot be permanently deleted. It will be archived instead:</p>
-                      <ul className="mt-1 list-disc pl-4 text-xs space-y-0.5">
-                        <li>Existing orgs keep working until their subscription expires</li>
-                        <li>No new orgs can be assigned to this plan</li>
-                        <li>Once all subscriptions expire, you can permanently delete it</li>
-                      </ul>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-1 text-sm text-muted-foreground">No organizations are assigned to <span className="font-semibold text-foreground">{pkg.name}</span>. It will be permanently removed.</p>
-                )}
-              </div>
-            </div>
-
-            {deleteState.status === "error" && (
-              <div className="mt-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                <span>{deleteState.message}</span>
-              </div>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">No organizations are assigned to <span className="font-semibold text-foreground">{pkg.name}</span>.</p>
             )}
+          </div>
+        </div>
 
-            <form action={deleteAction} className="mt-5 space-y-4">
-              <input type="hidden" name="packageId" value={pkg.id} />
-              <input type="hidden" name="forceDeactivate" value={hasSubscribers ? "true" : "false"} />
-              <div>
-                <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="delete-confirm">
-                  Type <span className={hasSubscribers ? "text-amber-600" : "text-red-600"}>DELETE</span> to confirm {hasSubscribers ? "archival" : "deletion"}
-                </label>
-                <Input id="delete-confirm" value={deleteConfirm} onChange={(e) => onDeleteConfirmChange(e.target.value)} placeholder="DELETE" className="mt-1" disabled={deletePending} />
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" onClick={onClose} disabled={deletePending}>Cancel</Button>
-                <Button type="submit" variant={hasSubscribers ? "secondary" : "destructive"} disabled={deleteConfirm !== "DELETE" || deletePending} className={`gap-2 min-w-[160px] ${hasSubscribers ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100" : ""}`}>
-                  {deletePending ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {deletePending
-                    ? hasSubscribers ? "Archiving..." : "Deleting..."
-                    : hasSubscribers ? "Archive Package" : "Permanently Delete"
-                  }
-                </Button>
-              </div>
-            </form>
-          </>
+        {deleteState.status === "error" && (
+          <div className="mt-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>{deleteState.message}</span>
+          </div>
         )}
+
+        <form action={deleteAction} className="mt-5 space-y-4">
+          <input type="hidden" name="packageId" value={pkg.id} />
+          <input type="hidden" name="forceDeactivate" value={hasSubscribers ? "true" : "false"} />
+          <div>
+            <label className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground" htmlFor="delete-confirm">
+              Type <span className={hasSubscribers ? "text-amber-600" : "text-red-600"}>DELETE</span> to confirm
+            </label>
+            <Input id="delete-confirm" value={deleteConfirm} onChange={(e) => onDeleteConfirmChange(e.target.value)} placeholder="DELETE" className="mt-1" disabled={deletePending} />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={deletePending}>Cancel</Button>
+            <Button type="submit" variant={hasSubscribers ? "secondary" : "destructive"} disabled={deleteConfirm !== "DELETE" || deletePending} className="gap-2">
+              {deletePending ? <Loader2 className="size-4 animate-spin" /> : null}
+              {deletePending ? "Processing..." : hasSubscribers ? "Archive Package" : "Permanently Delete"}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
 }
 
-function StatusBadge({ status, suppressHydrationWarning }: { status: string; suppressHydrationWarning?: boolean }) {
-  const colors: Record<string, string> = {
-    active: "border-green-200 bg-green-50 text-green-700",
-    trial: "border-blue-200 bg-blue-50 text-blue-700",
-    expired: "border-red-200 bg-red-50 text-red-700",
-    suspended: "border-orange-200 bg-orange-50 text-orange-800",
-    cancelled: "border-slate-200 bg-slate-50 text-slate-700",
-    inactive: "border-gray-200 bg-gray-50 text-gray-700"
-  };
-  const normalized = status?.toLowerCase() ?? "inactive";
+function PackageIcon({ className }: { className?: string }) {
   return (
-    <span className={"inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold " + (colors[normalized] ?? "border-border bg-surface-muted text-muted-foreground")} suppressHydrationWarning={suppressHydrationWarning}>
-      {normalized}
-    </span>
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16.5 9.4 7.55 4.24" />
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <path d="M3.29 7 12 12l8.71-5" />
+      <path d="M12 22V12" />
+    </svg>
   );
 }

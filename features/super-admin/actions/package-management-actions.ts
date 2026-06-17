@@ -7,7 +7,6 @@ import { requireApiRole } from "@/lib/auth/api-guards";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { z } from "zod";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SbClient = any;
 
 const packageSchema = z.object({
@@ -17,6 +16,7 @@ const packageSchema = z.object({
   maxMembers: z.coerce.number().int().min(-1).default(0),
   maxBranches: z.coerce.number().int().min(-1).default(0),
   maxTrainers: z.coerce.number().int().min(-1).default(0),
+  maxStaff: z.coerce.number().int().min(-1).default(0),
   maxStorage: z.coerce.number().int().min(-1).default(0),
   maxApiCalls: z.coerce.number().int().min(-1).default(0),
   trialDays: z.coerce.number().int().min(0).default(0),
@@ -25,6 +25,7 @@ const packageSchema = z.object({
   billingPeriod: z.enum(["monthly", "quarterly", "half_yearly", "annual"]).default("monthly"),
   isActive: z.coerce.boolean().default(true),
   recommended: z.coerce.boolean().default(false),
+  // Feature toggles (checkbox fields from editor)
   qrAttendance: z.coerce.boolean().default(false),
   classScheduling: z.coerce.boolean().default(false),
   trainerAssignment: z.coerce.boolean().default(false),
@@ -40,18 +41,55 @@ const packageSchema = z.object({
   whiteLabelEnabled: z.coerce.boolean().default(false),
 });
 
+// New streamlined feature toggles from the editor
+const FEATURE_FIELD_MAP: Record<string, string> = {
+  manual_attendance: "manualAttendance",
+  qr_attendance: "qrAttendance",
+  biometric_attendance: "biometricAttendance",
+  rfid_attendance: "rfidAttendance",
+  member_management: "memberManagement",
+  class_booking: "classScheduling",
+  trainer_management: "trainerManagement",
+  whatsapp_integration: "communicationsEnabled",
+  sms_integration: "smsIntegration",
+  billing_invoices: "razorpayEnabled",
+  basic_reports: "basicReports",
+  advanced_reports: "advancedReports",
+  member_portal: "memberPortal",
+  api_access: "apiAccess",
+  white_label: "whiteLabelEnabled",
+  custom_domain: "customDomain",
+  ai_recommendations: "aiEnabled",
+  multi_branch_management: "multiBranchManagement",
+  lead_management: "leadManagement",
+  pt_sessions: "ptSessions",
+  nutrition_plans: "nutritionPlans",
+  goal_tracking: "goalTracking",
+  progress_photos: "progressPhotos",
+  workout_assignment: "trainerAssignment",
+  staff_management: "staffManagement",
+  expiry_tracking: "expiryTracking",
+  membership_renewals: "membershipRenewals",
+  attendance_reports: "attendanceReports",
+  email_notifications: "emailNotifications",
+  in_app_notifications: "notificationsEnabled",
+  trainer_portal: "trainerPortal",
+};
+
 export async function savePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _prev;
   const auth = await requireApiRole(["super_admin"]);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const parsed = packageSchema.safeParse({
+  // Build parsed data from form
+  const raw: Record<string, unknown> = {
     id: formData.get("id") ?? "",
     name: formData.get("name"),
     description: formData.get("description") ?? "",
     maxMembers: formData.get("maxMembers") ?? "0",
     maxBranches: formData.get("maxBranches") ?? "0",
     maxTrainers: formData.get("maxTrainers") ?? "0",
+    maxStaff: formData.get("maxStaff") ?? "0",
     maxStorage: formData.get("maxStorage") ?? "0",
     maxApiCalls: formData.get("maxApiCalls") ?? "0",
     trialDays: formData.get("trialDays") ?? "0",
@@ -60,18 +98,22 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     billingPeriod: formData.get("billingPeriod") ?? "monthly",
     isActive: formData.get("isActive") === "on",
     recommended: formData.get("recommended") === "on",
-    qrAttendance: formData.get("qrAttendance") === "on",
-    classScheduling: formData.get("classScheduling") === "on",
-    trainerAssignment: formData.get("trainerAssignment") === "on",
-    aiEnabled: formData.get("aiEnabled") === "on",
-    razorpayEnabled: formData.get("razorpayEnabled") === "on",
-    communicationsEnabled: formData.get("communicationsEnabled") === "on",
-    advancedReports: formData.get("advancedReports") === "on",
-    customDomain: formData.get("customDomain") === "on",
-    apiAccess: formData.get("apiAccess") === "on",
-    biometricAttendance: formData.get("biometricAttendance") === "on",
-    rfidAttendance: formData.get("rfidAttendance") === "on",
-  });
+  };
+
+  // Collect feature toggles from form
+  for (const [featureCode, fieldName] of Object.entries(FEATURE_FIELD_MAP)) {
+    raw[fieldName] = formData.get(fieldName) === "on";
+  }
+
+  // Also catch any feature_xxx or direct boolean toggles from the editor
+  const allKeys = Array.from(formData.keys());
+  for (const key of allKeys) {
+    if (key.startsWith("feature_") && !raw[key]) {
+      raw[key] = formData.get(key) === "on";
+    }
+  }
+
+  const parsed = packageSchema.safeParse(raw);
 
   if (!parsed.success) {
     return { status: "error", message: "Validation failed.", fieldErrors: parsed.error.flatten().fieldErrors };
@@ -80,49 +122,82 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
   const supabase = getSupabaseAdminClient();
   if (!supabase) return { status: "error", message: "Database connection failed." };
 
+  const sb = supabase as SbClient;
+
   const payload: Record<string, unknown> = {
     name: parsed.data.name,
     description: parsed.data.description || null,
-    max_members: parsed.data.maxMembers,
-    max_branches: parsed.data.maxBranches,
-    max_trainers: parsed.data.maxTrainers,
-    max_storage_gb: parsed.data.maxStorage,
-    max_api_calls: parsed.data.maxApiCalls,
-    trial_days: parsed.data.trialDays,
     sort_order: parsed.data.sortOrder,
     price: parsed.data.price,
     billing_period: parsed.data.billingPeriod,
     is_active: parsed.data.isActive,
     recommended: parsed.data.recommended,
-    qr_attendance_enabled: parsed.data.qrAttendance,
-    class_scheduling_enabled: parsed.data.classScheduling,
-    trainer_assignment_enabled: parsed.data.trainerAssignment,
-    ai_enabled: parsed.data.aiEnabled,
-    razorpay_enabled: parsed.data.razorpayEnabled,
-    communications_enabled: parsed.data.communicationsEnabled,
-    advanced_reports_enabled: parsed.data.advancedReports,
-    custom_domain_enabled: parsed.data.customDomain,
-    api_access_enabled: parsed.data.apiAccess,
-    biometric_attendance_enabled: parsed.data.biometricAttendance,
-    rfid_attendance_enabled: parsed.data.rfidAttendance,
-    notifications_enabled: parsed.data.notificationsEnabled,
-    white_label_enabled: parsed.data.whiteLabelEnabled,
+    trial_days: parsed.data.trialDays,
   };
 
   try {
+    let packageId: string;
+
     if (parsed.data.id) {
-      const { error } = await (supabase as SbClient).from("packages").update(payload).eq("id", parsed.data.id);
-      if (error) return { status: "error", message: error.message };
+      await sb.from("packages").update(payload).eq("id", parsed.data.id);
+      packageId = parsed.data.id;
       await writeAuditLog({ actorId: auth.context.userId, action: "package.updated", entityType: "package", entityId: parsed.data.id });
+
+      // Also update slug if name changed
+      const slug = parsed.data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      await sb.from("packages").update({ slug }).eq("id", packageId);
     } else {
-      const { data, error } = await (supabase as SbClient).from("packages").insert(payload).select("*").maybeSingle();
+      const slug = parsed.data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const { data, error } = await sb.from("packages").insert({ ...payload, slug }).select("*").maybeSingle();
       if (error || !data) return { status: "error", message: error?.message ?? "Create failed" };
-      await writeAuditLog({ actorId: auth.context.userId, action: "package.created", entityType: "package", entityId: data.id });
+      packageId = data.id;
+      await writeAuditLog({ actorId: auth.context.userId, action: "package.created", entityType: "package", entityId: packageId });
     }
+
+    // Save feature toggles to package_features table
+    const featureValues: Array<{ package_id: string; feature_code: string; value: string }> = [];
+
+    // Map from form field names back to feature codes
+    for (const [featureCode, fieldName] of Object.entries(FEATURE_FIELD_MAP)) {
+      const value = raw[fieldName] === true ? "true" : "false";
+      featureValues.push({ package_id: packageId, feature_code: featureCode, value });
+    }
+
+    // Upsert each feature
+    for (const fv of featureValues) {
+      await sb.from("package_features").upsert(
+        { package_id: fv.package_id, feature_code: fv.feature_code, value: fv.value },
+        { onConflict: "package_id, feature_code" }
+      );
+    }
+
+    // Save limits to package_limits table
+    const limitMappings: Array<{ limit_code: string; label: string; value: number; sort_order: number }> = [
+      { limit_code: "max_members", label: "Maximum Members", value: parsed.data.maxMembers, sort_order: 1 },
+      { limit_code: "max_branches", label: "Maximum Branches", value: parsed.data.maxBranches, sort_order: 2 },
+      { limit_code: "max_trainers", label: "Maximum Trainers", value: parsed.data.maxTrainers, sort_order: 3 },
+      { limit_code: "max_staff", label: "Maximum Staff", value: parsed.data.maxStaff, sort_order: 4 },
+      { limit_code: "max_storage_gb", label: "Storage Limit (GB)", value: parsed.data.maxStorage, sort_order: 5 },
+      { limit_code: "max_api_calls", label: "Monthly API Calls", value: parsed.data.maxApiCalls, sort_order: 6 },
+    ];
+
+    for (const lm of limitMappings) {
+      await sb.from("package_limits").upsert(
+        { package_id: packageId, limit_code: lm.limit_code, label: lm.label, value: lm.value, sort_order: lm.sort_order },
+        { onConflict: "package_id, limit_code" }
+      );
+    }
+
+    // Save pricing to package_pricing table
+    await sb.from("package_pricing").upsert(
+      { package_id: packageId, billing_period: parsed.data.billingPeriod, price: parsed.data.price, currency: "INR" },
+      { onConflict: "package_id, billing_period" }
+    );
+
     revalidatePath("/super-admin/subscriptions");
     return { status: "success", message: parsed.data.id ? "Package updated." : "Package created." };
   } catch (err) {
-    const message = err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong while processing this action. Please try again.";
+    const message = err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong while processing this action.";
     return { status: "error", message };
   }
 }
@@ -156,12 +231,10 @@ export async function deletePackageAction(_prev: AuthActionState, formData: Form
   try {
     const sb = supabase as SbClient;
 
-    // Check all restricted FK dependencies in parallel
     const depResults = await Promise.all(
       PACKAGE_DEPENDENCIES.map(async (dep) => {
         let query = sb.from(dep.table).select("id", { count: "exact", head: true }).eq(dep.column, packageId);
 
-        // subscription_addons.addon_id references package_addons, not packages directly
         if (dep.table === "subscription_addons" && dep.column === "addon_id") {
           query = sb.from("package_addons").select("id", { count: "exact", head: true }).eq("package_id", packageId);
           const { count: addonCount } = await query;
@@ -183,7 +256,6 @@ export async function deletePackageAction(_prev: AuthActionState, formData: Form
 
     const totalRestricted = depResults.filter((d) => d.isRestricted).reduce((s, d) => s + d.count, 0);
 
-    // If any restricted FK references exist, block hard delete
     if (totalRestricted > 0 && !forceDeactivate) {
       const details = depResults
         .filter((d) => d.count > 0)
@@ -191,13 +263,12 @@ export async function deletePackageAction(_prev: AuthActionState, formData: Form
         .join(", ");
       return {
         status: "error",
-        message: `Cannot delete: ${details}. Deactivate the plan instead. Existing subscriptions will keep working until they expire. Submit again with force deactivation to proceed.`,
+        message: `Cannot delete: ${details}. Deactivate the plan instead.`,
         fieldErrors: { forceDeactivate: [details] }
       };
     }
 
     if (totalRestricted > 0) {
-      // Archive/deactivate instead of delete
       const { error } = await sb.from("packages").update({ is_active: false }).eq("id", packageId);
       if (error) return { status: "error", message: error.message };
       await writeAuditLog({
@@ -207,24 +278,19 @@ export async function deletePackageAction(_prev: AuthActionState, formData: Form
         entityId: packageId,
         metadata: {
           dependencyDetails: depResults.filter((d) => d.count > 0).map((d) => ({ table: d.table, count: d.count })),
-          message: "Package deactivated because it has historical subscription/addon references. Hard delete blocked."
         }
       });
       revalidatePath("/super-admin/subscriptions");
-      return {
-        status: "success",
-        message: `Package deactivated — ${totalRestricted} historical reference(s) exist. Existing subscriptions will keep working.`
-      };
+      return { status: "success", message: `Package deactivated — ${totalRestricted} historical reference(s) exist.` };
     }
 
-    // Zero references — safe to hard delete all related data via CASCADE
     const { error } = await sb.from("packages").delete().eq("id", packageId);
     if (error) return { status: "error", message: error.message };
     await writeAuditLog({ actorId: auth.context.userId, action: "package.deleted", entityType: "package", entityId: packageId });
     revalidatePath("/super-admin/subscriptions");
     return { status: "success", message: "Package permanently deleted." };
   } catch (err) {
-    const message = err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong while processing this action. Please try again.";
+    const message = err instanceof Error ? err.message : typeof err === "string" ? err : "Something went wrong while processing this action.";
     return { status: "error", message };
   }
 }

@@ -5,6 +5,9 @@ export interface OrgFeatureFlags {
   maxStaff: number;
   maxStorageGb: number;
   maxApiCalls: number;
+  membershipPlanTypes: number;
+  weeklyClasses: number;
+  smsMonthly: number;
 
   // Attendance
   manualAttendance: boolean;
@@ -28,6 +31,7 @@ export interface OrgFeatureFlags {
   expiryTracking: boolean;
   goalTracking: boolean;
   progressPhotos: boolean;
+  membershipPauseFreeze: boolean;
 
   // CRM
   leadManagement: boolean;
@@ -39,25 +43,40 @@ export interface OrgFeatureFlags {
   nutritionPlans: boolean;
   ptSessions: boolean;
   classBooking: boolean;
+  waitlistManagement: boolean;
+  crossBranchClassBooking: boolean;
+  trainerCommissionsPayroll: boolean;
+  staffAttendanceLeave: boolean;
 
   // Billing
   billingInvoices: boolean;
   receipts: boolean;
   paymentTracking: boolean;
+  onlinePaymentLinks: boolean;
+  renewalReminders: boolean;
+  autoBilling: boolean;
+  discountPromoCodes: boolean;
+  corporateBulkMemberships: boolean;
 
   // Reports
   basicReports: boolean;
   advancedReportsEnabled: boolean;
+  customDashboards: boolean;
 
   // Communication
   emailNotifications: boolean;
   inAppNotifications: boolean;
   whatsappIntegration: boolean;
   smsIntegration: boolean;
+  birthdayGreetings: boolean;
+  broadcastMessages: boolean;
+  emailCampaigns: boolean;
 
   // Platform
   memberPortal: boolean;
   trainerPortal: boolean;
+  brandedMobileApp: boolean;
+  dietWorkoutPlans: boolean;
 
   // AI
   aiEnabled: boolean;
@@ -80,7 +99,7 @@ export interface OrgFeatureFlags {
   prioritySupport: boolean;
   staffManagement: boolean;
 
-  // Legacy aliases for backward compatibility (resolved via FEATURE_MAP aliases)
+  // Legacy aliases
   classSchedulingEnabled: boolean;
   communicationsEnabled: boolean;
   trainerAssignmentEnabled: boolean;

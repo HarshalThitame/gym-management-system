@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useActionState } from "react";
-import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, LineChart, Loader2, Minus, Plus, ReceiptText, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, LineChart, Loader2, Minus, Plus, ReceiptText, RefreshCw, XCircle, Users, Briefcase, Calendar, MessageSquare, BarChart3, Smartphone, Lock } from "lucide-react";
 import { LineChart as RechartsLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Line } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -11,7 +11,10 @@ import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { formatCurrency } from "@/features/enterprise/lib/business-rules";
 import { requestPlanChangeAction, toggleAutoRenewAction, cancelSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
-import type { PackageWithMeta, SubscriptionWithPackage, UsageHistoryPoint } from "@/features/organization-owner/actions/plan-data-actions";
+import type { PackageWithMeta, SubscriptionWithPackage, UsageHistoryPoint, OrgUsageData } from "@/features/organization-owner/actions/plan-data-actions";
+import { FeatureCard, FeatureCategorySection, LimitBar } from "@/components/ui/feature-card";
+import { FEATURE_CATEGORIES } from "@/features/subscription/feature-definitions";
+import { cn } from "@/lib/utils";
 
 type EnterprisePlanManagementProps = {
   organizationId: string;
@@ -19,12 +22,23 @@ type EnterprisePlanManagementProps = {
   allPackages: PackageWithMeta[];
   currentSubscription: SubscriptionWithPackage | null;
   usageHistory: UsageHistoryPoint[];
+  orgUsage: OrgUsageData | null;
+};
+
+const CATEGORY_ICONS: Record<string, any> = {
+  members: Users,
+  billing: CreditCard,
+  classes: Calendar,
+  staff: Briefcase,
+  communication: MessageSquare,
+  reports: BarChart3,
+  portal: Smartphone,
 };
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory }: EnterprisePlanManagementProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "compare" | "billing" | "addons" | "timeline">("overview");
+export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage }: EnterprisePlanManagementProps) {
+  const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
   const [showUpgradeForm, setShowUpgradeForm] = useState<string | null>(null);
@@ -32,52 +46,33 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   const [autoRenewState, autoRenewAction, autoRenewPending] = useActionState(toggleAutoRenewAction, initialAuthActionState);
   const [cancelState, cancelAction, cancelPending] = useActionState(cancelSubscriptionAction, initialAuthActionState);
 
-
   const packageName = planContext.packageName?.toLowerCase() ?? "unknown";
   const isActive = planContext.status === "active";
   const isTrialing = planContext.isTrialing;
   const isSuspended = planContext.isSuspended;
   const autoRenew = currentSubscription ? (currentSubscription as unknown as { auto_renew: boolean }).auto_renew : true;
 
-  // Find the current package from the packages list
+  // Get features from the package's _features enriched data
+  const currentPkgFeatures = useMemo(() => {
+    if (!currentSubscription?.package?._features) return {};
+    return currentSubscription.package._features;
+  }, [currentSubscription]);
+
+  const currentPkgLimits = useMemo(() => {
+    if (!currentSubscription?.package?._limits) return {};
+    return currentSubscription.package._limits;
+  }, [currentSubscription]);
+
   const currentPkg = currentSubscription
     ? allPackages.find((p) => p.id === currentSubscription.package_id) ?? null
     : null;
 
-  // Trial countdown
   const trialDaysRemaining = useMemo(() => {
     if (!planContext.trialEndsAt) return null;
     return Math.max(0, Math.ceil((planContext.trialEndsAt.getTime() - Date.now()) / 86400000));
   }, [planContext.trialEndsAt]);
 
-  // Build feature list from package columns
-  const featureLabels: Record<string, string> = {
-    qr_attendance_enabled: "QR Attendance",
-    biometric_attendance_enabled: "Biometric Attendance",
-    rfid_attendance_enabled: "RFID Attendance",
-    class_scheduling_enabled: "Class Scheduling",
-    trainer_assignment_enabled: "Trainer Assignment",
-    razorpay_enabled: "Online Payments",
-    communications_enabled: "Member Communications",
-    ai_enabled: "AI Recommendations",
-    advanced_reports_enabled: "Advanced Reports & BI",
-    custom_domain_enabled: "Custom Domain",
-    api_access_enabled: "API Access",
-    notifications_enabled: "Notifications",
-    white_label_enabled: "White Label",
-  };
-
-  const allFeatureKeys = Object.keys(featureLabels);
-
-  // Current package's enabled features
-  const currentFeatures = useMemo(() => {
-    if (!currentPkg) return {} as Record<string, boolean>;
-    const features: Record<string, boolean> = {};
-    for (const key of allFeatureKeys) {
-      features[key] = !!(currentPkg as unknown as Record<string, unknown>)[key];
-    }
-    return features;
-  }, [currentPkg]);
+  const isYearly = billingCycle === "yearly";
 
   const handleUpgradeRequest = useCallback((targetPlanName: string) => async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -93,15 +88,11 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
     autoRenewAction(fd);
   }, [autoRenew, autoRenewAction]);
 
-  // Available add-ons (configured by Super Admin in the future)
-  const availableAddons: Array<{ name: string; description: string; price: number; category: string }> = [];
-
-  // ── Render ──
   return (
     <div className="space-y-8">
       <ToastContainer />
 
-      {/* ═══ TRIAL BANNER ═══ */}
+      {/* Trial Banner */}
       {isTrialing && trialDaysRemaining !== null ? (
         <div className={`rounded-lg border p-5 ${trialDaysRemaining <= 3 ? "border-red-200 bg-red-50" : "border-cyan-200 bg-cyan-50"}`}>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -121,7 +112,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
         </div>
       ) : null}
 
-      {/* ═══ SUSPENDED BANNER ═══ */}
+      {/* Suspended Banner */}
       {isSuspended ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-5" role="alert">
           <div className="flex items-start gap-3">
@@ -131,20 +122,20 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
         </div>
       ) : null}
 
-      {/* ═══ TAB BAR ═══ */}
+      {/* Tab Bar */}
       <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1" role="tablist">
-        {(["overview", "compare", "billing", "addons", "timeline"] as const).map((tab) => (
+        {(["overview", "usage", "features", "compare", "billing", "timeline"] as const).map((tab) => (
           <button key={tab} className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-bold transition ${activeTab === tab ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setActiveTab(tab)} role="tab" aria-selected={activeTab === tab} type="button">
-            {tab === "overview" ? "Overview" : tab === "compare" ? "Compare Plans" : tab === "billing" ? "Billing" : tab === "addons" ? "Add-Ons" : "Timeline"}
+            {tab === "overview" ? "Overview" : tab === "usage" ? "Usage" : tab === "features" ? "Features" : tab === "compare" ? "Compare Plans" : tab === "billing" ? "Billing" : "Timeline"}
           </button>
         ))}
       </div>
 
       {/* ═══ TAB: OVERVIEW ═══ */}
-      {activeTab === "overview" ? (
+      {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid gap-5 lg:grid-cols-3">
-            {/* Current Plan Card */}
+            {/* Current Plan */}
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2"><CreditCard className="size-5 text-muted-foreground" /><h2 className="text-xl font-black">Current Plan</h2></div>
@@ -173,59 +164,180 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                   </div>
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Renewal</p><p className="mt-1 text-sm font-bold">{planContext.expiresAt ? planContext.expiresAt.toLocaleDateString("en-IN") : "No expiry"}</p></div>
                 </div>
-                <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5" onClick={() => setActiveTab("compare")} type="button">Compare & Upgrade</button>
-                <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-all hover:bg-red-100" onClick={() => setShowCancel(true)} type="button">Cancel Subscription</button>
+                <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5" onClick={() => setActiveTab("usage")} type="button">View Usage & Limits</button>
               </CardContent>
             </Card>
 
-            {/* Usage Trend */}
+            {/* Usage Summary */}
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2"><LineChart className="size-5 text-muted-foreground" /><h2 className="text-xl font-black">Usage</h2></div>
+                <div className="flex items-center gap-2"><LineChart className="size-5 text-muted-foreground" /><h2 className="text-xl font-black">Usage Summary</h2></div>
               </CardHeader>
-              <CardContent>
-                {usageHistory.length < 2 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">Not enough usage data yet.</p>
+              <CardContent className="space-y-4">
+                {orgUsage ? (
+                  <>
+                    <LimitBar label="Active Members" current={orgUsage.memberCount} limit={orgUsage.memberLimit} />
+                    <LimitBar label="Staff Users" current={orgUsage.staffCount} limit={orgUsage.staffLimit} />
+                    <LimitBar label="SMS Used" current={orgUsage.smsUsed} limit={orgUsage.smsLimit} />
+                    {usageHistory.length >= 2 && (
+                      <div className="h-32 w-full mt-2">
+                        <ResponsiveContainer height="100%" width="100%">
+                          <RechartsLine data={usageHistory}>
+                            <Tooltip />
+                            <Line dataKey="members" stroke="#16a34a" strokeWidth={2} dot={{ r: 2 }} type="monotone" name="Members" />
+                          </RechartsLine>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="h-40 w-full">
-                    <ResponsiveContainer height="100%" width="100%">
-                      <RechartsLine data={usageHistory}>
-                        <Tooltip />
-                        <Line dataKey="members" stroke="#16a34a" strokeWidth={2} dot={{ r: 2 }} type="monotone" name="Members" />
-                        <Line dataKey="branches" stroke="#0891b2" strokeWidth={2} dot={{ r: 2 }} type="monotone" name="Branches" />
-                      </RechartsLine>
-                    </ResponsiveContainer>
-                  </div>
+                  <p className="py-6 text-center text-sm text-muted-foreground">No usage data available.</p>
                 )}
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-md bg-surface-muted p-2"><p className="text-xs text-muted-foreground">Plan Limit</p><p className="text-sm font-bold">{currentPkg ? `${currentPkg.max_members} members` : "—"}</p></div>
-                  <div className="rounded-md bg-surface-muted p-2"><p className="text-xs text-muted-foreground">Branches</p><p className="text-sm font-bold">{currentPkg ? `${currentPkg.max_branches} max` : "—"}</p></div>
-                  <div className="rounded-md bg-surface-muted p-2"><p className="text-xs text-muted-foreground">Features</p><p className="text-sm font-bold">{currentPkg ? `${Object.entries(currentFeatures).filter(([, v]) => v).length}/${allFeatureKeys.length}` : "—"}</p></div>
-                </div>
               </CardContent>
             </Card>
 
-            {/* Current Add-Ons */}
+            {/* Quick Actions */}
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2"><Plus className="size-5 text-muted-foreground" /><h2 className="text-xl font-black">Add-Ons</h2></div>
+                <div className="flex items-center gap-2"><Plus className="size-5 text-muted-foreground" /><h2 className="text-xl font-black">Quick Actions</h2></div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">Enhance your plan with additional features.</p>
-                <div className="rounded-md border border-dashed border-border bg-surface-muted p-4 text-center">
-                  <p className="text-sm font-semibold text-muted-foreground">No add-ons yet</p>
-                  <p className="text-xs text-muted-foreground">Browse the marketplace to enhance your plan.</p>
-                </div>
-                <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-bold transition-all hover:border-border-strong" onClick={() => setActiveTab("addons")} type="button"><Plus className="size-4" /> Browse Add-Ons</button>
+                <button onClick={() => setActiveTab("compare")} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5" type="button">Compare Plans & Upgrade</button>
+                <button onClick={() => setActiveTab("features")} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-bold transition-all hover:bg-accent/10" type="button">View Features</button>
+                <button onClick={() => setActiveTab("billing")} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-bold transition-all hover:bg-accent/10" type="button">Billing & Invoices</button>
+                <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-all hover:bg-red-100" onClick={() => setShowCancel(true)} type="button">Cancel Subscription</button>
               </CardContent>
             </Card>
           </div>
         </div>
-      ) : null}
+      )}
+
+      {/* ═══ TAB: USAGE ═══ */}
+      {activeTab === "usage" && orgUsage && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader><h2 className="text-2xl font-black">Resource Usage</h2><p className="text-sm text-muted-foreground">Usage vs plan limits for {currentPkg?.name ?? planContext.packageName}</p></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <LimitBar label="Active Members" current={orgUsage.memberCount} limit={orgUsage.memberLimit} limitLabel="Up to 200 active members" />
+                <LimitBar label="Staff Users" current={orgUsage.staffCount} limit={orgUsage.staffLimit} limitLabel="Up to 3 staff users" />
+                <LimitBar label="Membership Plans" current={orgUsage.planTypesCount} limit={orgUsage.planTypesLimit} limitLabel="Up to 10 plan types" />
+                <LimitBar label="Weekly Classes" current={orgUsage.weeklyClasses} limit={orgUsage.weeklyClassesLimit} limitLabel="Up to 5 classes per week" />
+                <LimitBar label="SMS Used (Monthly)" current={orgUsage.smsUsed} limit={orgUsage.smsLimit} limitLabel="Up to 500 SMS per month" />
+                <LimitBar label="Branches" current={orgUsage.branchCount} limit={orgUsage.branchLimit} limitLabel="Single branch" />
+              </div>
+
+              {usageHistory.length >= 2 && (
+                <div className="mt-6">
+                  <h3 className="text-base font-black mb-3">Member Growth (6 months)</h3>
+                  <div className="h-48 w-full">
+                    <ResponsiveContainer height="100%" width="100%">
+                      <RechartsLine data={usageHistory}>
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Line dataKey="members" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} type="monotone" name="Members" />
+                      </RechartsLine>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {orgUsage.memberPercent >= 80 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+                <div>
+                  <p className="text-sm font-bold text-amber-800">You are approaching your plan limit</p>
+                  <p className="text-xs text-amber-700 mt-1">Consider upgrading to unlock more capacity and features.</p>
+                  <button onClick={() => setActiveTab("compare")} className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white" type="button">Upgrade Plan</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ TAB: FEATURES ═══ */}
+      {activeTab === "features" && (
+        <div className="space-y-5">
+          <Card>
+            <CardHeader><h2 className="text-2xl font-black">Plan Features</h2><p className="text-sm text-muted-foreground">Features included in your {currentPkg?.name ?? planContext.packageName} plan</p></CardHeader>
+            <CardContent className="space-y-6">
+              {FEATURE_CATEGORIES.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat.id] ?? Check;
+                const catFeatures = cat.features.map((f) => ({
+                  ...f,
+                  included: currentPkgFeatures[f.featureCode] === true || currentPkgFeatures[f.featureCode] === "true",
+                }));
+                if (catFeatures.length === 0) return null;
+                return (
+                  <FeatureCategorySection
+                    key={cat.id}
+                    name={cat.name}
+                    description={cat.description}
+                    icon={<Icon className="size-4" />}
+                  >
+                    {catFeatures.map((f, idx) => (
+                      <FeatureCard
+                        key={`${f.featureCode}-${idx}`}
+                        label={f.label}
+                        description={f.description}
+                        included={f.included}
+                        {...(f.included ? {} : { upgradeLabel: f.upgradeLabel ?? "Locked" })}
+                        {...(f.included && f.limitLabel ? { limitLabel: f.limitLabel } : {})}
+                      />
+                    ))}
+                  </FeatureCategorySection>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Locked features call to action */}
+          {currentPkg && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <Lock className="size-8 text-muted-foreground" />
+                  <div>
+                    <h3 className="text-lg font-black">Need more features?</h3>
+                    <p className="text-sm text-muted-foreground">Unlock premium features by upgrading to a higher plan.</p>
+                  </div>
+                  <button onClick={() => setActiveTab("compare")} className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-sm" type="button">Compare Plans & Upgrade</button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* ═══ TAB: COMPARE PLANS ═══ */}
-      {activeTab === "compare" ? (
+      {activeTab === "compare" && (
         <div className="space-y-6">
+          {/* Billing cycle toggle */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold">Billing:</span>
+            <div className="flex overflow-hidden rounded-lg border border-border">
+              <button
+                onClick={() => setBillingCycle("monthly")}
+                className={cn("px-4 py-2 text-sm font-bold transition", billingCycle === "monthly" ? "bg-primary text-primary-foreground" : "bg-surface text-muted-foreground hover:text-foreground")}
+                type="button"
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle("yearly")}
+                className={cn("px-4 py-2 text-sm font-bold transition border-l border-border", billingCycle === "yearly" ? "bg-primary text-primary-foreground" : "bg-surface text-muted-foreground hover:text-foreground")}
+                type="button"
+              >
+                Yearly <span className="text-[10px] opacity-80">(Save 17%)</span>
+              </button>
+            </div>
+          </div>
+
           {allPackages.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border bg-surface-muted p-8 text-center">
               <p className="text-sm font-semibold text-muted-foreground">No packages are available yet.</p>
@@ -233,133 +345,108 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             </div>
           ) : (
             <>
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div><h2 className="text-2xl font-black">Compare Plans</h2><p className="mt-1 text-sm text-muted-foreground">Packages configured by your platform administrator</p></div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[600px] text-left text-sm">
-                      <thead><tr className="border-b border-border">
-                        <th className="px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Feature</th>
-                        {allPackages.map((pkg) => (
-                          <th key={pkg.id} className={`px-4 py-3 ${currentPkg?.id === pkg.id ? "bg-accent/5" : ""}`}>
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="text-sm font-black">{pkg.name}</span>
-                              {(pkg as unknown as { recommended: boolean }).recommended ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Recommended</span> : null}
-                              {currentPkg?.id === pkg.id ? <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent">Current</span> : null}
-                            </div>
-                          </th>
-                        ))}
-                      </tr></thead>
-                      <tbody className="divide-y divide-border">
-                        <tr><td colSpan={allPackages.length + 1} className="bg-surface-muted px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Limits</td></tr>
-                        <tr className="hover:bg-surface-muted/50">
-                          <td className="px-4 py-3 font-semibold">Members</td>
-                          {allPackages.map((pkg) => (
-                            <td key={pkg.id} className={`px-4 py-3 text-center font-semibold ${currentPkg?.id === pkg.id ? "bg-accent/5" : ""}`}>
-                              {pkg.max_members === -1 ? "Unlimited" : String(pkg.max_members)}
-                            </td>
-                          ))}
-                        </tr>
-                        <tr className="hover:bg-surface-muted/50">
-                          <td className="px-4 py-3 font-semibold">Branches</td>
-                          {allPackages.map((pkg) => (
-                            <td key={pkg.id} className={`px-4 py-3 text-center font-semibold ${currentPkg?.id === pkg.id ? "bg-accent/5" : ""}`}>
-                              {pkg.max_branches === -1 ? "Unlimited" : String(pkg.max_branches)}
-                            </td>
-                          ))}
-                        </tr>
-                        <tr><td colSpan={allPackages.length + 1} className="bg-surface-muted px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Features</td></tr>
-                        {allFeatureKeys.map((key) => (
-                          <tr key={key} className="hover:bg-surface-muted/50">
-                            <td className="px-4 py-3 font-semibold">{featureLabels[key]}</td>
-                            {allPackages.map((pkg) => {
-                              const enabled = !!(pkg as unknown as Record<string, unknown>)[key];
-                              return (
-                                <td key={pkg.id} className={`px-4 py-3 text-center ${currentPkg?.id === pkg.id ? "bg-accent/5" : ""}`}>
-                                  {enabled ? <Check className="mx-auto size-4 text-green-600" /> : <Minus className="mx-auto size-4 text-muted-foreground" />}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {/* Pricing Cards */}
+              <div className="grid gap-5 lg:grid-cols-3">
+                {allPackages.map((pkg) => {
+                  const pkgPricing = (pkg as any)._pricing ?? [];
+                  const monthlyPrice = isYearly
+                    ? (pkgPricing.find((p: any) => p.billing_period === "annual")?.price ?? pkg.price ?? 0)
+                    : (pkgPricing.find((p: any) => p.billing_period === "monthly")?.price ?? pkg.price ?? 0);
+                  const isCurrent = currentPkg?.id === pkg.id;
+                  const limits = (pkg as any)._limits ?? {};
+                  const features = (pkg as any)._features ?? {};
 
-                  {/* Plan change request forms */}
-                  <div className="mt-6 space-y-4">
-                    <h3 className="text-lg font-black">Request Plan Change</h3>
-                    <p className="text-sm text-muted-foreground">Select a target plan below. An admin will review your request.</p>
-                    {allPackages.filter((p) => p.id !== currentPkg?.id).map((targetPkg) => (
-                      <div key={targetPkg.id} className="rounded-lg border border-border bg-surface-muted p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-bold">{targetPkg.name}</p>
-                            <p className="text-xs text-muted-foreground">{targetPkg.max_members} members · {targetPkg.max_branches} branches</p>
-                          </div>
-                          <button className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm" onClick={() => setShowUpgradeForm(showUpgradeForm === targetPkg.id ? null : targetPkg.id)} type="button">
-                            {showUpgradeForm === targetPkg.id ? "Cancel" : "Request Upgrade"}
-                          </button>
-                        </div>
-                        {showUpgradeForm === targetPkg.id ? (
-                          <form onSubmit={handleUpgradeRequest(targetPkg.name)} className="mt-4 space-y-3">
-                            <input name="targetPlan" type="hidden" value={targetPkg.name} />
-                            <input name="billingCycle" type="hidden" value={billingCycle} />
-                            <div className="space-y-2">
-                              <label className="text-sm font-bold">Reason for change <span className="text-red-500">*</span></label>
-                              <textarea className={`${selectClass} min-h-[80px]`} name="reason" required placeholder="Explain why you need to upgrade/downgrade..." rows={3} />
-                            </div>
-                            {planChangeState.message ? (
-                              <div className={`rounded-md border p-3 text-sm font-semibold ${planChangeState.status === "success" ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`} role="alert">{planChangeState.message}</div>
-                            ) : null}
-                            <div className="flex justify-end">
-                              <button className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-sm disabled:opacity-50" disabled={planChangePending} type="submit">
-                                {planChangePending ? <Loader2 className="size-4 animate-spin" /> : null}
-                                Submit Request
-                              </button>
-                            </div>
-                          </form>
-                        ) : null}
+                  return (
+                    <div key={pkg.id} className={cn(
+                      "relative rounded-xl border-2 bg-gradient-to-b from-background to-accent/5 p-6 transition-all hover:shadow-lg",
+                      isCurrent ? "border-primary shadow-md" : "border-border",
+                      (pkg as any).recommended ? "ring-2 ring-amber-400" : ""
+                    )}>
+                      {(pkg as any).recommended && !isCurrent && (
+                        <span className="absolute -top-3 right-4 rounded-full bg-amber-400 px-3 py-1 text-xs font-bold text-amber-900 shadow-sm">Popular</span>
+                      )}
+                      {isCurrent && (
+                        <span className="absolute -top-3 left-4 rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground shadow-sm">Current Plan</span>
+                      )}
+                      <p className="text-lg font-black">{pkg.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{pkg.description}</p>
+                      <div className="mt-4 flex items-baseline gap-1">
+                        <span className="text-3xl font-black">₹{Intl.NumberFormat("en-IN").format(Math.round(monthlyPrice / 100))}</span>
+                        <span className="text-sm text-muted-foreground">/ {isYearly ? "year" : "month"}</span>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
 
-              {/* Current plan features detail */}
-              <Card>
-                <CardHeader><h2 className="text-2xl font-black">Features Included</h2><p className="text-sm text-muted-foreground">Features included in {currentPkg?.name ?? planContext.packageName}</p></CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {allFeatureKeys.map((key) => {
-                      const enabled = !!currentFeatures[key];
-                      return (
-                        <div key={key} className={`rounded-md border p-4 transition-all ${enabled ? "border-border bg-surface" : "border-dashed border-border bg-surface-muted"}`}>
-                          <div className="flex items-start justify-between gap-4">
-                            <div><p className={`text-sm font-bold ${enabled ? "" : "text-muted-foreground"}`}>{featureLabels[key]}</p></div>
-                            {enabled ? (
-                              <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700"><CheckCircle2 className="size-3.5" /> Included</span>
-                            ) : (
-                              <span className="flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-muted-foreground"><XCircle className="size-3.5" /> Locked</span>
-                            )}
-                          </div>
+                      {/* Key limits */}
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Members</span>
+                          <span className="font-bold">{limits.max_members === -1 ? "Unlimited" : limits.max_members ?? "—"}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Branches</span>
+                          <span className="font-bold">{limits.max_branches === -1 ? "Unlimited" : limits.max_branches ?? "—"}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Staff</span>
+                          <span className="font-bold">{limits.max_staff === -1 ? "Unlimited" : limits.max_staff ?? "—"}</span>
+                        </div>
+                      </div>
+
+                      {/* Feature highlights */}
+                      <div className="mt-4 space-y-1.5">
+                        {FEATURE_CATEGORIES.map((cat) => {
+                          const includedCount = cat.features.filter((f) => features[f.featureCode] === true || features[f.featureCode] === "true").length;
+                          return (
+                            <div key={cat.id} className="flex items-center gap-2 text-xs">
+                              {includedCount > 0 ? (
+                                <Check className="size-3.5 shrink-0 text-green-600" />
+                              ) : (
+                                <Minus className="size-3.5 shrink-0 text-muted-foreground" />
+                              )}
+                              <span className="text-muted-foreground">{cat.name}</span>
+                              <span className="ml-auto font-semibold">{includedCount}/{cat.features.length}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {!isCurrent && (
+                        <button
+                          onClick={() => setShowUpgradeForm(showUpgradeForm === pkg.id ? null : pkg.id)}
+                          className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5"
+                          type="button"
+                        >
+                          {showUpgradeForm === pkg.id ? "Cancel" : "Request Upgrade"}
+                        </button>
+                      )}
+
+                      {showUpgradeForm === pkg.id && !isCurrent && (
+                        <form onSubmit={handleUpgradeRequest(pkg.name)} className="mt-4 space-y-3 border-t border-border pt-4">
+                          <input name="targetPlan" type="hidden" value={pkg.name} />
+                          <input name="billingCycle" type="hidden" value={billingCycle} />
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold">Reason <span className="text-red-500">*</span></label>
+                            <textarea className={`${selectClass} min-h-[80px]`} name="reason" required placeholder="Explain why you need to upgrade..." rows={3} />
+                          </div>
+                          {planChangeState.message ? (
+                            <div className={`rounded-md border p-3 text-sm font-semibold ${planChangeState.status === "success" ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`} role="alert">{planChangeState.message}</div>
+                          ) : null}
+                          <button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-50" disabled={planChangePending} type="submit">
+                            {planChangePending ? <Loader2 className="size-4 animate-spin" /> : null}
+                            Submit Upgrade Request
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
         </div>
-      ) : null}
+      )}
 
       {/* ═══ TAB: BILLING ═══ */}
-      {activeTab === "billing" ? (
+      {activeTab === "billing" && (
         <div className="space-y-5">
           <div className="grid gap-5 lg:grid-cols-2">
             <Card>
@@ -400,24 +487,10 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             </CardContent>
           </Card>
         </div>
-      ) : null}
-
-      {/* ═══ TAB: ADD-ONS ═══ */}
-      {activeTab === "addons" ? (
-        <Card>
-          <CardHeader><h2 className="text-2xl font-black">Add-On Marketplace</h2><p className="text-sm text-muted-foreground">Additional features to enhance your plan</p></CardHeader>
-          <CardContent>
-            <div className="rounded-md border border-dashed border-border bg-surface-muted p-8 text-center">
-              <Plus className="mx-auto size-8 text-muted-foreground" />
-              <p className="mt-3 text-sm font-semibold text-muted-foreground">Add-ons coming soon</p>
-              <p className="mt-1 text-xs text-muted-foreground">Super Admin will be able to configure available add-ons for your organization.</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      )}
 
       {/* ═══ TAB: TIMELINE ═══ */}
-      {activeTab === "timeline" ? (
+      {activeTab === "timeline" && (
         <Card>
           <CardHeader><h2 className="text-2xl font-black">Subscription Timeline</h2></CardHeader>
           <CardContent>
@@ -427,9 +500,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                 <div className="pb-6">
                   <p className="text-sm font-bold">Current Subscription</p>
                   <p className="text-xs text-muted-foreground">Plan: {currentPkg?.name ?? planContext.packageName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Started: {currentSubscription?.started_at ? new Date(currentSubscription.started_at).toLocaleDateString("en-IN") : "—"}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Started: {currentSubscription?.started_at ? new Date(currentSubscription.started_at).toLocaleDateString("en-IN") : "—"}</p>
                 </div>
               </div>
               {planContext.expiresAt ? (
@@ -445,10 +516,10 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             </div>
           </CardContent>
         </Card>
-      ) : null}
+      )}
 
-      {/* ═══ CANCEL FLOW ═══ */}
-      {showCancel ? (
+      {/* Cancel Confirmation Modal */}
+      {showCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-2xl">
             <div className="mb-4 flex items-start gap-3">
@@ -477,7 +548,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             </form>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

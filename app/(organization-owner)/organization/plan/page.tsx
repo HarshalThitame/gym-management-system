@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
-import { getActivePackagesAction, getOrgSubscriptionAction, getUsageHistoryAction } from "@/features/organization-owner/actions/plan-data-actions";
+import { getActivePackagesAction, getOrgSubscriptionAction, getUsageHistoryAction, getOrgUsageAction } from "@/features/organization-owner/actions/plan-data-actions";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import type { RoleName } from "@/types/auth";
 
@@ -24,11 +24,12 @@ async function PlanContent() {
   const organizationId = ctx.organizationId ?? null;
   if (!organizationId) redirect("/unauthorized?reason=organization_scope");
 
-  const [planContext, allPackages, currentSubscription, usageHistory] = await Promise.all([
+  const [planContext, allPackages, currentSubscription, usageHistory, orgUsage] = await Promise.all([
     getOrgPlanContext(organizationId),
     getActivePackagesAction(),
     getOrgSubscriptionAction(),
     getUsageHistoryAction(),
+    getOrgUsageAction(),
   ]);
 
   const { EnterprisePlanManagement } = await import("@/features/organization-owner/components/enterprise-plan-management");
@@ -42,6 +43,7 @@ async function PlanContent() {
         allPackages={allPackages}
         currentSubscription={currentSubscription}
         usageHistory={usageHistory}
+        orgUsage={orgUsage}
       />
     </div>
   );

@@ -4,32 +4,35 @@ import type { OrgFeatureFlags, FeatureFlagKey } from "./feature-flags";
 
 const SAFE_DEFAULT: OrgFeatureFlags = {
   maxMembers: 0, maxBranches: 0, maxTrainers: 0, maxStaff: 0, maxStorageGb: 0, maxApiCalls: 0,
+  membershipPlanTypes: 0, weeklyClasses: 0, smsMonthly: 0,
   manualAttendance: false, qrAttendanceEnabled: false, dynamicQrAttendance: false,
   trainerAttendance: false, staffAttendance: false, branchAttendance: false,
   biometricAttendanceEnabled: false, fingerprintAttendance: false, faceRecognitionAttendance: false,
   rfidAttendanceEnabled: false, nfcAttendance: false, geoFencingAttendance: false,
   attendanceApi: false, attendanceReports: false,
   memberManagement: false, membershipRenewals: false, expiryTracking: false,
-  goalTracking: false, progressPhotos: false,
+  goalTracking: false, progressPhotos: false, membershipPauseFreeze: false,
   leadManagement: false, trialManagement: false,
   trainerManagement: false, workoutAssignment: false, nutritionPlans: false,
-  ptSessions: false, classBooking: false,
+  ptSessions: false, classBooking: false, waitlistManagement: false,
+  crossBranchClassBooking: false, trainerCommissionsPayroll: false, staffAttendanceLeave: false,
   billingInvoices: false, receipts: false, paymentTracking: false,
-  basicReports: false, advancedReportsEnabled: false,
+  onlinePaymentLinks: false, renewalReminders: false,
+  autoBilling: false, discountPromoCodes: false, corporateBulkMemberships: false,
+  basicReports: false, advancedReportsEnabled: false, customDashboards: false,
   emailNotifications: false, inAppNotifications: false,
   whatsappIntegration: false, smsIntegration: false,
-  memberPortal: false, trainerPortal: false,
+  birthdayGreetings: false, broadcastMessages: false, emailCampaigns: false,
+  memberPortal: false, trainerPortal: false, brandedMobileApp: false, dietWorkoutPlans: false,
   aiEnabled: false, aiCoach: false, aiRetentionAnalysis: false, aiRevenueInsights: false,
   whiteLabelEnabled: false, customDomainEnabled: false, customBranding: false,
   multiBranchManagement: false, franchiseManagement: false,
   apiAccessEnabled: false, webhooks: false, auditLogs: false,
   advancedRbac: false, prioritySupport: false, staffManagement: false,
-  // Legacy aliases
   classSchedulingEnabled: false, communicationsEnabled: false,
   trainerAssignmentEnabled: false, razorpayEnabled: false,
 };
 
-// Map of feature flag keys to feature_catalog codes and limit keys
 const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "limit"; code: string }> = {
   // Limits
   maxMembers: { type: "limit", code: "max_members" },
@@ -38,6 +41,9 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   maxStaff: { type: "limit", code: "max_staff" },
   maxStorageGb: { type: "limit", code: "max_storage_gb" },
   maxApiCalls: { type: "limit", code: "max_api_calls" },
+  membershipPlanTypes: { type: "limit", code: "membership_plan_types" },
+  weeklyClasses: { type: "limit", code: "weekly_classes" },
+  smsMonthly: { type: "limit", code: "sms_monthly" },
 
   // Attendance features
   manualAttendance: { type: "feature", code: "manual_attendance" },
@@ -61,6 +67,7 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   expiryTracking: { type: "feature", code: "expiry_tracking" },
   goalTracking: { type: "feature", code: "goal_tracking" },
   progressPhotos: { type: "feature", code: "progress_photos" },
+  membershipPauseFreeze: { type: "feature", code: "membership_pause_freeze" },
 
   // CRM
   leadManagement: { type: "feature", code: "lead_management" },
@@ -68,33 +75,48 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
 
   // Trainer
   trainerManagement: { type: "feature", code: "trainer_management" },
-  trainerAssignmentEnabled: { type: "feature", code: "workout_assignment" },  // backward compat
+  trainerAssignmentEnabled: { type: "feature", code: "workout_assignment" },
   workoutAssignment: { type: "feature", code: "workout_assignment" },
   nutritionPlans: { type: "feature", code: "nutrition_plans" },
   ptSessions: { type: "feature", code: "pt_sessions" },
   classBooking: { type: "feature", code: "class_booking" },
-  classSchedulingEnabled: { type: "feature", code: "class_booking" },  // backward compat
+  classSchedulingEnabled: { type: "feature", code: "class_booking" },
+  waitlistManagement: { type: "feature", code: "waitlist_management" },
+  crossBranchClassBooking: { type: "feature", code: "cross_branch_class_booking" },
+  trainerCommissionsPayroll: { type: "feature", code: "trainer_commissions_payroll" },
+  staffAttendanceLeave: { type: "feature", code: "staff_attendance_leave" },
 
   // Billing
   billingInvoices: { type: "feature", code: "billing_invoices" },
-  razorpayEnabled: { type: "feature", code: "billing_invoices" },  // backward compat
+  razorpayEnabled: { type: "feature", code: "billing_invoices" },
   receipts: { type: "feature", code: "receipts" },
   paymentTracking: { type: "feature", code: "payment_tracking" },
+  onlinePaymentLinks: { type: "feature", code: "online_payment_links" },
+  renewalReminders: { type: "feature", code: "renewal_reminders" },
+  autoBilling: { type: "feature", code: "auto_billing" },
+  discountPromoCodes: { type: "feature", code: "discount_promo_codes" },
+  corporateBulkMemberships: { type: "feature", code: "corporate_bulk_memberships" },
 
   // Reports
   basicReports: { type: "feature", code: "basic_reports" },
   advancedReportsEnabled: { type: "feature", code: "advanced_reports" },
+  customDashboards: { type: "feature", code: "custom_dashboards" },
 
   // Communication
   emailNotifications: { type: "feature", code: "email_notifications" },
   inAppNotifications: { type: "feature", code: "in_app_notifications" },
   whatsappIntegration: { type: "feature", code: "whatsapp_integration" },
   smsIntegration: { type: "feature", code: "sms_integration" },
-  communicationsEnabled: { type: "feature", code: "whatsapp_integration" },  // backward compat
+  communicationsEnabled: { type: "feature", code: "whatsapp_integration" },
+  birthdayGreetings: { type: "feature", code: "birthday_greetings" },
+  broadcastMessages: { type: "feature", code: "broadcast_messages" },
+  emailCampaigns: { type: "feature", code: "email_campaigns" },
 
   // Portals
   memberPortal: { type: "feature", code: "member_portal" },
   trainerPortal: { type: "feature", code: "trainer_portal" },
+  brandedMobileApp: { type: "feature", code: "branded_mobile_app" },
+  dietWorkoutPlans: { type: "feature", code: "diet_workout_plans" },
 
   // AI
   aiEnabled: { type: "feature", code: "ai_recommendations" },
@@ -118,11 +140,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   staffManagement: { type: "feature", code: "staff_management" },
 };
 
-/**
- * Resolves all feature flags and limits for an organization.
- * Queries the new package_features and package_limits tables dynamically.
- * Adding a new feature to the catalog automatically makes it resolvable here.
- */
 export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFeatureFlags> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -161,7 +178,6 @@ export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFea
     const packageId = sub.package_id as string;
     if (!packageId) return { ...SAFE_DEFAULT };
 
-    // Fetch all features and limits for the package in parallel
     const [featuresData, limitsData] = await Promise.all([
       (s as never as {
         from(t: string): {
@@ -179,20 +195,17 @@ export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFea
       }).from("package_limits").select("limit_code, value").eq("package_id", packageId),
     ]);
 
-    // Build feature lookup
     const featureValues: Record<string, boolean> = {};
     for (const f of (featuresData.data ?? [])) {
       const val = f.value;
       featureValues[f.feature_code as string] = val === true || val === "true";
     }
 
-    // Build limit lookup
     const limitValues: Record<string, number> = {};
     for (const l of (limitsData.data ?? [])) {
       limitValues[l.limit_code as string] = l.value as number;
     }
 
-    // Build the full OrgFeatureFlags object from the map
     const result: Record<string, unknown> = {};
     for (const [key, mapping] of Object.entries(FEATURE_MAP)) {
       if (mapping.type === "feature") {
@@ -209,10 +222,6 @@ export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFea
   }
 }
 
-/**
- * Checks a single feature for an organization.
- * Logs a warning if the feature key is not recognized (prevents silent false returns).
- */
 export async function hasFeature(organizationId: string, feature: FeatureFlagKey): Promise<boolean> {
   const mapping = FEATURE_MAP[feature];
   if (!mapping) {
@@ -220,32 +229,22 @@ export async function hasFeature(organizationId: string, feature: FeatureFlagKey
     return false;
   }
   if (mapping.type !== "feature") {
-    // This is a limit key, not a feature flag
     return false;
   }
   return organizationHasFeature(organizationId, mapping.code);
 }
 
-/**
- * Throws if an organization does not have a required feature.
- */
 export async function assertFeature(organizationId: string, feature: FeatureFlagKey): Promise<void> {
   const enabled = await hasFeature(organizationId, feature);
   if (!enabled) throw new Error("Feature not available on your current plan.");
 }
 
-/**
- * Checks whether an organization can add another member.
- */
 export async function isWithinMemberLimit(organizationId: string, currentMemberCount: number): Promise<boolean> {
   const flags = await getOrgFeatureFlags(organizationId);
   if (flags.maxMembers === -1) return true;
   return currentMemberCount < flags.maxMembers;
 }
 
-/**
- * Checks whether an organization can add another branch.
- */
 export async function isWithinBranchLimit(organizationId: string, currentBranchCount: number): Promise<boolean> {
   const flags = await getOrgFeatureFlags(organizationId);
   if (flags.maxBranches === -1) return true;
