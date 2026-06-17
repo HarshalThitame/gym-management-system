@@ -26,7 +26,7 @@ function computeMrr(price: number, period: string): number {
 }
 
 export function PaymentDashboard({ organizations, packages, subscriptions, invoicesByOrg, eventsByOrg }: PaymentDashboardProps) {
-  const [tab, setTab] = useState<"overview" | "invoices" | "webhooks" | "risks">("overview");
+  const [tab, setTab] = useState<"overview" | "invoices" | "webhooks" | "dunning" | "risks">("overview");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState("");
@@ -37,6 +37,14 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
   const allInvoices = useMemo(() => Object.values(invoicesByOrg).flat(), [invoicesByOrg]);
   const allEvents = useMemo(() => Object.values(eventsByOrg).flat(), [eventsByOrg]);
   const webhookEvents = useMemo(() => allEvents.filter((e: any) => e.event_type?.includes("webhook") || e.metadata?.source === "webhook"), [allEvents]);
+
+  // Dunning metrics
+  const dunningCases = allInvoices.filter((i: any) => i.dunning_status && i.dunning_status !== "none");
+  const dunningFailed = allInvoices.filter((i: any) => i.dunning_status === "payment_failed");
+  const dunningOverdue = allInvoices.filter((i: any) => i.dunning_status === "overdue");
+  const dunningGrace = allInvoices.filter((i: any) => i.dunning_status === "grace_period");
+  const dunningSuspended = allInvoices.filter((i: any) => i.dunning_status === "suspended");
+  const dunningTotalAmount = dunningCases.reduce((s: number, i: any) => s + (i.total_amount ?? i.subtotal_amount ?? 0), 0);
 
   // Metrics
   const paidInvoices = allInvoices.filter((i: any) => i.status === "paid");
@@ -105,7 +113,7 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
 
       {/* Tab Bar */}
       <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1" role="tablist">
-        {([{ key: "overview" as const, label: "Revenue & Metrics" }, { key: "invoices" as const, label: `Invoices (${allInvoices.length})` }, { key: "webhooks" as const, label: `Webhooks (${webhookEvents.length})` }, { key: "risks" as const, label: `Risks (${risks.length})` }]).map((t) => (
+        {([{ key: "overview" as const, label: "Revenue & Metrics" }, { key: "invoices" as const, label: `Invoices (${allInvoices.length})` }, { key: "dunning" as const, label: `Dunning (${dunningCases.length})` }, { key: "webhooks" as const, label: `Webhooks (${webhookEvents.length})` }, { key: "risks" as const, label: `Risks (${risks.length})` }]).map((t) => (
           <button key={t.key} className={cn("whitespace-nowrap rounded-md px-4 py-2 text-sm font-bold transition", tab === t.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} onClick={() => setTab(t.key)} role="tab" type="button">{t.label}</button>
         ))}
       </div>
@@ -122,6 +130,18 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
             <StatCard label="Overdue" value={String(overdueInvoices.length)} detail="Past due date" status={overdueInvoices.length > 0 ? "risk" : "good"} />
             <StatCard label="Webhook Health" value={String(successfulWebhooks)} detail={`${failedWebhooks} failed · Last: ${lastWebhook ? new Date(lastWebhook.created_at).toLocaleDateString("en-IN") : "N/A"}`} status={failedWebhooks > 0 ? "watch" : "good"} />
             <StatCard label="Upcoming Renewals" value={String(subscriptions.filter((s: any) => s.next_billing_date && new Date(s.next_billing_date) > new Date() && new Date(s.next_billing_date).getTime() - Date.now() < 30 * 86400000).length)} detail="Within 30 days" status="good" />
+          </div>
+
+          {/* Dunning Cards */}
+          <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
+            <h3 className="text-sm font-black text-red-800 mb-3">Dunning & Overdue Operations</h3>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-red-200 bg-white p-3"><p className="text-xs font-black uppercase text-red-600">Active Dunning</p><p className="text-xl font-black mt-1">{dunningCases.length}</p></div>
+              <div className="rounded-lg border border-amber-200 bg-white p-3"><p className="text-xs font-black uppercase text-amber-600">Overdue</p><p className="text-xl font-black mt-1">{dunningOverdue.length}</p></div>
+              <div className="rounded-lg border border-orange-200 bg-white p-3"><p className="text-xs font-black uppercase text-orange-600">Grace Period</p><p className="text-xl font-black mt-1">{dunningGrace.length}</p></div>
+              <div className="rounded-lg border border-red-200 bg-white p-3"><p className="text-xs font-black uppercase text-red-600">Suspended</p><p className="text-xl font-black mt-1">{dunningSuspended.length}</p></div>
+              <div className="rounded-lg border border-gray-200 bg-white p-3"><p className="text-xs font-black uppercase text-gray-600">Total Dunning Amount</p><p className="text-xl font-black mt-1">₹{Intl.NumberFormat("en-IN").format(Math.round(dunningTotalAmount / 100))}</p></div>
+            </div>
           </div>
         </div>
       )}
@@ -182,6 +202,40 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══ DUNNING ═══ */}
+      {tab === "dunning" && (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4"><p className="text-xs font-black uppercase text-red-700">Failed Payments</p><p className="text-2xl font-black mt-1 text-red-700">{dunningFailed.length}</p></div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-black uppercase text-amber-700">Grace Period</p><p className="text-2xl font-black mt-1 text-amber-700">{dunningGrace.length}</p></div>
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4"><p className="text-xs font-black uppercase text-orange-700">Suspended</p><p className="text-2xl font-black mt-1 text-orange-700">{dunningSuspended.length}</p></div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-background overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-4 py-3">Organization</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Dunning</th><th className="px-4 py-3">Attempts</th><th className="px-4 py-3">Next Retry</th><th className="px-4 py-3">Grace End</th><th className="px-4 py-3">Reason</th>
+              </tr></thead>
+              <tbody>
+                {dunningCases.slice(0, 50).length === 0 ? <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No dunning cases</td></tr> :
+                dunningCases.slice(0, 50).map((inv: any) => (
+                  <tr key={inv.id} className="border-b border-border hover:bg-accent/5">
+                    <td className="px-4 py-3 text-xs">{getOrgName(inv.organization_id)}</td>
+                    <td className="px-4 py-3 text-xs">{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
+                    <td className="px-4 py-3 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))}</td>
+                    <td className="px-4 py-3"><StatusBadgeDK status={inv.dunning_status} /></td>
+                    <td className="px-4 py-3 text-xs">{inv.dunning_attempts ?? 0}</td>
+                    <td className="px-4 py-3 text-[10px] text-muted-foreground" suppressHydrationWarning>{inv.dunning_next_retry_at ? new Date(inv.dunning_next_retry_at).toLocaleDateString("en-IN") : "—"}</td>
+                    <td className="px-4 py-3 text-[10px] text-muted-foreground" suppressHydrationWarning>{inv.dunning_grace_period_ends_at ? new Date(inv.dunning_grace_period_ends_at).toLocaleDateString("en-IN") : "—"}</td>
+                    <td className="px-4 py-3 text-[10px] text-muted-foreground max-w-[120px] truncate">{inv.dunning_last_failure_reason ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -269,6 +323,20 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
 }
 
 /* ─── Helpers ─── */
+
+function StatusBadgeDK({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    payment_failed: "border-red-200 bg-red-50 text-red-700",
+    overdue: "border-red-200 bg-red-50 text-red-700",
+    retry_scheduled: "border-blue-200 bg-blue-50 text-blue-700",
+    grace_period: "border-amber-200 bg-amber-50 text-amber-700",
+    suspended: "border-orange-200 bg-orange-50 text-orange-800",
+    resolved: "border-green-200 bg-green-50 text-green-700",
+    waived: "border-gray-200 bg-gray-50 text-gray-500",
+    none: "border-gray-200 bg-gray-50 text-gray-500",
+  };
+  return <span className={"inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold " + (colors[status] ?? "border-border bg-surface-muted text-muted-foreground")}>{status ?? "unknown"}</span>;
+}
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
