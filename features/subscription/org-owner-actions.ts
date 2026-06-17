@@ -36,21 +36,48 @@ export async function submitSubscriptionRequest(input: SubmitRequestInput) {
     return { ok: false, error: "Organization mismatch." };
   }
 
-  const { data, error } = await db().rpc("submit_subscription_request", {
-    p_organization_id: parsed.data.organizationId,
-    p_request_type: parsed.data.requestType,
-    p_requested_package_id: parsed.data.requestedPackageId ?? null,
-    p_current_package_id: parsed.data.currentPackageId ?? null,
-    p_requested_billing_period: parsed.data.requestedBillingPeriod ?? null,
-    p_reason: parsed.data.reason ?? null,
-    p_organization_note: parsed.data.organizationNote ?? null,
-  });
+  const { data: existing } = await db()
+    .from("subscription_requests")
+    .select("id")
+    .eq("organization_id", parsed.data.organizationId)
+    .eq("request_type", parsed.data.requestType)
+    .in("status", ["pending", "under_review"])
+    .maybeSingle();
+
+  if (existing) {
+    return { ok: false, error: `A ${parsed.data.requestType} request is already pending for this organization. Cancel it first or wait for review.` };
+  }
+
+  const { data: currentSub } = await db()
+    .from("organization_subscriptions")
+    .select("id, package_id, billing_period")
+    .eq("organization_id", parsed.data.organizationId)
+    .maybeSingle();
+
+  const { data: request, error } = await db()
+    .from("subscription_requests")
+    .insert({
+      organization_id: parsed.data.organizationId,
+      request_type: parsed.data.requestType,
+      status: "pending",
+      current_package_id: parsed.data.currentPackageId ?? (currentSub?.package_id ?? null),
+      requested_package_id: parsed.data.requestedPackageId ?? null,
+      requested_billing_period: parsed.data.requestedBillingPeriod ?? (currentSub?.billing_period ?? null),
+      requested_by: context.userId,
+      reason: parsed.data.reason ?? null,
+      organization_note: parsed.data.organizationNote ?? null,
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return { ok: false, error: error.message };
   }
+  if (!request) {
+    return { ok: false, error: "Failed to create subscription request." };
+  }
 
-  return { ok: true, data };
+  return { ok: true, data: { requestId: request.id, status: "pending" } };
 }
 
 export async function getOrgSubscriptionDetailAction(
