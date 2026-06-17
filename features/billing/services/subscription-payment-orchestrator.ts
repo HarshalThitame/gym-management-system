@@ -241,9 +241,31 @@ export async function createSecureSubscriptionCheckoutOrderAction(
         };
       }
     } else {
+      let subId = currentSubId;
+      if (!subId) {
+        const { data: newSub } = await d
+          .from("organization_subscriptions")
+          .insert({
+            organization_id: organizationId,
+            package_id: targetPackageId,
+            status: "trial",
+            started_at: new Date().toISOString(),
+            billing_period: billingCycle,
+            provider: "razorpay",
+            provider_environment: providerEnvironment,
+          })
+          .select("id")
+          .maybeSingle();
+        if (newSub) {
+          subId = String(newSub.id);
+        } else {
+          return { success: false, error: "Failed to create subscription." };
+        }
+      }
+
       const invoicePayload: Record<string, unknown> = {
         organization_id: organizationId,
-        subscription_id: currentSubId || null,
+        subscription_id: subId,
         invoice_number: `SUB-${organizationId.slice(0, 8)}-${String(Date.now()).slice(-6)}`,
         status: "draft",
         currency,
