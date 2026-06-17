@@ -12,9 +12,17 @@ type FeatureCardProps = {
   limitLabel?: string;
   compact?: boolean;
   isNewInGrowth?: boolean;
+  isNewInEnterprise?: boolean;
+  isUnlimited?: boolean;
 };
 
-export function FeatureCard({ label, description, included, upgradeLabel, limitLabel, compact = false, isNewInGrowth }: FeatureCardProps) {
+export function FeatureCard({ label, description, included, upgradeLabel, limitLabel, compact = false, isNewInGrowth, isNewInEnterprise, isUnlimited }: FeatureCardProps) {
+  const isNew = isNewInEnterprise || isNewInGrowth;
+  const newColor = isNewInEnterprise ? "purple" : "blue";
+  const borderClass = included && isNewInEnterprise ? "border-purple-200/50 bg-purple-50/10" : included && isNewInGrowth ? "border-blue-200/50 bg-blue-50/10" : "";
+  const newBadgeClass = isNewInEnterprise ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-blue-50 border-blue-200 text-blue-700";
+  const newBadgeLabel = isNewInEnterprise ? "New in Enterprise" : "New in Growth";
+
   if (compact) {
     return (
       <div className={cn(
@@ -32,6 +40,11 @@ export function FeatureCard({ label, description, included, upgradeLabel, limitL
             <Sparkles className="size-2.5 inline mr-0.5" />New
           </span>
         )}
+        {isNewInEnterprise && included && (
+          <span className="ml-auto shrink-0 rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 border border-purple-200">
+            <Sparkles className="size-2.5 inline mr-0.5" />Enterprise
+          </span>
+        )}
         {!included && upgradeLabel && (
           <span className="ml-auto shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
             {upgradeLabel}
@@ -45,7 +58,7 @@ export function FeatureCard({ label, description, included, upgradeLabel, limitL
     <div className={cn(
       "rounded-lg border p-3.5 transition-all",
       included ? "border-border bg-background" : "border-dashed border-border bg-surface-muted/30",
-      isNewInGrowth && included && "border-blue-200/50 bg-blue-50/10"
+      borderClass
     )}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -66,14 +79,24 @@ export function FeatureCard({ label, description, included, upgradeLabel, limitL
                 <Minus className="size-3" /> Locked
               </span>
             )}
-            {isNewInGrowth && included && (
+            {isNewInEnterprise && included && (
+              <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-purple-50 border border-purple-200 px-2 py-0.5 text-[11px] font-bold text-purple-700">
+                <Sparkles className="size-3" /> New in Enterprise
+              </span>
+            )}
+            {isNewInGrowth && included && !isNewInEnterprise && (
               <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-bold text-blue-700">
                 <Sparkles className="size-3" /> New in Growth
               </span>
             )}
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
-          {limitLabel && included && (
+          {isUnlimited && included && (
+            <p className="mt-1 text-[11px] font-bold text-purple-600 flex items-center gap-1">
+              <Sparkles className="size-3" /> Unlimited
+            </p>
+          )}
+          {limitLabel && included && !isUnlimited && (
             <p className="mt-1 text-[11px] font-semibold text-indigo-600">{limitLabel}</p>
           )}
         </div>

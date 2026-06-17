@@ -34,12 +34,20 @@ export interface OrgFeatureFlags {
   membershipPauseFreeze: boolean;
   memberTaggingSegments: boolean;
   memberProgressTracking: boolean;
+  crossBranchMemberAccess: boolean;
+  customMemberFields: boolean;
+  memberDataImportExport: boolean;
 
   // CRM
   leadManagement: boolean;
   trialManagement: boolean;
   leadFollowupReminders: boolean;
   reEngagementAutomation: boolean;
+  advancedCrmLeadPipeline: boolean;
+  referralProgram: boolean;
+  loyaltyPointsSystem: boolean;
+  networkWideCampaignManager: boolean;
+  memberNpsSurveys: boolean;
 
   // Trainer
   trainerManagement: boolean;
@@ -54,6 +62,11 @@ export interface OrgFeatureFlags {
   classAttendanceTracking: boolean;
   payrollExport: boolean;
   roleBasedPermissions: boolean;
+  networkWideClassCalendar: boolean;
+  trainerSharingAcrossBranches: boolean;
+  customRolesGranularPermissions: boolean;
+  multiBranchStaffAssignment: boolean;
+  hrDocumentStorage: boolean;
 
   // Billing
   billingInvoices: boolean;
@@ -67,16 +80,26 @@ export interface OrgFeatureFlags {
   paymentFailureHandling: boolean;
   partialPaymentDues: boolean;
   razorpayPayuIntegration: boolean;
+  multiCurrencyBilling: boolean;
+  franchiseFeeManagement: boolean;
+  multiGstinSupport: boolean;
+  posMerchandiseSupplements: boolean;
+  branchRevenueSplit: boolean;
 
   // Reports
   basicReports: boolean;
   advancedReportsEnabled: boolean;
   customDashboards: boolean;
+  customDashboardsKpis: boolean;
   trainerPerformanceReport: boolean;
   classOccupancyReport: boolean;
   leadConversionReport: boolean;
   branchRevenueComparison: boolean;
   franchiseRollupReports: boolean;
+  franchiseRollupDashboard: boolean;
+  scheduledReportDelivery: boolean;
+  equipmentInventoryMaintenance: boolean;
+  dataExportCsvDownload: boolean;
 
   // Communication
   emailNotifications: boolean;
@@ -95,6 +118,9 @@ export interface OrgFeatureFlags {
   dietWorkoutPlans: boolean;
   whiteLabelMobileApp: boolean;
   googleCalendarSync: boolean;
+  inAppPushNotifications: boolean;
+  digitalMembershipCard: boolean;
+  loyaltyRewardsInApp: boolean;
 
   // AI
   aiEnabled: boolean;
@@ -118,6 +144,15 @@ export interface OrgFeatureFlags {
   staffManagement: boolean;
   tallyZohoBooksIntegration: boolean;
   restApiAccess: boolean;
+  ssoSamlLogin: boolean;
+  dedicatedCloudInfrastructure: boolean;
+  dedicatedOnboardingManager: boolean;
+  responseSla: boolean;
+  namedAccountManager: boolean;
+  automatedBackups90DayRetention: boolean;
+  uptimeSla99_9: boolean;
+  staffTrainingSessions: boolean;
+  customFeatureRequests: boolean;
 
   // Legacy aliases
   classSchedulingEnabled: boolean;

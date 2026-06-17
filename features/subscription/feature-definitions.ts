@@ -15,6 +15,8 @@ export type FeatureDefinition = {
   limitKey?: string;
   limitLabel?: string;
   isNewInGrowth?: boolean;
+  isNewInEnterprise?: boolean;
+  isUnlimited?: boolean;
 };
 
 export const FEATURE_CATEGORIES: FeatureCategory[] = [
@@ -24,15 +26,18 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Member management, check-in, and access control features",
     icon: "Users",
     features: [
-      { key: "memberManagement", label: "Member profiles", description: "Full name, photo, DOB, contact, emergency contact, health notes, custom fields", featureCode: "member_management", limitKey: "max_members", limitLabel: "Up to 200 active members on Starter" },
+      { key: "memberManagement", label: "Member profiles", description: "Full name, photo, DOB, contact, emergency contact, health notes, custom fields", featureCode: "member_management", limitKey: "max_members", limitLabel: "Unlimited on Enterprise" },
       { key: "qrAttendanceEnabled", label: "QR code check-in", description: "Members can scan QR from their profile or printed card at entry gate", featureCode: "qr_attendance" },
       { key: "manualAttendance", label: "Manual check-in", description: "Staff can mark attendance manually from admin dashboard", featureCode: "manual_attendance" },
       { key: "expiryTracking", label: "Member status tracking", description: "Active, Expired, Paused, Frozen — maintain status change history", featureCode: "expiry_tracking" },
       { key: "membershipPauseFreeze", label: "Membership pause / freeze", description: "Pause memberships for travel or injury. Auto-resume on selected date", featureCode: "membership_pause_freeze" },
       { key: "biometricAttendanceEnabled", label: "Biometric check-in", description: "Fingerprint scanner integration at entry gate", featureCode: "biometric_attendance", isNewInGrowth: true },
       { key: "multiBranchManagement", label: "Multi-branch access", description: "Members can check in at any organization branch", featureCode: "multi_branch_management", isNewInGrowth: true },
-      { key: "memberTaggingSegments", label: "Member tagging & segments", description: "Tags like weight-loss, senior, corporate, premium, trial for targeted communication", featureCode: "member_tagging_segments", isNewInGrowth: true },
-      { key: "faceRecognitionAttendance", label: "Facial recognition check-in", description: "AI-powered face recognition at entry", featureCode: "face_recognition_attendance", upgradeLabel: "Enterprise only" },
+      { key: "faceRecognitionAttendance", label: "Facial recognition check-in", description: "Camera-based face match at entry", featureCode: "face_recognition_attendance", isNewInEnterprise: true },
+      { key: "crossBranchMemberAccess", label: "Cross-branch member access", description: "Members can check in at any branch including franchise partner locations", featureCode: "cross_branch_member_access", isNewInEnterprise: true },
+      { key: "memberTaggingSegments", label: "Member tagging & segments", description: "Tags for targeted communication", featureCode: "member_tagging_segments", isNewInGrowth: true },
+      { key: "customMemberFields", label: "Custom member fields", description: "Add unlimited custom profile fields", featureCode: "custom_member_fields", isNewInEnterprise: true },
+      { key: "memberDataImportExport", label: "Member data import / export", description: "Bulk import from CSV, migration support, full data export", featureCode: "member_data_import_export", isNewInEnterprise: true },
     ],
   },
   {
@@ -41,17 +46,21 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Plan creation, payments, invoicing, and billing automation",
     icon: "CreditCard",
     features: [
-      { key: "memberManagement", label: "Membership plan builder", description: "Create unlimited monthly, quarterly, annual, day-pass, and custom plans", featureCode: "member_management", limitKey: "membership_plan_types", limitLabel: "Unlimited on Growth" },
+      { key: "memberManagement", label: "Membership plan builder", description: "Create unlimited monthly, quarterly, annual, day-pass, and custom plans", featureCode: "member_management", limitKey: "membership_plan_types", limitLabel: "Unlimited on Enterprise" },
       { key: "paymentTracking", label: "Cash, UPI & online payments", description: "All payment modes with auto-reconciliation dashboard", featureCode: "payment_tracking" },
-      { key: "onlinePaymentLinks", label: "Online payment link", description: "Generate Razorpay/PayU one-time links, share via WhatsApp", featureCode: "online_payment_links" },
+      { key: "onlinePaymentLinks", label: "Online payment link", description: "Generate Razorpay/PayU one-time links", featureCode: "online_payment_links" },
       { key: "renewalReminders", label: "Renewal reminders", description: "Auto reminder before expiry via SMS/WhatsApp", featureCode: "renewal_reminders" },
       { key: "billingInvoices", label: "GST invoices & PDF receipts", description: "Full GST-compliant invoice, auto-generated, delivered via email and WhatsApp", featureCode: "billing_invoices" },
-      { key: "autoBilling", label: "Auto-billing & recurring charges", description: "NACH mandate or card-on-file auto-debit on renewal date", featureCode: "auto_billing", isNewInGrowth: true },
-      { key: "discountPromoCodes", label: "Discount & promo codes", description: "Fixed or percentage discount with expiry date and usage limits", featureCode: "discount_promo_codes", isNewInGrowth: true },
-      { key: "paymentFailureHandling", label: "Payment failure handling", description: "Auto-retry failed auto-debits, notify member and staff on failure", featureCode: "payment_failure_handling", isNewInGrowth: true },
-      { key: "partialPaymentDues", label: "Partial payment & dues tracking", description: "Record partial payment, track outstanding balance per member", featureCode: "partial_payment_dues", isNewInGrowth: true },
-      { key: "razorpayPayuIntegration", label: "Razorpay/PayU integration", description: "Full payment gateway with auto-billing, refunds, webhook sync", featureCode: "razorpay_payu_integration", isNewInGrowth: true },
-      { key: "corporateBulkMemberships", label: "Corporate / bulk memberships", description: "Company tie-ups for employee memberships", featureCode: "corporate_bulk_memberships", upgradeLabel: "Enterprise only" },
+      { key: "autoBilling", label: "Auto-billing & recurring charges", description: "NACH mandate or card-on-file auto-debit", featureCode: "auto_billing", isNewInGrowth: true },
+      { key: "discountPromoCodes", label: "Discount & promo codes", description: "Fixed or percentage discount with expiry", featureCode: "discount_promo_codes", isNewInGrowth: true },
+      { key: "paymentFailureHandling", label: "Payment failure handling", description: "Auto-retry failed auto-debits, notify on failure", featureCode: "payment_failure_handling", isNewInGrowth: true },
+      { key: "partialPaymentDues", label: "Partial payment & dues tracking", description: "Record partial payment, track outstanding balance", featureCode: "partial_payment_dues", isNewInGrowth: true },
+      { key: "corporateBulkMemberships", label: "Corporate / bulk memberships", description: "Company tie-ups for employee memberships, company-level invoicing", featureCode: "corporate_bulk_memberships", isNewInEnterprise: true },
+      { key: "multiCurrencyBilling", label: "Multi-currency billing", description: "INR, USD, AED, and other currency support", featureCode: "multi_currency_billing", isNewInEnterprise: true },
+      { key: "franchiseFeeManagement", label: "Franchise fee management", description: "Auto-deduct platform or royalty fees from franchise revenue", featureCode: "franchise_fee_management", isNewInEnterprise: true },
+      { key: "multiGstinSupport", label: "Multi-GSTIN support", description: "Each branch can have its own GST number", featureCode: "multi_gstin_support", isNewInEnterprise: true },
+      { key: "posMerchandiseSupplements", label: "POS — merchandise & supplements", description: "Sell gym merchandise, supplements, accessories at counter", featureCode: "pos_merchandise_supplements", isNewInEnterprise: true },
+      { key: "branchRevenueSplit", label: "Revenue split across branches", description: "Track and split collections branch-wise for P&L", featureCode: "branch_revenue_split", isNewInEnterprise: true },
     ],
   },
   {
@@ -60,15 +69,16 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Timetable management, capacity control, and member booking",
     icon: "Calendar",
     features: [
-      { key: "classBooking", label: "Unlimited class slots", description: "No weekly cap on recurring class slots like Zumba, Yoga, Spinning", featureCode: "class_booking", limitKey: "weekly_classes", limitLabel: "Unlimited on Growth" },
-      { key: "classBooking", label: "Class capacity control", description: "Set maximum seats per class, auto-close booking when full", featureCode: "class_booking" },
-      { key: "memberPortal", label: "Member self-booking from web portal", description: "Members can browse and book available classes", featureCode: "member_portal" },
-      { key: "classBooking", label: "Class cancellation by admin", description: "Admin can cancel class, notify enrolled members via SMS", featureCode: "class_booking" },
-      { key: "waitlistManagement", label: "Waitlist management", description: "Auto-promote next member from waitlist after cancellation", featureCode: "waitlist_management", isNewInGrowth: true },
-      { key: "ptSessions", label: "PT session booking", description: "Members book 1-on-1 sessions with specific trainers, trainer gets notified", featureCode: "pt_sessions", isNewInGrowth: true },
-      { key: "classAttendanceTracking", label: "Class attendance tracking", description: "Mark attended vs no-show, view per-class attendance history", featureCode: "class_attendance_tracking", isNewInGrowth: true },
-      { key: "classBooking", label: "Recurring & one-time classes", description: "Weekly recurring slots and special one-off workshops", featureCode: "class_booking", isNewInGrowth: true },
-      { key: "crossBranchClassBooking", label: "Cross-branch class booking", description: "Members book classes at any branch location", featureCode: "cross_branch_class_booking", upgradeLabel: "Enterprise only" },
+      { key: "classBooking", label: "Unlimited class slots", description: "No cap on recurring class slots", featureCode: "class_booking", limitKey: "weekly_classes", limitLabel: "Unlimited" },
+      { key: "classBooking", label: "Class capacity control", description: "Set maximum seats, auto-close when full", featureCode: "class_booking" },
+      { key: "memberPortal", label: "Member self-booking", description: "Members browse and book available classes", featureCode: "member_portal" },
+      { key: "classBooking", label: "Class cancellation by admin", description: "Admin can cancel class, notify enrolled members", featureCode: "class_booking" },
+      { key: "waitlistManagement", label: "Waitlist management", description: "Auto-promote next member after cancellation", featureCode: "waitlist_management", isNewInGrowth: true },
+      { key: "ptSessions", label: "PT session booking", description: "1-on-1 sessions with specific trainers", featureCode: "pt_sessions", isNewInGrowth: true },
+      { key: "classAttendanceTracking", label: "Class attendance tracking", description: "Mark attended vs no-show", featureCode: "class_attendance_tracking", isNewInGrowth: true },
+      { key: "crossBranchClassBooking", label: "Cross-branch class booking", description: "Members attend classes at any branch location", featureCode: "cross_branch_class_booking", isNewInEnterprise: true },
+      { key: "networkWideClassCalendar", label: "Network-wide class calendar", description: "Unified class schedule across all branches", featureCode: "network_wide_class_calendar", isNewInEnterprise: true },
+      { key: "trainerSharingAcrossBranches", label: "Trainer sharing across branches", description: "Assign trainer to multiple branches with conflict prevention", featureCode: "trainer_sharing_across_branches", isNewInEnterprise: true },
     ],
   },
   {
@@ -77,13 +87,15 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Staff accounts, roles, trainer profiles, and HR tools",
     icon: "Briefcase",
     features: [
-      { key: "staffManagement", label: "Staff accounts", description: "Create logins for front desk, trainers, branch managers", featureCode: "staff_management", limitKey: "max_staff", limitLabel: "Up to 15 staff users" },
-      { key: "roleBasedPermissions", label: "Role-based permissions", description: "Admin, Manager, Trainer, Receptionist roles with scoped dashboard access", featureCode: "role_based_permissions", isNewInGrowth: true },
-      { key: "trainerManagement", label: "Trainer profile", description: "Bio, certifications, photo — visible to members on portal", featureCode: "trainer_management" },
-      { key: "trainerCommissionsPayroll", label: "Trainer commission tracking", description: "Auto-calculate earnings per PT session or class, monthly payout summary", featureCode: "trainer_commissions_payroll", isNewInGrowth: true },
-      { key: "payrollExport", label: "Payroll export", description: "Export monthly salary and commission report as CSV/PDF", featureCode: "payroll_export", isNewInGrowth: true },
-      { key: "staffAttendanceLeave", label: "Staff attendance & leave", description: "Clock-in/out, leave requests, monthly attendance report", featureCode: "staff_attendance_leave", upgradeLabel: "Enterprise only" },
-      { key: "advancedRbac", label: "Custom permissions", description: "Fine-grained access control per staff member", featureCode: "advanced_rbac", upgradeLabel: "Enterprise only" },
+      { key: "staffManagement", label: "Staff accounts", description: "Create logins for all staff types", featureCode: "staff_management", limitKey: "max_staff", limitLabel: "Unlimited on Enterprise" },
+      { key: "roleBasedPermissions", label: "Role-based permissions", description: "Admin, Manager, Trainer, Receptionist roles", featureCode: "role_based_permissions", isNewInGrowth: true },
+      { key: "trainerManagement", label: "Trainer profile", description: "Bio, certifications, photo on member portal", featureCode: "trainer_management" },
+      { key: "trainerCommissionsPayroll", label: "Trainer commission tracking", description: "Auto-calculate earnings per PT session or class", featureCode: "trainer_commissions_payroll", isNewInGrowth: true },
+      { key: "payrollExport", label: "Payroll export", description: "Export salary and commission report as CSV/PDF", featureCode: "payroll_export", isNewInGrowth: true },
+      { key: "customRolesGranularPermissions", label: "Custom roles & granular permissions", description: "Build custom roles: Branch Head, Franchise Manager, Regional Manager", featureCode: "custom_roles_granular_permissions", isNewInEnterprise: true },
+      { key: "staffAttendanceLeaveTracking", label: "Staff attendance & leave tracking", description: "Clock-in/out, leave requests, monthly attendance reports", featureCode: "staff_attendance_leave", isNewInEnterprise: true },
+      { key: "multiBranchStaffAssignment", label: "Multi-branch staff assignment", description: "Assign staff to one or multiple branches", featureCode: "multi_branch_staff_assignment", isNewInEnterprise: true },
+      { key: "hrDocumentStorage", label: "HR document storage", description: "Upload contracts, certificates, ID proofs", featureCode: "hr_document_storage", isNewInEnterprise: true },
     ],
   },
   {
@@ -92,15 +104,19 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Member notifications, CRM, broadcasts, and marketing automation",
     icon: "MessageSquare",
     features: [
-      { key: "whatsappIntegration", label: "WhatsApp & SMS notifications", description: "All system-triggered messages for membership, payments, classes", featureCode: "whatsapp_integration" },
-      { key: "smsIntegration", label: "SMS alerts", description: "OTP login, renewal reminders, check-in confirmation", featureCode: "sms_integration", limitKey: "sms_monthly", limitLabel: "Up to 5,000 SMS per month" },
-      { key: "birthdayGreetings", label: "Birthday greetings", description: "Auto WhatsApp message on member birthday", featureCode: "birthday_greetings" },
-      { key: "broadcastMessages", label: "WhatsApp broadcast", description: "Send bulk messages to all members or tagged segments", featureCode: "broadcast_messages", isNewInGrowth: true },
-      { key: "emailCampaigns", label: "Email campaigns", description: "Designed email templates for offers, renewals, events", featureCode: "email_campaigns", isNewInGrowth: true },
-      { key: "leadManagement", label: "Lead / enquiry management", description: "Capture walk-in and online enquiries, assign follow-up tasks", featureCode: "lead_management", isNewInGrowth: true },
-      { key: "leadFollowupReminders", label: "Follow-up reminders for leads", description: "Call reminders, visit reminders, lead status: new → trial → converted", featureCode: "lead_followup_reminders", isNewInGrowth: true },
-      { key: "reEngagementAutomation", label: "Re-engagement automation", description: "Auto-message inactive members after 14/30 days of no check-in", featureCode: "re_engagement_automation", isNewInGrowth: true },
-      { key: "whatsappBusinessApi", label: "WhatsApp Business API", description: "Official WABA integration for broadcast and automation", featureCode: "whatsapp_business_api", isNewInGrowth: true },
+      { key: "whatsappIntegration", label: "WhatsApp & SMS notifications", description: "All system-triggered messages", featureCode: "whatsapp_integration" },
+      { key: "smsIntegration", label: "SMS alerts", description: "OTP, renewal reminders, check-in confirmation", featureCode: "sms_integration", limitKey: "sms_monthly", limitLabel: "Unlimited on Enterprise" },
+      { key: "birthdayGreetings", label: "Birthday greetings", description: "Auto WhatsApp on member birthday", featureCode: "birthday_greetings" },
+      { key: "broadcastMessages", label: "WhatsApp broadcast", description: "Bulk messages to all members or segments", featureCode: "broadcast_messages", isNewInGrowth: true },
+      { key: "emailCampaigns", label: "Email campaigns", description: "Templates for offers, renewals, events", featureCode: "email_campaigns", isNewInGrowth: true },
+      { key: "leadManagement", label: "Lead / enquiry management", description: "Capture walk-in and online enquiries", featureCode: "lead_management", isNewInGrowth: true },
+      { key: "leadFollowupReminders", label: "Follow-up reminders", description: "Call/visit reminders, lead pipeline", featureCode: "lead_followup_reminders", isNewInGrowth: true },
+      { key: "reEngagementAutomation", label: "Re-engagement automation", description: "Auto-message inactive members", featureCode: "re_engagement_automation", isNewInGrowth: true },
+      { key: "advancedCrmLeadPipeline", label: "Advanced CRM & lead pipeline", description: "Full sales funnel, lead scoring, conversion forecasting", featureCode: "advanced_crm_lead_pipeline", isNewInEnterprise: true },
+      { key: "referralProgram", label: "Referral program", description: "Members earn rewards for referrals", featureCode: "referral_program", isNewInEnterprise: true },
+      { key: "loyaltyPointsSystem", label: "Loyalty points system", description: "Points for check-ins, renewals, referrals, purchases", featureCode: "loyalty_points_system", isNewInEnterprise: true },
+      { key: "networkWideCampaignManager", label: "Network-wide campaign manager", description: "Run campaigns across all branches", featureCode: "network_wide_campaign_manager", isNewInEnterprise: true },
+      { key: "memberNpsSurveys", label: "Member NPS surveys", description: "Auto-trigger satisfaction surveys, track NPS", featureCode: "member_nps_surveys", isNewInEnterprise: true },
     ],
   },
   {
@@ -109,18 +125,20 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Business intelligence, member analytics, and data insights",
     icon: "BarChart",
     features: [
-      { key: "basicReports", label: "Revenue & attendance reports", description: "All Starter reports with daily, weekly, monthly breakdowns", featureCode: "basic_reports" },
-      { key: "attendanceReports", label: "Attendance report", description: "Daily footfall chart, peak hour analysis", featureCode: "attendance_reports" },
-      { key: "expiryTracking", label: "Expiring members list", description: "Members expiring in next 7 / 15 / 30 days", featureCode: "expiry_tracking" },
+      { key: "basicReports", label: "Revenue & attendance reports", description: "Daily, weekly, monthly breakdowns", featureCode: "basic_reports" },
+      { key: "attendanceReports", label: "Attendance report", description: "Footfall chart, peak hour analysis", featureCode: "attendance_reports" },
+      { key: "expiryTracking", label: "Expiring members list", description: "Members expiring in 7/15/30 days", featureCode: "expiry_tracking" },
       { key: "goalTracking", label: "New member report", description: "Joinings per month, plan breakdown", featureCode: "goal_tracking" },
-      { key: "aiRetentionAnalysis", label: "Churn & retention analytics", description: "Drop-off rates, renewal conversion percentage, at-risk member list", featureCode: "ai_retention_analysis", isNewInGrowth: true },
-      { key: "trainerPerformanceReport", label: "Trainer performance report", description: "Sessions conducted, PT bookings, member ratings per trainer", featureCode: "trainer_performance_report", isNewInGrowth: true },
-      { key: "classOccupancyReport", label: "Class occupancy report", description: "Fill rate per class type, identify under-performing slots", featureCode: "class_occupancy_report", isNewInGrowth: true },
-      { key: "leadConversionReport", label: "Lead conversion report", description: "Enquiries → trials → paid conversions funnel", featureCode: "lead_conversion_report", isNewInGrowth: true },
-      { key: "branchRevenueComparison", label: "Branch-wise revenue comparison", description: "Compare collections and footfall across branches", featureCode: "branch_revenue_comparison", isNewInGrowth: true },
-      { key: "customDashboards", label: "Custom dashboards & KPIs", description: "Build and save custom KPI views", featureCode: "custom_dashboards", upgradeLabel: "Enterprise only" },
-      { key: "franchiseRollupReports", label: "Franchise rollup reports", description: "Aggregated reports across all franchise locations", featureCode: "franchise_rollup_reports", upgradeLabel: "Enterprise only" },
-      { key: "apiAccessEnabled", label: "Data export / API", description: "CSV export or REST API access", featureCode: "api_access", upgradeLabel: "Enterprise only" },
+      { key: "aiRetentionAnalysis", label: "Churn & retention analytics", description: "Drop-off rates, renewal conversion, at-risk members", featureCode: "ai_retention_analysis", isNewInGrowth: true },
+      { key: "trainerPerformanceReport", label: "Trainer performance report", description: "Sessions, PT bookings, ratings", featureCode: "trainer_performance_report", isNewInGrowth: true },
+      { key: "classOccupancyReport", label: "Class occupancy report", description: "Fill rate, under-performing slots", featureCode: "class_occupancy_report", isNewInGrowth: true },
+      { key: "leadConversionReport", label: "Lead conversion report", description: "Enquiries to paid conversions funnel", featureCode: "lead_conversion_report", isNewInGrowth: true },
+      { key: "branchRevenueComparison", label: "Branch revenue comparison", description: "Collections and footfall across branches", featureCode: "branch_revenue_comparison", isNewInGrowth: true },
+      { key: "franchiseRollupDashboard", label: "Franchise rollup dashboard", description: "Consolidated P&L, footfall, churn across network", featureCode: "franchise_rollup_dashboard", isNewInEnterprise: true },
+      { key: "customDashboardsKpis", label: "Custom dashboards & KPIs", description: "Build, save, share personalized KPI views", featureCode: "custom_dashboards_kpis", isNewInEnterprise: true },
+      { key: "scheduledReportDelivery", label: "Scheduled report delivery", description: "Auto-email weekly/monthly reports", featureCode: "scheduled_report_delivery", isNewInEnterprise: true },
+      { key: "equipmentInventoryMaintenance", label: "Equipment inventory & maintenance", description: "Track equipment, service schedules, AMC", featureCode: "equipment_inventory_maintenance", isNewInEnterprise: true },
+      { key: "dataExportCsvDownload", label: "Data export & CSV download", description: "Export reports and member datasets as CSV", featureCode: "data_export_csv_download", isNewInEnterprise: true },
     ],
   },
   {
@@ -129,33 +147,54 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Member portal, mobile app, and digital experience",
     icon: "Smartphone",
     features: [
-      { key: "memberPortal", label: "Member web portal", description: "View profile, membership status, class schedule, payment history", featureCode: "member_portal" },
-      { key: "memberPortal", label: "Self-service class booking", description: "Members can book and cancel classes from portal", featureCode: "member_portal" },
-      { key: "customBranding", label: "Branded member portal", description: "Gym logo, colors, custom domain/subdomain", featureCode: "custom_branding", isNewInGrowth: true },
-      { key: "dietWorkoutPlans", label: "Diet & workout plan viewer", description: "Trainer-assigned nutrition and workout plans visible to members", featureCode: "diet_workout_plans", isNewInGrowth: true },
-      { key: "memberProgressTracking", label: "Member progress tracking", description: "Weight, body measurements, fitness milestones over time", featureCode: "member_progress_tracking", isNewInGrowth: true },
-      { key: "whiteLabelMobileApp", label: "White-label mobile app", description: "iOS and Android app with organization branding", featureCode: "white_label_mobile_app", upgradeLabel: "Enterprise only" },
-      { key: "brandedMobileApp", label: "Branded mobile app", description: "iOS and Android app with gym name and logo", featureCode: "branded_mobile_app", upgradeLabel: "Enterprise only" },
+      { key: "memberPortal", label: "Member web portal", description: "Profile, membership, class schedule, payments", featureCode: "member_portal" },
+      { key: "memberPortal", label: "Self-service class booking", description: "Book and cancel classes from portal", featureCode: "member_portal" },
+      { key: "customBranding", label: "Branded member portal", description: "Logo, colors, custom domain", featureCode: "custom_branding", isNewInGrowth: true },
+      { key: "dietWorkoutPlans", label: "Diet & workout plan viewer", description: "Trainer-assigned plans visible in portal and app", featureCode: "diet_workout_plans", isNewInGrowth: true },
+      { key: "memberProgressTracking", label: "Member progress tracking", description: "Weight, measurements, milestones", featureCode: "member_progress_tracking", isNewInGrowth: true },
+      { key: "whiteLabelMobileApp", label: "White-label mobile app", description: "iOS and Android app with gym branding, no Powered by label", featureCode: "white_label_mobile_app", isNewInEnterprise: true },
+      { key: "inAppPushNotifications", label: "In-app push notifications", description: "Class reminders, offers, renewal prompts, system alerts", featureCode: "in_app_push_notifications", isNewInEnterprise: true },
+      { key: "digitalMembershipCard", label: "Digital membership card", description: "Digital card in app showing status, plan, expiry", featureCode: "digital_membership_card", isNewInEnterprise: true },
+      { key: "loyaltyRewardsInApp", label: "Loyalty & rewards in-app", description: "View points, redeem rewards, referral status", featureCode: "loyalty_rewards_in_app", isNewInEnterprise: true },
     ],
   },
   {
     id: "integrations",
-    name: "Integrations",
-    description: "Third-party integrations and API access",
+    name: "Integrations & Infrastructure",
+    description: "Third-party integrations, API, SSO, and infrastructure",
     icon: "Zap",
     features: [
-      { key: "razorpayPayuIntegration", label: "Razorpay / PayU integration", description: "Full payment gateway with auto-billing, refunds, webhook sync", featureCode: "razorpay_payu_integration", isNewInGrowth: true },
-      { key: "whatsappBusinessApi", label: "WhatsApp Business API", description: "Official WABA integration for broadcast and automation", featureCode: "whatsapp_business_api", isNewInGrowth: true },
-      { key: "googleCalendarSync", label: "Google Calendar sync", description: "Class schedule syncs to trainer Google Calendar", featureCode: "google_calendar_sync", isNewInGrowth: true },
-      { key: "tallyZohoBooksIntegration", label: "Tally / Zoho Books integration", description: "Accounting software for automated bookkeeping", featureCode: "tally_zoho_books_integration", upgradeLabel: "Enterprise only" },
-      { key: "restApiAccess", label: "REST API access", description: "Programmatic access to platform data and operations", featureCode: "rest_api_access", upgradeLabel: "Enterprise only" },
+      { key: "razorpayPayuIntegration", label: "Razorpay/PayU integration", description: "Full gateway, auto-billing, refunds, webhooks", featureCode: "razorpay_payu_integration", isNewInGrowth: true },
+      { key: "whatsappBusinessApi", label: "WhatsApp Business API", description: "Official WABA integration", featureCode: "whatsapp_business_api", isNewInGrowth: true },
+      { key: "googleCalendarSync", label: "Google Calendar sync", description: "Class schedule syncs to Google Calendar", featureCode: "google_calendar_sync", isNewInGrowth: true },
+      { key: "restApiAccess", label: "REST API access", description: "Full API for custom integrations", featureCode: "rest_api_access", isNewInEnterprise: true },
+      { key: "tallyZohoBooksIntegration", label: "Tally / Zoho Books integration", description: "Sync revenue, GST, expenses with accounting", featureCode: "tally_zoho_books_integration", isNewInEnterprise: true },
+      { key: "webhookSupport", label: "Webhook support", description: "Push events: new member, payment, check-in, renewal", featureCode: "webhooks", isNewInEnterprise: true },
+      { key: "ssoSamlLogin", label: "SSO / SAML login", description: "Login via Google Workspace, Azure AD", featureCode: "sso_saml_login", isNewInEnterprise: true },
+      { key: "dedicatedCloudInfrastructure", label: "Dedicated cloud infrastructure", description: "Isolated database and storage per tenant", featureCode: "dedicated_cloud_infrastructure", isNewInEnterprise: true },
+    ],
+  },
+  {
+    id: "sla",
+    name: "Support & SLA",
+    description: "Enterprise-grade support, SLA, and account management",
+    icon: "Shield",
+    features: [
+      { key: "dedicatedOnboardingManager", label: "Dedicated onboarding manager", description: "Personal onboarding manager for enterprise setup", featureCode: "dedicated_onboarding_manager", isNewInEnterprise: true },
+      { key: "prioritySupport", label: "Priority support", description: "WhatsApp, email, and phone priority support", featureCode: "priority_support", isNewInEnterprise: true },
+      { key: "responseSla", label: "Response SLA", description: "4-hour critical, 24-hour standard issue response", featureCode: "response_sla", isNewInEnterprise: true },
+      { key: "namedAccountManager", label: "Named account manager", description: "Dedicated account manager for your organization", featureCode: "named_account_manager", isNewInEnterprise: true },
+      { key: "automatedBackups90DayRetention", label: "Automated backups 90-day retention", description: "Daily automated backups with 90-day retention", featureCode: "automated_backups_90_day_retention", isNewInEnterprise: true },
+      { key: "uptimeSla99_9", label: "99.9% uptime SLA", description: "Service level agreement guaranteeing 99.9% uptime", featureCode: "uptime_sla_99_9", isNewInEnterprise: true },
+      { key: "staffTrainingSessions", label: "Staff training sessions", description: "Remote or on-site training for staff", featureCode: "staff_training_sessions", isNewInEnterprise: true },
+      { key: "customFeatureRequests", label: "Custom feature requests", description: "Enterprise feature requests considered for development", featureCode: "custom_feature_requests", isNewInEnterprise: true },
     ],
   },
 ];
 
 const UPGRADE_LABEL_MAP: Record<string, string> = {};
 
-function buildLookups() {
+function buildLookups(): void {
   for (const cat of FEATURE_CATEGORIES) {
     for (const f of cat.features) {
       if (f.upgradeLabel) {
@@ -185,6 +224,17 @@ export function isNewInGrowth(featureCode: string): boolean {
   for (const cat of FEATURE_CATEGORIES) {
     for (const f of cat.features) {
       if (f.featureCode === featureCode && f.isNewInGrowth) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function isNewInEnterprise(featureCode: string): boolean {
+  for (const cat of FEATURE_CATEGORIES) {
+    for (const f of cat.features) {
+      if (f.featureCode === featureCode && f.isNewInEnterprise) {
         return true;
       }
     }
