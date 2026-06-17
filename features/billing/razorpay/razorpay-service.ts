@@ -12,9 +12,6 @@ import type {
   VerifyRazorpayWebhookSignatureResult,
 } from "./razorpay-types";
 
-const RAZORPAY_TIMEOUT_MS = 15_000;
-const RAZORPAY_RETRY_COUNT = 3;
-
 let razorpayClient: Razorpay | null = null;
 
 function getClient(): Razorpay {
@@ -58,7 +55,7 @@ export function normalizePaiseToRupees(amountInPaise: number): number {
 export async function createRazorpayOrder(
   input: CreateRazorpayOrderInput,
 ): Promise<{ ok: true; data: CreateRazorpayOrderResult } | { ok: false; message: string }> {
-  const { amountInRupees, currency = "INR", receipt, notes, idempotencyKey } = input;
+  const { amountInRupees, currency = "INR", receipt, notes } = input;
 
   if (!Number.isFinite(amountInRupees) || amountInRupees <= 0) {
     return { ok: false, message: `Invalid amount: ${amountInRupees}. Amount must be positive.` };
@@ -77,7 +74,6 @@ export async function createRazorpayOrder(
       currency: string;
       receipt: string;
       notes?: Record<string, string>;
-      idempotency_key?: string;
     } = {
       amount: amountInPaise,
       currency,
@@ -85,9 +81,6 @@ export async function createRazorpayOrder(
     };
     if (notes && Object.keys(notes).length > 0) {
       orderPayload.notes = notes;
-    }
-    if (idempotencyKey) {
-      orderPayload.idempotency_key = idempotencyKey;
     }
 
     const order = await client.orders.create(orderPayload);
