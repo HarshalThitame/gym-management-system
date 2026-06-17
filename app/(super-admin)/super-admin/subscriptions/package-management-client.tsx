@@ -299,11 +299,25 @@ function PackageCard({ pkg, subsCount, activeSubsCount, onEdit, onDelete, onView
           </span>
         </div>
 
-        {/* Pricing */}
-        <div className="mt-3 flex items-baseline gap-1">
-          <span className="text-2xl font-black">₹{Intl.NumberFormat("en-IN").format(pkg.price ?? 0)}</span>
-          <span className="text-xs text-muted-foreground">/ {pkg.billing_period ?? "month"}</span>
-        </div>
+        {/* Pricing - Monthly & Annual */}
+        {pkg.name === "Enterprise" ? (
+          <div className="mt-3">
+            <p className="text-lg font-black">Custom Pricing</p>
+            <p className="text-xs text-muted-foreground">Contact Sales</p>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-1">
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-black">₹{Intl.NumberFormat("en-IN").format(Math.round((pkg._pricing?.find((pr: any) => pr.billing_period === "monthly")?.price ?? pkg.price ?? 0) / 100))}</span>
+              <span className="text-xs text-muted-foreground">/month</span>
+            </div>
+            <div className="flex items-baseline gap-1 text-sm">
+              <span className="font-bold">₹{Intl.NumberFormat("en-IN").format(Math.round((pkg._pricing?.find((pr: any) => pr.billing_period === "annual")?.price ?? 0) / 100))}</span>
+              <span className="text-xs text-muted-foreground">/year</span>
+              <span className="inline-flex items-center rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-bold text-green-700 border border-green-200">2 free</span>
+            </div>
+          </div>
+        )}
 
         {/* Limits */}
         <div className="mt-4 grid grid-cols-3 gap-2">
@@ -345,11 +359,25 @@ function PackageCard({ pkg, subsCount, activeSubsCount, onEdit, onDelete, onView
           })}
         </div>
 
-        {/* Subscription count */}
+        {/* Subscription count + Trial */}
         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Users className="size-3.5" />
           <span>{subsCount} organizations ({activeSubsCount} active)</span>
         </div>
+        {pkg.trial_days > 0 && (
+          <div className="mt-2 flex items-center gap-1 text-[11px]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 font-semibold text-blue-700">
+              {pkg.trial_days}-day free trial
+            </span>
+          </div>
+        )}
+        {pkg.name === "Enterprise" && (
+          <div className="mt-2 flex items-center gap-1 text-[11px]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 border border-purple-200 px-2 py-0.5 font-semibold text-purple-700">
+              Custom pricing
+            </span>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="mt-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

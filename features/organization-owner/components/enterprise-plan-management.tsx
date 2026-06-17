@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useActionState } from "react";
-import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, LineChart, Loader2, Minus, Plus, ReceiptText, RefreshCw, XCircle, Users, Briefcase, Calendar, MessageSquare, BarChart3, Smartphone, Lock } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, LineChart, Loader2, Minus, Plus, ReceiptText, RefreshCw, XCircle, Users, Briefcase, Calendar, MessageSquare, BarChart3, Smartphone, Lock, Sparkles } from "lucide-react";
 import { LineChart as RechartsLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Line } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -219,6 +219,26 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                   </div>
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Renewal</p><p className="mt-1 text-sm font-bold">{planContext.expiresAt ? planContext.expiresAt.toLocaleDateString("en-IN") : "No expiry"}</p></div>
                 </div>
+                {/* Trial Status */}
+                {isTrialing && trialDaysRemaining !== null && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md bg-cyan-50 border border-cyan-200 p-2">
+                    <Clock className="size-4 text-cyan-600" />
+                    <div>
+                      <p className="text-xs font-bold text-cyan-800">
+                        Trial · {trialDaysRemaining} day{trialDaysRemaining !== 1 ? "s" : ""} remaining
+                      </p>
+                      <p className="text-[10px] text-cyan-600">
+                        {planContext.trialEndsAt ? `Expires ${planContext.trialEndsAt.toLocaleDateString("en-IN")}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {currentPkg?.name === "Enterprise" && !isTrialing && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md bg-purple-50 border border-purple-200 p-2">
+                    <Sparkles className="size-4 text-purple-600" />
+                    <p className="text-xs font-bold text-purple-800">Custom contract · Contact Sales</p>
+                  </div>
+                )}
                 <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5" onClick={() => setActiveTab("usage")} type="button">View Usage & Limits</button>
               </CardContent>
             </Card>

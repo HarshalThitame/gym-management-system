@@ -137,15 +137,16 @@ export function SubscriptionsClient({ data }: { data: Data }) {
                   <tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
                     <th className="px-5 py-3">Organization</th>
                     <th className="px-5 py-3">Package</th>
+                    <th className="px-5 py-3">Billing</th>
                     <th className="px-5 py-3">Status</th>
                     <th className="px-5 py-3">Started</th>
                     <th className="px-5 py-3">Expires</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.organizations.length === 0 ? (
+                    {data.organizations.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">
+                      <td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">
                         No organizations found
                       </td>
                     </tr>
@@ -153,6 +154,7 @@ export function SubscriptionsClient({ data }: { data: Data }) {
                     data.organizations.map((org: any) => {
                       const orgSub = data.subscriptions.find((s: any) => s.organization_id === org.id);
                       const pkg = orgSub ? data.packages.find((p: any) => p.id === orgSub.package_id) : null;
+                      const billingCycle = orgSub?.billing_period ?? "—";
                       return (
                         <tr key={org.id} className="border-b border-border hover:bg-accent/5 transition-colors">
                           <td className="px-5 py-3">
@@ -172,6 +174,15 @@ export function SubscriptionsClient({ data }: { data: Data }) {
                               <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-500">
                                 No plan
                               </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3">
+                            {orgSub ? (
+                              <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize" suppressHydrationWarning>
+                                {billingCycle === "annual" ? "Annual" : billingCycle === "monthly" ? "Monthly" : billingCycle === "custom" ? "Custom" : billingCycle}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
                             )}
                           </td>
                           <td className="px-5 py-3">
