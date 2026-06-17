@@ -65,12 +65,6 @@ export function RazorpayCheckout({
     return found?.price ?? pkg.price;
   }, [billingCycle]);
 
-  const getAnnualEffectiveMonthly = useCallback((pkg: PackageInfo) => {
-    const pricing = pkg._pricing ?? [];
-    const annualPrice = pricing.find((p) => p.billing_period === "annual")?.price;
-    return annualPrice ? Math.round(annualPrice / 12) : 0;
-  }, []);
-
   const getMonthlyPrice = useCallback((pkg: PackageInfo) => {
     const pricing = pkg._pricing ?? [];
     return pricing.find((p) => p.billing_period === "monthly")?.price ?? 0;
@@ -79,7 +73,6 @@ export function RazorpayCheckout({
   const selectedPkg = selectedPkgId ? activePackages.find((p) => p.id === selectedPkgId) ?? null : null;
   const price = selectedPkg ? getPrice(selectedPkg) : 0;
   const monthlyPrice = selectedPkg ? getMonthlyPrice(selectedPkg) : 0;
-  const annualEffMonthly = selectedPkg ? getAnnualEffectiveMonthly(selectedPkg) : 0;
   const annualSavings = monthlyPrice * 12 - price;
 
   const handlePay = useCallback(async () => {
