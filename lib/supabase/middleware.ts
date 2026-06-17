@@ -286,8 +286,8 @@ function applyNoStoreHeaders(response: NextResponse) {
 
 function baseContentSecurityPolicy(upgradeInsecureRequests: boolean) {
   const connectSource = process.env.NODE_ENV === "development"
-    ? "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* ws: wss: https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://api.resend.com"
-    : "connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://api.resend.com";
+    ? "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* ws: wss: https://*.supabase.co wss://*.supabase.co https://*.razorpay.com https://api.resend.com"
+    : "connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://*.razorpay.com https://api.resend.com";
 
   const directives = [
     "default-src 'self'",
@@ -298,7 +298,7 @@ function baseContentSecurityPolicy(upgradeInsecureRequests: boolean) {
     "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
     "font-src 'self' data:",
     connectSource,
-    "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+    "frame-src https://*.razorpay.com",
     "worker-src 'self' blob:"
   ];
 
@@ -311,8 +311,8 @@ function baseContentSecurityPolicy(upgradeInsecureRequests: boolean) {
 
 function buildSensitiveContentSecurityPolicy(nonce: string, upgradeInsecureRequests: boolean) {
   const scriptSource = process.env.NODE_ENV === "development"
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com"
-    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://checkout.razorpay.com`;
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.razorpay.com"
+    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://*.razorpay.com`;
   const styleSource = `style-src 'self' 'unsafe-inline'`;
 
   return [
@@ -326,7 +326,7 @@ function buildSensitiveContentSecurityPolicy(nonce: string, upgradeInsecureReque
 function buildPublicContentSecurityPolicy(upgradeInsecureRequests: boolean) {
   return [
     ...baseContentSecurityPolicy(upgradeInsecureRequests),
-    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
+    "script-src 'self' 'unsafe-inline' https://*.razorpay.com",
     "style-src 'self' 'unsafe-inline'",
     "style-src-attr 'unsafe-inline'"
   ].join("; ");

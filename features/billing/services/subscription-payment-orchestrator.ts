@@ -147,12 +147,11 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       .from("organization_subscriptions")
       .select("id, status, package_id, price_override, billing_period")
       .eq("organization_id", organizationId)
-      .in("status", ["active", "trial"])
       .order("started_at", { ascending: false })
       .limit(1);
 
     const currentSubscription = (currentSubscriptions ?? [])[0];
-    const currentSubId = currentSubscription?.id;
+    const currentSubId = currentSubscription?.id as string | undefined;
 
     if (typeof currentSubscription?.price_override === "number") {
       subtotalPaise = currentSubscription.price_override;
@@ -192,28 +191,19 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const existingInv = (existingInvs ?? [])[0];
 
-    let invoiceId: string;
+    let subId = currentSubId;
+    let invoiceId: string | undefined;
     let existingOrderId: string | null = null;
 
     if (existingInv) {
-      if (existingInv.organization_id !== organizationId || existingInv.package_id !== targetPackageId) {
-        return { success: false, error: "Existing invoice ownership mismatch." };
-      }
-      if (existingInv.provider_environment !== providerEnvironment) {
-        return { success: false, error: "Existing invoice environment mismatch." };
-      }
-      if (existingInv.status === "paid") {
-        return { success: false, error: "This checkout has already been paid. Refresh your subscription status." };
-      }
-
       invoiceId = String(existingInv.id);
       if (typeof existingInv.razorpay_order_id === "string" && existingInv.razorpay_order_id && existingInv.status !== "cancelled") {
         existingOrderId = existingInv.razorpay_order_id;
         const existingAmountPaise = typeof existingInv.total_amount === "number" ? existingInv.total_amount : totalAmountPaise;
         const attach = await attachSubscriptionOrder(d, {
-          invoiceId,
+          invoiceId: invoiceId!,
           organizationId,
-          subscriptionId: typeof currentSubId === "string" ? currentSubId : null,
+          subscriptionId: subId ?? null,
           providerEnvironment,
           providerOrderId: existingOrderId,
           amount: existingAmountPaise,
@@ -232,7 +222,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
           razorpayOrderId: existingOrderId,
           amountPaise: existingAmountPaise,
           currency: typeof existingInv.currency === "string" ? existingInv.currency : currency,
-          invoiceId,
+          invoiceId: invoiceId!,
           packageDisplayName: pkg.name,
           organizationDisplayName: organization.name ?? "",
           billingCycle,
@@ -240,10 +230,42 @@ export async function createSecureSubscriptionCheckoutOrderAction(
           environmentLabel: providerEnvironment === "test" ? "Test Mode" : "Live",
         };
       }
-    } else {
-      let subId = currentSubId;
-      if (!subId) {
-        const { data: newSub } = await d
+    }
+
+    if (!subId) {
+      const existingSub = currentSubscription;
+      if (existingSub) {
+        const updater = d as unknown as {
+          from(table: string): {
+            update(row: Record<string, unknown>): {
+              eq(col: string, val: string): Promise<{ error: { message: string } | null }>;
+            };
+          };
+        };
+        const { error: updError } = await updater
+          .from("organization_subscriptions")
+          .update({
+            package_id: targetPackageId,
+            status: "trial",
+            started_at: new Date().toISOString(),
+            billing_period: billingCycle,
+            provider: "razorpay",
+            provider_environment: providerEnvironment,
+            expires_at: null,
+            cancelled_at: null,
+            cancellation_reason: null,
+            cancellation_category: null,
+            dunning_attempts: 0,
+            dunning_next_retry: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", String(existingSub.id));
+        if (updError) {
+          return { success: false, error: updError.message ?? "Failed to reactivate subscription." };
+        }
+        subId = String(existingSub.id);
+      } else {
+        const { data: newSub, error: subError } = await d
           .from("organization_subscriptions")
           .insert({
             organization_id: organizationId,
@@ -256,13 +278,18 @@ export async function createSecureSubscriptionCheckoutOrderAction(
           })
           .select("id")
           .maybeSingle();
+        if (subError) {
+          return { success: false, error: subError.message ?? "Failed to create subscription." };
+        }
         if (newSub) {
           subId = String(newSub.id);
         } else {
           return { success: false, error: "Failed to create subscription." };
         }
       }
+    }
 
+    if (!invoiceId) {
       const invoicePayload: Record<string, unknown> = {
         organization_id: organizationId,
         subscription_id: subId,
@@ -304,7 +331,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       notes: {
         organization_id: organizationId,
         package_id: targetPackageId,
-        invoice_id: invoiceId,
+        invoice_id: invoiceId!,
         billing_cycle: billingCycle,
         environment: providerEnvironment,
       },
@@ -318,9 +345,9 @@ export async function createSecureSubscriptionCheckoutOrderAction(
     const order = orderResult.data;
 
     const attach = await attachSubscriptionOrder(d, {
-      invoiceId,
+      invoiceId: invoiceId!,
       organizationId,
-      subscriptionId: typeof currentSubId === "string" ? currentSubId : null,
+      subscriptionId: subId ?? null,
       providerEnvironment,
       providerOrderId: order.id,
       amount: totalAmountPaise,
@@ -346,7 +373,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       razorpayOrderId: order.id,
       amountPaise: totalAmountPaise,
       currency,
-      invoiceId,
+      invoiceId: invoiceId!,
       packageDisplayName: pkg.name,
       organizationDisplayName: (org as { name: string } | null)?.name ?? organization.name ?? "",
       billingCycle,
