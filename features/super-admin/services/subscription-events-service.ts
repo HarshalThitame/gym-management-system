@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
 import type { Json } from "@/types/database";

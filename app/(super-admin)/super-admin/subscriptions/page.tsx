@@ -21,7 +21,7 @@ async function getData() {
   };
 
   try {
-    const [orgsRes, pkgsRes, subsRes, featuresRes, limitsRes, pricingRes, invoicesRes, eventsRes] = await Promise.all([
+    const [orgsRes, pkgsRes, subsRes, featuresRes, limitsRes, pricingRes, invoicesRes, eventsRes, addonsRes, subAddonsRes, schedRes] = await Promise.all([
       supabase.from("organizations").select("id, name, billing_email, primary_domain").order("name"),
       supabase.from("packages").select("*").order("sort_order"),
       supabase.from("organization_subscriptions").select("id, organization_id, package_id, status, started_at, expires_at, billing_period, trial_ends_at, price_override, next_billing_date, last_billing_date, cancelled_at, notes, created_at, updated_at, auto_renew"),
@@ -30,6 +30,9 @@ async function getData() {
       sb.from("package_pricing").select("package_id, billing_period, price, currency"),
       sb.from("org_subscription_invoices").select("id, organization_id, subscription_id, invoice_number, status, total_amount, currency, issued_at, due_at, paid_at, razorpay_order_id, billing_period_start, billing_period_end"),
       sb.from("subscription_events").select("id, organization_id, subscription_id, event_type, actor_id, reason, created_at, metadata"),
+      sb.from("package_addons").select("id, package_id, name, description, type, unit_price, max_quantity, is_active"),
+      sb.from("subscription_addons").select("id, subscription_id, addon_id, quantity, unit_price, created_at"),
+      sb.from("scheduled_plan_changes").select("id, subscription_id, from_package_id, to_package_id, effective_date, change_type, status, reason, created_by, created_at, applied_at"),
     ]);
 
     const featuresByPackage: Record<string, Record<string, any>> = {};
@@ -67,6 +70,22 @@ async function getData() {
       eventsByOrg[orgId].push(ev);
     }
 
+    // Build add-on lookup maps
+    const availableAddons = (addonsRes.data ?? []) as any[];
+    const subAddonsBySub: Record<string, any[]> = {};
+    for (const sa of (subAddonsRes.data ?? []) as any[]) {
+      const subId = sa.subscription_id as string;
+      if (!subAddonsBySub[subId]) subAddonsBySub[subId] = [];
+      subAddonsBySub[subId].push(sa);
+    }
+
+    const schedChangesBySub: Record<string, any[]> = {};
+    for (const sc of (schedRes.data ?? []) as any[]) {
+      const subId = sc.subscription_id as string;
+      if (!schedChangesBySub[subId]) schedChangesBySub[subId] = [];
+      schedChangesBySub[subId].push(sc);
+    }
+
     const packages = (pkgsRes.data ?? []).map((p: any) => {
       const pkgId = p.id;
       const pkgPricing = pricingByPackage[pkgId] ?? [];
@@ -98,6 +117,9 @@ async function getData() {
       subscriptions,
       invoicesByOrg,
       eventsByOrg,
+      availableAddons,
+      subAddonsBySub,
+      schedChangesBySub,
     };
   } catch (err) {
     return {
@@ -107,6 +129,9 @@ async function getData() {
       subscriptions: [],
       invoicesByOrg: {},
       eventsByOrg: {},
+      availableAddons: [],
+      subAddonsBySub: {},
+      schedChangesBySub: {},
     };
   }
 }

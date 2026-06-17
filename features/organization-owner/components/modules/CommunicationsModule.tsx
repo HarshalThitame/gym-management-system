@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useCallback, useMemo, useState, useActionState } from "react";
 import { CalendarDays, Download, Edit3, Eye, Mail, MessageSquare, Plus, Send } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";

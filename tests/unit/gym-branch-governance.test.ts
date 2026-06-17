@@ -144,6 +144,7 @@ function createSuperAdminContext(): AuthContext {
     profile: {
       id: userId,
       gym_id: null,
+      branch_id: null,
       full_name: "Super Admin",
       email: "hthitame@gmail.com",
       phone: null,

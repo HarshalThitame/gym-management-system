@@ -35,7 +35,7 @@ test.describe("Super Admin Subscriptions Page", () => {
     const createBtn = page.getByText("Create Package").first();
     const hasBtn = await createBtn.isVisible().catch(() => false);
     if (!hasBtn) {
-      test.skip("No Create Package button visible");
+      test.skip(true, "No Create Package button visible");
       return;
     }
     await createBtn.click();
@@ -96,7 +96,7 @@ test.describe("Super Admin Subscriptions Page", () => {
     const searchInput = page.locator('input[aria-label="Search"]');
     const hasInput = await searchInput.isVisible().catch(() => false);
     if (!hasInput) {
-      test.skip("Search input not visible");
+      test.skip(true, "Search input not visible");
       return;
     }
 

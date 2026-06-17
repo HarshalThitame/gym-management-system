@@ -831,7 +831,7 @@ test.describe("Super Admin Dashboard — Comprehensive QA Suite", () => {
       const sloCard = main(page).getByRole("heading", { name: "Reliability Targets" }).locator("..").locator("..");
       const text = await sloCard.textContent();
       const uptimeMatch = text?.match(/(\d+\.?\d*)%/);
-      if (uptimeMatch) {
+      if (uptimeMatch?.[1]) {
         const uptime = parseFloat(uptimeMatch[1]);
         expect(uptime).toBeGreaterThanOrEqual(0);
         expect(uptime).toBeLessThanOrEqual(100);
@@ -1205,13 +1205,13 @@ test.describe("Super Admin Dashboard — Comprehensive QA Suite", () => {
       const text = await sloCard.innerText();
 
       const apiP95Match = text.match(/API P95[^0-9]*(\d+)\s*ms/);
-      if (apiP95Match) {
+      if (apiP95Match?.[1]) {
         const latency = parseInt(apiP95Match[1], 10);
         expect(latency).toBeGreaterThanOrEqual(0);
       }
 
       const dbP95Match = text.match(/DB P95[^0-9]*(\d+)\s*ms/);
-      if (dbP95Match) {
+      if (dbP95Match?.[1]) {
         const latency = parseInt(dbP95Match[1], 10);
         expect(latency).toBeGreaterThanOrEqual(0);
       }
@@ -1225,7 +1225,7 @@ test.describe("Super Admin Dashboard — Comprehensive QA Suite", () => {
       const text = await sloCard.innerText();
 
       const uptimeMatch = text.match(/Uptime[^0-9]*(\d+\.?\d*)%/);
-      if (uptimeMatch) {
+      if (uptimeMatch?.[1]) {
         const uptime = parseFloat(uptimeMatch[1]);
         expect(uptime).toBeGreaterThanOrEqual(0);
         expect(uptime).toBeLessThanOrEqual(100);

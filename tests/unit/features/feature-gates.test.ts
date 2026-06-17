@@ -256,6 +256,7 @@ function createScope(roles: RoleName[]): AuthContext & {
     profile: {
       id: userId,
       gym_id: gymId,
+      branch_id: null,
       full_name: "QA User",
       email: "qa@example.com",
       phone: "9876543210",

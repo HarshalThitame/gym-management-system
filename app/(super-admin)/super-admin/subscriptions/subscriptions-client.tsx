@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
 import { BarChart3, Package, Users, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Shield, Trash2, Calendar, Puzzle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,11 +21,12 @@ import {
   overrideSubscriptionPriceAction,
 } from "@/features/super-admin/actions/subscription-enterprise-actions";
 
-type Data = { error: string | null; organizations: any[]; packages: any[]; subscriptions: any[]; invoicesByOrg: Record<string, any[]>; eventsByOrg: Record<string, any[]>; };
+type Data = { error: string | null; organizations: any[]; packages: any[]; subscriptions: any[]; invoicesByOrg: Record<string, any[]>; eventsByOrg: Record<string, any[]>; availableAddons: any[]; subAddonsBySub: Record<string, any[]>; schedChangesBySub: Record<string, any[]>; };
 const PAGE_SIZES = [25, 50, 100];
 const PackageManagementClient = dynamic(() => import("./package-management-client").then((m) => m.PackageManagementClient), { ssr: false });
 
 export function SubscriptionsClient({ data }: { data: Data }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"overview" | "packages" | "requests">("overview");
   const [drawerOrgData, setDrawerOrgData] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -40,10 +42,19 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   const expiredSubs = data.subscriptions.filter((s: any) => s.status === "expired" || s.status === "suspended" || s.status === "cancelled").length;
   const unassigned = data.organizations.length - data.subscriptions.length;
 
+  // Normalize MRR by billing period
+  const computeMrr = (price: number, period: string) => {
+    if (!price) return 0;
+    const divisors: Record<string, number> = { monthly: 1, annual: 12, quarterly: 3, half_yearly: 6 };
+    return Math.round(price / (divisors[period] || 1));
+  };
+
   const totalMonthlyRevenue = data.subscriptions.reduce((sum: number, s: any) => {
     if (s.status !== "active") return sum;
     const pkg = data.packages.find((p: any) => p.id === s.package_id);
-    return sum + (s.price_override ?? pkg?.price ?? 0);
+    const price = s.price_override ?? pkg?.price ?? 0;
+    const period = s.billing_period || pkg?.billing_period || "monthly";
+    return sum + computeMrr(price, period);
   }, 0);
 
   const totalInvoices = Object.values(data.invoicesByOrg).flat().length;
@@ -64,13 +75,14 @@ export function SubscriptionsClient({ data }: { data: Data }) {
     const result = await fn(input);
     if (result.status === "success") {
       showToast(successMsg, "success");
+      router.refresh();
       if (drawerOrgData?.org?.id) triggeredSync(drawerOrgData.org.id);
     } else {
       showToast(result.message || result.error || "Action failed", "error");
     }
     setActionLoading(null);
     setRefreshKey(k => k + 1);
-  }, [drawerOrgData, triggeredSync]);
+  }, [drawerOrgData, router, triggeredSync]);
 
   const filteredOrgs = useMemo(() => {
     let list = data.organizations;
@@ -171,9 +183,12 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
 }) {
   const { org, sub, pkg } = drawerOrg;
   const [tab, setTab] = useState<"overview" | "invoices" | "events" | "addons" | "scheduled">("overview");
-  const [modal, setModal] = useState<{ type: string } | null>(null);
+  const [modal, setModal] = useState<any>(null);
   const invoices = (data.invoicesByOrg[org.id] ?? []) as any[];
   const events = (data.eventsByOrg[org.id] ?? []) as any[];
+  const availableAddons = (pkg?.id ? data.availableAddons.filter((addon: any) => addon.package_id === pkg.id && addon.is_active) : []) as any[];
+  const assignedAddons = (sub?.id ? data.subAddonsBySub[sub.id] ?? [] : []) as any[];
+  const scheduledChanges = (sub?.id ? data.schedChangesBySub[sub.id] ?? [] : []) as any[];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
@@ -250,16 +265,63 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
         {/* ─── ADD-ONS ─── */}
         {tab === "addons" && (
           <div className="p-5 space-y-3">
-            <div className="flex items-center justify-between"><p className="text-xs font-black uppercase text-muted-foreground">Add-ons</p><button onClick={() => setModal({ type: "assign_addon" })} className="inline-flex items-center gap-1 rounded-md bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 text-xs font-semibold hover:bg-primary/20" type="button"><Plus className="size-3" /> Assign</button></div>
-            {sub ? <div className="py-8 text-center text-muted-foreground text-sm border border-dashed border-border rounded-lg">Add-on assignment ready. Click Assign to add an add-on to this subscription.</div> : <div className="py-12 text-center text-muted-foreground text-sm">Assign a plan first</div>}
+            <div className="flex items-center justify-between"><p className="text-xs font-black uppercase text-muted-foreground">Add-ons ({assignedAddons.length})</p><button onClick={() => setModal({ type: "assign_addon" })} className="inline-flex items-center gap-1 rounded-md bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 text-xs font-semibold hover:bg-primary/20" type="button"><Plus className="size-3" /> Assign</button></div>
+            {!sub ? <div className="py-8 text-center text-muted-foreground text-sm">Assign a plan first</div> : assignedAddons.length === 0 && availableAddons.length === 0 ? <div className="py-8 text-center text-muted-foreground text-sm border border-dashed border-border rounded-lg">No add-ons configured for this package.</div> : (
+              <div className="space-y-2">
+                {assignedAddons.map((sa: any) => {
+                  const addon = availableAddons.find((a: any) => a.id === sa.addon_id);
+                  return (
+                    <div key={sa.id} className="rounded-lg border border-border bg-background p-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-semibold">{addon?.name ?? sa.addon_id}</p>
+                        <p className="text-[10px] text-muted-foreground">Qty: {sa.quantity} · ₹{Intl.NumberFormat("en-IN").format(Math.round((sa.unit_price ?? 0) / 100))}/mo</p>
+                      </div>
+                      <button onClick={() => setModal({ type: "remove_addon", assignedAddon: sa, addon })} className="rounded-md p-1 text-muted-foreground hover:text-red-600" type="button" aria-label="Remove"><Trash2 className="size-3.5" /></button>
+                    </div>
+                  );
+                })}
+                {availableAddons.length > 0 && (
+                  <div className="mt-4 border-t border-border pt-3">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">Available Add-ons</p>
+                    {availableAddons.filter((a: any) => a.is_active !== false && !assignedAddons.find((s: any) => s.addon_id === a.id)).map((addon: any) => (
+                      <div key={addon.id} className="flex items-center justify-between rounded-md border border-dashed border-border bg-surface-muted/30 p-2 text-xs">
+                        <span>{addon.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((addon.unit_price ?? 0) / 100))}/mo</span>
+                        <button onClick={() => setModal({ type: "assign_addon" })} className="text-primary underline" type="button">Assign</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {/* ─── SCHEDULED ─── */}
         {tab === "scheduled" && (
           <div className="p-5 space-y-3">
-            <p className="text-xs font-black uppercase text-muted-foreground">Scheduled Changes</p>
-            <div className="py-8 text-center text-muted-foreground text-sm border border-dashed border-border rounded-lg">Use the Schedule Change button in Overview to schedule future plan changes. Scheduled changes will be listed here.</div>
+            <p className="text-xs font-black uppercase text-muted-foreground">Scheduled Changes ({scheduledChanges.length})</p>
+            {scheduledChanges.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground text-sm border border-dashed border-border rounded-lg">No scheduled changes. Use Schedule Change in Overview to create one.</div>
+            ) : scheduledChanges.map((sc: any) => {
+              const fromPkg = packages.find((p: any) => p.id === sc.from_package_id);
+              const toPkg = packages.find((p: any) => p.id === sc.to_package_id);
+              return (
+                <div key={sc.id} className="rounded-lg border border-border bg-background p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold border", sc.status === "pending" ? "bg-blue-50 text-blue-700 border-blue-200" : sc.status === "applied" ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200")}>{sc.status}</span>
+                    <span className="text-[10px] font-bold capitalize">{sc.change_type}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span>{fromPkg?.name ?? "—"} → {toPkg?.name ?? "—"}</span>
+                    <span className="text-muted-foreground" suppressHydrationWarning>{sc.effective_date ? new Date(sc.effective_date).toLocaleDateString("en-IN") : "—"}</span>
+                  </div>
+                  {sc.reason && <p className="text-[10px] text-muted-foreground">{sc.reason}</p>}
+                  {sc.status === "pending" && (
+                    <button onClick={() => setModal({ type: "cancel_scheduled", change: sc })} className="text-[10px] text-red-600 underline" type="button">Cancel</button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -286,7 +348,9 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
       {modal?.type === "convert_trial" && sub && <ConvertTrialModal sub={sub} packages={packages} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
       {modal?.type === "override_price" && sub && <OverridePriceModal sub={sub} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
       {modal?.type === "schedule" && sub && <ScheduleModal sub={sub} pkg={pkg} packages={packages} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
-      {modal?.type === "assign_addon" && sub && <AssignAddonModal sub={sub} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
+      {modal?.type === "assign_addon" && sub && <AssignAddonModal sub={sub} orgId={org.id} availableAddons={availableAddons} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
+      {modal?.type === "remove_addon" && sub && <RemoveAddonModal assignedAddon={modal.assignedAddon} addon={modal.addon} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
+      {modal?.type === "cancel_scheduled" && sub && <CancelScheduledModal change={modal.change} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
     </div>
   );
 }
@@ -403,10 +467,10 @@ function ConvertTrialModal({ sub, packages, onClose, execAction, actionLoading }
 }
 
 function OverridePriceModal({ sub, orgId, onClose, execAction, actionLoading }: any) {
-  const [price, setPrice] = useState(sub?.price_override ?? ""); const [reason, setReason] = useState("");
+  const [price, setPrice] = useState(sub?.price_override ?? ""); const [reason, setReason] = useState(""); const [stepUpEmail, setStepUpEmail] = useState("");
   const handleSubmit = () => {
-    if (!price || !reason.trim()) return;
-    execAction(overrideSubscriptionPriceAction, { subscriptionId: sub.id, organizationId: orgId, price: Number(price), reason }, "override_price", "Price updated");
+    if (!price || reason.trim().length < 10 || !stepUpEmail) return;
+    execAction(overrideSubscriptionPriceAction, { subscriptionId: sub.id, organizationId: orgId, overrideAmount: Number(price), currency: "INR", reason, stepUpEmail }, "override_price", "Price updated");
     onClose();
   };
   return (
@@ -415,8 +479,10 @@ function OverridePriceModal({ sub, orgId, onClose, execAction, actionLoading }: 
         <h3 className="text-lg font-black mb-1">Override Price</h3><p className="text-sm text-muted-foreground mb-4">Current: ₹{Intl.NumberFormat("en-IN").format(Math.round((sub.price_override ?? 0) / 100))}/mo</p>
         <div className="space-y-3">
           <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="New price in paise" />
-          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1" placeholder="Reason for override" />
-          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!price || !!actionLoading} className="gap-2">{actionLoading === "override_price" ? <Loader2 className="size-4 animate-spin" /> : null}Override</Button></div>
+          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1" placeholder="Reason for override (min 10 chars)" />
+          <input value={stepUpEmail} onChange={(e) => setStepUpEmail(e.target.value)} type="email" className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Super Admin email (step-up)" />
+          <InlineMfaStepUp compact />
+          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!price || reason.trim().length < 10 || !stepUpEmail || !!actionLoading} className="gap-2">{actionLoading === "override_price" ? <Loader2 className="size-4 animate-spin" /> : null}Override</Button></div>
         </div>
       </div>
     </div>
@@ -442,11 +508,12 @@ function ScheduleModal({ sub, pkg, packages, orgId, onClose, execAction, actionL
   );
 }
 
-function AssignAddonModal({ sub, onClose, execAction, actionLoading }: any) {
-  const [addonId, setAddonId] = useState(""); const [qty, setQty] = useState(1);
+function AssignAddonModal({ sub, orgId, availableAddons, onClose, execAction, actionLoading }: any) {
+  const [addonId, setAddonId] = useState(availableAddons?.[0]?.id ?? ""); const [qty, setQty] = useState(1); const [reason, setReason] = useState("");
+  const selectedAddon = availableAddons?.find((a: any) => a.id === addonId);
   const handleSubmit = () => {
-    if (!addonId) return;
-    execAction(assignAddonAction, { subscriptionId: sub.id, addonId, quantity: qty }, "assign_addon", "Add-on assigned");
+    if (!addonId || reason.trim().length < 5) return;
+    execAction(assignAddonAction, { subscriptionId: sub.id, organizationId: orgId, addonId, quantity: qty, reason }, "assign_addon", "Add-on assigned");
     onClose();
   };
   return (
@@ -454,10 +521,54 @@ function AssignAddonModal({ sub, onClose, execAction, actionLoading }: any) {
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-black mb-4">Assign Add-on</h3>
         <div className="space-y-3">
-          <input value={addonId} onChange={(e) => setAddonId(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Add-on ID (UUID)" />
-          <input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} min={1} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Quantity" />
-          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!addonId || !!actionLoading} className="gap-2">Assign</Button></div>
+          {availableAddons?.filter((a: any) => a.is_active !== false).length > 0 ? (
+            <select value={addonId} onChange={(e) => setAddonId(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm">
+              {availableAddons.filter((a: any) => a.is_active !== false).map((a: any) => <option key={a.id} value={a.id}>{a.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((a.unit_price ?? 0) / 100))}/mo{a.max_quantity > 0 ? ` (max ${a.max_quantity})` : ""}</option>)}
+            </select>
+          ) : <div className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No active add-ons are configured for this package.</div>}
+          {selectedAddon?.max_quantity > 0 && <p className="text-xs text-muted-foreground">Max quantity: {selectedAddon.max_quantity}{selectedAddon.description ? ` · ${selectedAddon.description}` : ""}</p>}
+          <div className="flex items-center gap-3"><input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} min={1} max={selectedAddon?.max_quantity || 999} className="h-11 w-24 rounded-md border border-border bg-surface px-3 text-sm" /><span className="text-xs text-muted-foreground">× ₹{Intl.NumberFormat("en-IN").format(Math.round((selectedAddon?.unit_price ?? 0) / 100))} = ₹{Intl.NumberFormat("en-IN").format(Math.round((selectedAddon?.unit_price ?? 0) * qty / 100))}/mo</span></div>
+          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1" placeholder="Reason for assigning add-on" />
+          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!addonId || reason.trim().length < 5 || !!actionLoading} className="gap-2">{actionLoading === "assign_addon" ? <Loader2 className="size-4 animate-spin" /> : null}Assign</Button></div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RemoveAddonModal({ assignedAddon, addon, orgId, onClose, execAction, actionLoading }: any) {
+  const [reason, setReason] = useState("");
+  const handleSubmit = () => {
+    if (!assignedAddon?.id || reason.trim().length < 5) return;
+    execAction(removeAddonAction, { assignedAddonId: assignedAddon.id, organizationId: orgId, reason }, "remove_addon", "Add-on removed");
+    onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-black mb-1">Remove Add-on</h3>
+        <p className="text-sm text-muted-foreground mb-4">{addon?.name ?? assignedAddon?.addon_id ?? "Selected add-on"} · Qty {assignedAddon?.quantity ?? 0}</p>
+        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="mt-1" placeholder="Reason for removing add-on" />
+        <div className="flex justify-end gap-3 pt-4"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="destructive" onClick={handleSubmit} disabled={reason.trim().length < 5 || !!actionLoading} className="gap-2">{actionLoading === "remove_addon" ? <Loader2 className="size-4 animate-spin" /> : null}Remove</Button></div>
+      </div>
+    </div>
+  );
+}
+
+function CancelScheduledModal({ change, orgId, onClose, execAction, actionLoading }: any) {
+  const [reason, setReason] = useState("");
+  const handleSubmit = () => {
+    if (!change?.id || reason.trim().length < 5) return;
+    execAction(cancelScheduledChangeAction, { changeId: change.id, organizationId: orgId, reason }, "cancel_scheduled", "Scheduled change cancelled");
+    onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-black mb-1">Cancel Scheduled Change</h3>
+        <p className="text-sm text-muted-foreground mb-4">This will cancel the pending {change?.change_type ?? "plan"} change.</p>
+        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="mt-1" placeholder="Reason for cancellation" />
+        <div className="flex justify-end gap-3 pt-4"><Button type="button" variant="secondary" onClick={onClose}>Back</Button><Button type="button" variant="destructive" onClick={handleSubmit} disabled={reason.trim().length < 5 || !!actionLoading} className="gap-2">{actionLoading === "cancel_scheduled" ? <Loader2 className="size-4 animate-spin" /> : null}Cancel Change</Button></div>
       </div>
     </div>
   );

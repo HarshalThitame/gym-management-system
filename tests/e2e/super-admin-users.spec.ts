@@ -93,7 +93,7 @@ test("U02-15: full users test", async ({ page }) => {
   const detailHref = await page.evaluate(() => {
     const links = Array.from(document.querySelectorAll("a[href^='/super-admin/users/']"));
     const nonExport = links.filter((l) => !l.getAttribute("href")?.includes("/export"));
-    return nonExport.length > 0 ? nonExport[0].getAttribute("href") : null;
+    return nonExport[0]?.getAttribute("href") ?? null;
   });
   if (detailHref && !detailHref.includes("/export")) {
     await visit(page, detailHref);
@@ -130,7 +130,7 @@ test("U16-20: destructive actions + content validation", async ({ page }) => {
   const detailHref = await page.evaluate(() => {
     const links = Array.from(document.querySelectorAll("a[href^='/super-admin/users/']"));
     const nonExport = links.filter((l) => !l.getAttribute("href")?.includes("/export"));
-    return nonExport.length > 0 ? nonExport[0].getAttribute("href") : null;
+    return nonExport[0]?.getAttribute("href") ?? null;
   });
   if (detailHref && !detailHref.includes("/export")) {
     await visit(page, detailHref);

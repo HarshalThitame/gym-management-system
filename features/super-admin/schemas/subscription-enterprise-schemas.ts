@@ -46,12 +46,17 @@ export const convertTrialSchema = z.object({
 
 export const assignAddonSchema = z.object({
   subscriptionId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   addonId: z.string().uuid(),
   quantity: z.number().int().min(1).default(1),
+  effectiveDate: z.string().datetime("Must be a valid ISO date.").optional(),
+  reason: z.string().trim().min(5, "Please provide a reason.").max(500),
 });
 
 export const removeAddonSchema = z.object({
   assignedAddonId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  reason: z.string().trim().min(5, "Please provide a reason.").max(500),
 });
 
 export const scheduleChangeSchema = z.object({
@@ -67,6 +72,7 @@ export const scheduleChangeSchema = z.object({
 export const cancelScheduledChangeSchema = z.object({
   changeId: z.string().uuid(),
   organizationId: z.string().uuid(),
+  reason: z.string().trim().min(5, "Please provide a reason.").max(500),
 });
 
 export const bulkUpdateSubscriptionStatusSchema = z.object({
@@ -94,8 +100,18 @@ export type BulkUpdateStatusInput = z.infer<typeof bulkUpdateSubscriptionStatusS
 export const overridePriceSchema = z.object({
   subscriptionId: z.string().uuid(),
   organizationId: z.string().uuid(),
-  price: z.number().int().min(0),
-  reason: z.string().trim().min(5, "Please provide a reason.").max(500),
+  overrideAmount: z.number().int().min(1, "Override amount must be positive."),
+  currency: z.string().trim().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter ISO code.").default("INR"),
+  effectiveDate: z.string().datetime("Must be a valid ISO date.").optional(),
+  endDate: z.string().datetime("Must be a valid ISO date.").optional(),
+  reason: z.string().trim().min(10, "Please provide at least 10 characters.").max(500),
+  stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
+}).refine((value) => {
+  if (!value.effectiveDate || !value.endDate) return true;
+  return new Date(value.endDate).getTime() > new Date(value.effectiveDate).getTime();
+}, {
+  message: "End date must be after effective date.",
+  path: ["endDate"],
 });
 
 export type OverridePriceInput = z.infer<typeof overridePriceSchema>;

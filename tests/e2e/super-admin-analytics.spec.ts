@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Response } from "@playwright/test";
 
 const password = (() => {
   const v = process.env.E2E_AUTH_PASSWORD;
@@ -9,10 +9,10 @@ const email = process.env.E2E_SUPER_ADMIN_EMAIL ?? "hthitame+qa.superadmin@gmail
 
 test.use({ screenshot: "on", serviceWorkers: "block", trace: "on", video: "on" });
 
-function errs(p: any) {
+function errs(p: Page) {
   const e: string[] = [];
-  p.on("pageerror", (err) => e.push(err.message));
-  p.on("response", (r: any) => { if (r.status() >= 500) e.push(`500 ${r.url()}`); });
+  p.on("pageerror", (err: Error) => e.push(err.message));
+  p.on("response", (r: Response) => { if (r.status() >= 500) e.push(`500 ${r.url()}`); });
   return e;
 }
 

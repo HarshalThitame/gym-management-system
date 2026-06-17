@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 import type { ReactNode } from "react";
 import { useEffect, useRef, useCallback } from "react";
 import { X, Loader2 } from "lucide-react";

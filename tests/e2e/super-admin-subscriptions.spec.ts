@@ -358,7 +358,7 @@ test.describe("Super Admin Subscriptions — Full QA Suite", () => {
 
   test.describe("Subscription state machine", () => {
     test("TC-SU21: valid transitions accepted", async () => {
-      const valid = [
+      const valid: Array<[string, string]> = [
         ["trial", "active"], ["trial", "expired"], ["trial", "cancelled"],
         ["active", "expired"], ["active", "suspended"], ["active", "cancelled"],
         ["suspended", "active"], ["suspended", "cancelled"],
@@ -371,7 +371,7 @@ test.describe("Super Admin Subscriptions — Full QA Suite", () => {
     });
 
     test("TC-SU22: invalid transitions rejected", async () => {
-      const invalid = [
+      const invalid: Array<[string, string]> = [
         ["cancelled", "suspended"], ["cancelled", "expired"], ["cancelled", "trial"],
         ["expired", "trial"], ["expired", "suspended"],
         ["suspended", "trial"], ["suspended", "expired"],

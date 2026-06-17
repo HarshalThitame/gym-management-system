@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useCallback, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Banknote, BarChart3, CreditCard, Download, Eye, PieChart as PieChartIcon, ReceiptText, TrendingUp } from "lucide-react";
 
@@ -307,5 +309,4 @@ function PaymentDetailPanel({ payment, dashboard, onClose }: { payment: PaymentR
     </div>
   );
 }
-
 

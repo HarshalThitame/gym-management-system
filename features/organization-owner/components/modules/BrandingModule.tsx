@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 import { useCallback, useMemo, useState, useActionState } from "react";
 import { Copy, Download, Edit3, Eye, Globe2, Image, Palette, Plus, ShieldCheck } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";

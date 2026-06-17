@@ -31,7 +31,7 @@ test.describe("Super Admin Branches Page", () => {
     const table = page.locator("table");
     const tableExists = await table.isVisible().catch(() => false);
     if (!tableExists) {
-      test.skip("No branches exist to test filtering");
+      test.skip(true, "No branches exist to test filtering");
       return;
     }
 
@@ -53,7 +53,7 @@ test.describe("Super Admin Branches Page", () => {
     const select = page.locator("select").first();
     const selectExists = await select.isVisible().catch(() => false);
     if (!selectExists) {
-      test.skip("Filter dropdown not visible");
+      test.skip(true, "Filter dropdown not visible");
       return;
     }
 
@@ -68,7 +68,7 @@ test.describe("Super Admin Branches Page", () => {
     const clearBtn = page.getByText("Clear Filters");
     const exists = await clearBtn.isVisible().catch(() => false);
     if (!exists) {
-      test.skip("Clear filters button not visible");
+      test.skip(true, "Clear filters button not visible");
       return;
     }
 
@@ -91,7 +91,7 @@ test.describe("Super Admin Branches Page", () => {
     const eyeButton = page.locator('button[aria-label="View details"]').first();
     const exists = await eyeButton.isVisible().catch(() => false);
     if (!exists) {
-      test.skip("No branch detail buttons available");
+      test.skip(true, "No branch detail buttons available");
       return;
     }
 

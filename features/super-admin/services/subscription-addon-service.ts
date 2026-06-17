@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { recordSubscriptionEvent } from "./subscription-events-service";
 
@@ -16,7 +18,7 @@ type Filter = {
 
 type RawClient = {
   from(t: string): {
-    select(c: string): Filter;
+    select(c: string): Filter & QueryRes;
     insert(r: Record<string, unknown>): Filter & QueryRes;
     update(r: Record<string, unknown>): Filter & QueryRes;
     delete(): Filter & QueryRes;
@@ -33,6 +35,19 @@ export type AddonDefinition = {
   maxQuantity: number;
   isActive: boolean;
 };
+
+function mapAddonDefinition(row: Record<string, unknown>): AddonDefinition {
+  return {
+    id: row.id as string,
+    packageId: row.package_id as string,
+    name: row.name as string,
+    description: row.description as string | null,
+    type: row.type as AddonDefinition["type"],
+    unitPrice: Number(row.unit_price ?? 0),
+    maxQuantity: Number(row.max_quantity ?? 1),
+    isActive: Boolean(row.is_active),
+  };
+}
 
 export type AssignedAddon = {
   id: string;
@@ -54,16 +69,7 @@ export async function getAvailableAddons(packageId: string): Promise<AddonDefini
     .order("sort_order", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r: Record<string, unknown>) => ({
-    id: r.id as string,
-    packageId: r.package_id as string,
-    name: r.name as string,
-    description: r.description as string | null,
-    type: r.type as AddonDefinition["type"],
-    unitPrice: r.unit_price as number,
-    maxQuantity: r.max_quantity as number,
-    isActive: r.is_active as boolean,
-  }));
+  return (data ?? []).map(mapAddonDefinition);
 }
 
 export async function getAssignedAddons(subscriptionId: string): Promise<AssignedAddon[]> {
@@ -75,22 +81,33 @@ export async function getAssignedAddons(subscriptionId: string): Promise<Assigne
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((r: Record<string, unknown>) => ({
+  const { data: addonRows } = await (supabase as never as RawClient)
+    .from("package_addons")
+    .select("");
+  const addonsById = new Map((addonRows ?? []).map((row) => [row.id as string, mapAddonDefinition(row)]));
+
+  return (data ?? []).map((r: Record<string, unknown>) => {
+    const addon = addonsById.get(r.addon_id as string);
+    const unitPrice = Number(r.unit_price ?? addon?.unitPrice ?? 0);
+    const quantity = Number(r.quantity ?? 0);
+    return {
     id: r.id as string,
     addonId: r.addon_id as string,
-    name: ((r.package_addons as Record<string, unknown> | null)?.name as string) ?? "",
-    type: ((r.package_addons as Record<string, unknown> | null)?.type as AssignedAddon["type"]) ?? "feature",
-    quantity: r.quantity as number,
-    unitPrice: r.unit_price as number,
-    totalPrice: (r.quantity as number) * (r.unit_price as number),
-  }));
+    name: addon?.name ?? "Unknown add-on",
+    type: addon?.type ?? "feature",
+    quantity,
+    unitPrice,
+    totalPrice: quantity * unitPrice,
+  };
+  });
 }
 
 export async function assignAddon(
   subscriptionId: string,
   addonId: string,
   quantity: number,
-  actorId: string
+  actorId: string,
+  reason: string
 ): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const q = (supabase as never as RawClient);
@@ -101,7 +118,7 @@ export async function assignAddon(
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
-  const addonDef = (addons ?? [])[0] as AddonDefinition | undefined;
+  const addonDef = addons?.[0] ? mapAddonDefinition(addons[0]) : null;
   if (!addonDef) throw new Error("Add-on not found or inactive.");
 
   if (quantity > addonDef.maxQuantity) {
@@ -112,8 +129,13 @@ export async function assignAddon(
 
   const assigned = await getAssignedAddons(subscriptionId);
   const alreadyAssigned = assigned.find((a) => a.addonId === addonId);
+  const nextQuantity = (alreadyAssigned?.quantity ?? 0) + quantity;
+  if (nextQuantity > addonDef.maxQuantity) {
+    throw new Error(`Maximum quantity for "${addonDef.name}" is ${addonDef.maxQuantity}. Current quantity is ${alreadyAssigned?.quantity ?? 0}.`);
+  }
+
   if (alreadyAssigned) {
-    const { error } = await q.from("subscription_addons").update({ quantity: alreadyAssigned.quantity + quantity, unit_price: addonDef.unitPrice }).eq("id", alreadyAssigned.id);
+    const { error } = await q.from("subscription_addons").update({ quantity: nextQuantity, unit_price: addonDef.unitPrice }).eq("id", alreadyAssigned.id);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await q.from("subscription_addons").insert({
@@ -129,12 +151,14 @@ export async function assignAddon(
     organizationId: orgId,
     subscriptionId,
     eventType: alreadyAssigned ? "addon_quantity_changed" : "addon_added",
-    newState: { addonId, name: addonDef.name, quantity },
+    previousState: alreadyAssigned ? { addonId, quantity: alreadyAssigned.quantity } : null,
+    newState: { addonId, name: addonDef.name, quantity: nextQuantity, unitPrice: addonDef.unitPrice },
     actorId,
+    reason,
   });
 }
 
-export async function removeAddon(assignedAddonId: string, actorId: string): Promise<void> {
+export async function removeAddon(assignedAddonId: string, actorId: string, reason: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const q = (supabase as never as RawClient);
 
@@ -143,6 +167,7 @@ export async function removeAddon(assignedAddonId: string, actorId: string): Pro
 
   const subId = existing.subscription_id as string;
   const orgId = await resolveOrgIdFromSubscription(subId);
+  const { data: addon } = await q.from("package_addons").select("").eq("id", existing.addon_id as string).maybeSingle();
 
   const { error } = await q.from("subscription_addons").delete().eq("id", assignedAddonId);
   if (error) throw new Error(error.message);
@@ -151,9 +176,14 @@ export async function removeAddon(assignedAddonId: string, actorId: string): Pro
     organizationId: orgId,
     subscriptionId: subId,
     eventType: "addon_removed",
-    previousState: { addonId: existing.addon_id },
+    previousState: {
+      addonId: existing.addon_id,
+      name: addon?.name ?? "Unknown add-on",
+      quantity: existing.quantity,
+      unitPrice: existing.unit_price,
+    },
     actorId,
-    reason: `Removed add-on: ${((existing.package_addons as Record<string, unknown>)?.name as string) ?? "Unknown"}`,
+    reason,
   });
 }
 

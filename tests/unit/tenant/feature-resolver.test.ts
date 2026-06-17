@@ -69,20 +69,6 @@ const safeDefaultFlags: OrgFeatureFlags = {
   classSchedulingEnabled: false, communicationsEnabled: false,
   trainerAssignmentEnabled: false, razorpayEnabled: false,
 };
-  billingInvoices: false, receipts: false, paymentTracking: false,
-  basicReports: false, advancedReportsEnabled: false,
-  emailNotifications: false, inAppNotifications: false,
-  whatsappIntegration: false, smsIntegration: false,
-  memberPortal: false, trainerPortal: false,
-  aiEnabled: false, aiCoach: false, aiRetentionAnalysis: false, aiRevenueInsights: false,
-  whiteLabelEnabled: false, customDomainEnabled: false, customBranding: false,
-  multiBranchManagement: false, franchiseManagement: false,
-  apiAccessEnabled: false, webhooks: false, auditLogs: false,
-  advancedRbac: false, prioritySupport: false, staffManagement: false,
-  classSchedulingEnabled: false, communicationsEnabled: false,
-  trainerAssignmentEnabled: false, razorpayEnabled: false,
-};
-
 const standardPackage = {
   max_members: 500,
   max_branches: 3,

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { recordSubscriptionEvent } from "./subscription-events-service";
 
@@ -87,7 +89,7 @@ export async function schedulePlanChange(input: {
   };
 }
 
-export async function cancelScheduledChange(changeId: string, organizationId: string, actorId: string): Promise<void> {
+export async function cancelScheduledChange(changeId: string, organizationId: string, actorId: string, reason: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const db = supabase as never as Db;
 
@@ -118,6 +120,7 @@ export async function cancelScheduledChange(changeId: string, organizationId: st
     eventType: "downgrade_cancelled",
     previousState: { scheduledChangeId: changeId },
     actorId,
+    reason,
   });
 }
 

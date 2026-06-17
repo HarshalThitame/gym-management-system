@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useCallback, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, BarChart3, CalendarDays, Download, Dumbbell, Eye, Gauge, TrendingUp, UsersRound } from "lucide-react";
 import { Bar, BarChart, Cell, Line, LineChart as RechartsLine, Pie, PieChart as RechartsPie, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";

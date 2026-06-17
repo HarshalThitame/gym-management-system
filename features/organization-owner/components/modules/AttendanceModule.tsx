@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useCallback, useMemo, useState } from "react";
 import { Activity, CalendarCheck, Clock, Download, Eye, Percent, TrendingUp, XCircle } from "lucide-react";
 import { Bar, BarChart, Cell, Line, LineChart as RechartsLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -259,5 +261,4 @@ function AttendanceDetailPanel({ log, dashboard, onClose }: { log: Record<string
     </div>
   );
 }
-
 

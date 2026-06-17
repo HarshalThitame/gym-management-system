@@ -2,16 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { writeAuditLog } from "@/lib/audit";
 import { requireApiRole } from "@/lib/auth/api-guards";
-import { requireRole } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
-import { overridePriceSchema } from "../schemas/subscription-enterprise-schemas";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { validateTransition } from "../services/subscription-state-machine";
 import { assignPackageToOrg } from "../services/subscription-service";
 import { recordSubscriptionEvent } from "../services/subscription-events-service";
@@ -30,6 +26,7 @@ import {
   scheduleChangeSchema,
   cancelScheduledChangeSchema,
   bulkUpdateSubscriptionStatusSchema,
+  overridePriceSchema,
 } from "../schemas/subscription-enterprise-schemas";
 import { prorate, formatProrationSummary, getDaysInPeriod } from "../services/subscription-proration";
 import type { ProrationResult } from "../services/subscription-proration";
@@ -53,6 +50,36 @@ function revalidatePaths() {
   revalidatePath("/super-admin");
   revalidatePath("/super-admin/subscriptions");
   revalidatePath("/organization/plan");
+}
+
+type MinimalQueryResult = Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+type MinimalSelect = {
+  eq(column: string, value: string): MinimalSelect;
+  maybeSingle(): MinimalQueryResult;
+  single(): MinimalQueryResult;
+};
+type MinimalMutation = {
+  eq(column: string, value: string): Promise<{ error: { message: string } | null }>;
+};
+type MinimalDb = {
+  from(table: string): {
+    select(columns: string): MinimalSelect;
+    update(row: Record<string, unknown>): MinimalMutation;
+  };
+};
+
+async function getSubscriptionForOrg(subscriptionId: string, organizationId: string): Promise<Record<string, unknown> | null> {
+  const supabase = await createSupabaseServerClient();
+  const db = supabase as never as MinimalDb;
+  const { data, error } = await db
+    .from("organization_subscriptions")
+    .select("id, organization_id, package_id, status, price_override, billing_period")
+    .eq("id", subscriptionId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data || data.organization_id !== organizationId) return null;
+  return data;
 }
 
 async function verifyMfaStepUp(stepUpEmail: string): Promise<AuthActionState | null> {
@@ -553,7 +580,10 @@ export async function assignAddonAction(input: unknown): Promise<AuthActionState
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
   try {
-    await assignAddon(parsed.data.subscriptionId, parsed.data.addonId, parsed.data.quantity, auth.context.userId);
+    const sub = await getSubscriptionForOrg(parsed.data.subscriptionId, parsed.data.organizationId);
+    if (!sub) return { status: "error", message: "Subscription not found for this organization." };
+
+    await assignAddon(parsed.data.subscriptionId, parsed.data.addonId, parsed.data.quantity, auth.context.userId, parsed.data.reason);
     revalidatePaths();
     return { status: "success", message: "Add-on assigned." };
   } catch (e) {
@@ -569,7 +599,30 @@ export async function removeAddonAction(input: unknown): Promise<AuthActionState
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
   try {
-    await removeAddon(parsed.data.assignedAddonId, auth.context.userId);
+    const supabase = await createSupabaseServerClient();
+    const db = supabase as never as {
+      from(table: string): {
+        select(columns: string): {
+          eq(column: string, value: string): {
+            maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+
+    const { data: assigned, error } = await db
+      .from("subscription_addons")
+      .select("id, subscription_id")
+      .eq("id", parsed.data.assignedAddonId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!assigned) return { status: "error", message: "Add-on assignment not found." };
+
+    const sub = await getSubscriptionForOrg(assigned.subscription_id as string, parsed.data.organizationId);
+    if (!sub) return { status: "error", message: "Add-on assignment is not linked to this organization." };
+
+    await removeAddon(parsed.data.assignedAddonId, auth.context.userId, parsed.data.reason);
     revalidatePaths();
     return { status: "success", message: "Add-on removed." };
   } catch (e) {
@@ -610,7 +663,30 @@ export async function cancelScheduledChangeAction(input: unknown): Promise<AuthA
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
   try {
-    await cancelScheduledChange(parsed.data.changeId, parsed.data.organizationId, auth.context.userId);
+    const supabase = await createSupabaseServerClient();
+    const db = supabase as never as {
+      from(table: string): {
+        select(columns: string): {
+          eq(column: string, value: string): {
+            maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+
+    const { data: change, error } = await db
+      .from("scheduled_plan_changes")
+      .select("id, subscription_id")
+      .eq("id", parsed.data.changeId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!change) return { status: "error", message: "Scheduled change not found." };
+
+    const sub = await getSubscriptionForOrg(change.subscription_id as string, parsed.data.organizationId);
+    if (!sub) return { status: "error", message: "Scheduled change is not linked to this organization." };
+
+    await cancelScheduledChange(parsed.data.changeId, parsed.data.organizationId, auth.context.userId, parsed.data.reason);
     revalidatePaths();
     return { status: "success", message: "Scheduled change cancelled." };
   } catch (e) {
@@ -665,33 +741,47 @@ export async function overrideSubscriptionPriceAction(input: unknown): Promise<A
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  try {
-    const sb = getSupabaseAdminClient() as any;
-    if (!sb) return { status: "error", message: "Database connection failed." };
+  const mfaError = await verifyMfaStepUp(parsed.data.stepUpEmail);
+  if (mfaError) return mfaError;
 
-    const { data: sub } = await sb
-      .from("organization_subscriptions")
-      .select("id, organization_id, price_override")
-      .eq("id", parsed.data.subscriptionId)
-      .single();
-    if (!sub) return { status: "error", message: "Subscription not found." };
+  const rateCheck = checkRateLimit(`override-price:${auth.context.userId}`, 10, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
+
+  try {
+    const sub = await getSubscriptionForOrg(parsed.data.subscriptionId, parsed.data.organizationId);
+    if (!sub) return { status: "error", message: "Subscription not found for this organization." };
+
+    const supabase = await createSupabaseServerClient();
+    const db = supabase as never as MinimalDb;
 
     const oldPrice = sub.price_override as number | null;
+    const now = new Date().toISOString();
 
-    await sb.from("organization_subscriptions").update({
-      price_override: parsed.data.price,
+    const { error } = await db.from("organization_subscriptions").update({
+      price_override: parsed.data.overrideAmount,
       notes: parsed.data.reason,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     }).eq("id", parsed.data.subscriptionId);
+
+    if (error) throw new Error(error.message);
 
     await recordSubscriptionEvent({
       organizationId: parsed.data.organizationId,
       subscriptionId: parsed.data.subscriptionId,
       eventType: "price_override_set",
       previousState: { price_override: oldPrice },
-      newState: { price_override: parsed.data.price },
+      newState: {
+        price_override: parsed.data.overrideAmount,
+        currency: parsed.data.currency,
+        effectiveDate: parsed.data.effectiveDate ?? now,
+        endDate: parsed.data.endDate ?? null,
+      },
       actorId: auth.context.userId,
       reason: parsed.data.reason,
+      metadata: {
+        organizationId: parsed.data.organizationId,
+        currency: parsed.data.currency,
+      },
     });
 
     revalidatePaths();

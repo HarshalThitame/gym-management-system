@@ -11,6 +11,7 @@ function authContext(input: Partial<AuthContext>): AuthContext {
     profile: {
       id: "user_1",
       gym_id: "gym_1",
+      branch_id: null,
       full_name: "Member",
       email: "member@example.com",
       phone: null,

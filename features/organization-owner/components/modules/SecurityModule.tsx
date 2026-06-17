@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useCallback, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CheckCircle2, Download, Eye, ShieldCheck, XCircle } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";

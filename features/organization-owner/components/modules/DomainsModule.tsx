@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 import { useCallback, useMemo, useState, useActionState } from "react";
 import { CheckCircle2, Copy, Download, Eye, Globe2, Plus, ShieldCheck, Star, Trash2 } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
@@ -270,5 +272,4 @@ function DomainDetailPanel({ domain, dashboard, onClose }: { domain: DomainRow; 
     </div>
   );
 }
-
 
