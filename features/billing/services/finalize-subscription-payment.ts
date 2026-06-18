@@ -1,5 +1,6 @@
 import "server-only";
 
+import { revalidatePath } from "next/cache";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { FinalizePaymentInput, FinalizePaymentResult } from "@/features/billing/razorpay/razorpay-types";
 import { syncOrganizationEntitlements, syncOrganizationUsageLimits } from "@/features/subscription/entitlement-sync-service";
@@ -70,6 +71,10 @@ export async function finalizeSubscriptionPayment(
         syncOrganizationUsageLimits(organizationId, "Usage limits synced after Razorpay payment."),
       ]);
       entitlementSyncStatus = entitlements.ok && limits.ok ? "completed" : "failed";
+
+      // Revalidate organization pages so sidebar/dashboard/plan show updated state
+      revalidatePath("/organization");
+      revalidatePath("/organization/plan");
     }
   }
 

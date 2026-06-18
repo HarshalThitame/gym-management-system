@@ -169,6 +169,12 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       await (adminDbClient as any).from("organization_subscriptions").delete().eq("id", currentSubId);
     }
 
+    const purchaseIntentType =
+      currentStatus === "cancelled" && startMode === "now" ? "replace_now" :
+      currentStatus === "cancelled" && startMode === "later" ? "schedule_after_current" :
+      currentSubId ? "renewal" :
+      "new_plan";
+
     if (typeof currentSubscription?.price_override === "number") {
       subtotalPaise = currentSubscription.price_override;
     }
@@ -259,6 +265,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
         provider_environment: providerEnvironment,
         idempotency_key: idempotencyKey,
         package_id: targetPackageId,
+        notes: JSON.stringify({ purchase_intent: purchaseIntentType, startMode }),
         due_at: new Date(Date.now() + 7 * 86400000).toISOString(),
         issued_at: new Date().toISOString(),
       };
@@ -288,6 +295,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
         invoice_id: invoiceId!,
         billing_cycle: billingCycle,
         environment: providerEnvironment,
+        purchase_intent: purchaseIntentType,
       },
       idempotencyKey,
     });
