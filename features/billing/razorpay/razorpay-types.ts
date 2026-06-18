@@ -65,6 +65,8 @@ export type SecureCheckoutIntentResult = {
   razorpayKeyId: string;
   razorpayOrderId: string;
   amountPaise: number;
+  subtotalPaise: number;
+  taxPaise: number;
   currency: string;
   invoiceId: string;
   packageDisplayName: string;
