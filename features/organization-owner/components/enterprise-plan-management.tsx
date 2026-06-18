@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { formatCurrency } from "@/features/enterprise/lib/business-rules";
-import { requestPlanChangeAction, toggleAutoRenewAction, cancelSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
+import { toggleAutoRenewAction, cancelSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
 import { RazorpayCheckout } from "@/features/organization-owner/components/razorpay-checkout";
 import { OrderSummaryDialog } from "@/features/organization-owner/components/order-summary-dialog";
 import { PaymentSuccessDialog } from "@/features/organization-owner/components/payment-success-dialog";
@@ -71,8 +71,6 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "pay" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
-  const [showUpgradeForm, setShowUpgradeForm] = useState<string | null>(null);
-  const [planChangeState, planChangeAction, planChangePending] = useActionState(requestPlanChangeAction, initialAuthActionState);
   const [autoRenewState, autoRenewAction, autoRenewPending] = useActionState(toggleAutoRenewAction, initialAuthActionState);
   const [cancelState, cancelAction, cancelPending] = useActionState(cancelSubscriptionAction, initialAuthActionState);
   const razorpayScriptStatus = useRazorpayScript();
@@ -131,14 +129,6 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   }, [planContext.trialEndsAt]);
 
   const isYearly = billingCycle === "yearly";
-
-  const handleUpgradeRequest = useCallback((targetPlanName: string) => async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    fd.set("targetPlan", targetPlanName);
-    fd.set("billingCycle", billingCycle);
-    planChangeAction(fd);
-  }, [billingCycle, planChangeAction]);
 
   const handleComparePlanPay = useCallback(async (targetPackageId: string) => {
     setPayDialogState((prev) => ({ ...prev, processingOrder: true }));
