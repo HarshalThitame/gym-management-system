@@ -1,18 +1,18 @@
 "use client";
 
 import {
-  Activity, AlertTriangle, Archive, ArrowUpRight, Ban, BarChart3, Bell, CheckCircle2,
-  Clock, Database, Download, FileText, Gauge, Globe2, HeartPulse, Inbox, Lock,
-  RefreshCcw, Server, ShieldCheck, Shield, Sidebar, TrendingUp, UsersRound, Zap
+  Activity, AlertTriangle, CheckCircle2, Clock, Database, FileText, Gauge,
+  Globe2, HeartPulse, Inbox, Lock, RefreshCcw, Server, ShieldCheck, Shield,
+  TrendingUp, Zap
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink, Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import type { AuthContext } from "@/types/auth";
 import type { BackupDashboard } from "@/features/backup/services/backup-service";
-import { formatAnalyticsLabel, formatCompactNumber, formatCurrency } from "@/features/analytics/lib/business-rules";
+import { formatAnalyticsLabel, formatCompactNumber } from "@/features/analytics/lib/business-rules";
 
 type Props = { context: AuthContext; dashboard: BackupDashboard };
 type TabId = "overview" | "backups" | "recovery" | "replication" | "verification" | "storage" | "security" | "schedules" | "pitr" | "compliance" | "approvals" | "dr";

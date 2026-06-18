@@ -3,11 +3,7 @@
 import {
   Activity,
   AlertTriangle,
-  Database,
-  Globe,
-  HeartPulse,
   RefreshCcw,
-  Server,
   Shield,
   ShieldCheck,
   Users,

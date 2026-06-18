@@ -1,6 +1,6 @@
 "use client";
 
-import { Accessibility, Activity, BookOpen, CheckCircle2, Eye, Gauge, Globe, Grid3x3, Keyboard, Layout, Palette, Search, Settings, ShieldCheck, Sliders, Type, Zap, Info } from "lucide-react";
+import { Accessibility, Activity, CheckCircle2, Globe, Grid3x3, Keyboard, Layout, Palette, Settings, ShieldCheck, Sliders, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";

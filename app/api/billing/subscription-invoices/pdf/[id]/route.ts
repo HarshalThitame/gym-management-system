@@ -26,8 +26,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // Check access: Super Admin or org owner
   const { data: profile } = await supabase.from("profiles").select("organization_id").eq("id", user.id as never).maybeSingle();
   const profileOrgId = (profile as unknown as { organization_id: string } | null)?.organization_id;
-  const isSuperAdmin = (await supabase.auth.getUser()).data.user?.role === "service_role"; // Not ideal, fallback
-
   // Simple check: if user's profile org doesn't match, check if they're super admin via a profiles check
   const { data: userRoles } = await supabase.from("user_roles" as never).select("role_id").eq("user_id", user.id as never).limit(1) as any;
   const isSuperAdminCheck = userRoles?.some((r: any) => r.role_id === "super_admin");

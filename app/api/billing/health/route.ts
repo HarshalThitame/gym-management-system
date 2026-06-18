@@ -9,7 +9,7 @@ export async function GET() {
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.from("invoices").select("id", { count: "exact", head: true });
+    const { error } = await supabase.from("invoices").select("id", { count: "exact", head: true });
     checks.database = error ? `error: ${error.message}` : "connected";
   } catch (e) {
     checks.database = `error: ${e instanceof Error ? e.message : "unknown"}`;

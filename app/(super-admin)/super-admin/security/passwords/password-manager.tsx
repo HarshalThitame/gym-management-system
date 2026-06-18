@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Lock, CheckCircle2, XCircle, AlertTriangle, Search } from "lucide-react";
+import { Shield, Lock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
 export function PasswordPolicyManager({
   policy, userCount, lockedCount,

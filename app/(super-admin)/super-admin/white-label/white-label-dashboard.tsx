@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import NextImage from "next/image";
 import {
   ArrowLeftRight, CheckCircle2, Download, EyeOff,
-  FileText,
   Globe2,
-  Image,
   Mail,
   Monitor,
   PaintBucket,
@@ -13,7 +12,6 @@ import {
   Search,
   Shield,
   Shirt,
-  Smartphone,
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -327,7 +325,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                   onClick={() => handleConfigClick(cid)}
                   className={`cursor-pointer transition-colors hover:bg-muted/30 ${selectedConfigId === cid ? "bg-muted/50" : ""}`}
                 >
-                  <td className="p-3"><input type="checkbox" checked={selectedIds.has(cid)} onChange={(e) => setSelectedIds((prev) => { const n = new Set(prev); e.target.checked ? n.add(cid) : n.delete(cid); return n; })} className="rounded" onClick={(e) => e.stopPropagation()} /></td>
+                  <td className="p-3"><input type="checkbox" checked={selectedIds.has(cid)} onChange={(e) => setSelectedIds((prev) => { const n = new Set(prev); if (e.target.checked) n.add(cid); else n.delete(cid); return n; })} className="rounded" onClick={(e) => e.stopPropagation()} /></td>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
                       <span className="font-bold">{cfg.brand_name as string ?? "Unnamed Brand"}</span>
@@ -643,7 +641,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                         <div className="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-center text-[10px] font-semibold text-amber-700 uppercase tracking-wider">Sample Preview</div>
                         <div className="p-3 text-center" style={{ backgroundColor: primary }}>
                           {editingConfig.logo_url ? (
-                            <img src={editingConfig.logo_url as string} alt="" className="h-8 mx-auto" />
+                            <NextImage src={editingConfig.logo_url as string} alt="" className="mx-auto h-8 w-auto" width={128} height={32} unoptimized />
                           ) : (
                             <span className="text-white font-bold text-sm">{brandName}</span>
                           )}
@@ -754,7 +752,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
                         <div className="p-6 text-center" style={{ backgroundColor: primary }}>
                           <div className="h-12 w-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
                             {editingConfig.logo_url ? (
-                              <img src={editingConfig.logo_url as string} alt="" className="h-8 w-8 rounded-full object-cover" />
+                              <NextImage src={editingConfig.logo_url as string} alt="" className="h-8 w-8 rounded-full object-cover" width={32} height={32} unoptimized />
                             ) : (
                               <Shirt className="size-6 text-white" />
                             )}
@@ -946,7 +944,7 @@ function TestEmailButton({ config, editingConfig }: { config: Record<string, unk
           fromName: editingConfig.email_from_name as string ?? "Brand",
         }),
       });
-      const data = await res.json();
+      await res.json();
       setSent(true);
       setTimeout(() => setSent(false), 3000);
     } catch {} finally {

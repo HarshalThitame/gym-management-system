@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/api-guards";
 const superAdminRoles = ["super_admin"] as const;
 import { updateDisputeStatus } from "@/features/billing/services/dispute-service";
-import { checkRateLimitWithEnv } from "@/lib/rate-limiter";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiRole(superAdminRoles);

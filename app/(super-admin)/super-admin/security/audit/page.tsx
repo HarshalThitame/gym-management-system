@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ChevronLeft, Shield } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/guards";
 import { searchAuditLogs, getAuditStats } from "@/features/security/services/security-audit-service";
 import { SecurityAuditLog } from "@/features/security/components/security-audit-log";

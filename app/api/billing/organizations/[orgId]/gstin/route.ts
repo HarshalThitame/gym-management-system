@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/api-guards";
 const superAdminRoles = ["super_admin"] as const;
 import { validateAndSetGstin } from "@/features/billing/services/tax-service";
-import { checkRateLimitWithEnv } from "@/lib/rate-limiter";
 
 export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   const auth = await requireApiRole(superAdminRoles);

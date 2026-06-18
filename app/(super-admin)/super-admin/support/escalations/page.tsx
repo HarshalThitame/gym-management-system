@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { requireRole } from "@/lib/auth/guards";
-import { getEscalationSummary, listEscalationRules } from "@/features/support/services/support-escalation-service";
+import { getEscalationSummary } from "@/features/support/services/support-escalation-service";
 import { SupportEscalationMatrix } from "@/features/support/components/support-escalation-matrix";
 
 async function EscalationsContent() {

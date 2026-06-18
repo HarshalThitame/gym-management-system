@@ -6,7 +6,6 @@ import { db } from "@/features/support/services/support-db";
 import { listTickets } from "@/features/support/services/support-ticket-service";
 import { getSupportDashboard } from "@/features/support/services/support-analytics-service";
 import { listSlaPolicies, getSlaDashboard } from "@/features/support/services/support-sla-service";
-import { listSavedViews } from "@/features/support/services/support-saved-views-service";
 import type { SavedView } from "@/features/support/services/support-saved-views-service";
 import type { SupportDashboard } from "@/types/enterprise";
 import { SupportPageClient } from "./support-page-client";

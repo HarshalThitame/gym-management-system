@@ -5,7 +5,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
-import { BarChart3, Package, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Shield, Trash2, Calendar, Puzzle, DollarSign } from "lucide-react";
+import { BarChart3, Package, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Trash2, Calendar, Puzzle, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,6 @@ export function SubscriptionsClient({ data }: { data: Data }) {
 
   const activeSubs = data.subscriptions.filter((s: any) => s.status === "active").length;
   const trialSubs = data.subscriptions.filter((s: any) => s.status === "trial").length;
-  const expiredSubs = data.subscriptions.filter((s: any) => s.status === "expired" || s.status === "suspended" || s.status === "cancelled").length;
   const unassigned = data.organizations.length - data.subscriptions.length;
 
   // Normalize MRR by billing period
@@ -369,7 +368,7 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
 /*  ACTION MODALS — MFA + Reason + Audit   */
 /* ════════════════════════════════════════ */
 
-function ChangePlanModal({ sub, pkg, packages, orgId, onClose, execAction, actionLoading }: any) {
+function ChangePlanModal({ sub, pkg, packages, onClose, execAction, actionLoading }: any) {
   const [targetId, setTargetId] = useState(""); const [reason, setReason] = useState("");
   const targetPkg = packages.find((p: any) => p.id === targetId);
   const isDowngrade = targetPkg && pkg && targetPkg.sort_order < pkg.sort_order;

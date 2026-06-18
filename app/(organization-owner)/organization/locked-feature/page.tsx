@@ -24,8 +24,8 @@ export default async function LockedFeatureRoute({ searchParams }: Props) {
 
   return (
     <LockedFeaturePageClient
-      feature={params.feature ?? undefined}
-      reason={params.reason ?? undefined}
+      feature={params.feature ?? ""}
+      reason={params.reason ?? ""}
       planSummary={summary}
     />
   );

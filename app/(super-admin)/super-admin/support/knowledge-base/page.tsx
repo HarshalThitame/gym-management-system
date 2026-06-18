@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 import { requireRole } from "@/lib/auth/guards";
 import { listKbArticles } from "@/features/support/services/support-knowledge-base-service";
-import Link from "next/link";
-import { FileText, ExternalLink } from "lucide-react";
+import { FileText } from "lucide-react";
 
 async function KnowledgeBaseContent() {
   await requireRole(["super_admin"], "/super-admin");

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiRole } from "@/lib/auth/api-guards";
 const superAdminRoles = ["super_admin"] as const;
-import { getActiveGateway, setDefaultGateway, upsertGatewayConfig } from "@/features/billing/services/gateway-config-service";
+import { setDefaultGateway, upsertGatewayConfig } from "@/features/billing/services/gateway-config-service";
 import { checkRateLimitWithEnv } from "@/lib/rate-limiter";
 
 export async function GET(request: Request) {

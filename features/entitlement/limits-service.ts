@@ -271,7 +271,7 @@ export async function canCreateResource(
     // Audit the denial (fire-and-forget, never blocks)
     logLimitReached({
       actorId: null, organizationId, limitKey,
-      currentUsage, limitValue, attemptedIncrement: increment,
+      currentUsage, limitValue: limit.limitValue, attemptedIncrement: increment,
     }).catch(() => {});
   }
 

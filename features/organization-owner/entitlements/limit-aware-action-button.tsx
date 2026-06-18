@@ -40,7 +40,7 @@ export function LimitAwareActionButton({
         variant="secondary"
         size={size}
         disabled
-        className={className}
+        className={className ?? ""}
         onClick={(e) => {
           e.preventDefault();
           showToast(`This feature is not included in your ${plan?.name ?? "current"} plan.`, "info");
@@ -60,7 +60,7 @@ export function LimitAwareActionButton({
           variant="secondary"
           size={size}
           disabled
-          className={className}
+          className={className ?? ""}
           onClick={(e) => {
             e.preventDefault();
             showToast(`Limit reached: ${currentUsage} / ${limitCheck.limit}. Upgrade your plan to add more.`, "info");
@@ -79,14 +79,14 @@ export function LimitAwareActionButton({
 
   if (href) {
     return (
-      <Button variant={variant} size={size} className={className} onClick={() => window.location.assign(href)} type="button">
+      <Button variant={variant} size={size} className={className ?? ""} onClick={() => window.location.assign(href)} type="button">
         {label}
       </Button>
     );
   }
 
   return (
-    <Button variant={variant} size={size} className={className} onClick={onClick} type="button">
+    <Button variant={variant} size={size} className={className ?? ""} onClick={onClick} type="button">
       {label}
     </Button>
   );

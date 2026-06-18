@@ -2,9 +2,8 @@
 
 import {
   Activity, AlertTriangle, ArrowUpRight, Banknote, BarChart3, Bell,
-  CalendarCheck, CreditCard, Download, Dumbbell, Gauge, Globe2,
-  LineChart, PiggyBank, RefreshCcw, ShieldCheck, Target, TrendingUp, UsersRound,
-  Zap, Search, DownloadCloud, FileSpreadsheet, FileJson, FileText
+  CreditCard, Dumbbell, Gauge, Globe2, LineChart, PiggyBank, RefreshCcw,
+  Target, TrendingUp, UsersRound, Zap, Search, FileSpreadsheet, FileJson, FileText
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -13,9 +12,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import type { AuthContext } from "@/types/auth";
 import type {
-  EnterpriseAnalyticsDashboard, BranchScorecardPoint, ChurnAnalysisPoint,
-  TrainerPerformancePoint, MarketingChannelPoint, CampaignPerformancePoint,
-  CapacityUtilizationPoint, BehaviorSegmentPoint, LtvSegmentPoint
+  EnterpriseAnalyticsDashboard, BranchScorecardPoint
 } from "@/types/analytics";
 import { useAnalyticsLive } from "@/features/analytics/hooks/use-analytics-live";
 import { formatAnalyticsLabel, formatCompactNumber, formatCurrency } from "@/features/analytics/lib/business-rules";
@@ -74,7 +71,6 @@ export function EnterpriseAnalyticsDashboardClient({ context: _ctx, dashboard }:
         <EnterpriseHeader
           connected={connected}
           dashboard={dashboard}
-          latest={latest}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onNlpQuery={handleNlpQuery}
@@ -201,11 +197,11 @@ function AnimatedSection({ children, delay = 0, className = "" }: { children: Re
 
 // ENTERPRISE HEADER
 function EnterpriseHeader({
-  connected, dashboard, latest, searchQuery, setSearchQuery,
+  connected, dashboard, searchQuery, setSearchQuery,
   onNlpQuery, nlpLoading, nlpResult, setNlpResult, showLiveFeed, exportFormats, suggestions
 }: {
   connected: boolean; dashboard: EnterpriseAnalyticsDashboard;
-  latest: Record<string, unknown>; searchQuery: string; setSearchQuery: (v: string) => void;
+  searchQuery: string; setSearchQuery: (v: string) => void;
   onNlpQuery: (q: string) => void; nlpLoading: boolean; nlpResult: string | null;
   setNlpResult: (v: string | null) => void; showLiveFeed: boolean;
   exportFormats: Array<{ label: string; icon: React.ReactNode; href: string }>;

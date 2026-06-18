@@ -1,8 +1,8 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { GLOBAL_SHORTCUTS, modKey } from "@/features/ux/hooks/use-keyboard-shortcuts";
+import { useEffect, useRef, useState } from "react";
+import { modKey } from "@/features/ux/hooks/use-keyboard-shortcuts";
 
 type CommandItem = {
   id: string;

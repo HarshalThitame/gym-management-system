@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCopy, CloudCog, Download, FileText, Flag, Globe2, Loader2, RefreshCw, Search, ShieldCheck, ShieldOff, Trash2, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardCopy, CloudCog, Download, FileText, Flag, Globe2, Loader2, RefreshCw, Search, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,27 +23,12 @@ function formatDate(d: string | null | undefined) {
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function dnsTone(status: string, ssl: string): "good" | "watch" | "risk" | "neutral" {
-  if (status === "verified" && ssl === "issued") return "good";
-  if (status === "failed" || ssl === "failed") return "risk";
-  if (status === "pending" || ssl === "pending") return "watch";
-  return "neutral";
-}
-
-function toneVariant(tone: "good" | "watch" | "risk" | "neutral") {
-  return tone === "good" ? "success" as const : tone === "watch" ? "info" as const : tone === "risk" ? "error" as const : "neutral" as const;
-}
-
 function StatusBadge({ status }: { status: string }) {
   const v = status === "verified" || status === "issued" ? "success" as const
     : status === "failed" ? "error" as const
     : status === "pending" ? "info" as const
     : "neutral" as const;
   return <Badge variant={v}>{status}</Badge>;
-}
-
-function copyToClipboard(text: string, label: string) {
-  navigator.clipboard.writeText(text);
 }
 
 type Registrar = "cloudflare" | "godaddy" | "namecheap" | "aws" | "other";
@@ -57,7 +42,7 @@ const REGISTRAR_LINKS: Record<Registrar, string> = {
 };
 
 export function DomainDashboard({
-  domains, checks, providerEvents, organizations, tenantConfigs, stats, module,
+  domains, checks, providerEvents, organizations, stats, module,
 }: {
   domains: DomainRow[];
   checks: CheckRow[];
@@ -91,7 +76,6 @@ export function DomainDashboard({
   const [showHistory, setShowHistory] = useState<string | null>(null);
   const [showTransfer, setShowTransfer] = useState<string | null>(null);
   const [showAddDomain, setShowAddDomain] = useState(false);
-  const [transferOrgId, setTransferOrgId] = useState<string>("");
   const [sortKey, setSortKey] = useState<string>("created_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [editingRouting, setEditingRouting] = useState<string | null>(null);
@@ -422,17 +406,14 @@ export function DomainDashboard({
             ) : (
               pagedDomains.map((domain) => {
                 const did = domain.id as string;
-                const check = checksByDomain.get(did);
-                const providerEv = providerByDomain.get(did);
                 const org = orgMap.get(domain.organization_id as string);
-                const tone = dnsTone(domain.status as string, domain.ssl_status as string);
                 const isChecking = checkingIds.has(did);
                 const isProvisioning = providerIds.has(`${did}:add`) || providerIds.has(`${did}:sync`);
 
                 return (
                   <tr key={did} className={`border-b border-border hover:bg-muted/30 cursor-pointer transition-colors ${selectedId === did ? "bg-muted/50" : ""}`} onClick={() => setSelectedId(did)}>
                     <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={selectedIds.has(did)} onChange={(e) => setSelectedIds((prev) => { const n = new Set(prev); e.target.checked ? n.add(did) : n.delete(did); return n; })} className="rounded" />
+                      <input type="checkbox" checked={selectedIds.has(did)} onChange={(e) => setSelectedIds((prev) => { const n = new Set(prev); if (e.target.checked) n.add(did); else n.delete(did); return n; })} className="rounded" />
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
@@ -538,7 +519,7 @@ export function DomainDashboard({
 
       {/* Transfer Dialog */}
       {showTransfer && (
-        <TransferDialog domainId={showTransfer} organizations={organizations} onClose={() => { setShowTransfer(null); setTransferOrgId(""); }} />
+        <TransferDialog domainId={showTransfer} organizations={organizations} onClose={() => setShowTransfer(null)} />
       )}
 
       {/* Add Domain Modal */}
@@ -572,7 +553,6 @@ function DomainDetailPanel({
     const token = domain.verification_token as string;
     const txtHost = `_apex-verify.${domainName}`;
     const txtValue = `apex-verify=${token}`;
-    const cnameTarget = `cname.${domainName}`;
     const aRecord = "76.76.21.21";
     return [
       { type: "A", host: "@", value: aRecord, purpose: "traffic" as const },
@@ -589,7 +569,6 @@ function DomainDetailPanel({
 
   const checkError = check?.error_message as string | null;
   const providerError = providerEvent?.error_message as string | null;
-  const providerStatus = providerEvent?.operation_status as string | null;
 
   return (
     <Card className="p-4 sm:p-6">

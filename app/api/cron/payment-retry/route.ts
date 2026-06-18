@@ -62,8 +62,6 @@ export async function GET(request: Request) {
 
   const db = getDb(supabase);
   const now = new Date();
-  const results: string[] = [];
-
   const { data: dueForRetry } = await db
     .from("organization_subscriptions")
     .select("")

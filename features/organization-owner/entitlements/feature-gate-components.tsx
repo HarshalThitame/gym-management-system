@@ -25,7 +25,7 @@ export function FeatureGate({
 
   if (fallback) return <>{fallback}</>;
 
-  return <LockedFeaturePage feature={feature} reason={lockReason} />;
+  return <LockedFeaturePage feature={feature} featureName={undefined} reason={lockReason ?? ""} />;
 }
 
 // ═══ FeatureGateInline ═══
@@ -118,9 +118,9 @@ export function LockedFeaturePage({
   featureName,
   reason,
 }: {
-  feature?: FeatureKey;
-  featureName?: string;
-  reason?: string;
+  feature: FeatureKey | undefined;
+  featureName: string | undefined;
+  reason: string;
 }) {
   const { plan } = useEntitlements();
   const computedLockReason = useFeatureLockReason((feature ?? "memberManagement") as FeatureKey);

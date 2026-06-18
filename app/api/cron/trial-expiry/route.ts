@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { processExpiredTrials } from "@/features/super-admin/services/subscription-trial-service";
 import { sendEmail } from "@/services/email/resend";
-import { trialExpiredNotification, trialStartingReminder } from "@/emails/subscription";
+import { trialStartingReminder } from "@/emails/subscription";
 import { recordSubscriptionEvent } from "@/features/super-admin/services/subscription-events-service";
 
 type DbOrg = {
@@ -133,5 +133,4 @@ export async function GET(request: Request) {
     actions: results.length > 0 ? results : ["No actions taken"],
   });
 }
-
 

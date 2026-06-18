@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiRole } from "@/lib/auth/api-guards";
-import { checkRateLimitWithEnv } from "@/lib/rate-limiter";
 const superAdminRoles = ["super_admin"] as const;
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -1,11 +1,9 @@
 "use client";
 
 import {
-  Activity, AlertTriangle, Ban, Bell, CheckCircle2, Clock, Database, Eye, FileText,
-  Gauge, Lock, Plus, RefreshCcw, Scale, Shield, ShieldAlert, Siren, Sliders,
-  UserCog, UsersRound
+  AlertTriangle, Ban, CheckCircle2, Clock, FileText, Plus, Shield, ShieldAlert,
+  Siren
 } from "lucide-react";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,7 +11,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { PermissionBadge, DisabledReason, ImpactWarning, AuditPreview, RiskBadge, ConfirmationLevelBadge, RateLimitStatus } from "@/features/safety/components/safety-components";
 import type { AuthContext } from "@/types/auth";
 import type { SafetyDashboard } from "@/features/safety/services/safety-service";
-import { formatAnalyticsLabel, formatCompactNumber } from "@/features/analytics/lib/business-rules";
+import { formatAnalyticsLabel } from "@/features/analytics/lib/business-rules";
 
 type Props = { context: AuthContext; dashboard: SafetyDashboard };
 

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Json } from "@/types/database";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { db } from "@/features/support/services/support-db";

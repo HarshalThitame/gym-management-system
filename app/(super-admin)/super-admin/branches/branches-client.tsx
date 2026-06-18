@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -8,7 +8,6 @@ import {
   Ban,
   Building2,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Cpu,
@@ -16,28 +15,23 @@ import {
   Edit3,
   ExternalLink,
   Eye,
-  Globe2,
   Loader2,
   MapPin,
   MoreHorizontal,
   PauseCircle,
   PlayCircle,
   Plus,
-  RefreshCw,
   Search,
   ShieldAlert,
   ShieldCheck,
-  SlidersHorizontal,
-  Trash2,
   TrendingUp,
   Users,
   X,
   XCircle,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input, Textarea } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { GymBranchNode, GymBranchManagementSummary, BranchNode } from "@/features/super-admin/services/gym-branch-management-service";
@@ -108,7 +102,6 @@ export function BranchesClient({ data }: BranchesClientProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [showBulkBar, setShowBulkBar] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -573,7 +566,7 @@ export function BranchesClient({ data }: BranchesClientProps) {
           orgOptions={orgOptions}
           orgBranchInfo={orgBranchInfo}
           onClose={() => setShowCreate(false)}
-          onSubmit={(data) => { showToast("Branch created successfully.", "success"); setShowCreate(false); }}
+          onSubmit={() => { showToast("Branch created successfully.", "success"); setShowCreate(false); }}
         />
       )}
 
@@ -585,7 +578,7 @@ export function BranchesClient({ data }: BranchesClientProps) {
           orgOptions={orgOptions}
           orgBranchInfo={orgBranchInfo}
           onClose={() => setEditBranch(null)}
-          onSubmit={(data) => { showToast("Branch updated successfully.", "success"); setEditBranch(null); }}
+          onSubmit={() => { showToast("Branch updated successfully.", "success"); setEditBranch(null); }}
         />
       )}
 
@@ -721,7 +714,6 @@ function BranchFormDrawer({
                 const info = orgBranchInfo.get(org.id);
                 const used = info?.branchCount ?? 0;
                 const limit = info?.maxBranches ?? 0;
-                const remaining = Math.max(0, limit - used);
                 const atLimit = !info?.isUnlimited && used >= limit;
                 return (
                   <option key={org.id} value={org.id} disabled={atLimit && !branch}>
@@ -942,7 +934,7 @@ function HealthCheck({ label, passed }: { label: string; passed: boolean }) {
 }
 
 // Dummy ButtonLink for export
-function ButtonLink({ href, variant, size, children, className }: { href: string; variant?: string; size?: string; children: React.ReactNode; className?: string }) {
+function ButtonLink({ href, children, className }: { href: string; variant?: string; size?: string; children: React.ReactNode; className?: string }) {
   return (
     <a href={href} className={cn("inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition hover:bg-surface-muted", className)}>
       {children}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/api-guards";
-import { registerViewer, unregisterViewer, getActiveViewers, heartbeatViewer } from "@/features/support/services/support-collaboration-service";
+import { unregisterViewer, getActiveViewers, heartbeatViewer } from "@/features/support/services/support-collaboration-service";
 
 export const runtime = "nodejs";
 

@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import type { PlanSummary } from "@/features/entitlement";
 
 type Props = {
-  feature?: string;
-  reason?: string;
+  feature: string;
+  reason: string;
   planSummary: PlanSummary | null;
 };
 

@@ -12,8 +12,6 @@ type DbSubRow = {
   package_id: string;
 };
 
-type AdminClient = ReturnType<typeof getSupabaseAdminClient>;
-
 export async function GET(request: Request) {
   const configuredSecret = process.env.CRON_SECRET;
   const providedSecret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");

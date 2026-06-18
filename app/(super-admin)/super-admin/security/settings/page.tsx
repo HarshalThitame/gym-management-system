@@ -4,12 +4,11 @@ import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/guards";
 import { getMfaPolicies, getMfaStats } from "@/features/security/services/security-mfa-service";
 import { getPasswordPolicies } from "@/features/security/services/security-password-service";
-import { listNotificationRules } from "@/features/security/services/security-notification-service";
 
 async function SettingsContent() {
   await requireRole(["super_admin"], "/super-admin");
-  const [mfaPolicies, mfaStats, passwordPolicy, notificationRules] = await Promise.all([
-    getMfaPolicies(), getMfaStats(), getPasswordPolicies(), listNotificationRules(),
+  const [mfaPolicies, mfaStats, passwordPolicy] = await Promise.all([
+    getMfaPolicies(), getMfaStats(), getPasswordPolicies(),
   ]);
 
   return (

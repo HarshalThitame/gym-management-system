@@ -48,12 +48,6 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
   const trialSubs = subs.filter((s: any) => s.status === "trial").length;
   const expiredSubs = subs.filter((s: any) => s.status === "expired").length;
 
-  // Build feature map from package_features/package_limits (from DB)
-  function getPackageFeatureValue(pkg: any, featureCode: string): boolean {
-    const features = pkg._features ?? {};
-    return features[featureCode] === true || features[featureCode] === "true";
-  }
-
   function getPackageLimitValue(pkg: any, limitCode: string): number {
     const limits = pkg._limits ?? {};
     return limits[limitCode] ?? 0;
@@ -536,9 +530,7 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
   const pkgMeta = typeof pkg?.metadata === "object" ? (pkg.metadata ?? {}) : {};
   const [priceMonthly, setPriceMonthly] = useState(pkgMeta?.price_monthly ?? pkg?.price ?? 0);
   const [priceAnnual, setPriceAnnual] = useState(pkgMeta?.price_annual ?? (pkg?.price ?? 0) * 10);
-  const [annualDiscountLabel, setAnnualDiscountLabel] = useState(pkgMeta?.annual_discount_label ?? "2 months free");
-  const [billingPeriod, setBillingPeriod] = useState(pkg?.billing_period ?? "monthly");
-
+  const [annualDiscountLabel] = useState(pkgMeta?.annual_discount_label ?? "2 months free");
   if (!open) return null;
 
   return (
@@ -683,7 +675,6 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
             <div className="p-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {FEATURE_CATEGORIES.find((c) => c.id === activeFeatureTab)?.features.map((f, idx) => {
-                  const fieldName = `${f.featureCode}Enabled`;
                   return (
                     <label
                       key={`${f.featureCode}-${idx}`}

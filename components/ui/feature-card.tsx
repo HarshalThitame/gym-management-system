@@ -17,11 +17,7 @@ type FeatureCardProps = {
 };
 
 export function FeatureCard({ label, description, included, upgradeLabel, limitLabel, compact = false, isNewInGrowth, isNewInEnterprise, isUnlimited }: FeatureCardProps) {
-  const isNew = isNewInEnterprise || isNewInGrowth;
-  const newColor = isNewInEnterprise ? "purple" : "blue";
   const borderClass = included && isNewInEnterprise ? "border-purple-200/50 bg-purple-50/10" : included && isNewInGrowth ? "border-blue-200/50 bg-blue-50/10" : "";
-  const newBadgeClass = isNewInEnterprise ? "bg-purple-50 border-purple-200 text-purple-700" : "bg-blue-50 border-blue-200 text-blue-700";
-  const newBadgeLabel = isNewInEnterprise ? "New in Enterprise" : "New in Growth";
 
   if (compact) {
     return (

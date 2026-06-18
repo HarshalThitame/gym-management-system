@@ -1,8 +1,3 @@
-type RateLimitConfig = {
-  windowMs: number;
-  maxRequests: number;
-};
-
 function loadWindowMs(): number {
   const env = process.env.RATE_LIMIT_WINDOW_MS;
   if (env) {
