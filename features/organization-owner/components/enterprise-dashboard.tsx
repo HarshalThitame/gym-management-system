@@ -219,12 +219,7 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
       <PlanSummaryCard />
 
       {/* ═══ USAGE LIMITS ═══ */}
-      <UsageDashboardCard
-        memberCount={dashboard.metrics.activeMembers}
-        branchCount={dashboard.branches.filter((b) => b.status === "active").length}
-        trainerCount={dashboard.trainers.filter((t) => (t as any).status === "active").length}
-        staffCount={staffCount}
-      />
+      <UsageDashboardCard />
 
       {/* ═══ KPI GRID ═══ */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

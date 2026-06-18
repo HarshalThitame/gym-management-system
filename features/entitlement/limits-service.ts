@@ -217,6 +217,26 @@ export async function getOrganizationUsage(
 
 // ─── canCreateResource ─────────────────────────────────────────────────────
 
+// ─── canCreateResource ─────────────────────────────────────────────────────
+//
+// Concurrency safety note:
+// This function reads the current usage count and checks it against the plan
+// limit in two separate DB queries. In high-concurrency scenarios (e.g., two
+// simultaneous member creations when 1 slot remains), a race condition is
+// possible. The recommended approach for production hardening:
+//
+//   1. Use a PostgreSQL function that atomically checks count + inserts
+//      within a single transaction (SELECT FOR UPDATE + INSERT).
+//   2. Or use pg_advisory_lock(hashtext(org_id || limit_key)) before the
+//      check+insert sequence and release it after.
+//   3. The existing create actions in member/branch/trainer/staff already
+//      do a count-check-then-insert pattern — same race condition window.
+//
+// For most gym management use cases (low concurrent creation volume), the
+// current two-query approach is acceptable. If/when an atomic RPC is created,
+// replace this function's implementation with a call to that RPC.
+// ────────────────────────────────────────────────────────────────────────────
+
 export async function canCreateResource(
   organizationId: string,
   limitKey: LimitKey,

@@ -4,5 +4,8 @@ export { PlanSummaryCard } from "./plan-summary-card";
 export { UsageLimitBar } from "./usage-limit-bar";
 export { LimitAwareActionButton } from "./limit-aware-action-button";
 export { UsageDashboardCard } from "./usage-dashboard-card";
+export { useLimitErrorHandler } from "./limit-error-handler";
 export { getEntitlementSummaryAction } from "./entitlement-loader";
+export { getLiveUsageAction } from "./usage-loader";
 export type { EntitlementKey, EntitlementSummary, PlanSummary } from "./entitlement-loader";
+export type { LiveUsageData } from "./usage-loader";
