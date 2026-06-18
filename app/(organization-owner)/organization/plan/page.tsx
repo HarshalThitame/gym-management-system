@@ -38,10 +38,11 @@ async function PlanContent() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb2 = supabase as any;
 
-  const [orgData, invoicesData, eventsData] = await Promise.all([
+  const [orgData, invoicesData, eventsData, paymentsData] = await Promise.all([
     supabase.from("organizations").select("name, billing_email").eq("id", organizationId as never).maybeSingle(),
     sb2.from("org_subscription_invoices").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
     sb2.from("subscription_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
+    sb2.from("org_subscription_payments").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(20),
   ]);
 
   const orgRecord = orgData as unknown as { name: string; billing_email: string | null } | null;
@@ -51,6 +52,8 @@ async function PlanContent() {
   const orgInvoices = (invoicesData.data ?? []) as any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orgEvents = (eventsData.data ?? []) as any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orgPayments = (paymentsData.data ?? []) as any[];
 
   const { EnterprisePlanManagement } = await import("@/features/organization-owner/components/enterprise-plan-management");
 
@@ -68,6 +71,7 @@ async function PlanContent() {
         customerEmail={customerEmail}
         invoices={orgInvoices}
         events={orgEvents}
+        payments={orgPayments}
       />
     </div>
   );

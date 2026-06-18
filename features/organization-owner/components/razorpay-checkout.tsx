@@ -48,6 +48,11 @@ export function RazorpayCheckout({
   const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<CheckoutOrderState>("idle");
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<{
+    invoiceId: string;
+    paymentId?: string;
+    subscriptionId?: string;
+  } | null>(null);
   const [orderResult, setOrderResult] = useState<{
     orderId: string;
     invoiceId: string;
@@ -86,6 +91,7 @@ export function RazorpayCheckout({
 
     setPaymentState("creating_order");
     setPaymentError(null);
+    setPaymentDetails(null);
     setOrderResult(null);
 
     const result = await createSecureSubscriptionCheckoutOrderAction({
@@ -150,9 +156,13 @@ export function RazorpayCheckout({
 
         if (ackResult.success) {
           if (ackResult.status === "already_processed" || ackResult.status === "payment_confirmed") {
+            setPaymentDetails({
+              invoiceId: ackResult.invoiceId,
+              ...(ackResult.paymentId ? { paymentId: ackResult.paymentId } : {}),
+              ...(ackResult.subscriptionId ? { subscriptionId: ackResult.subscriptionId } : {}),
+            });
             setPaymentState("payment_confirmed");
             showToast("Payment confirmed! Your subscription is active.", "success");
-            window.location.reload();
           } else {
             setPaymentState("waiting_for_webhook");
             showToast(ackResult.warning || "Payment received. Confirmation is in progress.", "info");
@@ -164,9 +174,13 @@ export function RazorpayCheckout({
               });
               if (statusResult.success && statusResult.status === "payment_confirmed") {
                 clearInterval(checkInterval);
+                setPaymentDetails({
+                  invoiceId: statusResult.invoiceId,
+                  ...(statusResult.paymentId ? { paymentId: statusResult.paymentId } : {}),
+                  ...(statusResult.subscriptionId ? { subscriptionId: statusResult.subscriptionId } : {}),
+                });
                 setPaymentState("payment_confirmed");
                 showToast("Payment confirmed! Your subscription is active.", "success");
-                window.location.reload();
               }
             }, 5000);
             setTimeout(() => clearInterval(checkInterval), 120000);
@@ -262,7 +276,7 @@ export function RazorpayCheckout({
           return (
             <button
               key={pkg.id}
-              onClick={() => { setSelectedPkgId(pkg.id); setPaymentState("idle"); setPaymentError(null); setOrderResult(null); }}
+            onClick={() => { setSelectedPkgId(pkg.id); setPaymentState("idle"); setPaymentError(null); setPaymentDetails(null); setOrderResult(null); }}
               className={cn(
                 "relative rounded-xl border-2 bg-gradient-to-b from-background to-accent/5 p-6 text-left transition-all hover:shadow-lg",
                 isSelected ? "border-primary shadow-md ring-1 ring-primary/20" : "border-border",
@@ -331,6 +345,36 @@ export function RazorpayCheckout({
       {selectedPkg && (
         <Card>
           <CardContent className="p-5 space-y-4">
+            {paymentState === "payment_confirmed" && paymentDetails ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Check className="mt-0.5 size-5 shrink-0 text-green-600" />
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-bold text-green-900">Payment successful</p>
+                      <p className="text-xs text-green-800">Your subscription is active and the transaction is recorded.</p>
+                    </div>
+                    <div className="grid gap-1 rounded-md border border-green-200 bg-white/70 p-3 text-[11px] text-green-900">
+                      <p>Plan: <span className="font-semibold">{selectedPkg.name}</span></p>
+                      <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
+                      <p>Invoice ID: <span className="font-mono">{paymentDetails.invoiceId}</span></p>
+                      {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
+                      {paymentDetails.subscriptionId ? <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p> : null}
+                      {orderResult?.orderId ? <p>Razorpay Order ID: <span className="font-mono">{orderResult.orderId}</span></p> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
+                        View plan
+                      </Button>
+                      <Button variant="secondary" size="sm" type="button" onClick={() => window.location.reload()}>
+                        Refresh status
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold">{selectedPkg.name} · {billingCycle === "annual" ? "Annual" : "Monthly"}</p>
@@ -359,9 +403,54 @@ export function RazorpayCheckout({
             {paymentState === "payment_confirmed" && (
               <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
                 <Check className="size-5 shrink-0 mt-0.5" />
-                <div><p className="font-bold">Payment confirmed</p><p className="text-xs mt-0.5">Your subscription is now active.</p></div>
+                <div className="space-y-2">
+                  <div>
+                    <p className="font-bold">Payment confirmed</p>
+                    <p className="text-xs mt-0.5">Your subscription is now active.</p>
+                  </div>
+                  {paymentDetails ? (
+                    <div className="rounded-md border border-green-200 bg-white/70 p-3 text-[11px] text-green-900">
+                      <p className="font-semibold">Transaction details</p>
+                      <div className="mt-1 grid gap-1">
+                        <p>Invoice: <span className="font-mono">{paymentDetails.invoiceId}</span></p>
+                        {paymentDetails.paymentId ? <p>Payment: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
+                        {paymentDetails.subscriptionId ? <p>Subscription: <span className="font-mono">{paymentDetails.subscriptionId}</span></p> : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             )}
+
+            {paymentState === "payment_confirmed" && paymentDetails ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Check className="mt-0.5 size-5 shrink-0 text-green-600" />
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-bold text-green-900">Payment successful</p>
+                      <p className="text-xs text-green-800">Your subscription is active and the transaction is recorded.</p>
+                    </div>
+                    <div className="grid gap-1 rounded-md border border-green-200 bg-white/70 p-3 text-[11px] text-green-900">
+                      <p>Plan: <span className="font-semibold">{selectedPkg.name}</span></p>
+                      <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
+                      <p>Invoice ID: <span className="font-mono">{paymentDetails.invoiceId}</span></p>
+                      {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
+                      {paymentDetails.subscriptionId ? <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p> : null}
+                      {orderResult?.orderId ? <p>Razorpay Order ID: <span className="font-mono">{orderResult.orderId}</span></p> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
+                        View plan
+                      </Button>
+                      <Button variant="secondary" size="sm" type="button" onClick={() => window.location.reload()}>
+                        Refresh status
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {paymentState === "payment_failed" && (
               <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">

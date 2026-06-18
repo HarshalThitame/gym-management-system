@@ -30,6 +30,7 @@ type EnterprisePlanManagementProps = {
   customerEmail?: string;
   invoices?: any[];
   events?: any[];
+  payments?: any[];
 };
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -44,7 +45,7 @@ const CATEGORY_ICONS: Record<string, any> = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], events = [] }: EnterprisePlanManagementProps) {
+export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], events = [], payments = [] }: EnterprisePlanManagementProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "pay" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
@@ -624,33 +625,86 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
         </div>
       )}
 
-      {/* ═══ TAB: TIMELINE ═══ */}
+      {/* ═══ TAB: TIMELINE — Transaction History ═══ */}
       {activeTab === "timeline" && (
-        <Card>
-          <CardHeader><h2 className="text-2xl font-black">Subscription Timeline</h2></CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-start gap-4">
-                <div className="size-3 rounded-full bg-green-500" />
-                <div className="pb-6">
-                  <p className="text-sm font-bold">Current Subscription</p>
-                  <p className="text-xs text-muted-foreground">Plan: {currentPkg?.name ?? planContext.packageName}</p>
-                  <p className="text-xs text-muted-foreground">Started: {currentSubscription?.started_at ? new Date(currentSubscription.started_at).toLocaleDateString("en-IN") : "—"}</p>
+        <div className="space-y-5">
+          <Card>
+            <CardHeader><h2 className="text-2xl font-black">Transaction History</h2></CardHeader>
+            <CardContent>
+              {payments.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border bg-surface-muted p-6 text-center">
+                  <CreditCard className="mx-auto size-8 text-muted-foreground" />
+                  <p className="mt-3 text-sm font-semibold text-muted-foreground">No transactions yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Transactions will appear here after your first payment.</p>
                 </div>
-              </div>
-              {planContext.expiresAt ? (
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                      <th className="px-3 py-2">Transaction</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Details</th>
+                    </tr></thead>
+                    <tbody>
+                      {payments.slice(0, 20).map((pmt: any) => (
+                        <tr key={pmt.id} className="border-b border-border hover:bg-accent/5">
+                          <td className="px-3 py-2 text-xs font-semibold font-mono">{pmt.payment_number ?? pmt.id.slice(0, 8)}</td>
+                          <td className="px-3 py-2 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((pmt.amount ?? 0) / 100))}</td>
+                          <td className="px-3 py-2">{(() => {
+                            switch (pmt.status) {
+                              case "paid": return <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 border border-green-200"><CheckCircle2 className="size-3" /> Paid</span>;
+                              case "failed": return <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 border border-red-200"><XCircle className="size-3" /> Failed</span>;
+                              case "cancelled": return <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-bold text-gray-700 border border-gray-200"><XCircle className="size-3" /> Cancelled</span>;
+                              case "refunded":
+                              case "partially_refunded": return <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 border border-purple-200"><RefreshCw className="size-3" /> Refunded</span>;
+                              case "signature_acknowledged": return <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200"><Clock className="size-3" /> Verifying</span>;
+                              case "processing": return <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200"><Loader2 className="size-3 animate-spin" /> Processing</span>;
+                              case "created": return <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200"><Minus className="size-3" /> Pending</span>;
+                              default: return <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">{pmt.status ?? "Unknown"}</span>;
+                            }
+                          })()}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground" suppressHydrationWarning>{pmt.paid_at ? new Date(pmt.paid_at).toLocaleDateString("en-IN") : pmt.created_at ? new Date(pmt.created_at).toLocaleDateString("en-IN") : "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground max-w-[200px] truncate">{pmt.failure_reason ?? pmt.provider_order_id ? `Order: ${String(pmt.provider_order_id).slice(0, 12)}…` : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><h2 className="text-2xl font-black">Subscription Timeline</h2></CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {currentSubscription ? (
+                  <div className="flex items-start gap-4">
+                    <div className={cn("size-3 rounded-full mt-1", currentSubscription.status === "active" ? "bg-green-500" : currentSubscription.status === "trial" ? "bg-blue-500" : currentSubscription.status === "cancelled" ? "bg-red-500" : "bg-amber-500")} />
+                    <div className="pb-6">
+                      <p className="text-sm font-bold">Current Subscription</p>
+                      <p className="text-xs text-muted-foreground">Plan: {currentPkg?.name ?? planContext.packageName}</p>
+                      <p className="text-xs text-muted-foreground">Status: {currentSubscription.status}</p>
+                      <p className="text-xs text-muted-foreground">Started: {currentSubscription.started_at ? new Date(currentSubscription.started_at).toLocaleDateString("en-IN") : "—"}</p>
+                      {currentSubscription.expires_at ? <p className="text-xs text-muted-foreground">Expires: {new Date(currentSubscription.expires_at).toLocaleDateString("en-IN")}</p> : null}
+                      {currentSubscription.cancelled_at ? <p className="text-xs text-red-600">Cancelled: {new Date(currentSubscription.cancelled_at).toLocaleDateString("en-IN")}</p> : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-4">
+                    <div className="size-3 rounded-full mt-1 bg-gray-300" />
+                    <div className="pb-6">
+                      <p className="text-sm font-bold text-muted-foreground">No Active Subscription</p>
+                      <p className="text-xs text-muted-foreground">Subscribe to a plan to get started.</p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-start gap-4">
-                  <div className="size-3 rounded-full bg-amber-500" />
-                  <div><p className="text-sm font-bold">Next Renewal</p><p className="text-xs text-muted-foreground">{planContext.expiresAt.toLocaleDateString("en-IN")}</p></div>
+                  <div className="size-3 rounded-full border-2 border-dashed border-border mt-1" />
+                  <div><p className="text-sm font-bold text-muted-foreground">Present Day</p><p className="text-xs text-muted-foreground">{new Date().toLocaleDateString("en-IN")}</p></div>
                 </div>
-              ) : null}
-              <div className="flex items-start gap-4">
-                <div className="size-3 rounded-full border-2 border-dashed border-border" />
-                <div><p className="text-sm font-bold text-muted-foreground">Present Day</p><p className="text-xs text-muted-foreground">{new Date().toLocaleDateString("en-IN")}</p></div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Cancel Confirmation Modal */}

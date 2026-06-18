@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyRazorpayPaymentSignature } from "@/features/billing/razorpay/razorpay-service";
 import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
+import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
 import type {
   PaymentAcknowledgementInput,
   PaymentAcknowledgementResult,
@@ -105,11 +106,17 @@ export async function acknowledgeRazorpayCheckoutResultAction(
     }
 
     if (invoice.status === "paid") {
-      return {
+      const paymentId = (payment.provider_payment_id || razorpay_payment_id) as string;
+      const response: PaymentAcknowledgementResult = {
         success: true,
         status: "already_processed",
-        invoiceId: invoice.id,
+        invoiceId: invoice.id as string,
         subscriptionStatus: "active",
+        ...(paymentId ? { paymentId } : {}),
+        ...(payment.subscription_id ? { subscriptionId: payment.subscription_id as string } : {}),
+      };
+      return {
+        ...response,
       };
     }
 
@@ -154,27 +161,36 @@ export async function acknowledgeRazorpayCheckoutResultAction(
         created_at: new Date().toISOString(),
       });
 
-    const { data: webhookPayment } = await d
-      .from("org_subscription_payments")
-      .select("status")
-      .eq("id", payment.id)
-      .maybeSingle();
+    const finalizeResult = await finalizeSubscriptionPayment({
+      providerOrderId: razorpay_order_id,
+      providerPaymentId: razorpay_payment_id,
+      providerEnvironment: getRazorpayEnvironment(),
+      eventId: `frontend:${razorpay_order_id}:${razorpay_payment_id}`,
+    });
 
-    if (webhookPayment && webhookPayment.status === "paid") {
-      return {
+    if (finalizeResult.success) {
+      const response: PaymentAcknowledgementResult = {
         success: true,
         status: "payment_confirmed",
-        invoiceId: invoice.id,
+        invoiceId: invoice.id as string,
         subscriptionStatus: "active",
+        ...(finalizeResult.paymentId ? { paymentId: finalizeResult.paymentId } : { paymentId: razorpay_payment_id }),
+        ...(finalizeResult.subscriptionId ? { subscriptionId: finalizeResult.subscriptionId } : {}),
+      };
+      return {
+        ...response,
       };
     }
 
-    return {
+    const fallbackResponse: PaymentAcknowledgementResult = {
       success: true,
       status: "signature_acknowledged",
-      invoiceId: invoice.id,
+      invoiceId: invoice.id as string,
+      paymentId: razorpay_payment_id,
+      ...(payment.subscription_id ? { subscriptionId: payment.subscription_id as string } : {}),
       warning: "Payment received. Confirmation is in progress. Your plan will activate shortly.",
     };
+    return fallbackResponse;
   } catch (err) {
     const message = err instanceof Error ? err.message : "An unexpected error occurred.";
     return { success: false, error: message };
@@ -259,29 +275,62 @@ export async function getSubscriptionPaymentStatusAction(
     }
 
     if (payment.status === "paid" && invoice.status === "paid") {
-      return {
+      const paymentId = (payment.provider_payment_id || razorpay_payment_id) as string;
+      const response: PaymentAcknowledgementResult = {
         success: true,
         status: "payment_confirmed",
-        invoiceId: invoice.id,
+        invoiceId: invoice.id as string,
         subscriptionStatus: "active",
+        ...(paymentId ? { paymentId } : {}),
+        ...(payment.subscription_id ? { subscriptionId: payment.subscription_id as string } : {}),
+      };
+      return {
+        ...response,
       };
     }
 
     if (payment.status === "signature_acknowledged" || payment.status === "created") {
-      return {
+      const finalizeResult = await finalizeSubscriptionPayment({
+        providerOrderId: razorpay_order_id,
+        providerPaymentId: razorpay_payment_id,
+        providerEnvironment: getRazorpayEnvironment(),
+        eventId: `status:${razorpay_order_id}:${razorpay_payment_id}`,
+      });
+
+      if (finalizeResult.success) {
+        const response: PaymentAcknowledgementResult = {
+          success: true,
+          status: "payment_confirmed",
+          invoiceId: invoice.id as string,
+          subscriptionStatus: "active",
+          ...(finalizeResult.paymentId ? { paymentId: finalizeResult.paymentId } : { paymentId: razorpay_payment_id }),
+          ...(finalizeResult.subscriptionId ? { subscriptionId: finalizeResult.subscriptionId } : {}),
+        };
+        return {
+          ...response,
+        };
+      }
+
+      const fallbackResponse: PaymentAcknowledgementResult = {
         success: true,
         status: "signature_acknowledged",
-        invoiceId: invoice.id,
+        invoiceId: invoice.id as string,
+        paymentId: razorpay_payment_id,
+        ...(payment.subscription_id ? { subscriptionId: payment.subscription_id as string } : {}),
         warning: "Payment received. Confirmation is in progress.",
       };
+      return fallbackResponse;
     }
 
-    return {
+    const processingResponse: PaymentAcknowledgementResult = {
       success: true,
       status: "signature_acknowledged",
-      invoiceId: invoice.id,
+      invoiceId: invoice.id as string,
+      paymentId: razorpay_payment_id,
+      ...(payment.subscription_id ? { subscriptionId: payment.subscription_id as string } : {}),
       warning: "Payment is being processed.",
     };
+    return processingResponse;
   } catch (err) {
     const message = err instanceof Error ? err.message : "An unexpected error occurred.";
     return { success: false, error: message };

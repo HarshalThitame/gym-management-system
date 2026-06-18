@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import crypto from "node:crypto";
 import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 
@@ -277,6 +278,22 @@ test.describe("Organization Owner — Complete Workflows", () => {
 
   test("9 — Razorpay subscription checkout creates an order without invoice constraint errors", async ({ page }) => {
     test.setTimeout(120_000);
+    await page.addInitScript(() => {
+      class MockRazorpay {
+        options: any;
+
+        constructor(options: any) {
+          this.options = options;
+          (window as any).__mockRazorpayOptions = options;
+        }
+
+        open() {
+          (window as any).__mockRazorpayOpened = true;
+        }
+      }
+
+      (window as any).Razorpay = MockRazorpay;
+    });
     await login(page);
 
     await page.goto("/organization/plan");
@@ -291,11 +308,28 @@ test.describe("Organization Owner — Complete Workflows", () => {
     await expect(payButton).toBeEnabled({ timeout: 30_000 });
     await payButton.click();
 
-    await expect(page.getByText(/Test Mode:|Live:/)).toBeVisible({ timeout: 30_000 });
+    await expect.poll(async () => page.evaluate(() => Boolean((window as any).__mockRazorpayOptions)), { timeout: 30_000 }).toBe(true);
+
+    const orderId = await page.evaluate(() => (window as any).__mockRazorpayOptions?.order_id as string);
+    const paymentId = `pay_${Date.now()}`;
+    const signature = crypto.createHmac("sha256", process.env.RAZORPAY_TEST_KEY_SECRET ?? "").update(`${orderId}|${paymentId}`).digest("hex");
+
+    await page.evaluate(({ paymentId: pid, sig }) => {
+      const options = (window as any).__mockRazorpayOptions;
+      options?.handler?.({
+        razorpay_payment_id: pid,
+        razorpay_order_id: options.order_id,
+        razorpay_signature: sig,
+      });
+    }, { paymentId, sig: signature });
+
+    await expect(page.getByText("Payment successful", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Transaction details/i)).toBeVisible();
+    await expect(page.getByText(/Invoice ID:/i)).toBeVisible();
+    await expect(page.getByText(/Payment ID:/i)).toBeVisible();
+    await expect(page.getByText(/Subscription ID:/i)).toBeVisible();
     await expect(page.getByText(/null value in column "subscription_id"/i)).toHaveCount(0);
     await expect(page.getByText("Payment failed", { exact: true })).toHaveCount(0);
-    await expect(page.getByText(/Failed to create payment order/i)).toHaveCount(0);
-    await expect(page.locator('iframe[src*="razorpay"]')).toHaveCount(1);
   });
 
 });

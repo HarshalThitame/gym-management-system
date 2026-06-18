@@ -89,6 +89,8 @@ export type PaymentAcknowledgementResult = {
   status: "signature_acknowledged" | "payment_confirmed" | "already_processed";
   invoiceId: string;
   subscriptionStatus?: string;
+  paymentId?: string;
+  subscriptionId?: string;
   warning?: string;
 } | {
   success: false;
