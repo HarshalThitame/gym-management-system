@@ -110,9 +110,12 @@ export {
   getPlanLimit,
   hasUnlimitedLimit,
   getUsageLimitSummary,
+  canCreateResource,
+  requireResourceLimit,
+  getOrganizationUsage,
 } from "./limits-service";
 
-export type { LimitResult, UsageLimitSummary } from "./limits-service";
+export type { LimitResult, UsageLimitSummary, ResourceCheckResult } from "./limits-service";
 
 // ─── Action guards (Phase 4 — server action protection) ────────────────────
 export {

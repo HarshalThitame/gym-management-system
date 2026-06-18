@@ -9,6 +9,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { PlanSummaryCard } from "@/features/organization-owner/entitlements";
+import { UsageDashboardCard } from "@/features/organization-owner/entitlements";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 
@@ -216,6 +217,14 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
 
       {/* ═══ PLAN STATUS ═══ */}
       <PlanSummaryCard />
+
+      {/* ═══ USAGE LIMITS ═══ */}
+      <UsageDashboardCard
+        memberCount={dashboard.metrics.activeMembers}
+        branchCount={dashboard.branches.filter((b) => b.status === "active").length}
+        trainerCount={dashboard.trainers.filter((t) => (t as any).status === "active").length}
+        staffCount={staffCount}
+      />
 
       {/* ═══ KPI GRID ═══ */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { getOrganizationEntitlements } from "./entitlement-service";
 import { getPackageLimits } from "./entitlement-repository";
@@ -130,4 +131,145 @@ export async function getUsageLimitSummary(
     limits,
     hasActiveSubscription: hasActive,
   };
+}
+
+// ─── Resource check types ──────────────────────────────────────────────────
+
+export type ResourceCheckResult = {
+  allowed: boolean;
+  limitKey: string;
+  currentUsage: number;
+  limitValue: number;
+  isUnlimited: boolean;
+  remaining: number | null;
+  reason?: string;
+  message?: string;
+};
+
+// ─── Usage counters (server-only DB queries) ───────────────────────────────
+
+async function countBranches(organizationId: string): Promise<number> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { count } = await (supabase as any)
+      .from("branches")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("status", ["active"]);
+    return count ?? 0;
+  } catch { return 0; }
+}
+
+async function countMembers(organizationId: string): Promise<number> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { count } = await (supabase as any)
+      .from("members")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("status", ["active"]);
+    return count ?? 0;
+  } catch { return 0; }
+}
+
+async function countTrainers(organizationId: string): Promise<number> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { count } = await (supabase as any)
+      .from("trainers")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("status", ["active"]);
+    return count ?? 0;
+  } catch { return 0; }
+}
+
+async function countStaff(organizationId: string): Promise<number> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { count } = await (supabase as any)
+      .from("branch_users")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .not("role_name", "in", '("member","trainer")');
+    return count ?? 0;
+  } catch { return 0; }
+}
+
+const USAGE_COUNTERS: Record<string, (orgId: string) => Promise<number>> = {
+  max_branches: countBranches,
+  max_members: countMembers,
+  max_trainers: countTrainers,
+  max_staff: countStaff,
+};
+
+// ─── getOrganizationUsage ──────────────────────────────────────────────────
+
+export async function getOrganizationUsage(
+  organizationId: string,
+): Promise<Record<string, number>> {
+  const usage: Record<string, number> = {};
+  for (const [key, counter] of Object.entries(USAGE_COUNTERS)) {
+    usage[key] = await counter(organizationId);
+  }
+  return usage;
+}
+
+// ─── canCreateResource ─────────────────────────────────────────────────────
+
+export async function canCreateResource(
+  organizationId: string,
+  limitKey: LimitKey,
+  increment = 1,
+): Promise<ResourceCheckResult> {
+  const limit = await getPlanLimit(organizationId, limitKey);
+  if (!limit) {
+    return {
+      allowed: false, limitKey, currentUsage: 0, limitValue: 0,
+      isUnlimited: false, remaining: 0,
+      reason: "NO_ACTIVE_SUBSCRIPTION",
+      message: "Your organization does not have an active subscription.",
+    };
+  }
+
+  if (limit.isUnlimited) {
+    return {
+      allowed: true, limitKey, currentUsage: 0, limitValue: -1,
+      isUnlimited: true, remaining: null,
+    };
+  }
+
+  const currentUsage = USAGE_COUNTERS[limitKey]
+    ? await USAGE_COUNTERS[limitKey]!(organizationId)
+    : 0;
+
+  const remaining = Math.max(0, limit.limitValue - currentUsage);
+  const allowed = currentUsage + increment <= limit.limitValue;
+
+  return {
+    allowed,
+    limitKey,
+    currentUsage,
+    limitValue: limit.limitValue,
+    isUnlimited: false,
+    remaining,
+    ...(!allowed ? {
+      reason: "LIMIT_REACHED",
+      message: `Your current plan allows only ${limit.limitValue} ${limitKey.replace("max_", "")}. You have ${currentUsage}. Please upgrade to add more.`,
+    } : {}),
+  };
+}
+
+// ─── requireResourceLimit ──────────────────────────────────────────────────
+
+export async function requireResourceLimit(
+  organizationId: string,
+  limitKey: LimitKey,
+  increment = 1,
+): Promise<ResourceCheckResult> {
+  const result = await canCreateResource(organizationId, limitKey, increment);
+  if (!result.allowed) {
+    throw new Error(result.message ?? "Resource limit reached. Please upgrade your plan.");
+  }
+  return result;
 }
