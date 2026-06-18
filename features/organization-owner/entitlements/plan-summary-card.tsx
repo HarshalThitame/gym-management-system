@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowUpRight, AlertTriangle, CheckCircle2, Clock, CreditCard, Shield } from "lucide-react";
+import { Clock, ArrowUpRight, AlertTriangle, CheckCircle2, CreditCard, Shield } from "lucide-react";
 import { useEntitlements } from "./entitlement-provider";
+import { organizationOwnerModules } from "@/features/organization-owner/lib/organization-owner-modules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +21,7 @@ const statusConfig: Record<PlanStatus, { color: string; label: string; icon: typ
 };
 
 export function PlanSummaryCard() {
-  const { plan, activeFeatureKeys, features } = useEntitlements();
+  const { plan, activeFeatureKeys } = useEntitlements();
 
   if (!plan) {
     return (
@@ -52,8 +53,8 @@ export function PlanSummaryCard() {
   const StatusIcon = cfg.icon;
 
   const activeCount = activeFeatureKeys.size;
-  const totalCount = Object.values(features).filter((v) => typeof v === "boolean").length;
-  const lockedCount = totalCount - activeCount;
+  const totalModuleCount = organizationOwnerModules.filter((m) => m.featureKey).length;
+  const lockedCount = totalModuleCount - [...activeFeatureKeys].filter((k) => organizationOwnerModules.some((m) => m.featureKey === k)).length;
 
   return (
     <Card>

@@ -163,7 +163,6 @@ export const organizationOwnerModules = [
     description: "Review your SaaS plan, usage limits, renewal status, billing state, and subscription capacity.",
     icon: <ReceiptText className="size-5" />,
     iconKey: "receipt",
-    featureKey: "billing_invoices" as FeatureKey,
   },
   {
     slug: "nutrition",
@@ -183,7 +182,6 @@ export const organizationOwnerModules = [
     description: "Create and track support tickets, escalate issues, and access documentation for your organization.",
     icon: <LifeBuoy className="size-5" />,
     iconKey: "message-square",
-    featureKey: "priority_support" as FeatureKey,
   },
   {
     slug: "profile",
