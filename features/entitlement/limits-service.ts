@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { getOrganizationEntitlements } from "./entitlement-service";
 import { getPackageLimits } from "./entitlement-repository";
+import { logLimitReached } from "./audit-service";
 import type { LimitKey } from "./feature-registry";
 import { LIMIT_KEY_SET } from "./feature-registry";
 
@@ -265,6 +266,14 @@ export async function canCreateResource(
 
   const remaining = Math.max(0, limit.limitValue - currentUsage);
   const allowed = currentUsage + increment <= limit.limitValue;
+
+  if (!allowed) {
+    // Audit the denial (fire-and-forget, never blocks)
+    logLimitReached({
+      actorId: null, organizationId, limitKey,
+      currentUsage, limitValue, attemptedIncrement: increment,
+    }).catch(() => {});
+  }
 
   return {
     allowed,
