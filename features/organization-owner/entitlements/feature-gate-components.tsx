@@ -5,7 +5,7 @@ import { Lock, ArrowUpRight, AlertTriangle } from "lucide-react";
 import { useEntitlements, useHasFeature, useFeatureLockReason } from "./entitlement-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { FeatureFlagKey } from "@/lib/tenant/feature-flags";
+import type { FeatureKey } from "@/features/entitlement";
 
 // ═══ FeatureGate ═══
 // Wraps children with a feature check. If feature is locked, shows fallback.
@@ -14,7 +14,7 @@ export function FeatureGate({
   children,
   fallback,
 }: {
-  feature: FeatureFlagKey;
+  feature: FeatureKey;
   children: ReactNode;
   fallback?: ReactNode;
 }) {
@@ -34,7 +34,7 @@ export function FeatureGateInline({
   feature,
   children,
 }: {
-  feature: FeatureFlagKey;
+  feature: FeatureKey;
   children: ReactNode;
 }) {
   const hasFeature = useHasFeature(feature);
@@ -48,7 +48,7 @@ export function LockedFeatureCard({
   feature,
   featureName,
 }: {
-  feature: FeatureFlagKey;
+  feature: FeatureKey;
   featureName: string;
 }) {
   const { plan } = useEntitlements();
@@ -84,7 +84,7 @@ export function LockedActionButton({
   label,
   reason: propReason,
 }: {
-  feature: FeatureFlagKey;
+  feature: FeatureKey;
   label: string;
   reason?: string;
 }) {
@@ -118,12 +118,12 @@ export function LockedFeaturePage({
   featureName,
   reason,
 }: {
-  feature?: FeatureFlagKey;
+  feature?: FeatureKey;
   featureName?: string;
   reason?: string;
 }) {
   const { plan } = useEntitlements();
-  const computedLockReason = useFeatureLockReason((feature ?? "memberManagement") as FeatureFlagKey);
+  const computedLockReason = useFeatureLockReason((feature ?? "memberManagement") as FeatureKey);
   const lockReason = reason ?? (feature ? computedLockReason : null);
 
   return (
@@ -171,7 +171,7 @@ export function LockedFeaturePage({
 
 // ═══ UpgradePrompt ═══
 // Compact inline prompt shown when a user tries to use a locked feature
-export function UpgradePrompt({ feature, featureName }: { feature: FeatureFlagKey; featureName: string }) {
+export function UpgradePrompt({ feature, featureName }: { feature: FeatureKey; featureName: string }) {
   const { plan } = useEntitlements();
   void feature;
 

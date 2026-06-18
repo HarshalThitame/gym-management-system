@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, AlertTriangle, CheckCircle2, Clock, CreditCard, Shield } from "lucide-react";
-import { useEntitlements, useHasFeature } from "./entitlement-provider";
+import { useEntitlements } from "./entitlement-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ const statusConfig: Record<PlanStatus, { color: string; label: string; icon: typ
 };
 
 export function PlanSummaryCard() {
-  const { plan, features, limits } = useEntitlements();
+  const { plan, activeFeatureKeys, features } = useEntitlements();
 
   if (!plan) {
     return (
@@ -51,7 +51,7 @@ export function PlanSummaryCard() {
   const cfg = statusConfig[status] ?? statusConfig.none;
   const StatusIcon = cfg.icon;
 
-  const activeCount = Object.values(features).filter((v) => v === true).length;
+  const activeCount = activeFeatureKeys.size;
   const totalCount = Object.values(features).filter((v) => typeof v === "boolean").length;
   const lockedCount = totalCount - activeCount;
 
@@ -64,7 +64,7 @@ export function PlanSummaryCard() {
             <h2 className="text-lg font-black">Plan Status</h2>
           </div>
           <Badge variant={status === "active" || status === "trial" ? "success" : status === "cancelled" || status === "expired" ? "error" : "info"}>
-            {cfg.label}
+            <StatusIcon className="size-3 mr-1" /> {cfg.label}
           </Badge>
         </div>
       </CardHeader>

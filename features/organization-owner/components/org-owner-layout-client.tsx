@@ -9,11 +9,13 @@ import { ThemeToggleClient } from "@/features/organization-owner/components/them
 import { RtlToggleClient } from "@/features/organization-owner/components/rtl-toggle-client";
 import { EntitlementProvider } from "@/features/organization-owner/entitlements/entitlement-provider";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
+import type { FeatureKey } from "@/features/entitlement";
 
 type OrgOwnerLayoutClientProps = {
   organizationId: string;
   children: ReactNode;
   planContext: OrgPlanContext;
+  activeFeatureKeys: readonly FeatureKey[];
 };
 
 function LayoutToolbar({ orgId }: { orgId: string }) {
@@ -27,12 +29,12 @@ function LayoutToolbar({ orgId }: { orgId: string }) {
   );
 }
 
-export function OrgOwnerLayoutClient({ organizationId, children, planContext }: OrgOwnerLayoutClientProps) {
+export function OrgOwnerLayoutClient({ organizationId, children, planContext, activeFeatureKeys }: OrgOwnerLayoutClientProps) {
   const { showGuide, setShowGuide, shortcuts } = useKeyboardShortcuts();
 
   return (
     <RtlProvider>
-      <EntitlementProvider organizationId={organizationId} initialPlanContext={planContext}>
+      <EntitlementProvider organizationId={organizationId} initialPlanContext={planContext} activeFeatureKeys={activeFeatureKeys}>
         <LayoutToolbar orgId={organizationId} />
         <ShortcutGuide open={showGuide} onClose={() => setShowGuide(false)} shortcuts={shortcuts} />
         {children}

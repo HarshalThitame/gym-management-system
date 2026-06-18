@@ -21,8 +21,7 @@ import {
 import type { ReactNode } from "react";
 import type { PortalNavItem } from "@/components/layout/portal-shell";
 
-import type { FeatureFlagKey } from "@/lib/tenant/feature-flags";
-import type { OrgPlanContext } from "@/lib/tenant/plan-context";
+import type { FeatureKey } from "@/features/entitlement";
 
 export type OrganizationOwnerModule = {
   slug: string;
@@ -32,7 +31,7 @@ export type OrganizationOwnerModule = {
   description: string;
   icon: ReactNode;
   iconKey: PortalNavItem["iconKey"];
-  featureKey?: FeatureFlagKey;
+  featureKey?: FeatureKey;
 };
 
 export const organizationOwnerModules = [
@@ -44,7 +43,7 @@ export const organizationOwnerModules = [
     description: "View every branch and location inside your organization with status, capacity, staff assignments, and performance metrics.",
     icon: <Building2 className="size-5" />,
     iconKey: "briefcase",
-    featureKey: "multiBranchManagement" as FeatureFlagKey,
+    featureKey: "multi_branch_management" as FeatureKey,
   },
   {
     slug: "staff",
@@ -54,7 +53,7 @@ export const organizationOwnerModules = [
     description: "Review branch user assignments, roles, access scope, and account status across your organization.",
     icon: <UsersRound className="size-5" />,
     iconKey: "users",
-    featureKey: "staffManagement" as FeatureFlagKey,
+    featureKey: "staff_management" as FeatureKey,
   },
   {
     slug: "members",
@@ -64,7 +63,7 @@ export const organizationOwnerModules = [
     description: "Monitor member volume, active members, branch distribution, and membership growth for owned gyms.",
     icon: <UsersRound className="size-5" />,
     iconKey: "users",
-    featureKey: "memberManagement" as FeatureFlagKey,
+    featureKey: "member_management" as FeatureKey,
   },
   {
     slug: "memberships",
@@ -74,7 +73,7 @@ export const organizationOwnerModules = [
     description: "Review membership plans, status mix, renewals, and plan performance across the organization.",
     icon: <Tags className="size-5" />,
     iconKey: "tags",
-    featureKey: "memberManagement" as FeatureFlagKey,
+    featureKey: "member_management" as FeatureKey,
   },
   {
     slug: "revenue",
@@ -84,7 +83,7 @@ export const organizationOwnerModules = [
     description: "Track payments, branch revenue, payment status, and financial performance for your organization.",
     icon: <CreditCard className="size-5" />,
     iconKey: "credit-card",
-    featureKey: "paymentTracking" as FeatureFlagKey,
+    featureKey: "payment_tracking" as FeatureKey,
   },
   {
     slug: "trainers",
@@ -94,7 +93,7 @@ export const organizationOwnerModules = [
     description: "Review trainers, status, branch coverage, and trainer utilization across owned gyms.",
     icon: <Dumbbell className="size-5" />,
     iconKey: "dumbbell",
-    featureKey: "trainerManagement" as FeatureFlagKey,
+    featureKey: "trainer_management" as FeatureKey,
   },
   {
     slug: "attendance",
@@ -104,7 +103,7 @@ export const organizationOwnerModules = [
     description: "Monitor attendance logs, branch usage, peak activity signals, and access-control incidents.",
     icon: <CalendarCheck className="size-5" />,
     iconKey: "calendar-check",
-    featureKey: "manualAttendance" as FeatureFlagKey,
+    featureKey: "manual_attendance" as FeatureKey,
   },
   {
     slug: "classes",
@@ -114,7 +113,7 @@ export const organizationOwnerModules = [
     description: "Track class sessions, booking volume, waitlists, cancellations, and class utilization.",
     icon: <CalendarDays className="size-5" />,
     iconKey: "calendar-days",
-    featureKey: "classBooking" as FeatureFlagKey,
+    featureKey: "class_booking" as FeatureKey,
   },
   {
     slug: "communications",
@@ -124,7 +123,7 @@ export const organizationOwnerModules = [
     description: "Review notifications, campaigns, communication volume, and engagement signals across branches.",
     icon: <MessageSquare className="size-5" />,
     iconKey: "message-square",
-    featureKey: "whatsappIntegration" as FeatureFlagKey,
+    featureKey: "whatsapp_integration" as FeatureKey,
   },
   {
     slug: "analytics",
@@ -134,7 +133,7 @@ export const organizationOwnerModules = [
     description: "View branch performance, tenant usage, revenue trends, and operational KPIs for your organization only.",
     icon: <BarChart3 className="size-5" />,
     iconKey: "bar-chart",
-    featureKey: "basicReports" as FeatureFlagKey,
+    featureKey: "basic_reports" as FeatureKey,
   },
   {
     slug: "branding",
@@ -144,7 +143,7 @@ export const organizationOwnerModules = [
     description: "Review tenant brand profiles, colors, domains, and white-label readiness for your organization.",
     icon: <Palette className="size-5" />,
     iconKey: "settings",
-    featureKey: "customBranding" as FeatureFlagKey,
+    featureKey: "custom_branding" as FeatureKey,
   },
   {
     slug: "domains",
@@ -154,7 +153,7 @@ export const organizationOwnerModules = [
     description: "Monitor custom domains, routing mode, DNS status, TLS status, and primary domain configuration.",
     icon: <Globe2 className="size-5" />,
     iconKey: "settings",
-    featureKey: "customDomainEnabled" as FeatureFlagKey,
+    featureKey: "custom_domain" as FeatureKey,
   },
   {
     slug: "billing",
@@ -164,6 +163,7 @@ export const organizationOwnerModules = [
     description: "Review your SaaS plan, usage limits, renewal status, billing state, and subscription capacity.",
     icon: <ReceiptText className="size-5" />,
     iconKey: "receipt",
+    featureKey: "billing_invoices" as FeatureKey,
   },
   {
     slug: "nutrition",
@@ -173,7 +173,7 @@ export const organizationOwnerModules = [
     description: "Manage nutrition templates, meal plans, and view compliance reports across your organization.",
     icon: <Apple className="size-5" />,
     iconKey: "settings",
-    featureKey: "nutritionPlans" as FeatureFlagKey,
+    featureKey: "nutrition_plans" as FeatureKey,
   },
   {
     slug: "support",
@@ -183,6 +183,7 @@ export const organizationOwnerModules = [
     description: "Create and track support tickets, escalate issues, and access documentation for your organization.",
     icon: <LifeBuoy className="size-5" />,
     iconKey: "message-square",
+    featureKey: "priority_support" as FeatureKey,
   },
   {
     slug: "profile",
@@ -224,8 +225,8 @@ export const organizationOwnerNavItems = [
   }))
 ] satisfies PortalNavItem[];
 
-export function buildEntitlementFilteredNavItems(planContext: OrgPlanContext): PortalNavItem[] {
-  const features = planContext.features;
+export function buildEntitlementFilteredNavItems(activeFeatureKeys: readonly FeatureKey[], packageName: string): PortalNavItem[] {
+  const featureSet = new Set<string>(activeFeatureKeys);
   const dashItem = { href: "/organization", label: "Dashboard", icon: <Gauge className="size-5" />, iconKey: "gauge" } as PortalNavItem;
   const planItem = { href: "/organization/plan", label: "Plan", icon: <ReceiptText className="size-5" />, iconKey: "receipt" } as PortalNavItem;
 
@@ -233,7 +234,7 @@ export function buildEntitlementFilteredNavItems(planContext: OrgPlanContext): P
     if (!mod.featureKey) {
       return { href: mod.href, label: mod.label, icon: mod.icon, iconKey: mod.iconKey } as PortalNavItem;
     }
-    const hasFeature = (features as Record<string, unknown>)[mod.featureKey] === true;
+    const hasFeature = featureSet.has(mod.featureKey);
     if (hasFeature) {
       return { href: mod.href, label: mod.label, icon: mod.icon, iconKey: mod.iconKey } as PortalNavItem;
     }
@@ -243,7 +244,7 @@ export function buildEntitlementFilteredNavItems(planContext: OrgPlanContext): P
       icon: mod.icon,
       iconKey: mod.iconKey,
       locked: true,
-      lockedReason: `Not included in your ${planContext.packageName || "current"} plan.`,
+      lockedReason: `Not included in your ${packageName || "current"} plan.`,
     } as PortalNavItem;
   });
 

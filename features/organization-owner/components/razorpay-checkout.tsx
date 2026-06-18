@@ -10,6 +10,7 @@ import { useRazorpayScript } from "@/features/billing/razorpay/use-razorpay-scri
 import { createSecureSubscriptionCheckoutOrderAction } from "@/features/billing/services/subscription-payment-orchestrator";
 import { acknowledgeRazorpayCheckoutResultAction, getSubscriptionPaymentStatusAction } from "@/features/billing/services/payment-acknowledgement";
 import { SubscriptionDecisionModal } from "./subscription-decision-modal";
+import { useRefreshEntitlements } from "@/features/organization-owner/entitlements";
 import type { CheckoutOrderState } from "@/features/billing/razorpay/razorpay-checkout-types";
 
 type PackageInfo = {
@@ -73,6 +74,7 @@ export function RazorpayCheckout({
   const [decisionLoading, setDecisionLoading] = useState(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshEntitlements = useRefreshEntitlements();
 
   useEffect(() => {
     return () => {
@@ -203,6 +205,7 @@ export function RazorpayCheckout({
             });
             setPaymentState("payment_confirmed");
             showToast("Payment confirmed! Your subscription is active.", "success");
+            refreshEntitlements();
           } else {
             setPaymentState("waiting_for_webhook");
             showToast(ackResult.warning || "Payment received. Confirmation is in progress.", "info");
@@ -223,6 +226,7 @@ export function RazorpayCheckout({
                 });
                 setPaymentState("payment_confirmed");
                 showToast("Payment confirmed! Your subscription is active.", "success");
+                refreshEntitlements();
               }
             }, 5000);
             pollTimeoutRef.current = setTimeout(() => {
@@ -247,7 +251,7 @@ export function RazorpayCheckout({
       showToast(message, "error");
       setPaymentState("payment_failed");
     }
-  }, [selectedPkgId, billingCycle, scriptStatus, organizationName, customerEmail, customerContact]);
+  }, [selectedPkgId, billingCycle, scriptStatus, organizationName, customerEmail, customerContact, refreshEntitlements]);
 
   const handleDecisionConfirm = useCallback(async (mode: "now" | "later") => {
     setDecisionLoading(true);

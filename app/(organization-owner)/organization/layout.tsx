@@ -3,12 +3,16 @@ import { PortalShell } from "@/components/layout/portal-shell";
 import { buildEntitlementFilteredNavItems } from "@/features/organization-owner/lib/organization-owner-modules";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { getOrganizationEntitlements } from "@/features/entitlement";
 import { OrgOwnerLayoutClient } from "@/features/organization-owner/components/org-owner-layout-client";
 
 export default async function OrganizationOwnerLayout({ children }: { children: ReactNode }) {
   const context = await requireOrganizationOwner("/organization");
-  const planContext = await getOrgPlanContext(context.organizationId);
-  const navItems = buildEntitlementFilteredNavItems(planContext);
+  const [planContext, entitlements] = await Promise.all([
+    getOrgPlanContext(context.organizationId),
+    getOrganizationEntitlements(context.organizationId),
+  ]);
+  const navItems = buildEntitlementFilteredNavItems(entitlements.activeFeatureKeys, planContext.packageName);
 
   return (
     <>
@@ -32,7 +36,7 @@ export default async function OrganizationOwnerLayout({ children }: { children: 
         title="Organization Command Center"
       >
         <main id="org-owner-main" tabIndex={-1}>
-          <OrgOwnerLayoutClient organizationId={context.organizationId} planContext={planContext}>
+          <OrgOwnerLayoutClient organizationId={context.organizationId} planContext={planContext} activeFeatureKeys={entitlements.activeFeatureKeys}>
             {children}
           </OrgOwnerLayoutClient>
         </main>

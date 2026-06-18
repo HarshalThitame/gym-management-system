@@ -1,8 +1,9 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
-import type { OrgFeatureFlags, FeatureFlagKey } from "@/lib/tenant/feature-flags";
+import type { OrgFeatureFlags } from "@/lib/tenant/feature-flags";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
+import type { FeatureKey } from "@/features/entitlement";
 import type { PlanSummary } from "./entitlement-loader";
 import { getEntitlementSummaryAction } from "./entitlement-loader";
 
@@ -10,13 +11,14 @@ type EntitlementState = {
   plan: PlanSummary | null;
   features: OrgFeatureFlags;
   limits: Record<string, number>;
+  activeFeatureKeys: Set<string>;
   loading: boolean;
   error: string | null;
 };
 
 type EntitlementContextValue = EntitlementState & {
   refresh: () => Promise<void>;
-  hasFeature: (key: FeatureFlagKey) => boolean;
+  hasFeature: (key: FeatureKey) => boolean;
   isWithinLimit: (limitKey: string, currentUsage: number) => { ok: boolean; limit: number };
 };
 
@@ -26,15 +28,18 @@ export function EntitlementProvider({
   children,
   organizationId,
   initialPlanContext,
+  activeFeatureKeys,
 }: {
   children: ReactNode;
   organizationId: string;
   initialPlanContext: OrgPlanContext;
+  activeFeatureKeys: readonly FeatureKey[];
 }) {
   const [state, setState] = useState<EntitlementState>({
     plan: buildPlanSummary(initialPlanContext),
     features: initialPlanContext.features,
     limits: extractLimits(initialPlanContext),
+    activeFeatureKeys: new Set(activeFeatureKeys),
     loading: false,
     error: null,
   });
@@ -47,6 +52,7 @@ export function EntitlementProvider({
         plan: summary.plan,
         features: summary.allFeatures,
         limits: summary.limits,
+        activeFeatureKeys: new Set(summary.features.active),
         loading: false,
         error: null,
       });
@@ -60,10 +66,10 @@ export function EntitlementProvider({
   }, [organizationId]);
 
   const hasFeature = useCallback(
-    (key: FeatureFlagKey): boolean => {
-      return (state.features[key] as boolean | undefined) ?? false;
+    (key: FeatureKey): boolean => {
+      return state.activeFeatureKeys.has(key);
     },
-    [state.features],
+    [state.activeFeatureKeys],
   );
 
   const isWithinLimit = useCallback(
@@ -89,7 +95,7 @@ export function useEntitlements() {
   return ctx;
 }
 
-export function useHasFeature(key: FeatureFlagKey): boolean {
+export function useHasFeature(key: FeatureKey): boolean {
   const ctx = useContext(EntitlementContext);
   if (!ctx) return false;
   return ctx.hasFeature(key);
@@ -101,7 +107,7 @@ export function usePlanSummary(): PlanSummary | null {
   return ctx.plan;
 }
 
-export function useFeatureLockReason(key: FeatureFlagKey): string | null {
+export function useFeatureLockReason(key: FeatureKey): string | null {
   const ctx = useContext(EntitlementContext);
   if (!ctx) return "Entitlement system unavailable.";
   if (!ctx.plan) return "No active subscription. Upgrade to a plan to access this feature.";
