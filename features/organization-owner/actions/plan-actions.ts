@@ -93,8 +93,6 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
   }
 }
 
-// Org Owner can only REQUEST cancellation now, not directly cancel
-// Cancellation is allowed regardless of subscription status (active, expired, suspended, etc.)
 export async function cancelSubscriptionAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await requireOrganizationOwner("/organization/plan");
@@ -105,30 +103,52 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
       return { status: "error", message: "Provide a reason and type CANCEL to confirm." };
     }
 
-    // Submit cancellation request through the subscription request system
-    const result = await submitSubscriptionRequest({
-      organizationId: ctx.organizationId,
-      requestType: "cancellation",
-      reason,
-      organizationNote: null,
-    });
+    const admin = getSupabaseAdminClient();
+    if (!admin) {
+      return { status: "error", message: "Database connection failed." };
+    }
+    const db = admin as any;
 
-    if (!result.ok) {
-      return { status: "error", message: result.error ?? "Failed to submit cancellation request." };
+    const { data: subscription } = await db
+      .from("organization_subscriptions")
+      .select("id, status")
+      .eq("organization_id", ctx.organizationId)
+      .maybeSingle();
+
+    if (!subscription) {
+      return { status: "error", message: "No active subscription found for this organization." };
+    }
+
+    if (subscription.status === "cancelled") {
+      return { status: "error", message: "Subscription is already cancelled." };
+    }
+
+    const { error: updError } = await db
+      .from("organization_subscriptions")
+      .update({
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+        cancellation_reason: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", subscription.id);
+
+    if (updError) {
+      return { status: "error", message: updError.message ?? "Failed to cancel subscription." };
     }
 
     await writeAuditLog({
       actorId: ctx.userId,
-      action: "organization_owner.request_cancellation",
-      entityType: "subscription_request",
-      entityId: null,
-      metadata: { reason, requestId: result.data?.requestId } as never,
+      action: "organization_owner.cancel_subscription",
+      entityType: "organization_subscription",
+      entityId: subscription.id,
+      metadata: { reason, organizationId: ctx.organizationId } as never,
     });
 
     revalidatePath("/organization/plan");
-    return { status: "success", message: "Cancellation request submitted. Super Admin will review it." };
+    return { status: "success", message: "Subscription cancelled. Data will be retained for 30 days." };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to submit cancellation request." };
+    return { status: "error", message: e instanceof Error ? e.message : "Failed to cancel subscription." };
   }
 }
 
