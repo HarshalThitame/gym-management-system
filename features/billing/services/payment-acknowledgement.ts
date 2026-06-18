@@ -221,6 +221,24 @@ export async function getSubscriptionPaymentStatusAction(
 
     const organizationId = profile.organization_id;
 
+    const { data: branchUser } = await supabase
+      .from("branch_users")
+      .select("role_name")
+      .eq("user_id", user.id)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    const role = branchUser?.role_name;
+    if (role === "member" || role === "reception_staff" || role === "trainer") {
+      return { success: false, error: "You do not have permission to check payment status." };
+    }
+
+    const adminDb = getSupabaseAdminClient();
+    if (!adminDb) {
+      return { success: false, error: "Database connection failed." };
+    }
+    const d = adminDb as any;
+
     const sigResult = verifyRazorpayPaymentSignature({
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
@@ -231,15 +249,9 @@ export async function getSubscriptionPaymentStatusAction(
       return { success: false, error: "Payment signature verification failed." };
     }
 
-    const adminDb = getSupabaseAdminClient();
-    if (!adminDb) {
-      return { success: false, error: "Database connection failed." };
-    }
-    const d = adminDb as any;
-
     const { data: payments } = await d
       .from("org_subscription_payments")
-      .select("id, invoice_id, organization_id, status, provider_environment, provider_payment_id")
+      .select("id, invoice_id, organization_id, subscription_id, status, provider_environment, provider_payment_id")
       .eq("provider_order_id", razorpay_order_id);
 
     const payment = (payments ?? [])[0] as Record<string, unknown> | undefined;

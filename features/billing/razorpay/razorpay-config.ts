@@ -100,5 +100,9 @@ export function maskRazorpayKey(key: string): string {
  */
 export function getRazorpayWebhookSecret(): string {
   const env = getRazorpayEnvironment();
-  return resolveEnvVar(env, "RAZORPAY_TEST_WEBHOOK_SECRET", "RAZORPAY_LIVE_WEBHOOK_SECRET", "RAZORPAY_WEBHOOK_SECRET") ?? "";
+  const secret = resolveEnvVar(env, "RAZORPAY_TEST_WEBHOOK_SECRET", "RAZORPAY_LIVE_WEBHOOK_SECRET", "RAZORPAY_WEBHOOK_SECRET");
+  if (!secret) {
+    throw new Error(`Razorpay ${env === "test" ? "Test" : "Live"} webhook secret is not configured. Check ${env === "test" ? "RAZORPAY_TEST_WEBHOOK_SECRET" : "RAZORPAY_LIVE_WEBHOOK_SECRET"} (or legacy RAZORPAY_WEBHOOK_SECRET).`);
+  }
+  return secret;
 }

@@ -58,7 +58,6 @@ export type RazorpayHealthStatus = {
 export type SecureCheckoutIntentInput = {
   targetPackageId: string;
   billingCycle: "monthly" | "annual";
-  upgradeRequestId?: string;
 };
 
 export type SecureCheckoutIntentResult = {

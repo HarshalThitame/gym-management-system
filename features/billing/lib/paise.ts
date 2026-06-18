@@ -29,20 +29,6 @@ export function assertValidPaiseAmount(paise: number): void {
   }
 }
 
-export function normalizePackagePriceToPaise(price: number): number {
-  if (!Number.isFinite(price) || price < 0) {
-    throw new Error(`Invalid package price: ${price}.`);
-  }
-  return Math.round(price);
-}
-
-export function normalizeInvoiceAmountToPaise(amount: number): number {
-  if (!Number.isFinite(amount) || amount < 0) {
-    throw new Error(`Invalid invoice amount: ${amount}.`);
-  }
-  return Math.round(amount);
-}
-
 export function rupeesToDisplay(rupees: number): string {
   if (!Number.isFinite(rupees) || rupees < 0) return "₹0";
   return `₹${Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(rupees)}`;

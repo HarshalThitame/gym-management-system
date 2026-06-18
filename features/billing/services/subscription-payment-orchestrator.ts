@@ -67,8 +67,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
   input: SecureCheckoutIntentInput,
 ): Promise<SecureCheckoutIntentResult> {
   try {
-    const { targetPackageId, billingCycle, upgradeRequestId } = input;
-    void upgradeRequestId;
+    const { targetPackageId, billingCycle } = input;
     const providerEnvironment = getRazorpayEnvironment();
 
     const supabase = await createSupabaseServerClient();
@@ -127,6 +126,12 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       return { success: false, error: "Package is not active." };
     }
 
+    const adminDbClient = getSupabaseAdminClient();
+    if (!adminDbClient) {
+      return { success: false, error: "Database connection failed." };
+    }
+    const d = adminDbClient as unknown as CheckoutDb;
+
     const readDb = supabase as unknown as CheckoutDb;
     const { data: pricingRows } = await readDb
       .from("package_pricing")
@@ -143,10 +148,11 @@ export async function createSecureSubscriptionCheckoutOrderAction(
     let subtotalPaise = typeof pricing.price === "number" ? pricing.price : 0;
     const currency = typeof pricing.currency === "string" && pricing.currency ? pricing.currency : "INR";
 
-    const { data: currentSubscriptions } = await readDb
+    const { data: currentSubscriptions } = await d
       .from("organization_subscriptions")
-      .select("id, status, price_override")
+      .select("id, status, package_id, price_override, billing_period")
       .eq("organization_id", organizationId)
+      .in("status", ["active", "trial", "pending"])
       .order("started_at", { ascending: false })
       .limit(1);
 
@@ -175,12 +181,6 @@ export async function createSecureSubscriptionCheckoutOrderAction(
     const daysMap: Record<string, number> = { monthly: 30, annual: 365 };
     const periodEnd = new Date(Date.now() + (daysMap[billingCycle] || 30) * 86400000).toISOString().slice(0, 10);
     const idempotencyKey = `sub_${providerEnvironment}_${organizationId}_${targetPackageId}_${billingCycle}_${periodStart}`;
-
-    const adminDbClient = getSupabaseAdminClient();
-    if (!adminDbClient) {
-      return { success: false, error: "Database connection failed." };
-    }
-    const d = adminDbClient as unknown as CheckoutDb;
 
     const { data: existingInvs } = await d
       .from("org_subscription_invoices")
@@ -303,12 +303,6 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       return attach;
     }
 
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("name")
-      .eq("id", organizationId)
-      .maybeSingle();
-
     return {
       success: true,
       razorpayKeyId: getRazorpayPublicKeyId(),
@@ -316,8 +310,8 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       amountPaise: totalAmountPaise,
       currency,
       invoiceId: invoiceId!,
-      packageDisplayName: pkg.name as string,
-      organizationDisplayName: (org as { name: string } | null)?.name ?? organization.name ?? "",
+      packageDisplayName: pkg.name,
+      organizationDisplayName: organization.name ?? "",
       billingCycle,
       isTestMode: providerEnvironment === "test",
       environmentLabel: providerEnvironment === "test" ? "Test Mode" : "Live",
