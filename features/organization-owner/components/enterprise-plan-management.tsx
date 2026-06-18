@@ -667,12 +667,18 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
               ) : null}
               <div className="space-y-2">
                 <label className="text-sm font-bold">Reason <span className="text-red-500">*</span></label>
-                <textarea className={`${selectClass} min-h-[80px]`} name="reason" required placeholder="Tell us why..." rows={3} />
+                <textarea className={`${selectClass} min-h-[80px]`} minLength={10} name="reason" required placeholder="Tell us why (minimum 10 characters)..." rows={3} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold">Type <kbd className="rounded border border-border bg-background px-2 py-0.5 text-xs font-mono">CANCEL</kbd> to confirm <span className="text-red-500">*</span></label>
-                <input className={selectClass} name="confirmation" required placeholder="Type CANCEL here" />
+                <input autoComplete="off" className={selectClass} name="confirmation" pattern="CANCEL" required placeholder="Type CANCEL here" />
               </div>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                <input className="mt-0.5 size-4 shrink-0 accent-red-600" name="termsAccepted" required type="checkbox" value="true" />
+                <span>
+                  I understand this cancellation cannot be undone, auto-renewal will stop, and no refund will be issued for the current billing period.
+                </span>
+              </label>
               <div className="flex justify-end gap-3 pt-4">
                 <button className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={() => setShowCancel(false)} type="button">Keep Subscription</button>
                 <button className="inline-flex items-center gap-2 rounded-md bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-50" disabled={cancelPending} type="submit">

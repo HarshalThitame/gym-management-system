@@ -96,57 +96,76 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
 export async function cancelSubscriptionAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await requireOrganizationOwner("/organization/plan");
-    const reason = formData.get("reason") as string;
-    const confirmation = formData.get("confirmation") as string;
+    if (!ctx.userId) {
+      return { status: "error", message: "Authenticated user could not be resolved." };
+    }
+    const reason = String(formData.get("reason") ?? "").trim();
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+    const termsAccepted = formData.get("termsAccepted") === "true";
 
-    if (!reason || confirmation !== "CANCEL") {
-      return { status: "error", message: "Provide a reason and type CANCEL to confirm." };
+    if (reason.length < 10) {
+      return { status: "error", message: "Cancellation reason must contain at least 10 characters." };
+    }
+    if (confirmation !== "CANCEL") {
+      return { status: "error", message: "Type CANCEL exactly to confirm." };
+    }
+    if (!termsAccepted) {
+      return { status: "error", message: "Accept the cancellation terms, including that cancellation cannot be undone and no refund will be issued." };
     }
 
     const admin = getSupabaseAdminClient();
     if (!admin) {
       return { status: "error", message: "Database connection failed." };
     }
-    const db = admin as any;
+    const cancellationDb = admin as unknown as {
+      rpc(
+        name: "cancel_organization_subscription",
+        args: {
+          p_organization_id: string;
+          p_actor_id: string;
+          p_reason: string;
+          p_terms_accepted: boolean;
+          p_no_refund_acknowledged: boolean;
+        },
+      ): Promise<{ data: unknown; error: { message: string } | null }>;
+    };
+    const { data, error } = await cancellationDb.rpc("cancel_organization_subscription", {
+      p_organization_id: ctx.organizationId,
+      p_actor_id: ctx.userId,
+      p_reason: reason,
+      p_terms_accepted: termsAccepted,
+      p_no_refund_acknowledged: termsAccepted,
+    });
 
-    const { data: subscription } = await db
-      .from("organization_subscriptions")
-      .select("id, status")
-      .eq("organization_id", ctx.organizationId)
-      .maybeSingle();
-
-    if (!subscription) {
-      return { status: "error", message: "No active subscription found for this organization." };
+    if (error) {
+      return { status: "error", message: error.message };
     }
 
-    if (subscription.status === "cancelled") {
-      return { status: "error", message: "Subscription is already cancelled." };
-    }
-
-    const { error: updError } = await db
-      .from("organization_subscriptions")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-        cancellation_reason: reason,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", subscription.id);
-
-    if (updError) {
-      return { status: "error", message: updError.message ?? "Failed to cancel subscription." };
+    const result = data && typeof data === "object"
+      ? data as { success?: boolean; error?: string; subscriptionId?: string }
+      : {};
+    if (!result.success || !result.subscriptionId) {
+      return { status: "error", message: result.error ?? "Failed to cancel subscription." };
     }
 
     await writeAuditLog({
       actorId: ctx.userId,
       action: "organization_owner.cancel_subscription",
       entityType: "organization_subscription",
-      entityId: subscription.id,
-      metadata: { reason, organizationId: ctx.organizationId } as never,
+      entityId: result.subscriptionId,
+      metadata: {
+        reason,
+        organizationId: ctx.organizationId,
+        termsAccepted: true,
+        noRefundAcknowledged: true,
+        irreversibleAcknowledged: true,
+        dataRetentionDays: 30,
+      } as never,
     });
 
     revalidatePath("/organization/plan");
-    return { status: "success", message: "Subscription cancelled. Data will be retained for 30 days." };
+    revalidatePath("/organization");
+    return { status: "success", message: "Subscription cancelled. Auto-renewal is disabled and data will be retained for 30 days." };
   } catch (e) {
     return { status: "error", message: e instanceof Error ? e.message : "Failed to cancel subscription." };
   }
