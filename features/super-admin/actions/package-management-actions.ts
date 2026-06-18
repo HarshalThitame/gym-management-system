@@ -294,7 +294,7 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
 }
 
 type DependencyCheck = {
-  table: "organization_subscriptions" | "scheduled_plan_changes" | "subscription_requests" | "subscription_addons";
+  table: "organization_subscriptions" | "scheduled_plan_changes" | "subscription_addons";
   column: string;
   label: string;
 };
@@ -307,8 +307,6 @@ const PACKAGE_REFERENCE_CHECKS: DependencyCheck[] = [
   { table: "organization_subscriptions", column: "package_id", label: "organization subscriptions" },
   { table: "scheduled_plan_changes", column: "from_package_id", label: "scheduled plan changes (from)" },
   { table: "scheduled_plan_changes", column: "to_package_id", label: "scheduled plan changes (to)" },
-  { table: "subscription_requests", column: "current_package_id", label: "subscription requests (current)" },
-  { table: "subscription_requests", column: "requested_package_id", label: "subscription requests (requested)" },
 ];
 
 async function countPackageReference(sb: SbClient, dep: DependencyCheck, packageId: string): Promise<DependencyResult> {

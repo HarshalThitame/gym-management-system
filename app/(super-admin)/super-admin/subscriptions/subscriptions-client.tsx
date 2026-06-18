@@ -5,14 +5,13 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
-import { BarChart3, Package, Users, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Shield, Trash2, Calendar, Puzzle, DollarSign } from "lucide-react";
+import { BarChart3, Package, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Shield, Trash2, Calendar, Puzzle, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
-import { RequestQueueClient } from "./request-queue-client";
 import { PaymentDashboard } from "@/features/super-admin/components/payment-dashboard";
 import { syncEntitlementsAction, syncUsageLimitsAction } from "@/features/subscription/super-admin-actions";
 import {
@@ -28,7 +27,7 @@ const PackageManagementClient = dynamic(() => import("./package-management-clien
 
 export function SubscriptionsClient({ data }: { data: Data }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"overview" | "packages" | "requests" | "payments">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "packages" | "payments">("overview");
   const [drawerOrgData, setDrawerOrgData] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -106,7 +105,7 @@ export function SubscriptionsClient({ data }: { data: Data }) {
       </div>
 
       <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1" role="tablist">
-        {[{ key: "overview" as const, label: "Operations", icon: BarChart3 }, { key: "packages" as const, label: "Packages", icon: Package }, { key: "payments" as const, label: "Payments", icon: DollarSign }, { key: "requests" as const, label: "Requests", icon: Users }].map((tab) => {
+        {[{ key: "overview" as const, label: "Operations", icon: BarChart3 }, { key: "packages" as const, label: "Packages", icon: Package }, { key: "payments" as const, label: "Payments", icon: DollarSign }].map((tab) => {
           const Icon = tab.icon;
           return (<button key={tab.key} className={cn("flex items-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-bold transition", activeTab === tab.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} onClick={() => setActiveTab(tab.key)} role="tab" type="button"><Icon className="size-4" />{tab.label}</button>);
         })}
@@ -158,7 +157,6 @@ export function SubscriptionsClient({ data }: { data: Data }) {
       )}
 
       {activeTab === "packages" && <PackageManagementClient data={data} />}
-      {activeTab === "requests" && <RequestQueueClient />}
 
       {/* Payments Tab */}
       {activeTab === "payments" && (

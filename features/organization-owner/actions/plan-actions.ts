@@ -7,62 +7,8 @@ import { writeAuditLog } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getOrgOwnerContext } from "./action-utils";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
-import { submitSubscriptionRequest } from "@/features/subscription/org-owner-actions";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
-
-export async function requestPlanChangeAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
-  try {
-    const ctx = await requireOrganizationOwner("/organization/plan");
-    const targetPlanSlug = formData.get("targetPlan") as string;
-    const reason = formData.get("reason") as string;
-    const billingCycle = formData.get("billingCycle") as string;
-
-    if (!targetPlanSlug || !reason) {
-      return { status: "error", message: "Target plan and reason are required." };
-    }
-
-    // Resolve target package by slug
-    const admin = getSupabaseAdminClient();
-    if (!admin) return { status: "error", message: "Database connection failed." };
-
-    const { data: packages } = await (admin as any)
-      .from("packages")
-      .select("id")
-      .eq("slug", targetPlanSlug)
-      .eq("is_active", true)
-      .single();
-
-    if (!packages) return { status: "error", message: "Target package not found." };
-
-    // Submit through the subscription request system
-    const result = await submitSubscriptionRequest({
-      organizationId: ctx.organizationId,
-      requestType: targetPlanSlug === (formData.get("currentPlanSlug") as string) ? "renewal" : "upgrade",
-      requestedPackageId: packages.id,
-      requestedBillingPeriod: billingCycle === "yearly" ? "annual" : "monthly",
-      reason,
-      organizationNote: null,
-    });
-
-    if (!result.ok) {
-      return { status: "error", message: result.error ?? "Failed to submit request." };
-    }
-
-    await writeAuditLog({
-      actorId: ctx.userId,
-      action: "organization_owner.request_plan_change",
-      entityType: "subscription_request",
-      entityId: null,
-      metadata: { targetPlan: targetPlanSlug, reason, requestId: result.data?.requestId } as never,
-    });
-
-    revalidatePath("/organization/plan");
-    return { status: "success", message: `Plan change to ${targetPlanSlug} requested. Super Admin will review your request.` };
-  } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to request plan change." };
-  }
-}
 
 export async function toggleAutoRenewAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {

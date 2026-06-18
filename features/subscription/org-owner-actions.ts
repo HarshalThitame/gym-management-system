@@ -4,16 +4,7 @@
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
-import {
-  submitRequestSchema,
-  uploadPaymentProofSchema,
-  cancelRequestSchema,
-  type SubmitRequestInput,
-  type UploadPaymentProofInput,
-  type CancelRequestInput,
-} from "./schemas";
 import type {
-  SubscriptionRequest,
   OrgSubscriptionDetail,
   PackageInfo,
 } from "./types";
@@ -22,62 +13,6 @@ function db() {
   const c = getSupabaseAdminClient();
   if (!c) throw new Error("Database connection failed.");
   return c as any;
-}
-
-export async function submitSubscriptionRequest(input: SubmitRequestInput) {
-  const context = await requireOrganizationOwner("/organization");
-
-  const parsed = submitRequestSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-
-  if (parsed.data.organizationId !== context.organizationId) {
-    return { ok: false, error: "Organization mismatch." };
-  }
-
-  const { data: existing } = await db()
-    .from("subscription_requests")
-    .select("id")
-    .eq("organization_id", parsed.data.organizationId)
-    .eq("request_type", parsed.data.requestType)
-    .in("status", ["pending", "under_review"])
-    .maybeSingle();
-
-  if (existing) {
-    return { ok: false, error: `A ${parsed.data.requestType} request is already pending for this organization. Cancel it first or wait for review.` };
-  }
-
-  const { data: currentSub } = await db()
-    .from("organization_subscriptions")
-    .select("id, package_id, billing_period")
-    .eq("organization_id", parsed.data.organizationId)
-    .maybeSingle();
-
-  const { data: request, error } = await db()
-    .from("subscription_requests")
-    .insert({
-      organization_id: parsed.data.organizationId,
-      request_type: parsed.data.requestType,
-      status: "pending",
-      current_package_id: parsed.data.currentPackageId ?? (currentSub?.package_id ?? null),
-      requested_package_id: parsed.data.requestedPackageId ?? null,
-      requested_billing_period: parsed.data.requestedBillingPeriod ?? (currentSub?.billing_period ?? null),
-      requested_by: context.userId,
-      reason: parsed.data.reason ?? null,
-      organization_note: parsed.data.organizationNote ?? null,
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-  if (!request) {
-    return { ok: false, error: "Failed to create subscription request." };
-  }
-
-  return { ok: true, data: { requestId: request.id, status: "pending" } };
 }
 
 export async function getOrgSubscriptionDetailAction(
@@ -97,104 +32,6 @@ export async function getOrgSubscriptionDetailAction(
   }
 
   return { ok: true, data: data as unknown as OrgSubscriptionDetail };
-}
-
-export async function getOrgSubscriptionRequestsAction(
-  organizationId: string
-): Promise<{ ok: boolean; data?: SubscriptionRequest[]; error?: string }> {
-  const context = await requireOrganizationOwner("/organization");
-  if (organizationId !== context.organizationId) {
-    return { ok: false, error: "Organization mismatch." };
-  }
-
-  const { data, error } = await db()
-    .from("subscription_requests")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .order("requested_at", { ascending: false });
-
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-
-  return { ok: true, data: data as unknown as SubscriptionRequest[] };
-}
-
-export async function uploadPaymentProofAction(input: UploadPaymentProofInput) {
-  const context = await requireOrganizationOwner("/organization");
-
-  const parsed = uploadPaymentProofSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-
-  // Verify the request belongs to this org
-  const { data: request } = await db()
-    .from("subscription_requests")
-    .select("id, organization_id, status")
-    .eq("id", parsed.data.requestId)
-    .single();
-
-  if (!request || request.organization_id !== context.organizationId) {
-    return { ok: false, error: "Request not found or organization mismatch." };
-  }
-
-  if (request.status !== "approved") {
-    return { ok: false, error: "Payment proof can only be uploaded for approved requests." };
-  }
-
-  const { error } = await db()
-    .from("subscription_requests")
-    .update({
-      payment_proof_url: parsed.data.paymentProofUrl,
-      payment_proof_uploaded_at: new Date().toISOString(),
-      payment_note: parsed.data.paymentNote ?? null,
-    })
-    .eq("id", parsed.data.requestId);
-
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-
-  return { ok: true, data: { requestId: parsed.data.requestId } };
-}
-
-export async function cancelOwnRequestAction(input: CancelRequestInput) {
-  const context = await requireOrganizationOwner("/organization");
-
-  const parsed = cancelRequestSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-
-  const { data: request } = await db()
-    .from("subscription_requests")
-    .select("id, organization_id, status, requested_by")
-    .eq("id", parsed.data.requestId)
-    .single();
-
-  if (!request || request.organization_id !== context.organizationId) {
-    return { ok: false, error: "Request not found." };
-  }
-
-  if (request.status !== "pending") {
-    return { ok: false, error: "Only pending requests can be cancelled." };
-  }
-
-  const { error } = await db()
-    .from("subscription_requests")
-    .update({
-      status: "cancelled_by_organization",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.data.requestId)
-    .eq("requested_by", context.userId);
-
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-
-  return { ok: true, data: { requestId: parsed.data.requestId, status: "cancelled_by_organization" } };
 }
 
 export async function getAvailablePackagesAction(): Promise<{

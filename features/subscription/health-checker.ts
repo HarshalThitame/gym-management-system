@@ -27,7 +27,6 @@ export type SubscriptionHealthReport = {
     suspended: number;
     cancelled: number;
     noSubscription: number;
-    pendingRequests: number;
   };
 };
 
@@ -56,11 +55,6 @@ export async function runSubscriptionHealthCheckAction(): Promise<{
   const { data: subscriptions } = await supabase
     .from("organization_subscriptions")
     .select("*, packages!inner(name, slug)");
-
-  const { data: pendingRequests } = await supabase
-    .from("subscription_requests")
-    .select("id, organization_id, request_type, status, requested_at")
-    .in("status", ["pending", "under_review"]);
 
   const orgMap = new Map<string, { id: string; name: string; status: string }>();
   for (const org of organizations ?? []) {
@@ -170,26 +164,6 @@ export async function runSubscriptionHealthCheckAction(): Promise<{
     });
   }
 
-  const requestTypeCounts = new Map<string, number>();
-  for (const req of (pendingRequests ?? []) as Array<{ organization_id: string; request_type: string }>) {
-    const key = `${req.organization_id}-${req.request_type}`;
-    requestTypeCounts.set(key, (requestTypeCounts.get(key) ?? 0) + 1);
-  }
-
-  for (const [key, count] of requestTypeCounts.entries()) {
-    if (count > 1) {
-      const [orgId, requestType] = key.split("-") as [string, string];
-      const org = orgMap.get(orgId);
-      issues.push({
-        severity: "critical" as const,
-        category: "duplicate_requests",
-        message: `Organization "${org?.name ?? orgId}" has ${count} pending "${requestType}" requests.`,
-        organizationId: orgId,
-        organizationName: org?.name,
-      } as SubscriptionHealthIssue);
-    }
-  }
-
   const stats = {
     active: (subscriptions ?? []).filter((s: Record<string, unknown>) => s.status === "active").length,
     trial: (subscriptions ?? []).filter((s: Record<string, unknown>) => s.status === "trial").length,
@@ -197,7 +171,6 @@ export async function runSubscriptionHealthCheckAction(): Promise<{
     suspended: (subscriptions ?? []).filter((s: Record<string, unknown>) => s.status === "suspended").length,
     cancelled: (subscriptions ?? []).filter((s: Record<string, unknown>) => s.status === "cancelled").length,
     noSubscription: (organizations ?? []).filter((o: Record<string, unknown>) => !subMap.has(o.id as string)).length,
-    pendingRequests: pendingRequests?.length ?? 0,
   };
 
   return {
