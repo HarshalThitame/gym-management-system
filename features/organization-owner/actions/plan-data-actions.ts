@@ -28,6 +28,7 @@ export type PackageWithMeta = {
   recommended: boolean;
   _features?: Record<string, unknown>;
   _limits?: Record<string, number>;
+  _pricing?: Array<{ billing_period: string; price: number; currency: string; setup_fee: number }>;
 };
 
 export type SubscriptionWithPackage = {
@@ -86,33 +87,39 @@ export async function getActivePackagesAction(): Promise<PackageWithMeta[]> {
 
   const rawPackages = (packages ?? []) as unknown as PackageWithMeta[];
 
-  // Enrich with features and limits from the new tables
+  // Enrich with features, limits, and pricing from the new tables
   const enriched: PackageWithMeta[] = [];
   for (const pkg of rawPackages) {
-    const { data: features } = await sb
-      .from("package_features")
-      .select("feature_code, value")
-      .eq("package_id", pkg.id);
-
-    const { data: limits } = await sb
-      .from("package_limits")
-      .select("limit_code, value")
-      .eq("package_id", pkg.id);
+    const [featuresRes, limitsRes, pricingRes] = await Promise.all([
+      sb.from("package_features").select("feature_code, value").eq("package_id", pkg.id),
+      sb.from("package_limits").select("limit_code, value").eq("package_id", pkg.id),
+      sb.from("package_pricing").select("billing_period, price, currency, setup_fee, is_active").eq("package_id", pkg.id),
+    ]);
 
     const featuresMap: Record<string, unknown> = {};
-    for (const f of (features ?? []) as Array<Record<string, unknown>>) {
+    for (const f of ((featuresRes as any).data ?? []) as Array<Record<string, unknown>>) {
       featuresMap[f.feature_code as string] = f.value;
     }
 
     const limitsMap: Record<string, number> = {};
-    for (const l of (limits ?? []) as Array<Record<string, unknown>>) {
+    for (const l of ((limitsRes as any).data ?? []) as Array<Record<string, unknown>>) {
       limitsMap[l.limit_code as string] = l.value as number;
     }
+
+    const pricingList = (((pricingRes as any).data ?? []) as Array<Record<string, unknown>>)
+      .filter((p: Record<string, unknown>) => p.is_active !== false)
+      .map((p: Record<string, unknown>) => ({
+        billing_period: p.billing_period as string,
+        price: p.price as number,
+        currency: p.currency as string,
+        setup_fee: (p.setup_fee as number) ?? 0,
+      }));
 
     enriched.push({
       ...pkg,
       _features: featuresMap,
       _limits: limitsMap,
+      _pricing: pricingList,
       // Map new features to legacy fields for backward compat
       qr_attendance_enabled: featuresMap["qr_attendance"] === true || featuresMap["qr_attendance"] === "true",
       biometric_attendance_enabled: featuresMap["biometric_attendance"] === true || featuresMap["biometric_attendance"] === "true",
