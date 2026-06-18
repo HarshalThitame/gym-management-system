@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { OrganizationOwnerWorkspace } from "@/features/organization-owner/components/organization-owner-workspace";
 import { getOrganizationOwnerModule, organizationOwnerModules } from "@/features/organization-owner/lib/organization-owner-modules";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
@@ -8,7 +8,8 @@ import { resolveModuleData, type ModuleSearchParams } from "@/features/organizat
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { MODULE_FEATURE_MAP, requireOrganizationFeatureAccess } from "@/features/entitlement";
+import { MODULE_FEATURE_MAP, isEntitlementError } from "@/features/entitlement";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type OrgOwnerModuleRouteProps = {
   params: Promise<{ module: string }>;
@@ -52,11 +53,21 @@ export default async function OrganizationOwnerModuleRoute({ params, searchParam
   const requiredFeature = MODULE_FEATURE_MAP[slug];
 
   if (requiredFeature) {
-    await requireOrganizationFeatureAccess({
-      organizationId: context.organizationId,
-      featureKey: requiredFeature,
-      actionName: `organization.module.${slug}.read`,
-    });
+    try {
+      await requireOrganizationFeatureAccess({
+        organizationId: context.organizationId,
+        featureKey: requiredFeature,
+        actionName: `organization.module.${slug}.read`,
+      });
+    } catch (err) {
+      if (isEntitlementError(err)) {
+        const params = new URLSearchParams();
+        if (err.featureKey) params.set("feature", err.featureKey);
+        if (err.reason) params.set("reason", err.reason);
+        redirect(`/organization/locked-feature?${params.toString()}`);
+      }
+      throw err;
+    }
   }
 
   const [dashboard, planContext, moduleResult] = await Promise.all([
