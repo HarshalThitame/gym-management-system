@@ -58,6 +58,7 @@ export type RazorpayHealthStatus = {
 export type SecureCheckoutIntentInput = {
   targetPackageId: string;
   billingCycle: "monthly" | "annual";
+  startMode?: "now" | "later";
 };
 
 export type SecureCheckoutIntentResult = {

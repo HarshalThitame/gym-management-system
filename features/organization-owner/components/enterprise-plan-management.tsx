@@ -335,16 +335,16 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                     {(() => {
                       const pkgAny = currentPkg as any;
                       const pricing = pkgAny?._pricing ?? [];
-                      const annualPrice = pricing.find((p: any) => p.billing_period === "annual")?.price ?? 0;
-                      const monthlyPrice = pricing.find((p: any) => p.billing_period === "monthly")?.price ?? 0;
+                      const monthlyPrice = pricing.find((p: any) => p.billing_period === "monthly")?.price ?? currentPkg?.price ?? 0;
+                      const annualPricing = pricing.find((p: any) => p.billing_period === "annual");
                       if (currentPkg?.name === "Enterprise") {
                         return <p className="mt-2 text-lg font-black">Custom Pricing</p>;
                       }
-                      if (billingCycle === "yearly") {
+                      if (annualPricing) {
                         return (
                           <div className="mt-2">
-                            <p className="text-lg font-black">₹{Intl.NumberFormat("en-IN").format(Math.round(annualPrice / 100))}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
-                            <p className="text-xs text-green-600 font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round(annualPrice / 1200))}/mo effective · 2 months free</p>
+                            <p className="text-lg font-black">₹{Intl.NumberFormat("en-IN").format(Math.round(annualPricing.price / 100))}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+                            <p className="text-xs text-green-600 font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round(monthlyPrice / 100))}/mo · Save {Math.round((1 - annualPricing.price / (monthlyPrice * 12 || 1)) * 100)}%</p>
                           </div>
                         );
                       }
@@ -360,39 +360,6 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                       {(currentPkg as unknown as { recommended: boolean }).recommended ? "Recommended" : "Current"}
                     </span>
                   ) : null}
-                </div>
-                {/* Billing Cycle Toggle */}
-                <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-accent/5 p-3">
-                  <span className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Billing:</span>
-                  <div className="flex overflow-hidden rounded-md border border-border">
-                    <button
-                      onClick={() => setBillingCycle("monthly")}
-                      className={cn("px-3 py-1.5 text-xs font-bold transition", billingCycle === "monthly" ? "bg-primary text-primary-foreground" : "bg-surface text-muted-foreground hover:text-foreground")}
-                      type="button"
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      onClick={() => setBillingCycle("yearly")}
-                      className={cn("relative px-3 py-1.5 text-xs font-bold transition border-l border-border", billingCycle === "yearly" ? "bg-primary text-primary-foreground" : "bg-surface text-muted-foreground hover:text-foreground")}
-                      type="button"
-                    >
-                      Annual
-                      {currentPkg?.name !== "Enterprise" && (
-                        <span className="absolute -top-2 -right-2 rounded-full bg-green-500 px-1.5 py-0.5 text-[8px] font-bold text-white leading-none shadow-sm">2 free</span>
-                      )}
-                    </button>
-                  </div>
-                  {currentPkg?.name !== "Enterprise" && billingCycle === "yearly" && (
-                    <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700">
-                      2 months free
-                    </span>
-                  )}
-                  {currentPkg?.name === "Enterprise" && (
-                    <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700">
-                      Custom pricing
-                    </span>
-                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-2">
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Status</p><Badge className="mt-1" variant={isActive ? "success" : isTrialing ? "info" : "error"}>{planContext.status}</Badge></div>
@@ -584,6 +551,9 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             allPackages={allPackages}
             currentPackageId={currentPkg?.id ?? null}
             currentSubscriptionId={currentSubscription?.id ?? null}
+            currentSubscriptionStatus={currentSubscription?.status ?? null}
+            currentSubscriptionExpiresAt={currentSubscription?.expires_at ?? null}
+            currentPackageName={currentPkg?.name ?? null}
           />
         </div>
       )}

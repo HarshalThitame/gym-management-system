@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { CreditCard, Loader2, Check, AlertTriangle, Shield, X } from "lucide-react";
+import { CreditCard, Loader2, Check, AlertTriangle, Shield, X, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { showToast, ToastContainer } from "@/components/ui/toast";
 import { useRazorpayScript } from "@/features/billing/razorpay/use-razorpay-script";
 import { createSecureSubscriptionCheckoutOrderAction } from "@/features/billing/services/subscription-payment-orchestrator";
 import { acknowledgeRazorpayCheckoutResultAction, getSubscriptionPaymentStatusAction } from "@/features/billing/services/payment-acknowledgement";
+import { SubscriptionDecisionModal } from "./subscription-decision-modal";
 import type { CheckoutOrderState } from "@/features/billing/razorpay/razorpay-checkout-types";
 
 type PackageInfo = {
@@ -34,6 +35,9 @@ type RazorpayCheckoutProps = {
   allPackages: PackageInfo[];
   currentPackageId?: string | null;
   currentSubscriptionId?: string | null;
+  currentSubscriptionStatus?: string | null;
+  currentSubscriptionExpiresAt?: string | null;
+  currentPackageName?: string | null;
 };
 
 export function RazorpayCheckout({
@@ -42,6 +46,9 @@ export function RazorpayCheckout({
   customerContact,
   allPackages,
   currentPackageId,
+  currentSubscriptionStatus,
+  currentSubscriptionExpiresAt,
+  currentPackageName,
 }: RazorpayCheckoutProps) {
   const scriptStatus = useRazorpayScript();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
@@ -62,6 +69,15 @@ export function RazorpayCheckout({
     isTestMode: boolean;
     environmentLabel: string;
   } | null>(null);
+  const [showDecisionModal, setShowDecisionModal] = useState(false);
+  const [decisionLoading, setDecisionLoading] = useState(false);
+
+  const isActive = currentSubscriptionStatus === "active" || currentSubscriptionStatus === "trial";
+  const isCancelledWithTime = currentSubscriptionStatus === "cancelled" && currentSubscriptionExpiresAt && new Date(currentSubscriptionExpiresAt) > new Date();
+
+  const remainingDays = isCancelledWithTime
+    ? Math.ceil((new Date(currentSubscriptionExpiresAt!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : 0;
 
   const activePackages = allPackages.filter((p) => p.is_active);
 
@@ -81,8 +97,22 @@ export function RazorpayCheckout({
   const monthlyPrice = selectedPkg ? getMonthlyPrice(selectedPkg) : 0;
   const annualSavings = monthlyPrice * 12 - price;
 
-  const handlePay = useCallback(async () => {
+  const handlePlanSelect = useCallback((pkgId: string) => {
+    if (isActive) return;
+    setSelectedPkgId(pkgId);
+    setPaymentState("idle");
+    setPaymentError(null);
+    setPaymentDetails(null);
+    setOrderResult(null);
+
+    if (isCancelledWithTime) {
+      setShowDecisionModal(true);
+    }
+  }, [isActive, isCancelledWithTime]);
+
+  const executePayment = useCallback(async (startMode: "now" | "later") => {
     if (!selectedPkgId) return;
+
     const Razorpay = (window as RazorpayWindow).Razorpay;
     if (scriptStatus !== "loaded" || !Razorpay) {
       showToast("Razorpay is not loaded. Please refresh and try again.", "error");
@@ -97,6 +127,7 @@ export function RazorpayCheckout({
     const result = await createSecureSubscriptionCheckoutOrderAction({
       targetPackageId: selectedPkgId,
       billingCycle,
+      startMode,
     });
 
     if (!result.success) {
@@ -205,11 +236,43 @@ export function RazorpayCheckout({
     }
   }, [selectedPkgId, billingCycle, scriptStatus, organizationName, customerEmail, customerContact]);
 
-  const isLoading = paymentState === "creating_order";
+  const handleDecisionConfirm = useCallback(async (mode: "now" | "later") => {
+    setDecisionLoading(true);
+    setShowDecisionModal(false);
+    await executePayment(mode);
+    setDecisionLoading(false);
+  }, [executePayment]);
+
+  const handlePay = useCallback(async () => {
+    if (!selectedPkgId) return;
+    if (isActive) return;
+
+    if (isCancelledWithTime) {
+      setShowDecisionModal(true);
+      return;
+    }
+
+    await executePayment("now");
+  }, [selectedPkgId, isActive, isCancelledWithTime, executePayment]);
+
+  const isLoading = paymentState === "creating_order" || decisionLoading;
 
   return (
     <div className="space-y-6">
       <ToastContainer />
+
+      {selectedPkg && isCancelledWithTime && currentPackageName && (
+        <SubscriptionDecisionModal
+          open={showDecisionModal}
+          onClose={() => setShowDecisionModal(false)}
+          onConfirm={handleDecisionConfirm}
+          loading={decisionLoading}
+          currentPlanName={currentPackageName}
+          currentExpiryDate={currentSubscriptionExpiresAt!}
+          remainingDays={remainingDays}
+          newPlanName={selectedPkg.name}
+        />
+      )}
 
       {scriptStatus === "loading" && (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-background p-4 text-sm">
@@ -221,6 +284,16 @@ export function RazorpayCheckout({
         <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <AlertTriangle className="size-5 shrink-0" />
           <div><p className="font-bold">Payment gateway failed to load</p><p className="text-xs mt-1">Please refresh the page or try again later.</p></div>
+        </div>
+      )}
+
+      {isActive && (
+        <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+          <Lock className="size-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">You already have an active plan</p>
+            <p className="text-xs mt-1">Please cancel your current plan before purchasing a new one. Go to the <strong>Billing</strong> tab to cancel.</p>
+          </div>
         </div>
       )}
 
@@ -276,17 +349,23 @@ export function RazorpayCheckout({
           return (
             <button
               key={pkg.id}
-            onClick={() => { setSelectedPkgId(pkg.id); setPaymentState("idle"); setPaymentError(null); setPaymentDetails(null); setOrderResult(null); }}
+              onClick={() => handlePlanSelect(pkg.id)}
               className={cn(
-                "relative rounded-xl border-2 bg-gradient-to-b from-background to-accent/5 p-6 text-left transition-all hover:shadow-lg",
-                isSelected ? "border-primary shadow-md ring-1 ring-primary/20" : "border-border",
+                "relative rounded-xl border-2 bg-gradient-to-b from-background to-accent/5 p-6 text-left transition-all",
+                isActive ? "opacity-60 cursor-not-allowed" : "hover:shadow-lg",
+                isSelected && !isActive ? "border-primary shadow-md ring-1 ring-primary/20" : "border-border",
                 currentPackageId === pkg.id ? "ring-2 ring-indigo-400" : ""
               )}
               type="button"
-              disabled={isLoading}
+              disabled={isLoading || isActive}
             >
               {currentPackageId === pkg.id && (
                 <span className="absolute -top-2.5 left-4 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm">Current</span>
+              )}
+              {isActive && currentPackageId !== pkg.id && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/60">
+                  <Lock className="size-6 text-muted-foreground" />
+                </div>
               )}
               <p className="text-lg font-black">{pkg.name}</p>
               <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{pkg.description}</p>
@@ -395,7 +474,7 @@ export function RazorpayCheckout({
                 <Loader2 className="size-5 animate-spin shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold">Payment received</p>
-                  <p className="text-xs mt-0.5">Payment is being processed. Confirmation is in progress. Your plan will activate shortly. You do not need to pay again.</p>
+                  <p className="text-xs mt-0.5">Payment is being processed. Your plan will activate shortly. You do not need to pay again.</p>
                 </div>
               </div>
             )}
@@ -485,11 +564,11 @@ export function RazorpayCheckout({
               size="lg"
               className="w-full gap-2"
               onClick={handlePay}
-              disabled={isLoading || paymentState === "waiting_for_webhook" || paymentState === "payment_confirmed" || paymentState === "payment_callback_received" || scriptStatus !== "loaded"}
+              disabled={isLoading || isActive || paymentState === "waiting_for_webhook" || paymentState === "payment_confirmed" || paymentState === "payment_callback_received" || scriptStatus !== "loaded"}
               type="button"
             >
-              {isLoading ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />}
-              {isLoading ? "Creating Order..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Pay ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via Razorpay`}
+              {isActive ? <Lock className="size-5" /> : isLoading ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />}
+              {isActive ? "Plan Active" : isLoading ? "Creating Order..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Pay ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via Razorpay`}
             </Button>
 
             <p className="text-center text-[11px] text-muted-foreground">

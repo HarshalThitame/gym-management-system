@@ -67,7 +67,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
   input: SecureCheckoutIntentInput,
 ): Promise<SecureCheckoutIntentResult> {
   try {
-    const { targetPackageId, billingCycle } = input;
+    const { targetPackageId, billingCycle, startMode } = input;
     const providerEnvironment = getRazorpayEnvironment();
 
     const supabase = await createSupabaseServerClient();
@@ -150,14 +150,24 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const { data: currentSubscriptions } = await d
       .from("organization_subscriptions")
-      .select("id, status, package_id, price_override, billing_period")
+      .select("id, status, package_id, price_override, billing_period, expires_at, cancelled_at")
       .eq("organization_id", organizationId)
-      .in("status", ["active", "trial", "pending"])
+      .in("status", ["active", "trial", "cancelled", "pending_activation"])
       .order("started_at", { ascending: false })
       .limit(1);
 
     const currentSubscription = (currentSubscriptions ?? [])[0];
+    const currentStatus = currentSubscription?.status as string | undefined;
     const currentSubId = currentSubscription?.id as string | undefined;
+
+    if (currentStatus === "active" || currentStatus === "trial") {
+      return { success: false, error: "You already have an active plan. Please cancel the current plan before purchasing a new one." };
+    }
+
+    if (currentStatus === "cancelled" && startMode === "now" && currentSubId) {
+      // Remove cancelled subscription so new one can be created (unique constraint on org_id)
+      await (adminDbClient as any).from("organization_subscriptions").delete().eq("id", currentSubId);
+    }
 
     if (typeof currentSubscription?.price_override === "number") {
       subtotalPaise = currentSubscription.price_override;
