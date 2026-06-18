@@ -8,6 +8,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { ButtonLink } from "@/components/ui/button";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { PlanSummaryCard } from "@/features/organization-owner/entitlements";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 
@@ -212,6 +213,9 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
           </div>
         </div>
       </section>
+
+      {/* ═══ PLAN STATUS ═══ */}
+      <PlanSummaryCard />
 
       {/* ═══ KPI GRID ═══ */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

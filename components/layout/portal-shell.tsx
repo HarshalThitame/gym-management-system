@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { MobileBottomNav, type MobilePortalIconKey } from "@/components/pwa/mobile-bottom-nav";
@@ -20,6 +20,8 @@ export type PortalNavItem = {
   label: string;
   icon: ReactNode;
   iconKey: MobilePortalIconKey;
+  locked?: boolean;
+  lockedReason?: string;
 };
 
 type PortalShellProps = {
@@ -130,19 +132,31 @@ export function PortalShell({
         </div>
         <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {navItems.map((item) => (
-            <Link
-              className={cn(
-                "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold transition",
-                isActiveItem(item.href) ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-surface-muted hover:text-foreground"
-              )}
-              href={item.href}
-              key={`${item.href}-${item.label}`}
-              aria-current={isActiveItem(item.href) ? "page" : undefined}
-              onClick={closeSidebar}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
+            item.locked ? (
+              <div
+                key={`${item.href}-${item.label}`}
+                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
+                title={item.lockedReason}
+              >
+                <Lock className="size-4 shrink-0" />
+                {item.icon}
+                {item.label}
+              </div>
+            ) : (
+              <Link
+                className={cn(
+                  "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold transition",
+                  isActiveItem(item.href) ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+                )}
+                href={item.href}
+                key={`${item.href}-${item.label}`}
+                aria-current={isActiveItem(item.href) ? "page" : undefined}
+                onClick={closeSidebar}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            )
           ))}
         </nav>
         {showPlanIndicator && planContext ? (
@@ -169,6 +183,19 @@ export function PortalShell({
           <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
             {navItems.map((item) => {
               const active = isActiveItem(item.href);
+              if (item.locked) {
+                return (
+                  <div
+                    key={`${item.href}-${item.label}`}
+                    className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
+                    title={item.lockedReason}
+                  >
+                    <Lock className="size-4 shrink-0" />
+                    {item.icon}
+                    {item.label}
+                  </div>
+                );
+              }
               return (
                 <Link
                   className={cn(

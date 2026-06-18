@@ -7,10 +7,13 @@ import { useKeyboardShortcuts, ShortcutGuide } from "@/features/organization-own
 import { LanguageSwitcher } from "@/features/organization-owner/components/language-switcher";
 import { ThemeToggleClient } from "@/features/organization-owner/components/theme-toggle-client";
 import { RtlToggleClient } from "@/features/organization-owner/components/rtl-toggle-client";
+import { EntitlementProvider } from "@/features/organization-owner/entitlements/entitlement-provider";
+import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 
 type OrgOwnerLayoutClientProps = {
   organizationId: string;
   children: ReactNode;
+  planContext: OrgPlanContext;
 };
 
 function LayoutToolbar({ orgId }: { orgId: string }) {
@@ -24,14 +27,16 @@ function LayoutToolbar({ orgId }: { orgId: string }) {
   );
 }
 
-export function OrgOwnerLayoutClient({ organizationId, children }: OrgOwnerLayoutClientProps) {
+export function OrgOwnerLayoutClient({ organizationId, children, planContext }: OrgOwnerLayoutClientProps) {
   const { showGuide, setShowGuide, shortcuts } = useKeyboardShortcuts();
 
   return (
     <RtlProvider>
-      <LayoutToolbar orgId={organizationId} />
-      <ShortcutGuide open={showGuide} onClose={() => setShowGuide(false)} shortcuts={shortcuts} />
-      {children}
+      <EntitlementProvider organizationId={organizationId} initialPlanContext={planContext}>
+        <LayoutToolbar orgId={organizationId} />
+        <ShortcutGuide open={showGuide} onClose={() => setShowGuide(false)} shortcuts={shortcuts} />
+        {children}
+      </EntitlementProvider>
     </RtlProvider>
   );
 }

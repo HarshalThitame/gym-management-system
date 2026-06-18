@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { PortalShell } from "@/components/layout/portal-shell";
-import { organizationOwnerNavItems } from "@/features/organization-owner/lib/organization-owner-modules";
+import { buildEntitlementFilteredNavItems } from "@/features/organization-owner/lib/organization-owner-modules";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { OrgOwnerLayoutClient } from "@/features/organization-owner/components/org-owner-layout-client";
@@ -8,6 +8,7 @@ import { OrgOwnerLayoutClient } from "@/features/organization-owner/components/o
 export default async function OrganizationOwnerLayout({ children }: { children: ReactNode }) {
   const context = await requireOrganizationOwner("/organization");
   const planContext = await getOrgPlanContext(context.organizationId);
+  const navItems = buildEntitlementFilteredNavItems(planContext);
 
   return (
     <>
@@ -21,7 +22,7 @@ export default async function OrganizationOwnerLayout({ children }: { children: 
         branchName="Organization-wide tenant scope"
         context={context}
         eyebrow="Organization Owner Portal"
-        navItems={organizationOwnerNavItems}
+        navItems={navItems}
         planContext={planContext}
         planManageHref="/organization/plan"
         showPlanIndicator
@@ -31,7 +32,7 @@ export default async function OrganizationOwnerLayout({ children }: { children: 
         title="Organization Command Center"
       >
         <main id="org-owner-main" tabIndex={-1}>
-          <OrgOwnerLayoutClient organizationId={context.organizationId}>
+          <OrgOwnerLayoutClient organizationId={context.organizationId} planContext={planContext}>
             {children}
           </OrgOwnerLayoutClient>
         </main>
