@@ -47,6 +47,15 @@ ALTER TABLE public.org_subscription_payments
 ALTER TABLE public.payment_provider_events
   ADD COLUMN IF NOT EXISTS provider_environment text CHECK (provider_environment IN ('test', 'live')) DEFAULT 'test';
 
+-- Subscription events are an audit stream. Keep event names extensible so new
+-- payment lifecycle events do not require replacing a hard-coded enum check.
+ALTER TABLE public.subscription_events
+  DROP CONSTRAINT IF EXISTS subscription_events_event_type_check;
+
+ALTER TABLE public.subscription_events
+  ADD CONSTRAINT subscription_events_event_type_check
+  CHECK (length(btrim(event_type)) > 0);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_provider_env_event
   ON public.payment_provider_events (provider, provider_environment, event_id)
   WHERE event_id IS NOT NULL;

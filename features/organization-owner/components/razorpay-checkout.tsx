@@ -47,6 +47,7 @@ export function RazorpayCheckout({
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<CheckoutOrderState>("idle");
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [orderResult, setOrderResult] = useState<{
     orderId: string;
     invoiceId: string;
@@ -84,6 +85,7 @@ export function RazorpayCheckout({
     }
 
     setPaymentState("creating_order");
+    setPaymentError(null);
     setOrderResult(null);
 
     const result = await createSecureSubscriptionCheckoutOrderAction({
@@ -93,12 +95,15 @@ export function RazorpayCheckout({
 
     if (!result.success) {
       showToast(result.error, "error");
+      setPaymentError(result.error);
       setPaymentState("payment_failed");
       return;
     }
 
     if (!result.razorpayOrderId || !result.invoiceId) {
-      showToast("Failed to create payment order.", "error");
+      const message = "Failed to create payment order.";
+      showToast(message, "error");
+      setPaymentError(message);
       setPaymentState("payment_failed");
       return;
     }
@@ -167,6 +172,7 @@ export function RazorpayCheckout({
             setTimeout(() => clearInterval(checkInterval), 120000);
           }
         } else {
+          setPaymentError(ackResult.error || "Payment verification failed. Please contact support.");
           setPaymentState("payment_failed");
           showToast(ackResult.error || "Payment verification failed. Please contact support.", "error");
         }
@@ -177,8 +183,10 @@ export function RazorpayCheckout({
       const rzp = new Razorpay(options);
       rzp.open();
       setPaymentState("checkout_open");
-    } catch {
-      showToast("Failed to open Razorpay checkout.", "error");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to open Razorpay checkout.";
+      setPaymentError(message);
+      showToast(message, "error");
       setPaymentState("payment_failed");
     }
   }, [selectedPkgId, billingCycle, scriptStatus, organizationName, customerEmail, customerContact]);
@@ -254,7 +262,7 @@ export function RazorpayCheckout({
           return (
             <button
               key={pkg.id}
-              onClick={() => { setSelectedPkgId(pkg.id); setPaymentState("idle"); setOrderResult(null); }}
+              onClick={() => { setSelectedPkgId(pkg.id); setPaymentState("idle"); setPaymentError(null); setOrderResult(null); }}
               className={cn(
                 "relative rounded-xl border-2 bg-gradient-to-b from-background to-accent/5 p-6 text-left transition-all hover:shadow-lg",
                 isSelected ? "border-primary shadow-md ring-1 ring-primary/20" : "border-border",
@@ -358,7 +366,7 @@ export function RazorpayCheckout({
             {paymentState === "payment_failed" && (
               <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                 <AlertTriangle className="size-5 shrink-0 mt-0.5" />
-                <div><p className="font-bold">Payment failed</p><p className="text-xs mt-0.5">Please try again or contact support.</p></div>
+                <div><p className="font-bold">Payment failed</p><p className="text-xs mt-0.5">{paymentError ?? "Please try again or contact support."}</p></div>
               </div>
             )}
 

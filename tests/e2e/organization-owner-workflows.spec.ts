@@ -275,6 +275,29 @@ test.describe("Organization Owner — Complete Workflows", () => {
     await expect(page.getByText("Application error", { exact: false })).toHaveCount(0);
   });
 
+  test("9 — Razorpay subscription checkout creates an order without invoice constraint errors", async ({ page }) => {
+    test.setTimeout(120_000);
+    await login(page);
+
+    await page.goto("/organization/plan");
+    await expectPath(page, "/organization/plan");
+    await page.getByRole("tab", { name: "Pay", exact: true }).click();
+
+    const packageCard = page.locator("button.rounded-xl.border-2").first();
+    await expect(packageCard).toBeVisible();
+    await packageCard.click();
+
+    const payButton = page.getByRole("button", { name: /Pay .* via Razorpay/i });
+    await expect(payButton).toBeEnabled({ timeout: 30_000 });
+    await payButton.click();
+
+    await expect(page.getByText(/Test Mode:|Live:/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/null value in column "subscription_id"/i)).toHaveCount(0);
+    await expect(page.getByText("Payment failed", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Failed to create payment order/i)).toHaveCount(0);
+    await expect(page.locator('iframe[src*="razorpay"]')).toHaveCount(1);
+  });
+
 });
 
 /* ---------- env helpers ---------- */
