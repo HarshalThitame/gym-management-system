@@ -3,6 +3,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyRazorpayWebhookSignature } from "@/features/billing/razorpay/razorpay-service";
 import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
 import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
+import { logWebhookEvent } from "@/features/entitlement/audit-service";
 
 const WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000;
 
@@ -42,6 +43,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const signature = request.headers.get("x-razorpay-signature") || "";
 
     if (!signature) {
+      await logWebhookEvent({ actorId: null, organizationId: null, eventType: "WEBHOOK_SIGNATURE_INVALID", providerOrderId: "unknown", detail: "Missing webhook signature" }).catch(() => {});
       return NextResponse.json({ error: "Missing webhook signature" }, { status: 400 });
     }
 
@@ -68,6 +70,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       } catch {
         /* silent */
       }
+      await logWebhookEvent({ actorId: null, organizationId: null, eventType: "WEBHOOK_SIGNATURE_INVALID", providerOrderId: "unknown", detail: "Invalid webhook signature" }).catch(() => {});
       return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
     }
 
@@ -107,6 +110,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       const existingEvent = (existingEvents ?? [])[0];
       if (existingEvent && existingEvent.status === "processed") {
+        await logWebhookEvent({ actorId: null, organizationId: null, eventType: "WEBHOOK_DUPLICATE", providerOrderId: eventId, detail: "Duplicate webhook event" }).catch(() => {});
         return NextResponse.json({ ok: true, status: "duplicate_skipped", eventId });
       }
     }
@@ -152,17 +156,21 @@ export async function POST(request: Request): Promise<NextResponse> {
           if (!result.success) {
             processingError = result.error || "Payment finalization failed";
             processingStatus = "failed";
-          } else if (webhookDbId) {
-            await d.from("payment_provider_events").update({
-              invoice_id: result.invoiceId || null,
-              subscription_id: result.subscriptionId || null,
-            }).eq("id", webhookDbId);
+          } else {
+            await logWebhookEvent({ actorId: null, organizationId: null, eventType: "WEBHOOK_CAPTURED", providerOrderId: razorpayOrderId, providerPaymentId: razorpayPaymentId }).catch(() => {});
+            if (webhookDbId) {
+              await d.from("payment_provider_events").update({
+                invoice_id: result.invoiceId || null,
+                subscription_id: result.subscriptionId || null,
+              }).eq("id", webhookDbId);
+            }
           }
           break;
         }
 
         case "payment.failed": {
           const failureReason = (paymentEntity?.error_description as string) || (paymentEntity?.status as string) || "Unknown";
+          await logWebhookEvent({ actorId: null, organizationId: null, eventType: "WEBHOOK_FAILED", providerOrderId: razorpayOrderId, providerPaymentId: razorpayPaymentId, detail: failureReason }).catch(() => {});
           if (razorpayPaymentId) {
             let paymentQuery = d
               .from("org_subscription_payments")

@@ -134,3 +134,16 @@ export {
   requireApiFeatureAccessAll,
   withEntitlementErrorHandling,
 } from "./api-guards";
+
+// ─── Audit events + service (Phase 9) ──────────────────────────────────────
+export { AUDIT } from "./audit-events";
+export type { AuditEventType } from "./audit-events";
+export {
+  logFeatureAccessDenied,
+  logRouteAccessDenied,
+  logLimitReached,
+  logSubscriptionActivated,
+  logSubscriptionCancelled,
+  logSecurityEvent,
+  logWebhookEvent,
+} from "./audit-service";
