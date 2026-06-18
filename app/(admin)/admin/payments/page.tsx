@@ -12,6 +12,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import type { Database } from "@/types/database";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export const metadata: Metadata = createMetadata({
   title: "Admin Payments",
@@ -25,6 +26,8 @@ type RefundRow = Database["public"]["Tables"]["refunds"]["Row"];
 export default async function AdminPaymentsPage() {
   const scope = await requireGymAdminScope("/admin/payments");
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "billing_invoices", actionName: "admin.payments.read" });
   const planContext = organizationId ? await getOrgPlanContext(organizationId) : null;
   const razorpayEnabled = planContext?.features.billingInvoices === true;
   const supabase = await createSupabaseServerClient();

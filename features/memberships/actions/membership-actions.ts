@@ -14,6 +14,11 @@ import { isWithinMemberLimit } from "@/lib/tenant";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
 import type { AuthContext } from "@/types/auth";
+import {
+  entitlementSimpleCatch,
+  requireOrganizationFeatureAccess,
+  type FeatureKey,
+} from "@/features/entitlement";
 import type { MemberDocumentType, MembershipEvent, MembershipPlanRow, MembershipRow, MembershipStatus } from "@/types/membership";
 import {
   calculateEndDate,
@@ -43,6 +48,8 @@ type PaymentType = Database["public"]["Tables"]["payments"]["Insert"]["payment_t
 
 export async function saveMembershipPlanAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/membership-plans");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "membership_plan.save");
+  if (entitlementError) return entitlementError;
   const parsed = MembershipPlanSchema.safeParse({
     planId: formData.get("planId") ?? "",
     name: formData.get("name"),
@@ -118,6 +125,8 @@ export async function saveMembershipPlanAction(_previousState: AuthActionState, 
 
 export async function updatePlanStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/membership-plans");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "membership_plan.status.update");
+  if (entitlementError) return entitlementError;
   const planId = String(formData.get("planId") ?? "");
   const status = String(formData.get("status") ?? "");
 
@@ -154,6 +163,8 @@ export async function updatePlanStatusAction(_previousState: AuthActionState, fo
 
 export async function onboardMemberAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/register");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "member.onboard");
+  if (entitlementError) return entitlementError;
   const parsed = MemberOnboardingSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email") ?? "",
@@ -290,6 +301,8 @@ export async function onboardMemberAction(_previousState: AuthActionState, formD
 
 export async function assignMembershipAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/members");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "membership.assign");
+  if (entitlementError) return entitlementError;
   const parsed = MembershipAssignmentSchema.safeParse({
     memberId: formData.get("memberId"),
     planId: formData.get("planId"),
@@ -368,6 +381,8 @@ export async function assignMembershipAction(_previousState: AuthActionState, fo
 
 export async function renewMembershipAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/members");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management", "membership_renewals"], "membership.renew");
+  if (entitlementError) return entitlementError;
   const parsed = RenewalSchema.safeParse({
     membershipId: formData.get("membershipId"),
     planId: formData.get("planId"),
@@ -501,6 +516,8 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
 
 export async function changeMembershipPlanAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/members");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "membership.plan.change");
+  if (entitlementError) return entitlementError;
   const parsed = PlanChangeSchema.safeParse({
     membershipId: formData.get("membershipId"),
     planId: formData.get("planId"),
@@ -577,6 +594,8 @@ export async function changeMembershipPlanAction(_previousState: AuthActionState
 
 export async function changeMembershipStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/members");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "membership.status.change");
+  if (entitlementError) return entitlementError;
   const parsed = StatusChangeSchema.safeParse({
     membershipId: formData.get("membershipId"),
     nextStatus: formData.get("nextStatus"),
@@ -647,6 +666,8 @@ export async function changeMembershipStatusAction(_previousState: AuthActionSta
 
 export async function uploadMemberDocumentAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/members");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "member.document.upload");
+  if (entitlementError) return entitlementError;
   const parsed = DocumentUploadSchema.safeParse({
     memberId: formData.get("memberId"),
     documentType: formData.get("documentType")
@@ -704,6 +725,8 @@ export async function uploadMemberDocumentAction(_previousState: AuthActionState
 
 export async function deleteMemberDocumentAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/members");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management"], "member.document.delete");
+  if (entitlementError) return entitlementError;
   const documentId = String(formData.get("documentId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
 
@@ -744,6 +767,8 @@ export async function deleteMemberDocumentAction(_previousState: AuthActionState
 
 export async function expireMembershipsAction(): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management", "expiry_tracking"], "membership.expire");
+  if (entitlementError) return entitlementError;
   const supabase = await createSupabaseServerClient();
   const today = formatISO(new Date(), { representation: "date" });
   const query = supabase
@@ -1444,6 +1469,8 @@ function validationState(fieldErrors: Record<string, string[]>): AuthActionState
 
 export async function suggestedRenewalStartDateAction(membershipId: string) {
   const scope = await requireGymAdminScope("/admin/members");
+  const entitlementError = await requireMembershipFeatures(scope, ["member_management", "membership_renewals"], "membership.renewal_date.read");
+  if (entitlementError) return formatDateInput(new Date());
   const supabase = await createSupabaseServerClient();
   const membership = await loadMembership(supabase, membershipId);
 
@@ -1452,4 +1479,19 @@ export async function suggestedRenewalStartDateAction(membershipId: string) {
   }
 
   return formatDateInput(addDays(parseISO(membership.end_date), 1));
+}
+
+async function requireMembershipFeatures(
+  context: AuthContext & { scopedOrganizationId?: string | null },
+  featureKeys: readonly FeatureKey[],
+  actionName: string,
+): Promise<AuthActionState | null> {
+  const organizationId = context.scopedOrganizationId ?? context.organizationId;
+  if (!organizationId) return { status: "error", message: "Organization scope could not be resolved." };
+  try {
+    await requireOrganizationFeatureAccess({ organizationId, featureKey: featureKeys, actionName });
+    return null;
+  } catch (error) {
+    return entitlementSimpleCatch(error, "Membership feature access could not be verified.") as AuthActionState;
+  }
 }

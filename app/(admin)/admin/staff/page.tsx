@@ -7,6 +7,7 @@ import { TrainingStatusBadge } from "@/features/training/components/training-sta
 import { listStaffProfiles } from "@/features/training/services/training-service";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export const metadata: Metadata = createMetadata({
   title: "Staff Operations",
@@ -16,6 +17,9 @@ export const metadata: Metadata = createMetadata({
 
 export default async function AdminStaffPage() {
   const scope = await requireGymAdminScope("/admin/staff");
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "staff_management", actionName: "admin.staff.read" });
   const staff = await listStaffProfiles(scope.gymId);
   const activeStaff = staff.filter((profile) => profile.status === "active");
   const receptionStaff = staff.filter((profile) => profile.staff_role === "reception");

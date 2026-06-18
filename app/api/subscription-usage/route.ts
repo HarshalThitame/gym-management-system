@@ -9,7 +9,7 @@ function isOrgAccessible(context: { roles: readonly string[]; organizationId: st
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await requireApiAuth({});
+  const auth = await requireApiAuth({ skipSubscriptionCheck: true });
   if (!auth.ok) return auth.response;
 
   const ip = req.headers.get("x-forwarded-for") ?? "unknown";

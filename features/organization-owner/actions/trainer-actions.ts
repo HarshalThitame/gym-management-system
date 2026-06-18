@@ -6,6 +6,7 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit, requireOrgFeature } from "../lib/entitlement-guards";
+import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
 type TrainerInsert = Database["public"]["Tables"]["trainers"]["Insert"];
 type TrainerUpdate = Database["public"]["Tables"]["trainers"]["Update"];
@@ -13,6 +14,7 @@ type TrainerUpdate = Database["public"]["Tables"]["trainers"]["Update"];
 export async function saveTrainerAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/trainers");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "trainer_management", actionName: "trainer.save" });
     const supabase = await createSupabaseServerClient();
     const trainerId = formData.get("trainerId") as string | null;
     const gymId = formData.get("gymId") as string;
@@ -52,13 +54,14 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
     revalidateOrgModules(["/organization/trainers"]);
     return { ...prevState, status: "success", message: "Trainer saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save trainer." };
+    return entitlementActionCatch(prevState, e, "Failed to save trainer.");
   }
 }
 
 export async function assignMemberToTrainerAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/trainers");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "trainer_management", actionName: "trainer.assign_member" });
     const memberId = formData.get("memberId") as string;
     const trainerId = formData.get("trainerId") as string;
     if (!memberId || !trainerId) return { ...prevState, status: "error", message: "Member ID and Trainer ID are required." };
@@ -70,6 +73,6 @@ export async function assignMemberToTrainerAction(prevState: AuthActionState, fo
     revalidateOrgModules(["/organization/trainers", "/organization/members"]);
     return { ...prevState, status: "success", message: "Member assigned." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to assign member." };
+    return entitlementActionCatch(prevState, e, "Failed to assign member.");
   }
 }

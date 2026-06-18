@@ -23,6 +23,7 @@ import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { hasRequiredRole } from "@/lib/rbac";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export const metadata: Metadata = createMetadata({
   title: "Communication Hub",
@@ -35,6 +36,8 @@ export default async function AdminCommunicationsPage() {
   const gymId = scope.gymId;
   const canManageCommunications = hasRequiredRole(scope.roles, ["super_admin", "gym_admin"]);
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "whatsapp_integration", actionName: "admin.communications.read" });
   const [dashboard, membersResult, trainers, planContext] = await Promise.all([
     getCommunicationDashboard(gymId),
     listMembers({ gymId, pageSize: 120 }),

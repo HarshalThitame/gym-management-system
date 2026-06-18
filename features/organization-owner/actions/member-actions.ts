@@ -6,6 +6,7 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit } from "../lib/entitlement-guards";
+import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
 type MemberInsert = Database["public"]["Tables"]["members"]["Insert"];
 type MemberUpdate = Database["public"]["Tables"]["members"]["Update"];
@@ -13,6 +14,7 @@ type MemberUpdate = Database["public"]["Tables"]["members"]["Update"];
 export async function saveMemberAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/members");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "member_management", actionName: "member.save" });
     const supabase = await createSupabaseServerClient();
     const memberId = formData.get("memberId") as string | null;
     const gymId = formData.get("gymId") as string;
@@ -66,13 +68,14 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
     revalidateOrgModules(["/organization/members"]);
     return { ...prevState, status: "success", message: "Member saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save member." };
+    return entitlementActionCatch(prevState, e, "Failed to save member.");
   }
 }
 
 export async function setMemberStatusAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/members");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "member_management", actionName: "member.status.update" });
     const memberId = formData.get("memberId") as string;
     const status = formData.get("status") as string;
     if (!memberId || !status) return { ...prevState, status: "error", message: "Member ID and status are required." };
@@ -84,13 +87,14 @@ export async function setMemberStatusAction(prevState: AuthActionState, formData
     revalidateOrgModules(["/organization/members"]);
     return { ...prevState, status: "success", message: `Member ${status}.` };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to update member." };
+    return entitlementActionCatch(prevState, e, "Failed to update member.");
   }
 }
 
 export async function transferMemberAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/members");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "member_management", actionName: "member.transfer" });
     const memberId = formData.get("memberId") as string;
     const targetGymId = formData.get("targetGymId") as string;
     if (!memberId || !targetGymId) return { ...prevState, status: "error", message: "Member ID and target gym are required." };
@@ -105,6 +109,6 @@ export async function transferMemberAction(prevState: AuthActionState, formData:
     revalidateOrgModules(["/organization/members"]);
     return { ...prevState, status: "success", message: "Member transferred." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to transfer member." };
+    return entitlementActionCatch(prevState, e, "Failed to transfer member.");
   }
 }

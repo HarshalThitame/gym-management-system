@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
 type SessionInsert = Database["public"]["Tables"]["class_sessions"]["Insert"];
 type SessionUpdate = Database["public"]["Tables"]["class_sessions"]["Update"];
@@ -12,6 +13,7 @@ type SessionUpdate = Database["public"]["Tables"]["class_sessions"]["Update"];
 export async function saveClassSessionAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/classes");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "class_booking", actionName: "class.save" });
     const supabase = await createSupabaseServerClient();
     const sessionId = formData.get("sessionId") as string | null;
     const gymId = formData.get("gymId") as string;
@@ -47,13 +49,14 @@ export async function saveClassSessionAction(prevState: AuthActionState, formDat
     revalidateOrgModules(["/organization/classes"]);
     return { ...prevState, status: "success", message: "Class session saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save class session." };
+    return entitlementActionCatch(prevState, e, "Failed to save class session.");
   }
 }
 
 export async function cancelClassSessionAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/classes");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "class_booking", actionName: "class.cancel" });
     const sessionId = formData.get("sessionId") as string;
     if (!sessionId) return { ...prevState, status: "error", message: "Session ID is required." };
 
@@ -64,6 +67,6 @@ export async function cancelClassSessionAction(prevState: AuthActionState, formD
     revalidateOrgModules(["/organization/classes"]);
     return { ...prevState, status: "success", message: "Session cancelled." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to cancel session." };
+    return entitlementActionCatch(prevState, e, "Failed to cancel session.");
   }
 }

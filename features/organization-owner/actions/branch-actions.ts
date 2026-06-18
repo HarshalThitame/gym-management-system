@@ -6,6 +6,7 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit } from "../lib/entitlement-guards";
+import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
 type BranchInsert = Database["public"]["Tables"]["branches"]["Insert"];
 type BranchUpdate = Database["public"]["Tables"]["branches"]["Update"];
@@ -13,6 +14,7 @@ type BranchUpdate = Database["public"]["Tables"]["branches"]["Update"];
 export async function saveBranchAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/branches");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "multi_branch_management", actionName: "branch.save" });
     const supabase = await createSupabaseServerClient();
     const branchId = formData.get("branchId") as string | null;
     const gymId = formData.get("gymId") as string;
@@ -59,13 +61,14 @@ export async function saveBranchAction(prevState: AuthActionState, formData: For
     revalidateOrgModules(["/organization/branches"]);
     return { ...prevState, status: "success", message: "Branch saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save branch." };
+    return entitlementActionCatch(prevState, e, "Failed to save branch.");
   }
 }
 
 export async function setBranchStatusAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/branches");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "multi_branch_management", actionName: "branch.status.update" });
     const branchId = formData.get("branchId") as string;
     const status = formData.get("status") as string;
     if (!branchId || !status) return { ...prevState, status: "error", message: "Branch ID and status are required." };
@@ -77,6 +80,6 @@ export async function setBranchStatusAction(prevState: AuthActionState, formData
     revalidateOrgModules(["/organization/branches"]);
     return { ...prevState, status: "success", message: `Branch ${status}.` };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to update branch." };
+    return entitlementActionCatch(prevState, e, "Failed to update branch.");
   }
 }

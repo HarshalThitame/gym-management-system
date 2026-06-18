@@ -1,7 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
-import { checkSubscriptionStatus } from "@/lib/tenant/subscription-guard";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Json } from "@/types/database";
 
@@ -11,15 +10,7 @@ export type OrgOwnerActionState = AuthActionState & {
 
 export async function getOrgOwnerContext(nextPath: string) {
   const context = await requireOrganizationOwner(nextPath);
-  const orgId = context.organizationId;
-
-  // Subscription check: every org-owner action requires active or trial subscription
-  const subStatus = await checkSubscriptionStatus(orgId);
-  if (!subStatus.ok) {
-    throw new Error(subStatus.error ?? "Subscription is not active. Please contact support.");
-  }
-
-  return { ...context, organizationId: orgId };
+  return { ...context, organizationId: context.organizationId };
 }
 
 export async function auditOrgAction(

@@ -46,7 +46,14 @@ const packageSchema = z.object({
   whiteLabelEnabled: z.coerce.boolean().default(false),
 });
 
-// New streamlined feature toggles from the editor
+// Feature toggles from the editor. Keys are canonical feature keys (snake_case)
+// that MUST exist in feature_catalog.code — enforced by DB foreign key
+// (package_features_feature_code_fkey). The single source of truth for the
+// valid key set is features/entitlement/feature-registry.ts (FEATURE_KEYS).
+// TODO(Phase 3): add missing keys (e.g. custom_branding, trial_management,
+// nfc_attendance, fingerprint_attendance, face_recognition_attendance,
+// geo_fencing_attendance, attendance_api, dynamic_qr_attendance) so the
+// editor can control every registered feature.
 const FEATURE_FIELD_MAP: Record<string, string> = {
   manual_attendance: "manualAttendance",
   qr_attendance: "qrAttendance",

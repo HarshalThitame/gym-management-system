@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { requireReceptionScope } from "@/features/reception/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Member Support",
@@ -16,6 +17,9 @@ type ReceptionMembersPageProps = {
 
 export default async function ReceptionMembersPage({ searchParams }: ReceptionMembersPageProps) {
   const scope = await requireReceptionScope("/reception/members");
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "member_management", actionName: "reception.members.read" });
   const params = await searchParams;
   const result = await listMembers({
     gymId: scope.gymId,

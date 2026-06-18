@@ -11,6 +11,7 @@ type ApiAuthOptions = {
   inactiveMessage?: string;
   forbiddenMessage?: string;
   tenantDeniedMessage?: string;
+  skipSubscriptionCheck?: boolean;
 };
 
 type ApiAuthenticatedContext = AuthContext & {
@@ -68,7 +69,7 @@ export async function requireApiAuth(options: ApiAuthOptions = {}): Promise<ApiA
   }
 
   // Subscription check for non-super-admin API routes
-  if (!context.roles.includes("super_admin") && context.organizationId && !isApiWhitelistedPath()) {
+  if (!options.skipSubscriptionCheck && !context.roles.includes("super_admin") && context.organizationId) {
     const subGate = await requireActiveSubscriptionApi(context.organizationId, context);
     if (subGate) {
       return {
@@ -79,13 +80,6 @@ export async function requireApiAuth(options: ApiAuthOptions = {}): Promise<ApiA
   }
 
   return { ok: true, context: context as ApiAuthenticatedContext, tenant };
-}
-
-function isApiWhitelistedPath(): boolean {
-  // Whitelist paths that don't need subscription checks (auth, public endpoints)
-  // This is intentionally empty - all API routes should have subscription checks
-  // Individual routes can skip via their own options
-  return false;
 }
 
 export async function getOptionalApiAuth(options: ApiAuthOptions = {}): Promise<ApiOptionalAuthResult> {

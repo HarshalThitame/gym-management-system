@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
-import { requireApiAuth } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId, requireApiAuth } from "@/lib/auth/api-guards";
 import { sendEmail } from "@/services/email/resend";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 export async function POST(request: Request) {
   const auth = await requireApiAuth({});
   if (!auth.ok) return auth.response;
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return NextResponse.json({ error: "Organization scope required." }, { status: 403 });
+  const denied = await requireApiFeatureAccess(organizationId, "custom_branding");
+  if (denied) return denied;
 
   try {
     const body = await request.json();

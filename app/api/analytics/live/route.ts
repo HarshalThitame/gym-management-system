@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireApiRole } from "@/lib/auth/api-guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireApiRole(["super_admin"]);
+  if (!auth.ok) return auth.response;
   const supabase = getSupabaseAdminClient();
   if (!supabase) return new Response("Unauthorized", { status: 401 });
 

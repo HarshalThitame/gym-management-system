@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId, requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccessAll } from "@/features/entitlement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { analyticsRowsToCsv, analyticsRowsToExcel, analyticsRowsToPdf } from "@/features/analytics/lib/report-export";
 import { analyticsReportKeys, reportFormats, type AnalyticsReportFormat, type AnalyticsReportKey } from "@/types/analytics";
@@ -12,6 +13,10 @@ export async function GET(request: NextRequest) {
   if (!auth.ok) {
     return auth.response;
   }
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return NextResponse.json({ error: "Organization scope required." }, { status: 403 });
+  const featureDenied = await requireApiFeatureAccessAll(organizationId, ["advanced_reports", "data_export_csv_download"]);
+  if (featureDenied) return featureDenied;
 
   const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
   if (!gymScope.ok) {

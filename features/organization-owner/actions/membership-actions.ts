@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { entitlementActionCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type PlanInsert = Database["public"]["Tables"]["membership_plans"]["Insert"];
 type PlanUpdate = Database["public"]["Tables"]["membership_plans"]["Update"];
@@ -12,6 +13,7 @@ type PlanUpdate = Database["public"]["Tables"]["membership_plans"]["Update"];
 export async function savePlanAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/memberships");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "member_management", actionName: "membership_plan.save" });
     const supabase = await createSupabaseServerClient();
     const planId = formData.get("planId") as string | null;
     const gymId = formData.get("gymId") as string;
@@ -32,7 +34,7 @@ export async function savePlanAction(prevState: AuthActionState, formData: FormD
 
     if (planId) {
       const update: Record<string, unknown> = { name, slug, description: (formData.get("description") as string) || name, plan_type: planType, duration_days: durationDays, price_amount: priceAmount, currency, status, updated_at: new Date().toISOString() };
-      const { error } = await supabase.from("membership_plans").update(update as never).eq("id", planId);
+      const { error } = await supabase.from("membership_plans").update(update as never).eq("id", planId).eq("gym_id", gymId);
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_plan", entityType: "membership_plan", entityId: planId });
     } else {
@@ -45,24 +47,28 @@ export async function savePlanAction(prevState: AuthActionState, formData: FormD
     revalidateOrgModules(["/organization/memberships"]);
     return { ...prevState, status: "success", message: "Plan saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save plan." };
+    return entitlementActionCatch(prevState, e, "Failed to save plan.");
   }
 }
 
 export async function setPlanStatusAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/memberships");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "member_management", actionName: "membership_plan.status.update" });
     const planId = formData.get("planId") as string;
     const status = formData.get("status") as string;
     if (!planId || !status) return { ...prevState, status: "error", message: "Plan ID and status are required." };
 
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("membership_plans").update({ status: status as never, updated_at: new Date().toISOString() }).eq("id", planId);
+    const { data: gyms } = await supabase.from("gyms").select("id").eq("organization_id", ctx.organizationId);
+    const gymIds = (gyms ?? []).map((gym) => gym.id);
+    if (gymIds.length === 0) return { ...prevState, status: "error", message: "No organization gyms found." };
+    const { error } = await supabase.from("membership_plans").update({ status: status as never, updated_at: new Date().toISOString() }).eq("id", planId).in("gym_id", gymIds);
     if (error) throw new Error(error.message);
     await writeAuditLog({ actorId: ctx.userId, action: `organization_owner.${status}_plan`, entityType: "membership_plan", entityId: planId });
     revalidateOrgModules(["/organization/memberships"]);
     return { ...prevState, status: "success", message: `Plan ${status}.` };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to update plan." };
+    return entitlementActionCatch(prevState, e, "Failed to update plan.");
   }
 }

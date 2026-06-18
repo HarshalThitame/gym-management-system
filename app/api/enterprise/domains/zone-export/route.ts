@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiAuth } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 export async function GET(request: Request) {
   const auth = await requireApiAuth({});
@@ -14,6 +15,8 @@ export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: domain } = await supabase.from("tenant_domains").select("*").eq("id", domainId).single();
   if (!domain) return NextResponse.json({ error: "Domain not found" }, { status: 404 });
+  const denied = await requireApiFeatureAccess(domain.organization_id, "custom_domain");
+  if (denied) return denied;
 
   const d = domain as unknown as { domain: string; verification_token?: string };
 

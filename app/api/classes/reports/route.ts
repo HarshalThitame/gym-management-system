@@ -1,7 +1,8 @@
 import { classRowsToCsv } from "@/features/classes/lib/csv";
 import { classReportFormats, classRowsToExcel, classRowsToPdf, type ClassReportFormat } from "@/features/classes/lib/report-export";
 import { getClassReportRows } from "@/features/classes/services/class-service";
-import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId, requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccessAll } from "@/features/entitlement";
 
 const reportTypes = ["attendance", "bookings", "no_shows", "waitlists", "trainer_sessions"] as const;
 type ReportType = (typeof reportTypes)[number];
@@ -12,6 +13,10 @@ export async function GET(request: Request) {
   if (!auth.ok) {
     return auth.response;
   }
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return Response.json({ error: "Organization scope required." }, { status: 403 });
+  const featureDenied = await requireApiFeatureAccessAll(organizationId, ["class_booking", "advanced_reports"]);
+  if (featureDenied) return featureDenied;
 
   const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
   if (!gymScope.ok) {

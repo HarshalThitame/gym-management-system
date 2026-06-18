@@ -3,7 +3,7 @@ import { CreateRazorpayRefundSchema } from "@/features/billing/schemas/payment";
 import { createRazorpayRefundForPayment } from "@/features/billing/services/payment-processing";
 import { getApiTenantOrganizationId, requireApiRole } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { assertFeature } from "@/lib/tenant";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 export async function POST(request: Request) {
   const auth = await requireApiRole(["super_admin", "organization_owner", "gym_admin"], {
@@ -43,16 +43,7 @@ export async function POST(request: Request) {
 
 async function requireRazorpayFeature(organizationId: string | null) {
   if (!organizationId) {
-    return NextResponse.json({ ok: false, error: { code: "FEATURE_NOT_AVAILABLE", message: "Feature not available on your current plan." } }, { status: 403 });
+    return NextResponse.json({ error: "FEATURE_LOCKED", reason: "UNAUTHORIZED_ORG_ACCESS", message: "Organization scope required.", featureKey: "razorpay_payu_integration" }, { status: 403 });
   }
-
-  try {
-    await assertFeature(organizationId, "razorpayEnabled");
-    return null;
-  } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: { code: "FEATURE_NOT_AVAILABLE", message: error instanceof Error ? error.message : "Feature not available on your current plan." } },
-      { status: 403 }
-    );
-  }
+  return requireApiFeatureAccess(organizationId, "razorpay_payu_integration");
 }

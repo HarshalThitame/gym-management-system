@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrgOwnerContext } from "./action-utils";
+import { requireOrganizationFeatureAccess, entitlementSimpleCatch } from "@/features/entitlement";
 import type { Database } from "@/types/database";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
@@ -13,6 +14,7 @@ type PlanUpdate = Database["public"]["Tables"]["nutrition_plans"]["Update"];
 export async function saveNutritionPlanAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/nutrition");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "nutrition_plans", actionName: "nutrition_plan.save" });
     const supabase = await createSupabaseServerClient();
     const planId = formData.get("planId") as string | null;
     const memberId = formData.get("memberId") as string;
@@ -59,13 +61,14 @@ export async function saveNutritionPlanAction(prevState: ActionState, formData: 
     revalidatePath("/organization/nutrition");
     return { status: "success", message: `Nutrition plan ${planId ? "updated" : "created"}.` };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to save nutrition plan." };
+    return entitlementSimpleCatch(e, "Failed to save nutrition plan.");
   }
 }
 
 export async function setNutritionPlanStatusAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/nutrition");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "nutrition_plans", actionName: "nutrition_plan.status.update" });
     const supabase = await createSupabaseServerClient();
     const planId = formData.get("planId") as string;
     const status = formData.get("status") as string;
@@ -76,6 +79,6 @@ export async function setNutritionPlanStatusAction(prevState: ActionState, formD
     revalidatePath("/organization/nutrition");
     return { status: "success", message: `Plan ${status}.` };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to update plan status." };
+    return entitlementSimpleCatch(e, "Failed to update plan status.");
   }
 }

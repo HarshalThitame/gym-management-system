@@ -13,6 +13,7 @@ import { listActiveTrainers, listPersonalTrainingPackages, listTrainers } from "
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type AdminTrainersPageProps = {
   searchParams: Promise<{
@@ -35,6 +36,8 @@ export default async function AdminTrainersPage({ searchParams }: AdminTrainersP
   const gymId = scope.gymId;
   const page = Number(params.page ?? "1");
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "trainer_management", actionName: "admin.trainers.read" });
   const [trainerResult, activeTrainers, memberResult, packages, planContext] = await Promise.all([
     listTrainers({
       gymId,

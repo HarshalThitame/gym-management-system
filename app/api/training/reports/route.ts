@@ -1,4 +1,5 @@
-import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId, requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccessAll } from "@/features/entitlement";
 import { trainingRowsToCsv } from "@/features/training/lib/csv";
 import { getTrainingReportRows } from "@/features/training/services/training-service";
 
@@ -11,6 +12,10 @@ export async function GET(request: Request) {
   if (!auth.ok) {
     return auth.response;
   }
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return Response.json({ error: "Organization scope required." }, { status: 403 });
+  const featureDenied = await requireApiFeatureAccessAll(organizationId, ["trainer_management", "advanced_reports"]);
+  if (featureDenied) return featureDenied;
 
   const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
   if (!gymScope.ok) {

@@ -24,6 +24,11 @@ import {
 } from "../lib/business-rules";
 import { AccessDeviceSchema, CheckOutSchema, ManualCheckInSchema, QrCheckInSchema, RegenerateQrSchema } from "../schemas/attendance";
 import { getActiveMembershipForMember } from "../services/attendance-service";
+import {
+  entitlementSimpleCatch,
+  requireOrganizationFeatureAccess,
+  type FeatureKey,
+} from "@/features/entitlement";
 
 type AppSupabase = SupabaseClient<Database>;
 type AttendanceAlertSeverity = NonNullable<Database["public"]["Tables"]["attendance_alerts"]["Insert"]["severity"]>;
@@ -34,6 +39,8 @@ const inactivityAlertTypes: InactivityAlertType[] = ["inactive_7_days", "inactiv
 export async function manualCheckInAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/attendance");
   const context = scope;
+  const entitlementError = await requireAttendanceFeatures(context, ["manual_attendance"], "attendance.manual_check_in");
+  if (entitlementError) return entitlementError;
   const parsed = ManualCheckInSchema.safeParse({
     memberId: formData.get("memberId"),
     deviceId: formData.get("deviceId") ?? "",
@@ -60,6 +67,8 @@ export async function manualCheckInAction(_previousState: AuthActionState, formD
 export async function qrCheckInAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/attendance");
   const context = scope;
+  const entitlementError = await requireAttendanceFeatures(context, ["manual_attendance", "qr_attendance"], "attendance.qr_check_in");
+  if (entitlementError) return entitlementError;
   const parsed = QrCheckInSchema.safeParse({
     tokenValue: normalizeQrToken(String(formData.get("tokenValue") ?? "")),
     deviceId: formData.get("deviceId") ?? ""
@@ -162,6 +171,8 @@ export async function qrCheckInAction(_previousState: AuthActionState, formData:
 export async function checkOutAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymFrontDeskScope(["super_admin", "gym_admin", "reception_staff"], "/reception/attendance");
   const context = scope;
+  const entitlementError = await requireAttendanceFeatures(context, ["manual_attendance"], "attendance.check_out");
+  if (entitlementError) return entitlementError;
   const parsed = CheckOutSchema.safeParse({
     sessionId: formData.get("sessionId") ?? "",
     memberId: formData.get("memberId") ?? "",
@@ -252,6 +263,8 @@ export async function checkOutAction(_previousState: AuthActionState, formData: 
 
 export async function regenerateQrTokenAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const context = await requireRole(["member", "super_admin", "organization_owner", "gym_admin", "reception_staff"], "/member/attendance");
+  const entitlementError = await requireAttendanceFeatures(context, ["manual_attendance", "qr_attendance"], "attendance.qr_regenerate");
+  if (entitlementError) return entitlementError;
   const parsed = RegenerateQrSchema.safeParse({
     memberId: formData.get("memberId")
   });
@@ -332,6 +345,8 @@ export async function syncInactivityAlertsAction(_previousState: AuthActionState
   void _previousState;
   const scope = await requireGymAdminScope("/admin/attendance");
   const context = scope;
+  const entitlementError = await requireAttendanceFeatures(context, ["attendance_reports"], "attendance.inactivity_alerts.sync");
+  if (entitlementError) return entitlementError;
   const supabase = await createSupabaseServerClient();
   const gymId = scope.gymId;
   let frequencyQuery = supabase.from("attendance_member_frequency").select("*");
@@ -419,6 +434,14 @@ export async function saveAccessDeviceAction(_previousState: AuthActionState, fo
   if (!parsed.success) {
     return validationState(parsed.error.flatten().fieldErrors);
   }
+
+  const deviceFeature = getDeviceFeature(parsed.data.deviceType);
+  const entitlementError = await requireAttendanceFeatures(
+    context,
+    ["manual_attendance", "attendance_api", ...(deviceFeature ? [deviceFeature] : [])],
+    "attendance.device.save",
+  );
+  if (entitlementError) return entitlementError;
 
   const supabase = await createSupabaseServerClient();
   const payload = {
@@ -622,6 +645,36 @@ async function processCheckIn(input: {
   ]);
 
   return { status: "success", message: `${validation.member.full_name} checked in.` };
+}
+
+function getDeviceFeature(deviceType: string): FeatureKey | null {
+  if (deviceType === "qr") return "qr_attendance";
+  if (deviceType === "rfid") return "rfid_attendance";
+  if (deviceType === "nfc") return "nfc_attendance";
+  if (["biometric", "fingerprint", "face"].includes(deviceType)) return "biometric_attendance";
+  return null;
+}
+
+async function requireAttendanceFeatures(
+  context: AuthContext & { scopedOrganizationId?: string | null },
+  featureKeys: readonly FeatureKey[],
+  actionName: string,
+): Promise<AuthActionState | null> {
+  const organizationId = context.scopedOrganizationId ?? context.organizationId;
+  if (!organizationId) {
+    return { status: "error", message: "Organization scope could not be resolved." };
+  }
+
+  try {
+    await requireOrganizationFeatureAccess({
+      organizationId,
+      featureKey: featureKeys,
+      actionName,
+    });
+    return null;
+  } catch (error) {
+    return entitlementSimpleCatch(error, "Attendance feature access could not be verified.") as AuthActionState;
+  }
 }
 
 async function validateMemberAccess(memberId: string): Promise<AccessValidationResult> {

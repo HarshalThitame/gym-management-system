@@ -5,10 +5,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { entitlementActionCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export async function toggleFeatureFlagAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/settings");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "advanced_rbac", actionName: "feature_flag.toggle" });
     const flagId = formData.get("flagId") as string;
     const enabled = formData.get("enabled") === "true";
     if (!flagId) return { ...prevState, status: "error", message: "Flag ID is required." };
@@ -20,13 +22,14 @@ export async function toggleFeatureFlagAction(prevState: AuthActionState, formDa
     revalidateOrgModules(["/organization/settings"]);
     return { ...prevState, status: "success", message: `Flag ${enabled ? "enabled" : "disabled"}.` };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to toggle flag." };
+    return entitlementActionCatch(prevState, e, "Failed to toggle flag.");
   }
 }
 
 export async function saveBranchSettingAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/settings");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "multi_branch_management", actionName: "branch_setting.save" });
     const branchId = formData.get("branchId") as string;
     const settingsKey = formData.get("settingsKey") as string;
     const settingsValue = formData.get("settingsValue") as string;
@@ -53,6 +56,6 @@ export async function saveBranchSettingAction(prevState: AuthActionState, formDa
     revalidateOrgModules(["/organization/settings"]);
     return { ...prevState, status: "success", message: "Setting saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save setting." };
+    return entitlementActionCatch(prevState, e, "Failed to save setting.");
   }
 }

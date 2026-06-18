@@ -6,6 +6,7 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit } from "../lib/entitlement-guards";
+import { entitlementActionCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type GymInsert = Database["public"]["Tables"]["gyms"]["Insert"];
 type GymUpdate = Database["public"]["Tables"]["gyms"]["Update"];
@@ -13,6 +14,7 @@ type GymUpdate = Database["public"]["Tables"]["gyms"]["Update"];
 export async function saveGymAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/branches");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "multi_branch_management", actionName: "gym.save" });
     const supabase = await createSupabaseServerClient();
     const gymId = formData.get("gymId") as string | null;
     const name = formData.get("name") as string;
@@ -47,13 +49,14 @@ export async function saveGymAction(prevState: AuthActionState, formData: FormDa
     revalidateOrgModules(["/organization/branches"]);
     return { ...prevState, status: "success", message: "Location saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save gym." };
+    return entitlementActionCatch(prevState, e, "Failed to save gym.");
   }
 }
 
 export async function setGymStatusAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/branches");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "multi_branch_management", actionName: "gym.status.update" });
     const gymId = formData.get("gymId") as string;
     const status = formData.get("status") as "active" | "suspended" | "archived";
     if (!gymId || !status) return { ...prevState, status: "error", message: "Gym ID and status are required." };
@@ -65,6 +68,6 @@ export async function setGymStatusAction(prevState: AuthActionState, formData: F
     revalidateOrgModules(["/organization/branches"]);
     return { ...prevState, status: "success", message: `Location ${status}.` };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to update gym." };
+    return entitlementActionCatch(prevState, e, "Failed to update gym.");
   }
 }

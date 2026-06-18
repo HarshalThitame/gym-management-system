@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
 type CampaignInsert = Database["public"]["Tables"]["campaigns"]["Insert"];
 type CampaignUpdate = Database["public"]["Tables"]["campaigns"]["Update"];
@@ -12,6 +13,7 @@ type CampaignUpdate = Database["public"]["Tables"]["campaigns"]["Update"];
 export async function saveCampaignAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/communications");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "whatsapp_integration", actionName: "campaign.save" });
     const supabase = await createSupabaseServerClient();
     const campaignId = formData.get("campaignId") as string | null;
     const gymId = formData.get("gymId") as string;
@@ -40,13 +42,14 @@ export async function saveCampaignAction(prevState: AuthActionState, formData: F
     revalidateOrgModules(["/organization/communications"]);
     return { ...prevState, status: "success", message: "Campaign saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save campaign." };
+    return entitlementActionCatch(prevState, e, "Failed to save campaign.");
   }
 }
 
 export async function sendCampaignAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/communications");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "whatsapp_integration", actionName: "campaign.send" });
     const campaignId = formData.get("campaignId") as string;
     if (!campaignId) return { ...prevState, status: "error", message: "Campaign ID is required." };
 
@@ -57,6 +60,6 @@ export async function sendCampaignAction(prevState: AuthActionState, formData: F
     revalidateOrgModules(["/organization/communications"]);
     return { ...prevState, status: "success", message: "Campaign sent." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to send campaign." };
+    return entitlementActionCatch(prevState, e, "Failed to send campaign.");
   }
 }

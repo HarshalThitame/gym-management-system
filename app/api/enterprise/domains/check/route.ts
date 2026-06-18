@@ -6,7 +6,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { assertFeature } from "@/lib/tenant";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 import { notifyDomainCheck } from "../sse";
 import type { Json } from "@/types/database";
 
@@ -164,18 +164,9 @@ export async function POST(request: Request) {
 
 async function requireCustomDomainFeature(organizationId: string | null) {
   if (!organizationId) {
-    return NextResponse.json({ ok: false, error: { code: "FEATURE_NOT_AVAILABLE", message: "Feature not available on your current plan." } }, { status: 403 });
+    return NextResponse.json({ error: "FEATURE_LOCKED", reason: "UNAUTHORIZED_ORG_ACCESS", message: "Organization scope required.", featureKey: "custom_domain" }, { status: 403 });
   }
-
-  try {
-    await assertFeature(organizationId, "customDomainEnabled");
-    return null;
-  } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: { code: "FEATURE_NOT_AVAILABLE", message: error instanceof Error ? error.message : "Feature not available on your current plan." } },
-      { status: 403 }
-    );
-  }
+  return requireApiFeatureAccess(organizationId, "custom_domain");
 }
 
 function mergeMetadata(current: Json, patch: Record<string, Json>): Json {

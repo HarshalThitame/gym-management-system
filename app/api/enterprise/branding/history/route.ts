@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiAuth } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 export async function GET(request: Request) {
   const auth = await requireApiAuth({});
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
   if (!config) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const orgId = config.organization_id as string;
+  const denied = await requireApiFeatureAccess(orgId, "custom_branding");
+  if (denied) return denied;
 
   const [domainsRes, eventsRes] = await Promise.all([
     supabase.from("tenant_domains").select("id, domain, status, ssl_status, is_primary").eq("organization_id", orgId),

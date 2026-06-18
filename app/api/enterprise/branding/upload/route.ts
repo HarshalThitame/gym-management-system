@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiAuth } from "@/lib/auth/api-guards";
 import { writeAuditLog } from "@/lib/audit";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"];
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
@@ -38,6 +39,9 @@ export async function POST(request: Request) {
     };
     const { data: config } = await raw.from("tenant_configs").select("id, organization_id, brand_name").eq("id", configId).single();
     if (!config) return NextResponse.json({ error: "Tenant config not found" }, { status: 404 });
+    const organizationId = String(config.organization_id);
+    const denied = await requireApiFeatureAccess(organizationId, "custom_branding");
+    if (denied) return denied;
 
     const fileExt = file.name.split(".").pop() ?? "png";
     const fileName = `${type}-${configId.slice(0, 8)}-${Date.now()}.${fileExt}`;
@@ -55,7 +59,11 @@ export async function POST(request: Request) {
     const publicUrl = urlData.publicUrl;
 
     const updateField = type === "logo" ? "logo_url" : "favicon_url";
-    const { error: updateError } = await raw.from("tenant_configs").update({ [updateField]: publicUrl }).eq("id", configId);
+    const { error: updateError } = await supabase
+      .from("tenant_configs")
+      .update({ [updateField]: publicUrl } as never)
+      .eq("id", configId)
+      .eq("organization_id", organizationId);
 
     if (updateError) return NextResponse.json({ error: `Update failed: ${updateError.message}` }, { status: 500 });
 

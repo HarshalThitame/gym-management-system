@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId, requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccessAll } from "@/features/entitlement";
 import { membershipRowsToCsv } from "@/features/memberships/lib/csv";
 import { getMembershipReportRows } from "@/features/memberships/services/membership-service";
 
@@ -11,6 +12,10 @@ export async function GET(request: NextRequest) {
   if (!auth.ok) {
     return auth.response;
   }
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return NextResponse.json({ error: "Organization scope required." }, { status: 403 });
+  const featureDenied = await requireApiFeatureAccessAll(organizationId, ["member_management", "basic_reports"]);
+  if (featureDenied) return featureDenied;
 
   const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
   if (!gymScope.ok) {

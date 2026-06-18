@@ -8,8 +8,8 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { assertFeature } from "@/lib/tenant";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
+import { entitlementSimpleCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 import type { AuthContext } from "@/types/auth";
 import type { Database, Json } from "@/types/database";
 import type { CommunicationCategory, NotificationTemplateRow, OutboundChannel, SegmentRecipient } from "@/types/communications";
@@ -52,6 +52,8 @@ const communicatorRoles = ["super_admin", "organization_owner", "gym_admin", "re
 export async function saveNotificationTemplateAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicationManagerRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.template.save");
+  if (entitlementError) return entitlementError;
   const parsed = NotificationTemplateSchema.safeParse({
     templateId: formData.get("templateId") ?? "",
     name: formData.get("name"),
@@ -207,6 +209,8 @@ export async function updateNotificationStateAction(_previousState: AuthActionSt
 export async function saveAnnouncementAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicationManagerRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.announcement.save");
+  if (entitlementError) return entitlementError;
   const parsed = AnnouncementSchema.safeParse({
     announcementId: formData.get("announcementId") ?? "",
     title: formData.get("title"),
@@ -263,6 +267,8 @@ export async function saveAnnouncementAction(_previousState: AuthActionState, fo
 export async function saveCommunicationSegmentAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicationManagerRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.segment.save");
+  if (entitlementError) return entitlementError;
   const parsed = CommunicationSegmentSchema.safeParse({
     segmentId: formData.get("segmentId") ?? "",
     name: formData.get("name"),
@@ -314,6 +320,8 @@ export async function saveCommunicationSegmentAction(_previousState: AuthActionS
 export async function saveCampaignAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicationManagerRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.campaign.save");
+  if (entitlementError) return entitlementError;
   const parsed = CampaignSchema.safeParse({
     campaignId: formData.get("campaignId") ?? "",
     name: formData.get("name"),
@@ -365,6 +373,8 @@ export async function saveCampaignAction(_previousState: AuthActionState, formDa
 export async function dispatchCampaignAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicationManagerRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.campaign.dispatch");
+  if (entitlementError) return entitlementError;
   const parsed = CampaignDispatchSchema.safeParse({
     campaignId: formData.get("campaignId"),
     mode: formData.get("mode") ?? "queue"
@@ -437,6 +447,8 @@ export async function dispatchCampaignAction(_previousState: AuthActionState, fo
 export async function saveAutomationRuleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicationManagerRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.automation.save");
+  if (entitlementError) return entitlementError;
   const parsed = AutomationRuleSchema.safeParse({
     automationRuleId: formData.get("automationRuleId") ?? "",
     name: formData.get("name"),
@@ -484,6 +496,8 @@ export async function saveAutomationRuleAction(_previousState: AuthActionState, 
 export async function runAutomationRuleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicationManagerRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.automation.run");
+  if (entitlementError) return entitlementError;
   const ruleId = String(formData.get("automationRuleId") ?? "");
   if (!ruleId) {
     return { status: "error", message: "Choose an automation rule." };
@@ -545,6 +559,8 @@ export async function runAutomationRuleAction(_previousState: AuthActionState, f
 export async function createDirectNotificationAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(communicatorRoles, "/admin/communications");
+  const entitlementError = await requireCommunicationFeature(context, "communication.direct.send");
+  if (entitlementError) return entitlementError;
   const parsed = DirectNotificationSchema.safeParse({
     memberId: formData.get("memberId") ?? "",
     trainerId: formData.get("trainerId") ?? "",
@@ -1119,10 +1135,32 @@ async function requireCommunicationsFeature(
   }
 
   try {
-    await assertFeature(resolvedOrganizationId, "communicationsEnabled");
+    await requireOrganizationFeatureAccess({
+      organizationId: resolvedOrganizationId,
+      featureKey: "whatsapp_integration",
+      actionName: "communication.send",
+    });
     return null;
   } catch (error) {
-    return { status: "error", message: featureGateMessage(error) };
+    return entitlementSimpleCatch(error, "Communication feature access could not be verified.") as AuthActionState;
+  }
+}
+
+async function requireCommunicationFeature(
+  context: AuthContext,
+  actionName: string,
+): Promise<AuthActionState | null> {
+  const organizationId = getContextOrganizationId(context);
+  if (!organizationId) return { status: "error", message: "Organization scope could not be resolved." };
+  try {
+    await requireOrganizationFeatureAccess({
+      organizationId,
+      featureKey: "whatsapp_integration",
+      actionName,
+    });
+    return null;
+  } catch (error) {
+    return entitlementSimpleCatch(error, "Communication feature access could not be verified.") as AuthActionState;
   }
 }
 
@@ -1137,10 +1175,6 @@ async function getOrganizationIdForGym(supabase: AppSupabase, gymId: string | nu
   }
 
   return data?.organization_id ?? null;
-}
-
-function featureGateMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Feature not available on your current plan.";
 }
 
 function revalidateCommunicationPaths() {

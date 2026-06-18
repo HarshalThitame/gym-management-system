@@ -1,7 +1,8 @@
 import { attendanceRowsToCsv } from "@/features/attendance/lib/csv";
 import { attendanceReportFormats, attendanceRowsToExcel, attendanceRowsToPdf, type AttendanceReportFormat } from "@/features/attendance/lib/report-export";
 import { getAttendanceReportRows } from "@/features/attendance/services/attendance-service";
-import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId, requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 const reportTypes = ["daily", "weekly", "monthly", "custom", "exceptions"] as const;
 type ReportType = (typeof reportTypes)[number];
@@ -12,6 +13,10 @@ export async function GET(request: Request) {
   if (!auth.ok) {
     return auth.response;
   }
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return Response.json({ error: "Organization scope required." }, { status: 403 });
+  const featureDenied = await requireApiFeatureAccess(organizationId, "attendance_reports");
+  if (featureDenied) return featureDenied;
 
   const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
   if (!gymScope.ok) {

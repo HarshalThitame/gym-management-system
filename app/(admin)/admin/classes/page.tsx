@@ -13,6 +13,7 @@ import { listActiveTrainers } from "@/features/training/services/training-servic
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type AdminClassesPageProps = {
   searchParams: Promise<{ q?: string; status?: string; categoryId?: string; page?: string }>;
@@ -29,6 +30,8 @@ export default async function AdminClassesPage({ searchParams }: AdminClassesPag
   const params = await searchParams;
   const gymId = scope.gymId;
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "class_booking", actionName: "admin.classes.read" });
   const [dashboard, categories, classResult, trainers, planContext] = await Promise.all([
     getClassOperationsDashboard(gymId),
     listClassCategories(gymId),

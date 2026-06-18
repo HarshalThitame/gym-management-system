@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
+import { entitlementActionCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type ConfigInsert = Database["public"]["Tables"]["tenant_configs"]["Insert"];
 type ConfigUpdate = Database["public"]["Tables"]["tenant_configs"]["Update"];
@@ -12,6 +13,7 @@ type ConfigUpdate = Database["public"]["Tables"]["tenant_configs"]["Update"];
 export async function saveBrandingAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/branding");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "custom_branding", actionName: "branding.save" });
     const supabase = await createSupabaseServerClient();
     const configId = formData.get("configId") as string | null;
     const brandName = formData.get("brandName") as string;
@@ -45,6 +47,6 @@ export async function saveBrandingAction(prevState: AuthActionState, formData: F
     revalidateOrgModules(["/organization/branding"]);
     return { ...prevState, status: "success", message: "Branding saved." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to save branding." };
+    return entitlementActionCatch(prevState, e, "Failed to save branding.");
   }
 }

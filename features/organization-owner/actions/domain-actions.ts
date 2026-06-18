@@ -5,16 +5,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
-import { requireOrgFeature } from "../lib/entitlement-guards";
+import { entitlementActionCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type DomainInsert = Database["public"]["Tables"]["tenant_domains"]["Insert"];
 
 export async function addDomainAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/domains");
-    // Custom domains require Enterprise plan feature
-    const featureCheck = await requireOrgFeature(ctx.organizationId, "custom_domain", "add_domain");
-    if (!featureCheck.ok) return { ...prevState, status: "error", message: featureCheck.error };
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "custom_domain", actionName: "domain.add" });
 
     const supabase = await createSupabaseServerClient();
     const domain = formData.get("domain") as string;
@@ -40,13 +38,14 @@ export async function addDomainAction(prevState: AuthActionState, formData: Form
     revalidateOrgModules(["/organization/domains"]);
     return { ...prevState, status: "success", message: "Domain added. Complete DNS verification." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to add domain." };
+    return entitlementActionCatch(prevState, e, "Failed to add domain.");
   }
 }
 
 export async function removeDomainAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/domains");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "custom_domain", actionName: "domain.remove" });
     const domainId = formData.get("domainId") as string;
     if (!domainId) return { ...prevState, status: "error", message: "Domain ID is required." };
 
@@ -57,6 +56,6 @@ export async function removeDomainAction(prevState: AuthActionState, formData: F
     revalidateOrgModules(["/organization/domains"]);
     return { ...prevState, status: "success", message: "Domain removed." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to remove domain." };
+    return entitlementActionCatch(prevState, e, "Failed to remove domain.");
   }
 }

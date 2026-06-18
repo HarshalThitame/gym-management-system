@@ -7,6 +7,7 @@ import { formatCurrency } from "@/features/billing/lib/money";
 import { requireReceptionScope } from "@/features/reception/lib/access";
 import { listReceptionPayments } from "@/features/reception/services/reception-service";
 import { createMetadata } from "@/lib/seo/metadata";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Payments",
@@ -16,6 +17,9 @@ export const metadata: Metadata = createMetadata({
 
 export default async function ReceptionPaymentsPage() {
   const scope = await requireReceptionScope("/reception/payments");
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "billing_invoices", actionName: "reception.payments.read" });
   const payments = await listReceptionPayments(scope.gymId);
   const paidPayments = payments.filter((payment) => payment.status === "paid");
   const pendingPayments = payments.filter((payment) => payment.status === "pending" || payment.status === "processing" || payment.status === "failed");

@@ -6,6 +6,11 @@ import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
+import {
+  entitlementSimpleCatch,
+  requireOrganizationFeatureAccess,
+  type FeatureKey,
+} from "@/features/entitlement";
 import type { Json } from "@/types/database";
 import { parseJsonArray, parseJsonObject } from "../lib/business-rules";
 import {
@@ -20,6 +25,8 @@ import {
 export async function saveDashboardConfigAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const scope = await requireGymAdminScope("/admin/reports");
+  const entitlementError = await requireAnalyticsFeatures(scope, ["advanced_reports"], "analytics.dashboard.save");
+  if (entitlementError) return entitlementError;
   const context = scope;
   const parsed = DashboardConfigSchema.safeParse({
     dashboardConfigId: formData.get("dashboardConfigId") ?? "",
@@ -72,6 +79,8 @@ export async function saveDashboardConfigAction(_previousState: AuthActionState,
 export async function saveSavedReportAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const scope = await requireGymAdminScope("/admin/reports");
+  const entitlementError = await requireAnalyticsFeatures(scope, ["advanced_reports"], "analytics.report.save");
+  if (entitlementError) return entitlementError;
   const context = scope;
   const parsed = SavedReportSchema.safeParse({
     savedReportId: formData.get("savedReportId") ?? "",
@@ -127,6 +136,8 @@ export async function saveSavedReportAction(_previousState: AuthActionState, for
 export async function queueReportExportAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const scope = await requireGymAdminScope("/admin/reports");
+  const entitlementError = await requireAnalyticsFeatures(scope, ["advanced_reports", "data_export_csv_download"], "analytics.report.export");
+  if (entitlementError) return entitlementError;
   const context = scope;
   const parsed = ReportExportSchema.safeParse({
     savedReportId: formData.get("savedReportId") ?? "",
@@ -175,6 +186,8 @@ export async function queueReportExportAction(_previousState: AuthActionState, f
 export async function saveForecastModelAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const scope = await requireGymAdminScope("/admin/reports");
+  const entitlementError = await requireAnalyticsFeatures(scope, ["advanced_reports"], "analytics.forecast.save");
+  if (entitlementError) return entitlementError;
   const context = scope;
   const parsed = ForecastModelSchema.safeParse({
     forecastModelId: formData.get("forecastModelId") ?? "",
@@ -224,6 +237,8 @@ export async function saveForecastModelAction(_previousState: AuthActionState, f
 export async function updateInsightStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const scope = await requireGymAdminScope("/admin/reports");
+  const entitlementError = await requireAnalyticsFeatures(scope, ["advanced_reports"], "analytics.insight.update");
+  if (entitlementError) return entitlementError;
   const context = scope;
   const parsed = InsightStatusSchema.safeParse({
     insightId: formData.get("insightId"),
@@ -252,6 +267,8 @@ export async function updateInsightStatusAction(_previousState: AuthActionState,
 export async function captureAnalyticsEventAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const scope = await requireGymAdminScope("/admin/reports");
+  const entitlementError = await requireAnalyticsFeatures(scope, ["advanced_reports"], "analytics.event.capture");
+  if (entitlementError) return entitlementError;
   const parsed = AnalyticsEventSchema.safeParse({
     eventName: formData.get("eventName"),
     entityType: formData.get("entityType") ?? "",
@@ -305,6 +322,21 @@ async function writeAnalyticsAudit(context: AuthContext, action: string, entityT
 
 function getContextGymId(context: AuthContext) {
   return (context as AuthContext & { gymId?: string | null }).gymId ?? context.profile?.gym_id ?? null;
+}
+
+async function requireAnalyticsFeatures(
+  context: AuthContext & { scopedOrganizationId?: string | null },
+  featureKeys: readonly FeatureKey[],
+  actionName: string,
+): Promise<AuthActionState | null> {
+  const organizationId = context.scopedOrganizationId ?? context.organizationId;
+  if (!organizationId) return { status: "error", message: "Organization scope could not be resolved." };
+  try {
+    await requireOrganizationFeatureAccess({ organizationId, featureKey: featureKeys, actionName });
+    return null;
+  } catch (error) {
+    return entitlementSimpleCatch(error, "Analytics feature access could not be verified.") as AuthActionState;
+  }
 }
 
 function revalidateAnalyticsPaths() {

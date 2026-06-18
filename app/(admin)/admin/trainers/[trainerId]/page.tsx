@@ -26,6 +26,7 @@ import { formatTrainingLabel } from "@/features/training/lib/business-rules";
 import { getTrainerProfileBundle, listActiveTrainers } from "@/features/training/services/training-service";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type TrainerProfilePageProps = {
   params: Promise<{ trainerId: string }>;
@@ -45,6 +46,8 @@ export default async function AdminTrainerProfilePage({ params }: TrainerProfile
   const { trainerId } = await params;
   const gymId = scope.gymId;
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "trainer_management", actionName: "admin.trainer.profile.read" });
   const [bundle, activeTrainers, membersResult, planContext] = await Promise.all([
     getTrainerProfileBundle(trainerId),
     listActiveTrainers(gymId),

@@ -13,6 +13,7 @@ import { getAttendanceDashboard, listAccessDevices } from "@/features/attendance
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type AdminAttendancePageProps = {
   searchParams: Promise<{ memberQuery?: string; token?: string }>;
@@ -30,6 +31,8 @@ export default async function AdminAttendancePage({ searchParams }: AdminAttenda
   const gymId = scope.gymId;
   const memberQuery = params.memberQuery?.trim() ?? "";
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "attendance_reports", actionName: "admin.attendance.read" });
   const [dashboard, membersResult, devices, planContext] = await Promise.all([
     getAttendanceDashboard(gymId),
     listMembers({ gymId, pageSize: 100, query: memberQuery || undefined }),

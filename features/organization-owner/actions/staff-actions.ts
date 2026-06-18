@@ -7,10 +7,12 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit } from "../lib/entitlement-guards";
+import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
 export async function inviteStaffAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/staff");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "staff_management", actionName: "staff.invite" });
     const supabase = await createSupabaseServerClient();
     const email = formData.get("email") as string;
     const fullName = formData.get("fullName") as string;
@@ -68,13 +70,14 @@ export async function inviteStaffAction(prevState: AuthActionState, formData: Fo
     revalidateOrgModules(["/organization/staff"]);
     return { ...prevState, status: "success", message: "Staff invited." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to invite staff." };
+    return entitlementActionCatch(prevState, e, "Failed to invite staff.");
   }
 }
 
 export async function deactivateStaffAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/staff");
+    await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "staff_management", actionName: "staff.deactivate" });
     const userId = formData.get("userId") as string;
     if (!userId) return { ...prevState, status: "error", message: "User ID is required." };
 
@@ -90,6 +93,6 @@ export async function deactivateStaffAction(prevState: AuthActionState, formData
     revalidateOrgModules(["/organization/staff"]);
     return { ...prevState, status: "success", message: "Staff deactivated." };
   } catch (e) {
-    return { ...prevState, status: "error", message: e instanceof Error ? e.message : "Failed to deactivate staff." };
+    return entitlementActionCatch(prevState, e, "Failed to deactivate staff.");
   }
 }

@@ -57,6 +57,18 @@ vi.mock("@/lib/tenant", () => ({
   isWithinBranchLimit: vi.fn()
 }));
 
+vi.mock("@/features/entitlement", () => ({
+  requireOrganizationFeatureAccess: vi.fn().mockResolvedValue({
+    organizationId: "00000000-0000-4000-8000-000000000001",
+    userId: "00000000-0000-4000-8000-000000000003",
+    isSuperAdmin: false,
+  }),
+  entitlementSimpleCatch: (_error: unknown, fallbackMessage: string) => ({
+    status: "error",
+    message: fallbackMessage,
+  }),
+}));
+
 vi.mock("@/features/billing/lib/razorpay", () => ({
   createRazorpayOrder: vi.fn(),
   createRazorpayRefund: vi.fn(),

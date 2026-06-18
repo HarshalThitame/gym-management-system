@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiAuth } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 export async function PATCH(request: Request) {
   const auth = await requireApiAuth({});
   if (!auth.ok) return auth.response;
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return NextResponse.json({ error: "Organization scope required." }, { status: 403 });
+  const denied = await requireApiFeatureAccess(organizationId, "custom_domain");
+  if (denied) return denied;
 
   try {
     const body = await request.json();
@@ -25,7 +31,8 @@ export async function PATCH(request: Request) {
       const { error } = await supabase
         .from("tenant_domains")
         .update({ routing_mode: routingMode })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("organization_id", organizationId);
 
       if (error) errors.push(`${id}: ${error.message}`);
       else updated++;

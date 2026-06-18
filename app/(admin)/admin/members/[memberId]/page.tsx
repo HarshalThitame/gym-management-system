@@ -9,6 +9,7 @@ import { MembershipStatusBadge } from "@/features/memberships/components/members
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
 import { getMemberProfile, listActiveMembershipPlans } from "@/features/memberships/services/membership-service";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 import { createMetadata } from "@/lib/seo/metadata";
 
 type MemberProfilePageProps = {
@@ -27,6 +28,9 @@ export async function generateMetadata({ params }: MemberProfilePageProps): Prom
 
 export default async function AdminMemberProfilePage({ params }: MemberProfilePageProps) {
   const scope = await requireGymAdminScope("/admin/members");
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "member_management", actionName: "admin.member.profile.read" });
   const { memberId } = await params;
   const [profile, plans] = await Promise.all([
     getMemberProfile(memberId),

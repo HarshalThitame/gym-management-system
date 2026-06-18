@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiAuth } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccess } from "@/features/entitlement";
 
 export async function GET(request: Request) {
   const auth = await requireApiAuth({});
@@ -14,6 +15,8 @@ export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data: config } = await supabase.from("tenant_configs").select("*").eq("id", configId).single();
   if (!config) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const denied = await requireApiFeatureAccess(config.organization_id, "custom_branding");
+  if (denied) return denied;
 
   const cfg = config as unknown as {
     brand_name: string; plan_tier: string; status: string;

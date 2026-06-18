@@ -8,6 +8,7 @@ import { resolveModuleData, type ModuleSearchParams } from "@/features/organizat
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { MODULE_FEATURE_MAP, requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type OrgOwnerModuleRouteProps = {
   params: Promise<{ module: string }>;
@@ -48,6 +49,15 @@ export default async function OrganizationOwnerModuleRoute({ params, searchParam
 
   const context = await requireOrganizationOwner(selectedModule.href);
   const filters = parseSearchParams(await searchParams);
+  const requiredFeature = MODULE_FEATURE_MAP[slug];
+
+  if (requiredFeature) {
+    await requireOrganizationFeatureAccess({
+      organizationId: context.organizationId,
+      featureKey: requiredFeature,
+      actionName: `organization.module.${slug}.read`,
+    });
+  }
 
   const [dashboard, planContext, moduleResult] = await Promise.all([
     getOrganizationOwnerDashboard(context),

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 import { MemberOnboardingForm } from "@/features/memberships/components/member-onboarding-form";
 import { listActiveMembershipPlans } from "@/features/memberships/services/membership-service";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -13,6 +14,9 @@ export const metadata: Metadata = createMetadata({
 
 export default async function NewMemberPage() {
   const scope = await requireGymAdminScope("/admin/members/new");
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "member_management", actionName: "admin.member.create_form.read" });
   const plans = await listActiveMembershipPlans(scope.gymId);
 
   return (

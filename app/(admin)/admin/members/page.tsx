@@ -5,6 +5,7 @@ import { MemberDirectoryTable } from "@/features/memberships/components/member-d
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 type MembersPageProps = {
   searchParams: Promise<{
@@ -25,6 +26,8 @@ export const metadata: Metadata = createMetadata({
 
 export default async function AdminMembersPage({ searchParams }: MembersPageProps) {
   const scope = await requireGymAdminScope("/admin/members");
+  if (!scope.scopedOrganizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId: scope.scopedOrganizationId, featureKey: "member_management", actionName: "admin.members.read" });
   const params = await searchParams;
   const page = Number(params.page ?? "1");
   const result = await listMembers({

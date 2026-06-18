@@ -39,6 +39,7 @@ import { canAny } from "@/lib/rbac";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import type { KpiCard } from "@/types/analytics";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export const metadata: Metadata = createMetadata({
   title: "Analytics and Reporting Center",
@@ -58,6 +59,8 @@ export default async function AdminReportsPage() {
   const scope = await requireGymAdminScope("/admin/reports");
   const gymId = scope.gymId;
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "advanced_reports", actionName: "admin.analytics.read" });
   const canRequestReports = canAny(scope.roles, "reports", "export");
   const [dashboard, planContext] = await Promise.all([
     getExecutiveAnalyticsDashboard(gymId),

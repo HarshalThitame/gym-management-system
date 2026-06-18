@@ -4,7 +4,7 @@ import { requireApiAuth } from "@/lib/auth/api-guards";
 import { checkRateLimitWithEnv } from "@/lib/rate-limiter";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireApiAuth({});
+  const auth = await requireApiAuth({ skipSubscriptionCheck: true });
   if (!auth.ok) return auth.response;
 
   const ip = req.headers.get("x-forwarded-for") ?? "unknown";

@@ -8,6 +8,7 @@ import { getAttendanceDashboard, listAccessDevices } from "@/features/attendance
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { requireReceptionScope } from "@/features/reception/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
+import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 
 export const metadata: Metadata = createMetadata({
   title: "Reception Attendance",
@@ -21,6 +22,9 @@ type ReceptionAttendancePageProps = {
 
 export default async function ReceptionAttendancePage({ searchParams }: ReceptionAttendancePageProps) {
   const scope = await requireReceptionScope("/reception/attendance");
+  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
+  if (!organizationId) throw new Error("Organization scope required.");
+  await requireOrganizationFeatureAccess({ organizationId, featureKey: "manual_attendance", actionName: "reception.attendance.read" });
   const params = await searchParams;
   const memberQuery = params.memberQuery?.trim() ?? "";
   const [dashboard, membersResult, devices] = await Promise.all([

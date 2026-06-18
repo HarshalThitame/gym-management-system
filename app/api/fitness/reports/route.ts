@@ -1,7 +1,8 @@
 import { fitnessRowsToCsv, type FitnessReportType } from "@/features/fitness/lib/csv";
 import { fitnessReportFormats, fitnessRowsToExcel, fitnessRowsToPdf, type FitnessReportFormat } from "@/features/fitness/lib/report-export";
 import { getFitnessReportRows } from "@/features/fitness/services/fitness-service";
-import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { getApiTenantOrganizationId, requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
+import { requireApiFeatureAccessAll } from "@/features/entitlement";
 
 const reportTypes = ["goal_progress", "workout_adherence", "measurement_changes", "nutrition_compliance"] as const;
 
@@ -11,6 +12,10 @@ export async function GET(request: Request) {
   if (!auth.ok) {
     return auth.response;
   }
+  const organizationId = getApiTenantOrganizationId(auth.context, auth.tenant);
+  if (!organizationId) return Response.json({ error: "Organization scope required." }, { status: 403 });
+  const featureDenied = await requireApiFeatureAccessAll(organizationId, ["goal_tracking", "advanced_reports"]);
+  if (featureDenied) return featureDenied;
 
   const gymScope = requireApiTenantGymScope(auth.context, auth.tenant);
   if (!gymScope.ok) {
