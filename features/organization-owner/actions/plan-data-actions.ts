@@ -38,6 +38,8 @@ export type SubscriptionWithPackage = {
   trial_ends_at: string | null;
   started_at: string;
   expires_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
   auto_renew: boolean;
   package: PackageWithMeta;
 };
