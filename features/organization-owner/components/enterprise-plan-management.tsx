@@ -137,6 +137,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
       const result = await createSecureSubscriptionCheckoutOrderAction({
         targetPackageId,
         billingCycle: serverBillingCycle,
+        startMode: "now",
       });
       if (!result.success) {
         showToast(result.error, "error");

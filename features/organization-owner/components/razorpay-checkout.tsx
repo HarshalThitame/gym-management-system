@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { CreditCard, Loader2, Check, AlertTriangle, Shield, X, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,15 @@ export function RazorpayCheckout({
   } | null>(null);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [decisionLoading, setDecisionLoading] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    };
+  }, []);
 
   const isActive = currentSubscriptionStatus === "active" || currentSubscriptionStatus === "trial";
   const isCancelledWithTime = currentSubscriptionStatus === "cancelled" && currentSubscriptionExpiresAt && new Date(currentSubscriptionExpiresAt) > new Date();
@@ -197,14 +206,16 @@ export function RazorpayCheckout({
           } else {
             setPaymentState("waiting_for_webhook");
             showToast(ackResult.warning || "Payment received. Confirmation is in progress.", "info");
-            const checkInterval = setInterval(async () => {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+            pollIntervalRef.current = setInterval(async () => {
               const statusResult = await getSubscriptionPaymentStatusAction({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               });
               if (statusResult.success && statusResult.status === "payment_confirmed") {
-                clearInterval(checkInterval);
+                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                 setPaymentDetails({
                   invoiceId: statusResult.invoiceId,
                   ...(statusResult.paymentId ? { paymentId: statusResult.paymentId } : {}),
@@ -214,7 +225,9 @@ export function RazorpayCheckout({
                 showToast("Payment confirmed! Your subscription is active.", "success");
               }
             }, 5000);
-            setTimeout(() => clearInterval(checkInterval), 120000);
+            pollTimeoutRef.current = setTimeout(() => {
+              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            }, 120000);
           }
         } else {
           setPaymentError(ackResult.error || "Payment verification failed. Please contact support.");

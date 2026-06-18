@@ -13,7 +13,7 @@ type ActionState = { status: "idle" | "success" | "error"; message?: string };
 
 export async function requestPlanChangeAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const ctx = await getOrgOwnerContext("/organization/plan");
+    const ctx = await requireOrganizationOwner("/organization/plan");
     const targetPlanSlug = formData.get("targetPlan") as string;
     const reason = formData.get("reason") as string;
     const billingCycle = formData.get("billingCycle") as string;
@@ -66,7 +66,7 @@ export async function requestPlanChangeAction(prevState: ActionState, formData: 
 
 export async function toggleAutoRenewAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const ctx = await getOrgOwnerContext("/organization/plan");
+    const ctx = await requireOrganizationOwner("/organization/plan");
     const supabase = getSupabaseAdminClient();
     if (!supabase) return { status: "error", message: "Database connection failed." };
 
@@ -75,7 +75,8 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
     const { error } = await (supabase as any)
       .from("organization_subscriptions")
       .update({ auto_renew: enabled, updated_at: new Date().toISOString() })
-      .eq("organization_id", ctx.organizationId);
+      .eq("organization_id", ctx.organizationId)
+      .in("status", ["active", "trial"]);
 
     if (error) throw new Error(error.message);
 

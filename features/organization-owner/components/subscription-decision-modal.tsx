@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, Calendar, Clock, CreditCard, Loader2, Shield } from "lucide-react";
+import { AlertTriangle, ArrowRight, Calendar, Clock, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 

@@ -152,7 +152,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
       .from("organization_subscriptions")
       .select("id, status, package_id, price_override, billing_period, expires_at, cancelled_at")
       .eq("organization_id", organizationId)
-      .in("status", ["active", "trial", "cancelled", "pending_activation"])
+      .in("status", ["active", "trial", "cancelled", "expired", "suspended"])
       .order("started_at", { ascending: false })
       .limit(1);
 
