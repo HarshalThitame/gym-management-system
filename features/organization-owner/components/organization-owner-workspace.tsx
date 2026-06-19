@@ -1,5 +1,4 @@
 import { Activity, AlertTriangle, BarChart3, Building2, CreditCard, Dumbbell, Gauge, Globe2, MessageSquare, ShieldCheck, Tags, UsersRound } from "lucide-react";
-import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -55,7 +54,7 @@ export function OrganizationOwnerWorkspace({ dashboard, module, moduleData, modu
     return (
       <div className="space-y-8">
         <ModuleHero dashboard={dashboard} module={module} />
-        <ModuleContent dashboard={dashboard} module={module} moduleData={moduleData} moduleFilters={moduleFilters} planContext={planContext} />
+        <ModuleContent dashboard={dashboard} module={module} moduleData={moduleData} moduleFilters={moduleFilters} />
       </div>
     );
   }
@@ -82,43 +81,9 @@ function ModuleHero({ dashboard, module }: { dashboard: OrganizationOwnerDashboa
   );
 }
 
-const MODULE_FEATURE_MAP: Record<string, { feature: string; name: string; plan: string }> = {
-  gyms: { feature: "member_management", name: "Branch Management", plan: "Starter" },
-  branches: { feature: "member_management", name: "Branch Management", plan: "Starter" },
-  staff: { feature: "staff_management", name: "Staff Management", plan: "Growth" },
-  members: { feature: "member_management", name: "Member Management", plan: "Starter" },
-  memberships: { feature: "member_management", name: "Membership Management", plan: "Starter" },
-  revenue: { feature: "billing_invoices", name: "Revenue & Billing", plan: "Starter" },
-  trainers: { feature: "trainer_management", name: "Trainer Management", plan: "Starter" },
-  attendance: { feature: "attendance_reports", name: "Attendance", plan: "Starter" },
-  classes: { feature: "class_booking", name: "Class Booking", plan: "Growth" },
-  communications: { feature: "whatsapp_integration", name: "Communications", plan: "Growth" },
-  analytics: { feature: "advanced_reports", name: "Advanced Analytics", plan: "Growth" },
-  branding: { feature: "custom_branding", name: "White Label Branding", plan: "Enterprise" },
-  domains: { feature: "custom_domain", name: "Custom Domains", plan: "Enterprise" },
-  billing: { feature: "billing_invoices", name: "Billing", plan: "Starter" },
-  nutrition: { feature: "nutrition_plans", name: "Nutrition Plans", plan: "Growth" },
-  support: { feature: "priority_support", name: "Priority Support", plan: "Enterprise" },
-  security: { feature: "audit_logs", name: "Security & Audit", plan: "Enterprise" },
-};
-
-function ModuleContent({ dashboard, module, moduleData, moduleFilters, planContext }: { dashboard: OrganizationOwnerDashboard; module: OrganizationOwnerModule; moduleData?: unknown | undefined; moduleFilters?: ModuleSearchParams | undefined; planContext?: OrgPlanContext | null | undefined }) {
-  const featureCheck = MODULE_FEATURE_MAP[module.slug];
-  const isFeatureEnabled = featureCheck
-    ? planContext?.features?.[featureCheck.feature as keyof typeof planContext.features]
-    : true;
-
-  if (!isFeatureEnabled) {
-    return (
-      <FeatureLocked
-        description={`${featureCheck?.name ?? "This feature"} is available on ${featureCheck?.plan ?? "higher"} plans.`}
-        featureName={featureCheck?.name ?? module.title}
-        requiredPlan={featureCheck?.plan ?? "Growth"}
-      />
-    );
-  }
-
-  const common = { dashboard, moduleData, moduleFilters };
+// Module slug → page component (feature gating handled by route guard in [module]/page.tsx)
+function ModuleContent({ dashboard, module, moduleData, moduleFilters }: { dashboard: OrganizationOwnerDashboard; module: OrganizationOwnerModule; moduleData?: unknown | undefined; moduleFilters?: ModuleSearchParams | undefined }) {
+  void moduleData; void moduleFilters;
   switch (module.slug) {
     case "gyms":
     case "branches": return <BranchesModule dashboard={dashboard} />;
