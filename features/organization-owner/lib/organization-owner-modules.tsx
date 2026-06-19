@@ -83,7 +83,7 @@ export const organizationOwnerModules = [
     description: "Track payments, branch revenue, payment status, and financial performance for your organization.",
     icon: <CreditCard className="size-5" />,
     iconKey: "credit-card",
-    featureKey: "payment_tracking" as FeatureKey,
+    featureKey: "billing_invoices" as FeatureKey,
   },
   {
     slug: "trainers",
@@ -103,7 +103,7 @@ export const organizationOwnerModules = [
     description: "Monitor attendance logs, branch usage, peak activity signals, and access-control incidents.",
     icon: <CalendarCheck className="size-5" />,
     iconKey: "calendar-check",
-    featureKey: "manual_attendance" as FeatureKey,
+    featureKey: "attendance_reports" as FeatureKey,
   },
   {
     slug: "classes",
@@ -133,7 +133,7 @@ export const organizationOwnerModules = [
     description: "View branch performance, tenant usage, revenue trends, and operational KPIs for your organization only.",
     icon: <BarChart3 className="size-5" />,
     iconKey: "bar-chart",
-    featureKey: "basic_reports" as FeatureKey,
+    featureKey: "advanced_reports" as FeatureKey,
   },
   {
     slug: "branding",
@@ -209,6 +209,7 @@ export const organizationOwnerModules = [
     description: "Review security events, activity logs, compliance requests, and audit records for your organization.",
     icon: <ShieldCheck className="size-5" />,
     iconKey: "bell",
+    featureKey: "audit_logs" as FeatureKey,
   }
 ] satisfies OrganizationOwnerModule[];
 

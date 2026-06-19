@@ -283,11 +283,9 @@ export const MODULE_FEATURE_MAP: Record<string, FeatureKey> = {
   analytics: "advanced_reports",
   branding: "custom_branding",
   domains: "custom_domain",
-  billing: "billing_invoices",
   nutrition: "nutrition_plans",
-  support: "priority_support",
   security: "audit_logs",
-  // dashboard, plan, profile, settings are always available (no feature gate)
+  // dashboard, plan, profile, settings, billing, support are always available
 };
 
 // ─── Compile-time sanity: every module map value is a registered key ───────
