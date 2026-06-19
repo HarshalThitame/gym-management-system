@@ -13,10 +13,7 @@ BEGIN
   -- Billing category
   SELECT id INTO v_cat FROM feature_categories WHERE code = 'billing';
   INSERT INTO feature_catalog (code, name, description, category_id, feature_type, default_value, sort_order, feature_key) VALUES
-    ('multi_currency_billing', 'Multi-Currency Billing', 'INR, USD, AED and other currency support.', v_cat, 'boolean', 'false', 12, 'billing.multi_currency_billing'),
-    ('franchise_fee_management', 'Franchise Fee Management', 'Auto-deduct platform or royalty fees from franchise revenue.', v_cat, 'boolean', 'false', 13, 'billing.franchise_fee_management'),
     ('multi_gstin_support', 'Multi-GSTIN Support', 'Each branch can have its own GST number.', v_cat, 'boolean', 'false', 14, 'billing.multi_gstin_support'),
-    ('pos_merchandise_supplements', 'POS - Merchandise & Supplements', 'Sell gym merchandise, supplements, accessories at counter.', v_cat, 'boolean', 'false', 15, 'billing.pos_merchandise_supplements'),
     ('branch_revenue_split', 'Revenue Split Across Branches', 'Track and split collections branch-wise.', v_cat, 'boolean', 'false', 16, 'billing.branch_revenue_split')
   ON CONFLICT (code) DO UPDATE SET name = excluded.name, description = excluded.description, feature_key = excluded.feature_key;
 
@@ -50,7 +47,6 @@ BEGIN
     ('scheduled_report_delivery', 'Scheduled Report Delivery', 'Auto-email weekly/monthly reports to owners, managers, or investors.', v_cat, 'boolean', 'false', 9, 'reports.scheduled_report_delivery'),
     ('equipment_inventory_maintenance', 'Equipment Inventory & Maintenance', 'Track gym equipment, service schedules, AMC expiry, maintenance alerts.', v_cat, 'boolean', 'false', 10, 'reports.equipment_inventory_maintenance'),
     ('data_export_csv_download', 'Data Export & CSV Download', 'Export reports and member datasets as CSV.', v_cat, 'boolean', 'false', 11, 'reports.data_export_csv_download'),
-    ('franchise_rollup_dashboard', 'Franchise Rollup Dashboard', 'Consolidated P&L, footfall, churn, revenue across branches.', v_cat, 'boolean', 'false', 12, 'reports.franchise_rollup_dashboard'),
     ('custom_dashboards_kpis', 'Custom Dashboards & KPIs', 'Build, save, and share personalized KPI views.', v_cat, 'boolean', 'false', 13, 'reports.custom_dashboards_kpis')
   ON CONFLICT (code) DO UPDATE SET name = excluded.name, description = excluded.description, feature_key = excluded.feature_key;
 
@@ -68,18 +64,7 @@ BEGIN
     ('loyalty_rewards_in_app', 'Loyalty & Rewards In-App', 'Members view points balance, redeem rewards, see referral status.', v_cat, 'boolean', 'false', 9, 'platform.loyalty_rewards_in_app')
   ON CONFLICT (code) DO UPDATE SET name = excluded.name, description = excluded.description, feature_key = excluded.feature_key;
 
-  -- Enterprise category (infrastructure)
-  SELECT id INTO v_cat FROM feature_categories WHERE code = 'enterprise';
-  INSERT INTO feature_catalog (code, name, description, category_id, feature_type, default_value, sort_order, feature_key) VALUES
-    ('sso_saml_login', 'SSO/SAML Login', 'Enterprise staff login via Google Workspace, Azure AD, or other identity providers.', v_cat, 'boolean', 'false', 13, 'enterprise.sso_saml_login'),
-    ('dedicated_cloud_infrastructure', 'Dedicated Cloud Infrastructure', 'Isolated database and storage per enterprise tenant.', v_cat, 'boolean', 'false', 14, 'enterprise.dedicated_cloud_infrastructure'),
-    ('dedicated_onboarding_manager', 'Dedicated Onboarding Manager', 'Personal onboarding manager for enterprise setup.', v_cat, 'boolean', 'false', 15, 'enterprise.dedicated_onboarding_manager'),
-    ('response_sla', 'Response SLA', '4-hour critical, 24-hour standard issue response SLA.', v_cat, 'boolean', 'false', 17, 'enterprise.response_sla'),
-    ('named_account_manager', 'Named Account Manager', 'Dedicated account manager for your organization.', v_cat, 'boolean', 'false', 18, 'enterprise.named_account_manager'),
-    ('automated_backups_90_day_retention', 'Automated Backups 90-Day Retention', 'Daily automated backups with 90-day retention.', v_cat, 'boolean', 'false', 19, 'enterprise.automated_backups_90_day_retention'),
-    ('uptime_sla_99_9', '99.9% Uptime SLA', 'Service level agreement guaranteeing 99.9% uptime.', v_cat, 'boolean', 'false', 20, 'enterprise.uptime_sla_99_9'),
-    ('staff_training_sessions', 'Staff Training Sessions', 'Remote or on-site training for staff.', v_cat, 'boolean', 'false', 21, 'enterprise.staff_training_sessions'),
-    ('custom_feature_requests', 'Custom Feature Requests', 'Enterprise feature requests considered for development.', v_cat, 'boolean', 'false', 22, 'enterprise.custom_feature_requests');
+  -- Enterprise category (infrastructure) — phantom features removed per Phase 1.1
 
   -- ============================================================
   -- UPDATE ENTERPRISE PACKAGE
@@ -110,7 +95,6 @@ BEGIN
     (v_pkg, 'attendance_reports', 'true'),
     (v_pkg, 'dynamic_qr_attendance', 'true'),
     (v_pkg, 'biometric_attendance', 'true'),
-    (v_pkg, 'face_recognition_attendance', 'true'),
     (v_pkg, 'fingerprint_attendance', 'true'),
     (v_pkg, 'multi_branch_management', 'true'),
     (v_pkg, 'membership_pause_freeze', 'true'),
@@ -133,10 +117,7 @@ BEGIN
     (v_pkg, 'partial_payment_dues', 'true'),
     (v_pkg, 'razorpay_payu_integration', 'true'),
     (v_pkg, 'corporate_bulk_memberships', 'true'),
-    (v_pkg, 'multi_currency_billing', 'true'),
-    (v_pkg, 'franchise_fee_management', 'true'),
     (v_pkg, 'multi_gstin_support', 'true'),
-    (v_pkg, 'pos_merchandise_supplements', 'true'),
     (v_pkg, 'branch_revenue_split', 'true'),
     -- Class Scheduling
     (v_pkg, 'class_booking', 'true'),
@@ -186,8 +167,6 @@ BEGIN
     (v_pkg, 'class_occupancy_report', 'true'),
     (v_pkg, 'lead_conversion_report', 'true'),
     (v_pkg, 'branch_revenue_comparison', 'true'),
-    (v_pkg, 'franchise_rollup_reports', 'true'),
-    (v_pkg, 'franchise_rollup_dashboard', 'true'),
     (v_pkg, 'custom_dashboards', 'true'),
     (v_pkg, 'custom_dashboards_kpis', 'true'),
     (v_pkg, 'scheduled_report_delivery', 'true'),
@@ -200,7 +179,6 @@ BEGIN
     (v_pkg, 'custom_branding', 'true'),
     (v_pkg, 'white_label', 'true'),
     (v_pkg, 'custom_domain', 'true'),
-    (v_pkg, 'white_label_mobile_app', 'true'),
     (v_pkg, 'branded_mobile_app', 'true'),
     (v_pkg, 'in_app_push_notifications', 'true'),
     (v_pkg, 'digital_membership_card', 'true'),
@@ -211,8 +189,6 @@ BEGIN
     (v_pkg, 'rest_api_access', 'true'),
     (v_pkg, 'api_access', 'true'),
     (v_pkg, 'webhooks', 'true'),
-    (v_pkg, 'sso_saml_login', 'true'),
-    (v_pkg, 'dedicated_cloud_infrastructure', 'true'),
     -- AI
     (v_pkg, 'ai_recommendations', 'true'),
     (v_pkg, 'ai_coach', 'true'),
@@ -226,16 +202,7 @@ BEGIN
     (v_pkg, 'geo_fencing_attendance', 'true'),
     (v_pkg, 'attendance_api', 'true'),
     (v_pkg, 'audit_logs', 'true'),
-    (v_pkg, 'franchise_management', 'true'),
-    (v_pkg, 'priority_support', 'true'),
-    -- SLA & Support
-    (v_pkg, 'dedicated_onboarding_manager', 'true'),
-    (v_pkg, 'response_sla', 'true'),
-    (v_pkg, 'named_account_manager', 'true'),
-    (v_pkg, 'automated_backups_90_day_retention', 'true'),
-    (v_pkg, 'uptime_sla_99_9', 'true'),
-    (v_pkg, 'staff_training_sessions', 'true'),
-    (v_pkg, 'custom_feature_requests', 'true')
+    (v_pkg, 'priority_support', 'true')
   ON CONFLICT (package_id, feature_code) DO UPDATE SET value = excluded.value;
 
   -- Update Enterprise limits (all -1 for unlimited)

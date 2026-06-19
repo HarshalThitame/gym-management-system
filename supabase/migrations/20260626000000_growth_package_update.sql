@@ -36,8 +36,7 @@ BEGIN
     ('trainer_performance_report', 'Trainer Performance Report', 'Sessions, PT bookings, ratings.', v_cat_id, 'boolean', 'false', 4, 'reports.trainer_performance_report'),
     ('class_occupancy_report', 'Class Occupancy Report', 'Fill rate per class type.', v_cat_id, 'boolean', 'false', 5, 'reports.class_occupancy_report'),
     ('lead_conversion_report', 'Lead Conversion Report', 'Enquiry to paid conversion funnel.', v_cat_id, 'boolean', 'false', 6, 'reports.lead_conversion_report'),
-    ('branch_revenue_comparison', 'Branch Revenue Comparison', 'Compare collections across branches.', v_cat_id, 'boolean', 'false', 7, 'reports.branch_revenue_comparison'),
-    ('franchise_rollup_reports', 'Franchise Rollup Reports', 'Aggregated franchise reports.', v_cat_id, 'boolean', 'false', 8, 'reports.franchise_rollup_reports')
+    ('branch_revenue_comparison', 'Branch Revenue Comparison', 'Compare collections across branches.', v_cat_id, 'boolean', 'false', 7, 'reports.branch_revenue_comparison')
   ON CONFLICT (code) DO UPDATE SET name = excluded.name, description = excluded.description, feature_key = excluded.feature_key;
 
   SELECT id INTO v_cat_id FROM feature_categories WHERE code = 'communication';
@@ -47,8 +46,7 @@ BEGIN
 
   SELECT id INTO v_cat_id FROM feature_categories WHERE code = 'platform';
   INSERT INTO feature_catalog (code, name, description, category_id, feature_type, default_value, sort_order, feature_key) VALUES
-    ('google_calendar_sync', 'Google Calendar Sync', 'Class schedule syncs to Google Calendar.', v_cat_id, 'boolean', 'false', 5, 'platform.google_calendar_sync'),
-    ('white_label_mobile_app', 'White-label Mobile App', 'White-label iOS and Android app.', v_cat_id, 'boolean', 'false', 6, 'platform.white_label_mobile_app')
+    ('google_calendar_sync', 'Google Calendar Sync', 'Class schedule syncs to Google Calendar.', v_cat_id, 'boolean', 'false', 5, 'platform.google_calendar_sync')
   ON CONFLICT (code) DO UPDATE SET name = excluded.name, description = excluded.description, feature_key = excluded.feature_key;
 
   SELECT id INTO v_cat_id FROM feature_categories WHERE code = 'enterprise';
@@ -93,7 +91,6 @@ BEGIN
     (v_pkg_id, 'expiry_tracking', 'true'),
     (v_pkg_id, 'membership_renewals', 'true'),
     (v_pkg_id, 'member_tagging_segments', 'true'),
-    (v_pkg_id, 'face_recognition_attendance', 'false'),
     (v_pkg_id, 'fingerprint_attendance', 'false'),
     (v_pkg_id, 'billing_invoices', 'true'),
     (v_pkg_id, 'receipts', 'true'),
@@ -142,13 +139,11 @@ BEGIN
     (v_pkg_id, 'lead_conversion_report', 'true'),
     (v_pkg_id, 'branch_revenue_comparison', 'true'),
     (v_pkg_id, 'custom_dashboards', 'false'),
-    (v_pkg_id, 'franchise_rollup_reports', 'false'),
     (v_pkg_id, 'member_portal', 'true'),
     (v_pkg_id, 'trainer_portal', 'true'),
     (v_pkg_id, 'member_progress_tracking', 'true'),
     (v_pkg_id, 'diet_workout_plans', 'true'),
     (v_pkg_id, 'custom_branding', 'true'),
-    (v_pkg_id, 'white_label_mobile_app', 'false'),
     (v_pkg_id, 'branded_mobile_app', 'false'),
     (v_pkg_id, 'google_calendar_sync', 'true'),
     (v_pkg_id, 'tally_zoho_books_integration', 'false'),
@@ -160,7 +155,6 @@ BEGIN
     (v_pkg_id, 'webhooks', 'false'),
     (v_pkg_id, 'audit_logs', 'false'),
     (v_pkg_id, 'priority_support', 'false'),
-    (v_pkg_id, 'franchise_management', 'false'),
     (v_pkg_id, 'nfc_attendance', 'true'),
     (v_pkg_id, 'rfid_attendance', 'true'),
     (v_pkg_id, 'branch_attendance', 'true'),
