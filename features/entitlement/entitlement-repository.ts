@@ -1,6 +1,5 @@
 import "server-only";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { FeatureKey, LimitKey, SubscriptionStatus } from "./feature-registry";
 import { ACTIVE_ENTITLEMENT_STATUSES } from "./feature-registry";
@@ -72,7 +71,9 @@ function asString(v: unknown): string | null {
 }
 
 async function client(): Promise<RawDbClient> {
-  return (await createSupabaseServerClient()) as unknown as RawDbClient;
+  const c = getSupabaseAdminClient();
+  if (!c) throw new Error("Supabase admin client not configured");
+  return c as unknown as RawDbClient;
 }
 
 // ─── Package feature queries ───────────────────────────────────────────────

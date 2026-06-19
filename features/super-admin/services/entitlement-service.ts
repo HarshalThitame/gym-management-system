@@ -69,7 +69,8 @@ export async function getPackageEntitlements(packageId: string): Promise<Package
  * The organization must have an active or valid-trial subscription.
  */
 export async function organizationHasFeature(organizationId: string, featureCode: string): Promise<boolean> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return false;
   const s = supabase as never as {
     from(t: string): {
       select(c: string): {

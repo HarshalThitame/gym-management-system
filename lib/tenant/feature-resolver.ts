@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { organizationHasFeature } from "@/features/super-admin/services/entitlement-service";
 import type { OrgFeatureFlags, FeatureFlagKey } from "./feature-flags";
 
@@ -220,8 +220,9 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
 
 export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFeatureFlags> {
   try {
-    const supabase = await createSupabaseServerClient();
-    const s = supabase as never as {
+    const admin = getSupabaseAdminClient();
+    if (!admin) return { ...SAFE_DEFAULT };
+    const s = admin as never as {
       from(t: string): {
         select(c: string): {
           eq(k: string, v: string): {
