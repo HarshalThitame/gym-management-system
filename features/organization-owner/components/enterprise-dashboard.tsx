@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, Building2, Calendar, CreditCard, Download, Dumbbell, Gauge, Globe2, MessageSquare, Plus, RefreshCw, ShieldCheck, Tags, TrendingUp, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, Building2, Calendar, CreditCard, Download, Dumbbell, Gauge, Globe2, MessageSquare, Plus, RefreshCw, ShieldCheck, Tags, TrendingUp, UserRoundPlus, UsersRound } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -12,6 +12,7 @@ import { PlanSummaryCard } from "@/features/organization-owner/entitlements";
 import { UsageDashboardCard } from "@/features/organization-owner/entitlements";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
+import { getOrgNewLeadsCount } from "@/features/organization-owner/actions/lead-actions";
 
 type EnterpriseDashboardProps = {
   dashboard: OrganizationOwnerDashboard;
@@ -78,11 +79,18 @@ function EnhancedKpiWidget({ label, value, detail, icon, trend, sparklineData, s
 export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashboardProps) {
   const [period, setPeriod] = useState<"7d" | "30d" | "90d" | "1y">("30d");
   const [refreshing, setRefreshing] = useState(false);
+  const [newLeadsThisMonth, setNewLeadsThisMonth] = useState(0);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => window.location.reload(), 500);
   }, []);
+
+  useEffect(() => {
+    if (planContext?.features?.leadManagement) {
+      getOrgNewLeadsCount(dashboard.organization.id).then(setNewLeadsThisMonth).catch(() => {});
+    }
+  }, [dashboard.organization.id, planContext?.features?.leadManagement]);
 
   // ── Compute KPIs with trends ──
   const { kpis, sparklines } = useMemo(() => {
@@ -232,6 +240,9 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
         <EnhancedKpiWidget detail="Trainers across all gyms" icon={<Dumbbell className="size-4" />} label="Trainers" value={formatCompactNumber(dashboard.trainers.length)} />
         <EnhancedKpiWidget detail="Active membership subscriptions" icon={<Tags className="size-4" />} label="Active Memberships" value={formatCompactNumber(activeMemberships)} />
         <EnhancedKpiWidget detail="Memberships expiring in 30 days" icon={<AlertTriangle className="size-4" />} label="Expiring Soon" value={String(expiryCount)} status={(expiryCount > 10 ? "risk" : expiryCount > 5 ? "watch" : "good") as "good" | "watch" | "risk"} />
+        {planContext?.features?.leadManagement ? (
+          <EnhancedKpiWidget detail="New leads captured this month" icon={<UserRoundPlus className="size-4" />} label="New Leads" value={formatCompactNumber(newLeadsThisMonth)} />
+        ) : null}
         <EnhancedKpiWidget detail="Open or investigating security events" icon={<ShieldCheck className="size-4" />} label="Security Alerts" value={formatCompactNumber(dashboard.metrics.openSecurityEvents)} status={(dashboard.metrics.openSecurityEvents > 0 ? "watch" : "good") as "good" | "watch" | "risk"} />
       </div>
 

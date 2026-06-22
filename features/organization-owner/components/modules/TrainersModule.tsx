@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState, useActionState } from "react";
-import { CreditCard, Download, Dumbbell, Edit3, Eye, Plus, UserRound, UsersRound } from "lucide-react";
+import { useCallback, useState, useActionState, useMemo, type ReactNode } from "react";
+import { Banknote, Download, Dumbbell, Edit3, Eye, FileText, Percent, Plus, UserRound, UsersRound } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
@@ -17,9 +17,14 @@ import { useModuleFilters } from "@/features/organization-owner/lib/use-module-f
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { TrainerCommissionPanel } from "./TrainerCommissionPanel";
+import { CommissionRatesPanel } from "./CommissionRatesPanel";
+import { PayrollModule } from "./PayrollModule";
+import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import type { Database } from "@/types/database";
+import { cn } from "@/lib/utils";
 
-type TrainersEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
+type TrainersEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; planContext?: OrgPlanContext | null | undefined };
 type TrainerRow = Database["public"]["Tables"]["trainers"]["Row"];
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
@@ -30,7 +35,8 @@ function TrainerAvatar({ name }: { name: string }) {
   return <div className={`flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${colors[name.length % colors.length]}`}>{name.charAt(0).toUpperCase()}</div>;
 }
 
-export function TrainersEnterpriseModule({ dashboard, moduleData }: TrainersEnterpriseModuleProps) {
+export function TrainersEnterpriseModule({ dashboard, moduleData, planContext }: TrainersEnterpriseModuleProps) {
+  const [activeTab, setActiveTab] = useState<"trainers" | "commissions" | "rates" | "payroll">("trainers");
   const { filters, navigate, currentPage } = useModuleFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [assignDrawerOpen, setAssignDrawerOpen] = useState(false);
@@ -91,8 +97,61 @@ export function TrainersEnterpriseModule({ dashboard, moduleData }: TrainersEnte
 
   const totalItems = moduleData?.items?.length ?? dashboard.trainers.length;
 
+  const orgId = dashboard.organization.id;
+  const showCommissions = planContext?.features.trainerCommissionsPayroll === true;
+  const showPayroll = planContext?.features.payrollExport === true;
+
+  const tabs = useMemo(() => {
+    const t: Array<{ key: typeof activeTab; label: string; icon: ReactNode }> = [
+      { key: "trainers", label: "Trainers", icon: <Dumbbell className="size-4" /> },
+    ];
+    if (showCommissions) {
+      t.push({ key: "commissions", label: "Commissions", icon: <Banknote className="size-4" /> });
+      t.push({ key: "rates", label: "Rates", icon: <Percent className="size-4" /> });
+    }
+    if (showPayroll) {
+      t.push({ key: "payroll", label: "Payroll", icon: <FileText className="size-4" /> });
+    }
+    return t;
+  }, [showCommissions, showPayroll]);
+
+  const trainerList = useMemo(() => trainers.map((t) => ({ id: t.id, display_name: t.display_name })), [trainers]);
+
   return (
     <div className="space-y-6">
+      {/* ═══ SUB-TABS ═══ */}
+      {tabs.length > 1 ? (
+        <div className="flex gap-1 rounded-lg border border-border bg-surface-muted p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all",
+                activeTab === tab.key
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* ═══ COMMISSION PANEL ═══ */}
+      {activeTab === "commissions" ? <TrainerCommissionPanel organizationId={orgId} trainers={trainerList} /> : null}
+
+      {/* ═══ RATES PANEL ═══ */}
+      {activeTab === "rates" ? <CommissionRatesPanel organizationId={orgId} trainers={trainerList} /> : null}
+
+      {/* ═══ PAYROLL PANEL ═══ */}
+      {activeTab === "payroll" ? <PayrollModule organizationId={orgId} /> : null}
+
+      {/* ═══ TRAINERS TAB (DEFAULT) ═══ */}
+      {activeTab !== "trainers" ? null : (
+        <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total trainer profiles" icon={<Dumbbell className="size-5" />} label="Total Trainers" value={String(trainers.length)} />
@@ -211,6 +270,8 @@ export function TrainersEnterpriseModule({ dashboard, moduleData }: TrainersEnte
 
       {/* ═══ DETAIL PANEL ═══ */}
       {detailTrainer ? <TrainerDetailPanel trainer={detailTrainer} dashboard={dashboard} onClose={() => setDetailTrainer(null)} /> : null}
+        </>
+      )}
     </div>
   );
 }

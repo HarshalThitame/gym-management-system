@@ -56,14 +56,39 @@ export async function inviteStaffAction(prevState: AuthActionState, formData: Fo
     const { error: roleError } = await supabase.from("user_roles").insert({ user_id: profileId, role_id: role.id, gym_id: gymId } as never);
     if (roleError) throw new Error(roleError.message);
 
-    const branchId = formData.get("branchId") as string | null;
-    if (branchId) {
-      const { error: branchUserError } = await supabase.from("branch_users").insert({
-        organization_id: ctx.organizationId, branch_id: branchId, user_id: profileId,
-        role_name: roleName as never, access_scope: (formData.get("accessScope") as string) || "single_branch",
-        branch_role: "staff", status: "active"
-      } as never);
-      if (branchUserError) throw new Error(branchUserError.message);
+    const branchIds: string[] = [];
+    const branchIdRaw = formData.get("branchId") as string | null;
+    const branchIdsRaw = formData.getAll("branchIds");
+
+    if (branchIdsRaw.length > 0) {
+      branchIds.push(...(branchIdsRaw as string[]));
+    } else if (branchIdRaw) {
+      branchIds.push(branchIdRaw);
+    }
+
+    if (branchIds.length > 0) {
+      if (branchIds.length > 1) {
+        const hasMultiBranch = await requireOrganizationFeatureAccess({
+          organizationId: ctx.organizationId, featureKey: "multi_branch_staff_assignment", actionName: "staff.invite_multi"
+        }).catch(() => null);
+        if (!hasMultiBranch) {
+          return { ...prevState, status: "error", message: "Multi-branch assignment requires a Growth or Enterprise plan. Only single branch allowed." };
+        }
+      }
+
+      for (const bid of branchIds) {
+        const { data: branch } = await supabase.from("branches").select("id, organization_id").eq("id", bid).maybeSingle();
+        if (!branch) {
+          return { ...prevState, status: "error", message: `Branch ${bid} not found in your organization.` };
+        }
+
+        const { error: branchUserError } = await supabase.from("branch_users").insert({
+          organization_id: ctx.organizationId, branch_id: bid, user_id: profileId,
+          role_name: roleName as never, access_scope: (formData.get("accessScope") as string) || "single_branch",
+          branch_role: "staff", status: "active"
+        } as never);
+        if (branchUserError) throw new Error(branchUserError.message);
+      }
     }
 
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.invite_staff", entityType: "profile", entityId: profileId, metadata: { role: roleName, gymId } as never });

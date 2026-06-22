@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState, useActionState } from "react";
-import { Ban, Download, Edit3, Mail, ShieldCheck, UserPlus, UsersRound } from "lucide-react";
+import { useCallback, useMemo, useState, useActionState, type ReactNode } from "react";
+import { Ban, Download, Edit3, Mail, ShieldCheck, UserPlus, UsersRound, Clock, ArrowLeftRight, FileText } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
@@ -16,6 +16,12 @@ import { useModuleFilters } from "@/features/organization-owner/lib/use-module-f
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { showToast } from "@/components/ui/toast";
 import { formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
+import { StaffAttendancePanel } from "@/features/organization-owner/components/modules/StaffAttendancePanel";
+import { StaffLeavePanel } from "@/features/organization-owner/components/modules/StaffLeavePanel";
+import { StaffBranchAssignmentPanel } from "@/features/organization-owner/components/modules/StaffBranchAssignmentPanel";
+import { HRDocumentsPanel } from "@/features/organization-owner/components/modules/HRDocumentsPanel";
+import { cn } from "@/lib/utils";
 
 type StaffModuleProps = {
   dashboard: OrganizationOwnerDashboard;
@@ -70,6 +76,12 @@ function StaffAvatar({ name, email }: { name: string | null; email: string | nul
 }
 
 export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
+  const hasAttendanceLeave = useHasFeature("staff_attendance_leave");
+    const hasMultiBranch = useHasFeature("multi_branch_staff_assignment");
+    const hasHRDocs = useHasFeature("hr_document_storage");
+    const [activeTab, setActiveTab] = useState<"staff" | "attendance" | "leave" | "branchAccess" | "documents">("staff");
+    const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+
   const { filters, navigate, currentPage } = useModuleFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffItem | null>(null);
@@ -142,10 +154,64 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
     };
   });
 
+  const tabs = useMemo(() => {
+    const t: Array<{ key: typeof activeTab; label: string; icon: ReactNode }> = [
+      { key: "staff", label: "Staff", icon: <UsersRound className="size-4" /> },
+    ];
+    if (hasAttendanceLeave) {
+      t.push({ key: "attendance", label: "Attendance", icon: <Clock className="size-4" /> });
+      t.push({ key: "leave", label: "Leave", icon: <Mail className="size-4" /> });
+    }
+    if (hasMultiBranch) {
+      t.push({ key: "branchAccess", label: "Branch Access", icon: <ArrowLeftRight className="size-4" /> });
+    }
+    if (hasHRDocs) {
+      t.push({ key: "documents", label: "Documents", icon: <FileText className="size-4" /> });
+    }
+    return t;
+  }, [hasAttendanceLeave, hasMultiBranch, hasHRDocs]);
+
   const totalItems = moduleData?.items?.length ?? dashboard.branchUsers.length;
 
   return (
     <div className="space-y-6">
+      {/* ═══ SUB-TABS ═══ */}
+      {tabs.length > 1 ? (
+        <div className="flex gap-1 rounded-lg border border-border bg-surface-muted p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all",
+                activeTab === tab.key
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              type="button"
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* ═══ ATTENDANCE PANEL ═══ */}
+      {activeTab === "attendance" ? <StaffAttendancePanel dashboard={dashboard} /> : null}
+
+      {/* ═══ LEAVE PANEL ═══ */}
+      {activeTab === "leave" ? <StaffLeavePanel dashboard={dashboard} /> : null}
+
+      {/* ═══ BRANCH ACCESS PANEL ═══ */}
+      {activeTab === "branchAccess" ? <StaffBranchAssignmentPanel dashboard={dashboard} hasFeature={hasMultiBranch} /> : null}
+
+      {/* ═══ DOCUMENTS PANEL ═══ */}
+      {activeTab === "documents" ? <HRDocumentsPanel dashboard={dashboard} hasFeature={hasHRDocs} /> : null}
+
+      {/* ═══ STAFF TAB (DEFAULT) ═══ */}
+      {activeTab !== "staff" ? null : (
+        <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total staff across all branches" icon={<UsersRound className="size-5" />} label="Total Staff" value={String(staffItems.length)} />
@@ -238,12 +304,39 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
               </select>
             </DrawerField>
             <DrawerField label="Branch">
-              <select className={selectClass} defaultValue={editingStaff?.branchId ?? ""} name="branchId">
-                <option value="">All branches</option>
-                {dashboard.branches.filter((b) => !editingStaff || b.gym_id === editingStaff.gymId).map((branch) => (
-                  <option key={branch.id} value={branch.id}>{branch.name}</option>
-                ))}
-              </select>
+              {!editingStaff && hasMultiBranch ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto rounded-md border border-border bg-surface-muted p-3">
+                  {dashboard.branches.map((branch) => {
+                    const gym = dashboard.gyms.find((g) => g.id === branch.gym_id);
+                    return (
+                      <label key={branch.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          className="size-4 rounded border-border text-primary focus:ring-primary"
+                          name="branchIds"
+                          type="checkbox"
+                          value={branch.id}
+                          checked={selectedBranchIds.includes(branch.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedBranchIds((prev) => [...prev, branch.id]);
+                            else setSelectedBranchIds((prev) => prev.filter((id) => id !== branch.id));
+                          }}
+                        />
+                        <span className="text-sm">{branch.name} {gym ? `(${gym.name})` : ""}</span>
+                      </label>
+                    );
+                  })}
+                  {selectedBranchIds.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">Select at least one branch</p>
+                  ) : null}
+                </div>
+              ) : (
+                <select className={selectClass} defaultValue={editingStaff?.branchId ?? ""} name="branchId">
+                  <option value="">All branches</option>
+                  {dashboard.branches.filter((b) => !editingStaff || b.gym_id === editingStaff.gymId).map((branch) => (
+                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                  ))}
+                </select>
+              )}
             </DrawerField>
             <DrawerField label="Access Scope">
               <select className={selectClass} defaultValue={editingStaff?.accessScope ?? "single_branch"} name="accessScope">
@@ -270,6 +363,8 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
           </div>
         </form>
       </OrgOwnerDrawer>
+        </>
+      )}
     </div>
   );
 }

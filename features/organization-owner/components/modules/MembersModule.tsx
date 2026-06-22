@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState, useActionState } from "react";
-import { Ban, CalendarDays, CreditCard, Download, Dumbbell, Edit3, Eye, Plus, UserRound, UsersRound, VenetianMask } from "lucide-react";
+import { useCallback, useState, useActionState, useEffect } from "react";
+import { Ban, CalendarDays, CreditCard, Download, Dumbbell, Edit3, Eye, FileUp, LayoutList, Plus, UserRound, UsersRound, VenetianMask } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
@@ -18,6 +18,11 @@ import { useModuleFilters } from "@/features/organization-owner/lib/use-module-f
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
+import { CustomMemberFieldsPanel } from "@/features/organization-owner/components/modules/CustomMemberFieldsPanel";
+import { MemberImportPanel } from "@/features/organization-owner/components/modules/MemberImportPanel";
+import { MemberExportPanel } from "@/features/organization-owner/components/modules/MemberExportPanel";
+import type { CustomField } from "@/features/organization-owner/actions/member-field-actions";
 import type { Database } from "@/types/database";
 
 type MembersModuleProps = {
@@ -46,9 +51,19 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
   const [transferringMember, setTransferringMember] = useState<MemberRow | null>(null);
   const [state, formAction] = useActionState(saveMemberAction, initialAuthActionState);
   const [transferState, transferFormAction] = useActionState(transferMemberAction, initialAuthActionState);
+  const hasCustomFields = useHasFeature("custom_member_fields");
+  const hasImportExport = useHasFeature("member_data_import_export");
+
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [memberCustomValues, setMemberCustomValues] = useState<Record<string, string>>({});
+  const [showCustomFieldsPanel, setShowCustomFieldsPanel] = useState(false);
+  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [detailCustomValues, setDetailCustomValues] = useState<{ field: { id: string; field_name: string; field_type: string }; value: string }[]>([]);
+  const [detailCustomLoading, setDetailCustomLoading] = useState(false);
 
   const initialMembers = (moduleData?.items ?? dashboard.members) as MemberRow[];
-  const { items: members, addOptimistic, updateOptimistic, removeOptimistic } = useOptimisticList<MemberRow>(initialMembers);
+  const { items: members } = useOptimisticList<MemberRow>(initialMembers);
 
   // ── KPIs ──
   const activeCount = members.filter((m) => m.status === "active").length;
@@ -70,8 +85,36 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
     return e > n && e < n + 30 * 86400000;
   }).length;
 
-  const openCreate = useCallback(() => { setEditingMember(null); setDrawerOpen(true); }, []);
-  const openEdit = useCallback((m: MemberRow) => { setEditingMember(m); setDrawerOpen(true); }, []);
+  const openCreate = useCallback(async () => {
+    setEditingMember(null);
+    setMemberCustomValues({});
+    if (hasCustomFields) {
+      try {
+        const { getCustomFields } = await import("@/features/organization-owner/actions/member-field-actions");
+        const fields = await getCustomFields(dashboard.organization.id);
+        setCustomFields(fields);
+      } catch { /* ignore */ }
+    }
+    setDrawerOpen(true);
+  }, [hasCustomFields, dashboard.organization.id]);
+
+  const openEdit = useCallback(async (m: MemberRow) => {
+    setEditingMember(m);
+    if (hasCustomFields) {
+      try {
+        const { getCustomFields, getMemberCustomFieldValues } = await import("@/features/organization-owner/actions/member-field-actions");
+        const [fields, values] = await Promise.all([
+          getCustomFields(dashboard.organization.id),
+          getMemberCustomFieldValues(m.id).catch(() => [] as { field: CustomField; value: string }[]),
+        ]);
+        setCustomFields(fields);
+        const valMap: Record<string, string> = {};
+        for (const v of values) { valMap[v.field.id] = v.value; }
+        setMemberCustomValues(valMap);
+      } catch { /* ignore */ }
+    }
+    setDrawerOpen(true);
+  }, [hasCustomFields, dashboard.organization.id]);
   const openTransfer = useCallback((m: MemberRow) => { setTransferringMember(m); setTransferDrawerOpen(true); }, []);
   const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingMember(null); }, []);
   const closeTransfer = useCallback(() => { setTransferDrawerOpen(false); setTransferringMember(null); }, []);
@@ -82,6 +125,30 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
   const detailTrainer = detailMember?.assigned_trainer_id ? dashboard.trainers.find((t) => t.id === detailMember.assigned_trainer_id) : null;
   const detailMemberships = detailMember ? dashboard.memberships.filter((m) => m.member_id === detailMember.id) : [];
   const detailPayments = detailMember ? dashboard.payments.filter((p) => p.member_id === detailMember.id) : [];
+
+  useEffect(() => {
+    if (!detailMember || !hasCustomFields) {
+      setDetailCustomValues([]);
+      return;
+    }
+    let cancelled = false;
+    const fetchDetailCustom = async () => {
+      setDetailCustomLoading(true);
+      try {
+        const { getMemberCustomFieldValues } = await import("@/features/organization-owner/actions/member-field-actions");
+        const vals = await getMemberCustomFieldValues(detailMember.id);
+        if (!cancelled) {
+          setDetailCustomValues(vals.map((v) => ({ field: { id: v.field.id, field_name: v.field.field_name, field_type: v.field.field_type }, value: v.value })));
+        }
+      } catch {
+        if (!cancelled) setDetailCustomValues([]);
+      } finally {
+        if (!cancelled) setDetailCustomLoading(false);
+      }
+    };
+    fetchDetailCustom();
+    return () => { cancelled = true; };
+  }, [detailMember, hasCustomFields]);
 
   const items = members.map((member) => {
     const gym = dashboard.gyms.find((g) => g.id === member.gym_id);
@@ -130,6 +197,24 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
         <StatCard detail="Total active memberships" icon={<CreditCard className="size-5" />} label="Active Plans" value={formatCompactNumber(dashboard.memberships.filter((m) => m.status === "active").length)} />
       </section>
 
+      {/* ═══ CUSTOM FIELDS TOGGLE ═══ */}
+      {hasCustomFields ? (
+        <button
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-bold text-foreground transition-all hover:border-border-strong hover:bg-surface-muted"
+          onClick={() => setShowCustomFieldsPanel((v) => !v)}
+          type="button"
+        >
+          <LayoutList className="size-4" />
+          Custom Fields
+          <span className="text-xs text-muted-foreground">{showCustomFieldsPanel ? "Hide" : "Show"}</span>
+        </button>
+      ) : null}
+
+      {/* ═══ CUSTOM FIELDS PANEL ═══ */}
+      {hasCustomFields && showCustomFieldsPanel ? (
+        <CustomMemberFieldsPanel organizationId={dashboard.organization.id} hasFeature={hasCustomFields} />
+      ) : null}
+
       {/* ═══ FILTERS ═══ */}
       <FilterBar
         filterGroups={[
@@ -152,7 +237,17 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
           { label: "Export", onClick: (ids) => { const data = members.filter((m) => ids.includes(m.id)).map((m) => ({ name: m.full_name, code: m.member_code, phone: m.phone, email: m.email, status: m.status, gender: m.gender, joined: m.joined_at })); exportToCSV(data, "members-selected"); }, variant: "secondary" as const, icon: <Download className="size-3.5" /> }
         ]}
         onExportCSV={() => exportToCSV(members.map((m) => ({ name: m.full_name, code: m.member_code, phone: m.phone, email: m.email, status: m.status, gym_id: m.gym_id, trainer_id: m.assigned_trainer_id, joined: m.joined_at })), "all-members")}
-        headerAction={<Button onClick={openCreate} size="sm" variant="primary"><Plus className="size-4" /> Add Member</Button>}
+        headerAction={
+          <div className="flex items-center gap-2">
+            {hasImportExport ? (
+              <>
+                <Button onClick={() => setShowImportPanel(true)} size="sm" variant="secondary"><FileUp className="size-4" /> Import</Button>
+                <Button onClick={() => setShowExportPanel(true)} size="sm" variant="secondary"><Download className="size-4" /> Export</Button>
+              </>
+            ) : null}
+            <Button onClick={openCreate} size="sm" variant="primary"><Plus className="size-4" /> Add Member</Button>
+          </div>
+        }
         headerTitle="Members" items={items}
         totalItems={totalItems} totalPages={Math.ceil(totalItems / (filters.pageSize ?? 12))}
         currentPage={currentPage} onPageChange={(p) => navigate({ page: p })} pageSize={filters.pageSize ?? 12}
@@ -208,6 +303,30 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
               <input className={selectClass} defaultValue={editingMember?.address ?? ""} name="address" type="text" />
             </DrawerField>
           </div>
+          {hasCustomFields && customFields.length > 0 ? (
+            <div className="space-y-5 border-t border-border pt-5">
+              <h4 className="text-sm font-black text-muted-foreground">CUSTOM FIELDS</h4>
+              <div className="grid gap-5 md:grid-cols-2">
+                {customFields.map((cf) => (
+                  <DrawerField key={cf.id} label={cf.field_name} required={cf.required}>
+                    {cf.field_type === "select" ? (
+                      <select className={selectClass} value={memberCustomValues[cf.id] ?? ""} onChange={(e) => setMemberCustomValues((prev) => ({ ...prev, [cf.id]: e.target.value }))} name={`custom_${cf.id}`}>
+                        <option value="">Select</option>
+                        {(Array.isArray(cf.options) ? cf.options : []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : cf.field_type === "date" ? (
+                      <input className={selectClass} value={memberCustomValues[cf.id] ?? ""} onChange={(e) => setMemberCustomValues((prev) => ({ ...prev, [cf.id]: e.target.value }))} name={`custom_${cf.id}`} type="date" />
+                    ) : cf.field_type === "number" ? (
+                      <input className={selectClass} value={memberCustomValues[cf.id] ?? ""} onChange={(e) => setMemberCustomValues((prev) => ({ ...prev, [cf.id]: e.target.value }))} name={`custom_${cf.id}`} type="number" />
+                    ) : (
+                      <input className={selectClass} value={memberCustomValues[cf.id] ?? ""} onChange={(e) => setMemberCustomValues((prev) => ({ ...prev, [cf.id]: e.target.value }))} name={`custom_${cf.id}`} type="text" />
+                    )}
+                  </DrawerField>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <input name="customFields" type="hidden" value={JSON.stringify(customFields.map((cf) => ({ fieldId: cf.id, value: memberCustomValues[cf.id] ?? "" })))} />
           <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={closeDrawer} type="button">Cancel</button>
             <DrawerSubmitButton>{editingMember ? "Update" : "Add Member"}</DrawerSubmitButton>
@@ -317,9 +436,42 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
                   ))}
                 </CardContent>
               </Card>
+
+              {/* Custom Fields */}
+              {hasCustomFields && detailCustomValues.length > 0 ? (
+                <Card>
+                  <CardHeader><h3 className="text-lg font-black">Custom Fields</h3></CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    {detailCustomValues.map((cv) => (
+                      <div key={cv.field.id}>
+                        <p className="text-xs text-muted-foreground">{cv.field.field_name}</p>
+                        <p className="text-sm font-bold">{cv.value || "—"}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ) : null}
+              {detailCustomLoading ? (
+                <div className="flex items-center justify-center py-4"><p className="text-xs text-muted-foreground">Loading custom fields...</p></div>
+              ) : null}
             </div>
           </div>
         </div>
+      ) : null}
+
+      {/* ═══ IMPORT PANEL ═══ */}
+      {showImportPanel ? (
+        <MemberImportPanel organizationId={dashboard.organization.id} onClose={() => setShowImportPanel(false)} />
+      ) : null}
+
+      {/* ═══ EXPORT PANEL ═══ */}
+      {showExportPanel ? (
+        <MemberExportPanel
+          organizationId={dashboard.organization.id}
+          gyms={dashboard.gyms}
+          currentFilters={filters as unknown as { status?: string; gymId?: string }}
+          onClose={() => setShowExportPanel(false)}
+        />
       ) : null}
     </div>
   );

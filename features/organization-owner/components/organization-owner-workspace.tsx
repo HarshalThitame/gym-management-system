@@ -28,6 +28,7 @@ import { SupportEnterpriseModule } from "@/features/organization-owner/component
 import { ProfileEnterpriseModule } from "@/features/organization-owner/components/modules/ProfileModule";
 import { SettingsEnterpriseModule } from "@/features/organization-owner/components/modules/SettingsModule";
 import { SecurityEnterpriseModule } from "@/features/organization-owner/components/modules/SecurityModule";
+import { LeadsModule } from "@/features/organization-owner/components/modules/LeadsModule";
 import type { OrganizationOwnerModule } from "@/features/organization-owner/lib/organization-owner-modules";
 import { organizationOwnerModules } from "@/features/organization-owner/lib/organization-owner-modules";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
@@ -54,7 +55,7 @@ export function OrganizationOwnerWorkspace({ dashboard, module, moduleData, modu
     return (
       <div className="space-y-8">
         <ModuleHero dashboard={dashboard} module={module} />
-        <ModuleContent dashboard={dashboard} module={module} moduleData={moduleData} moduleFilters={moduleFilters} />
+        <ModuleContent dashboard={dashboard} module={module} moduleData={moduleData} moduleFilters={moduleFilters} planContext={planContext} />
       </div>
     );
   }
@@ -82,7 +83,7 @@ function ModuleHero({ dashboard, module }: { dashboard: OrganizationOwnerDashboa
 }
 
 // Module slug → page component (feature gating handled by route guard in [module]/page.tsx)
-function ModuleContent({ dashboard, module, moduleData, moduleFilters }: { dashboard: OrganizationOwnerDashboard; module: OrganizationOwnerModule; moduleData?: unknown | undefined; moduleFilters?: ModuleSearchParams | undefined }) {
+function ModuleContent({ dashboard, module, moduleData, moduleFilters, planContext }: { dashboard: OrganizationOwnerDashboard; module: OrganizationOwnerModule; moduleData?: unknown | undefined; moduleFilters?: ModuleSearchParams | undefined; planContext?: OrgPlanContext | null | undefined }) {
   void moduleData; void moduleFilters;
   switch (module.slug) {
     case "gyms":
@@ -91,7 +92,7 @@ function ModuleContent({ dashboard, module, moduleData, moduleFilters }: { dashb
     case "members": return <MembersModule dashboard={dashboard} />;
     case "memberships": return <MembershipsModule dashboard={dashboard} />;
     case "revenue": return <RevenueEnterpriseModule dashboard={dashboard} />;
-    case "trainers": return <TrainersEnterpriseModule dashboard={dashboard} />;
+    case "trainers": return <TrainersEnterpriseModule dashboard={dashboard} planContext={planContext} />;
     case "attendance": return <AttendanceEnterpriseModule dashboard={dashboard} />;
     case "classes": return <ClassesEnterpriseModule dashboard={dashboard} />;
     case "communications": return <CommunicationsEnterpriseModule dashboard={dashboard} />;
@@ -104,6 +105,7 @@ function ModuleContent({ dashboard, module, moduleData, moduleFilters }: { dashb
     case "profile": return <ProfileEnterpriseModule dashboard={dashboard} />;
     case "settings": return <SettingsEnterpriseModule dashboard={dashboard} />;
     case "security": return <SecurityEnterpriseModule dashboard={dashboard} />;
+    case "leads": return <LeadsModule dashboard={dashboard} moduleFilters={moduleFilters} />;
     default: return null;
   }
 }

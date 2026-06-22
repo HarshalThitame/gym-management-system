@@ -10,6 +10,7 @@ import { hasRequiredRole } from "@/lib/rbac";
 import { validateAllowedFile } from "@/lib/security/file-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assertFeature } from "@/lib/tenant";
+import { calculateCommissionsForSession } from "@/features/organization-owner/actions/commission-actions";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
 import type { AuthContext } from "@/types/auth";
@@ -728,6 +729,35 @@ export async function updateTrainerSessionStatusAction(_previousState: AuthActio
       : Promise.resolve(),
     writeTrainingAudit(context, "trainer_session.status_changed", "trainer_session", session.id, { from: session.status, to: parsed.data.nextStatus })
   ]);
+
+  if (parsed.data.nextStatus === "completed") {
+    try {
+      const organizationId = await getOrganizationIdForGym(supabase, session.gym_id);
+      if (organizationId) {
+        let baseAmount = 0;
+        let description = "PT session completed";
+        if (session.member_pt_package_id) {
+          const { data: pkg } = await supabase
+            .from("member_pt_packages")
+            .select("price_amount")
+            .eq("id", session.member_pt_package_id)
+            .maybeSingle();
+          if (pkg) baseAmount = pkg.price_amount;
+          description = `PT session #${session.id.slice(0, 8)}`;
+        }
+        await calculateCommissionsForSession(
+          organizationId,
+          session.trainer_id,
+          "pt_session",
+          session.id,
+          description,
+          baseAmount
+        );
+      }
+    } catch {
+      // Don't block session completion on commission error
+    }
+  }
 
   revalidatePath("/trainer");
   revalidatePath("/trainer/sessions");

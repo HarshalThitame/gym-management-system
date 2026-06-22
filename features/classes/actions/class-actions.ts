@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assertFeature } from "@/lib/tenant";
+import { calculateCommissionsForSession } from "@/features/organization-owner/actions/commission-actions";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
 import type { ClassRow, ClassSessionRow } from "@/types/classes";
@@ -556,6 +557,28 @@ export async function recordClassAttendanceAction(_previousState: AuthActionStat
     logClassSession(supabase, context, bundle.session, "attendance_marked", null, parsed.data.status, parsed.data.notes || null),
     writeClassAudit(context, "class.attendance_marked", "class_attendance", attendance.id, { sessionId: bundle.session.id, memberId: parsed.data.memberId, status: parsed.data.status })
   ]);
+
+  if (parsed.data.status === "attended" || parsed.data.status === "late") {
+    const trainerId = bundle.session.substitute_trainer_id ?? bundle.session.primary_trainer_id;
+    if (trainerId) {
+      try {
+        const orgId = await getOrganizationIdForGym(supabase, bundle.session.gym_id);
+        if (orgId) {
+          await calculateCommissionsForSession(
+            orgId,
+            trainerId,
+            "class",
+            bundle.session.id,
+            `Class session #${bundle.session.id.slice(0, 8)}`,
+            bundle.classRow.price_amount ?? 0
+          );
+        }
+      } catch {
+        // Don't block attendance on commission error
+      }
+    }
+  }
+
   revalidateClassPaths();
   return { status: "success", message: "Class attendance recorded." };
 }
