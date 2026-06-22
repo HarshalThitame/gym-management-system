@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Tags,
   UserRound,
+  UserRoundPlus,
   UsersRound
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -154,6 +155,16 @@ export const organizationOwnerModules = [
     icon: <Globe2 className="size-5" />,
     iconKey: "settings",
     featureKey: "custom_domain" as FeatureKey,
+  },
+  {
+    slug: "leads",
+    href: "/organization/leads",
+    label: "Leads",
+    title: "Lead & Enquiry Management",
+    description: "View, manage, and convert leads and enquiries across your organization.",
+    icon: <UserRoundPlus className="size-5" />,
+    iconKey: "users",
+    featureKey: "lead_management" as FeatureKey,
   },
   {
     slug: "billing",

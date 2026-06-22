@@ -7,6 +7,7 @@ import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit } from "../lib/entitlement-guards";
 import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
+import { saveMemberCustomFieldValues } from "./member-field-actions";
 
 type MemberInsert = Database["public"]["Tables"]["members"]["Insert"];
 type MemberUpdate = Database["public"]["Tables"]["members"]["Update"];
@@ -25,6 +26,12 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
     const { data: gym } = await supabase.from("gyms").select("organization_id").eq("id", gymId).single();
     if (!gym || gym.organization_id !== ctx.organizationId) return { ...prevState, status: "error", message: "Gym not in your organization." };
 
+    const customFieldsJson = formData.get("customFields") as string;
+    let customFieldValues: { fieldId: string; value: string }[] = [];
+    if (customFieldsJson) {
+      try { customFieldValues = JSON.parse(customFieldsJson); } catch { /* skip */ }
+    }
+
     if (memberId) {
       const update: Record<string, unknown> = {
         full_name: fullName, phone, email: (formData.get("email") as string) || null,
@@ -39,6 +46,10 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
       const { error } = await supabase.from("members").update(update as never).eq("id", memberId);
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_member", entityType: "member", entityId: memberId });
+
+      if (customFieldValues.length > 0) {
+        await saveMemberCustomFieldValues(memberId, customFieldValues);
+      }
     } else {
       // Enforce member limit before creation
       const { count } = await (supabase as never as { from(t: string): { select(c: string, o: { count: "exact"; head: true }): { eq(k: string, v: string): Promise<{ count: number | null }> } } })
@@ -63,6 +74,10 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
       const { data, error } = await supabase.from("members").insert(insert as never).select("id").single();
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.create_member", entityType: "member", entityId: data.id });
+
+      if (customFieldValues.length > 0 && data) {
+        await saveMemberCustomFieldValues(data.id, customFieldValues);
+      }
     }
 
     revalidateOrgModules(["/organization/members"]);

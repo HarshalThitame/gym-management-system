@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export type ModuleSearchParams = {
   q?: string | undefined;
   status?: string | undefined;
+  source?: string | undefined;
   role?: string | undefined;
   gymId?: string | undefined;
   sort?: string | undefined;
@@ -147,6 +148,18 @@ export async function resolveModuleData(
         supabase.from("activity_events").select("*", { count: "exact" }).eq("organization_id", orgId).order("created_at", { ascending: false }).range(0, 49)
       ]);
       return { moduleData: { securityEvents: eventsResult.data ?? [], activityEvents: activityResult.data ?? [] }, total: (eventsResult.count ?? 0) + (activityResult.count ?? 0), page, pageSize, totalPages: 1 } as never;
+    }
+
+    case "leads": {
+      const { getLeads } = await import("../services/lead-service");
+      const result = await getLeads(orgId, {
+        q: params.q ?? undefined,
+        status: params.status ?? undefined,
+        source: params.source ?? undefined,
+        page,
+        pageSize,
+      });
+      return { moduleData: { items: result.leads }, total: result.total, page: result.page, pageSize: result.pageSize, totalPages: result.totalPages } as never;
     }
 
     default:

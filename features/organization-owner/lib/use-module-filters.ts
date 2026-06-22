@@ -11,6 +11,7 @@ export function useModuleFilters() {
   const filters = useMemo(() => ({
     q: searchParams.get("q") ?? undefined,
     status: searchParams.get("status") ?? undefined,
+    source: searchParams.get("source") ?? undefined,
     role: searchParams.get("role") ?? undefined,
     gymId: searchParams.get("gymId") ?? undefined,
     sort: searchParams.get("sort") ?? undefined,

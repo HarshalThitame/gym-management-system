@@ -2526,6 +2526,8 @@ export type Database = {
           joined_at: string;
           years_experience: number;
           hourly_rate_amount: number;
+          base_salary: number;
+          branch_id: string | null;
           created_by: string | null;
           archived_at: string | null;
           metadata: Json;
@@ -2546,6 +2548,8 @@ export type Database = {
           joined_at?: string;
           years_experience?: number;
           hourly_rate_amount?: number;
+          base_salary?: number;
+          branch_id?: string | null;
           created_by?: string | null;
           archived_at?: string | null;
           metadata?: Json;
@@ -5500,6 +5504,150 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["leads"]["Insert"]>;
         Relationships: Relationship[];
+      };
+      trainer_commission_rates: {
+        Row: {
+          id: string;
+          organization_id: string;
+          trainer_id: string | null;
+          source_type: string;
+          rate: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          trainer_id?: string | null;
+          source_type: string;
+          rate: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["trainer_commission_rates"]["Insert"]>;
+        Relationships: [];
+      };
+      trainer_commissions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          trainer_id: string;
+          source_type: string;
+          source_id: string;
+          description: string | null;
+          amount: number;
+          rate: number;
+          calculated_at: string;
+          paid_at: string | null;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          trainer_id: string;
+          source_type: string;
+          source_id: string;
+          description?: string | null;
+          amount: number;
+          rate?: number;
+          calculated_at?: string;
+          paid_at?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["trainer_commissions"]["Insert"]>;
+        Relationships: [];
+      };
+      trainer_ratings: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          gym_id: string | null;
+          member_id: string | null;
+          organization_id: string | null;
+          rating: number;
+          review_text: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          gym_id?: string | null;
+          member_id?: string | null;
+          organization_id?: string | null;
+          rating: number;
+          review_text?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["trainer_ratings"]["Insert"]>;
+        Relationships: [];
+      };
+      staff_attendance: {
+        Row: {
+          id: string;
+          organization_id: string;
+          staff_id: string;
+          branch_id: string | null;
+          clock_in: string;
+          clock_out: string | null;
+          date: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          staff_id: string;
+          branch_id?: string | null;
+          clock_in?: string;
+          clock_out?: string | null;
+          date?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["staff_attendance"]["Insert"]>;
+        Relationships: [];
+      };
+      staff_leave_requests: {
+        Row: {
+          id: string;
+          organization_id: string;
+          staff_id: string;
+          leave_type: string;
+          start_date: string;
+          end_date: string;
+          reason: string | null;
+          status: string;
+          approver_id: string | null;
+          approved_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          staff_id: string;
+          leave_type: string;
+          start_date: string;
+          end_date: string;
+          reason?: string | null;
+          status?: string;
+          approver_id?: string | null;
+          approved_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["staff_leave_requests"]["Insert"]>;
+        Relationships: [];
       };
     };
     Views: {

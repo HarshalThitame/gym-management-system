@@ -13,6 +13,13 @@ import { StatCard } from "@/components/ui/stat-card";
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
+import { TrainerPerformanceReport } from "@/features/organization-owner/components/modules/reports/TrainerPerformanceReport";
+import { ClassOccupancyReport } from "@/features/organization-owner/components/modules/reports/ClassOccupancyReport";
+import { LeadConversionReport } from "@/features/organization-owner/components/modules/reports/LeadConversionReport";
+import { BranchRevenueReport } from "@/features/organization-owner/components/modules/reports/BranchRevenueReport";
+
+type AnalyticsTab = "overview" | "revenue" | "members" | "utilization" | "trainer_perf" | "class_occ" | "lead_conv" | "branch_rev";
 
 type AnalyticsEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
 
@@ -20,8 +27,13 @@ const CHART_COLORS = ["#111315", "#16a34a", "#0891b2", "#f59e0b", "#dc2626", "#8
 
 export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEnterpriseModuleProps) {
   const { filters, navigate, currentPage } = useModuleFilters();
-  const [activeTab, setActiveTab] = useState<"overview" | "revenue" | "members" | "utilization">("overview");
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>("overview");
   const [detailMetric, setDetailMetric] = useState<Record<string, unknown> | null>(null);
+
+  const hasTrainerPerf = useHasFeature("trainer_performance_report");
+  const hasClassOcc = useHasFeature("class_occupancy_report");
+  const hasLeadConv = useHasFeature("lead_conversion_report");
+  const hasBranchRev = useHasFeature("branch_revenue_comparison");
 
   const handleApply = useCallback((f: Record<string, string>) => { navigate({ q: f.q }); }, [navigate]);
   const branchMetrics = (moduleData?.items ?? dashboard.branchMetrics) as typeof dashboard.branchMetrics;
@@ -141,12 +153,23 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
       </section>
 
       {/* ═══ TAB BAR ═══ */}
-      <div className="flex gap-1 rounded-lg border border-border bg-surface p-1" role="tablist">
-        {(["overview", "revenue", "members", "utilization"] as const).map((tab) => (
-          <button key={tab} className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${activeTab === tab ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setActiveTab(tab)} role="tab" aria-selected={activeTab === tab} type="button">
-            {tab === "overview" ? "Overview" : tab === "revenue" ? "Revenue" : tab === "members" ? "Members" : "Utilization"}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1" role="tablist">
+        {([
+          { key: "overview", label: "Overview" },
+          { key: "revenue", label: "Revenue" },
+          { key: "members", label: "Members" },
+          { key: "utilization", label: "Utilization" },
+          hasTrainerPerf ? { key: "trainer_perf", label: "Trainer Performance" } : null,
+          hasClassOcc ? { key: "class_occ", label: "Class Occupancy" } : null,
+          hasLeadConv ? { key: "lead_conv", label: "Lead Conversion" } : null,
+          hasBranchRev ? { key: "branch_rev", label: "Branch Revenue" } : null,
+        ] as { key: AnalyticsTab; label: string }[])
+          .filter((t): t is { key: AnalyticsTab; label: string } => t !== null)
+          .map((tab) => (
+            <button key={tab.key} className={`flex-1 whitespace-nowrap rounded-md px-3 py-2 text-xs font-bold transition md:text-sm ${activeTab === tab.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setActiveTab(tab.key)} role="tab" aria-selected={activeTab === tab.key} type="button">
+              {tab.label}
+            </button>
+          ))}
       </div>
 
       {/* ═══ TAB: OVERVIEW ═══ */}
@@ -337,7 +360,21 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
         </div>
       ) : null}
 
-      {/* ═══ RAW DATA ═══ */}
+      {/* ═══ TAB: TRAINER PERFORMANCE ═══ */}
+      {activeTab === "trainer_perf" ? <TrainerPerformanceReport organizationId={dashboard.organization.id} hasFeature={hasTrainerPerf} /> : null}
+
+      {/* ═══ TAB: CLASS OCCUPANCY ═══ */}
+      {activeTab === "class_occ" ? <ClassOccupancyReport organizationId={dashboard.organization.id} hasFeature={hasClassOcc} /> : null}
+
+      {/* ═══ TAB: LEAD CONVERSION ═══ */}
+      {activeTab === "lead_conv" ? <LeadConversionReport organizationId={dashboard.organization.id} hasFeature={hasLeadConv} /> : null}
+
+      {/* ═══ TAB: BRANCH REVENUE ═══ */}
+      {activeTab === "branch_rev" ? <BranchRevenueReport organizationId={dashboard.organization.id} hasFeature={hasBranchRev} /> : null}
+
+      {/* ═══ RAW DATA (only for built-in tabs) ═══ */}
+      {(["overview", "revenue", "members", "utilization"] as string[]).includes(activeTab) ? (
+        <>
       <FilterBar searchPlaceholder="Filter by branch..." onApply={handleApply} activeFilters={filters as unknown as Record<string, string>} />
       <DataList
         selectable
@@ -364,6 +401,8 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
         onPageChange={(p) => navigate({ page: p })}
         pageSize={filters.pageSize ?? 12}
       />
+        </>
+      ) : null}
     </div>
   );
 }
