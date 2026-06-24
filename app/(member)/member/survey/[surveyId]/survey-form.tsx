@@ -59,7 +59,7 @@ export function NPSSurveyForm({
           </svg>
         </div>
         <h2 className="text-lg font-black text-green-800 dark:text-green-300">
-          Thank You!
+          {thankYouMessage || "Thank You!"}
         </h2>
         <p className="mt-1 text-sm text-green-700 dark:text-green-400">
           You&apos;ve already submitted your feedback for this survey.
@@ -77,7 +77,7 @@ export function NPSSurveyForm({
           </svg>
         </div>
         <h2 className="text-lg font-black text-green-800 dark:text-green-300">
-          Thank You!
+          {thankYouMessage || "Thank You!"}
         </h2>
         <p className="mt-1 text-sm text-green-700 dark:text-green-400">
           {result.message}
@@ -104,7 +104,7 @@ export function NPSSurveyForm({
     <div className="space-y-6">
       <div className="rounded-lg border border-border bg-surface p-6">
         <label className="mb-4 block text-sm font-bold text-muted-foreground">
-          How likely are you to recommend us? (0 = Not at all, 10 = Extremely likely)
+          {question || "How likely are you to recommend us? (0 = Not at all, 10 = Extremely likely)"}
         </label>
         <div className="flex flex-wrap gap-2 justify-center">
           {Array.from({ length: 11 }, (_, i) => i).map((n) => (

@@ -62,7 +62,7 @@ export default async function AdminMemberProfilePage({ params }: MemberProfilePa
         <StatCard detail={currentPlan?.name ?? "No active plan"} icon={<CreditCard className="size-5" />} label="Current Plan" value={currentPlan?.plan_type.replace("_", " ") ?? "None"} />
         <StatCard detail={currentMembership?.end_date ?? "No expiry date"} icon={<CalendarDays className="size-5" />} label="Remaining Days" value={currentMembership ? String(getRemainingDays(currentMembership.end_date)) : "0"} />
         <StatCard detail="Attendance connects in Phase 7" icon={<UserRound className="size-5" />} label="Attendance" value="Ready" />
-        <StatCard detail={currentMembership ? formatMoney(currentMembership.total_amount) : "No invoice"} icon={<FileText className="size-5" />} label="Payment" value={currentMembership?.payment_status ?? "none"} />
+        <StatCard detail={currentMembership ? formatMoney(currentMembership.total_amount ?? 0) : "No invoice"} icon={<FileText className="size-5" />} label="Payment" value={currentMembership?.payment_status ?? "none"} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
@@ -95,7 +95,7 @@ export default async function AdminMemberProfilePage({ params }: MemberProfilePa
                 <ProfileField label="Start date" value={currentMembership.start_date} />
                 <ProfileField label="Expiry date" value={currentMembership.end_date} />
                 <ProfileField label="Invoice" value={currentMembership.invoice_number ?? "-"} />
-                <ProfileField label="Amount" value={formatMoney(currentMembership.total_amount)} />
+                <ProfileField label="Amount" value={formatMoney(currentMembership.total_amount ?? 0)} />
               </dl>
             ) : (
               <p className="text-sm font-semibold text-muted-foreground">No open membership assigned.</p>
