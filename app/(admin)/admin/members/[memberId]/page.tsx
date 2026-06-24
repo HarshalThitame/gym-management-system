@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { DeleteDocumentForm, MemberLifecycleForms } from "@/features/memberships/components/member-lifecycle-forms";
 import { MembershipStatusBadge } from "@/features/memberships/components/membership-status-badge";
+import type { MembershipStatus } from "@/types/membership";
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
 import { getMemberProfile, listActiveMembershipPlans } from "@/features/memberships/services/membership-service";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
@@ -51,7 +52,7 @@ export default async function AdminMemberProfilePage({ params }: MemberProfilePa
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-3xl font-black">{profile.member.full_name}</h2>
             <Badge>{profile.member.member_code}</Badge>
-            <MembershipStatusBadge status={currentMembership?.status ?? "none"} />
+            <MembershipStatusBadge status={(currentMembership?.status ?? "none") as MembershipStatus | "none"} />
           </div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{profile.member.phone} · {profile.member.email ?? "No email"} · Joined {profile.member.joined_at}</p>
         </div>

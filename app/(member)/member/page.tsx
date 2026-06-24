@@ -5,6 +5,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
 import { MembershipStatusBadge } from "@/features/memberships/components/membership-status-badge";
+import type { MembershipStatus } from "@/types/membership";
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
 import { getMemberDashboardOverview } from "@/features/memberships/services/membership-service";
 import { requirePrimaryRole } from "@/lib/auth/guards";
@@ -46,7 +47,7 @@ export default async function MemberDashboardPage() {
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-black">Membership Status</h2>
-            <MembershipStatusBadge status={membership?.status ?? "none"} />
+            <MembershipStatusBadge status={(membership?.status ?? "none") as MembershipStatus | "none"} />
           </div>
           <p className="text-sm leading-6 text-muted-foreground">Your current plan, expiry, and renewal path are shown from the protected membership records connected to your account.</p>
         </CardHeader>

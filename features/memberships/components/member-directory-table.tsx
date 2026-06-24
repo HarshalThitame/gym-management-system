@@ -3,6 +3,7 @@ import { ButtonLink } from "@/components/ui/button";
 import type { MemberDirectoryItem } from "@/types/membership";
 import { formatMoney, getRemainingDays } from "../lib/business-rules";
 import { MembershipStatusBadge } from "./membership-status-badge";
+import type { MembershipStatus } from "@/types/membership";
 
 type MemberDirectoryTableProps = {
   members: MemberDirectoryItem[];
@@ -45,7 +46,7 @@ export function MemberDirectoryTable({ members, total, page, pageSize }: MemberD
                   <p className="mt-1 text-muted-foreground">{member.current_plan?.plan_type?.replace("_", " ") ?? "No membership"}</p>
                 </td>
                 <td className="px-4 py-4">
-                  <MembershipStatusBadge status={member.current_membership?.status ?? "none"} />
+                  <MembershipStatusBadge status={(member.current_membership?.status ?? "none") as MembershipStatus | "none"} />
                 </td>
                 <td className="px-4 py-4">
                   <p>{member.current_membership?.end_date ?? "-"}</p>

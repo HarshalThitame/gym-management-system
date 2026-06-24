@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
 import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
 import { MembershipStatusBadge } from "@/features/memberships/components/membership-status-badge";
+import type { MembershipStatus } from "@/types/membership";
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
 import { getMemberDashboard } from "@/features/memberships/services/membership-service";
 import { requirePrimaryRole } from "@/lib/auth/guards";
@@ -40,7 +41,7 @@ export default async function MemberMembershipPage() {
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-black">Membership Details</h2>
-          <MembershipStatusBadge status={membership?.status ?? "none"} />
+          <MembershipStatusBadge status={(membership?.status ?? "none") as MembershipStatus | "none"} />
         </div>
         <p className="text-sm leading-6 text-muted-foreground">Membership details are scoped to your signed-in user and protected by RLS.</p>
       </CardHeader>
