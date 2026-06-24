@@ -156,9 +156,9 @@ function InvoiceRowItem({ invoice }: { invoice: InvoiceRow }) {
         <p className="text-lg font-black">{formatCurrency(invoice.total_amount ?? 0, invoice.currency)}</p>
       </div>
       <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
-        <Amount label="Paid" value={formatCurrency(invoice.amount_paid, invoice.currency)} />
-        <Amount label="Due" value={formatCurrency(invoice.amount_due, invoice.currency)} />
-        <Amount label="Discount" value={formatCurrency(invoice.discount_amount, invoice.currency)} />
+        <Amount label="Paid" value={formatCurrency(invoice.amount_paid ?? 0, invoice.currency)} />
+        <Amount label="Due" value={formatCurrency(invoice.amount_due ?? 0, invoice.currency)} />
+        <Amount label="Discount" value={formatCurrency(invoice.discount_amount ?? 0, invoice.currency)} />
       </div>
       {invoice.pdf_path ? <p className="mt-3 text-xs font-semibold text-muted-foreground">PDF archived securely: {invoice.pdf_path}</p> : null}
     </div>

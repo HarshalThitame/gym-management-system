@@ -33,7 +33,7 @@ export async function generateInvoicePdf(bundle: InvoiceBundle) {
   for (const item of bundle.items) {
     page.drawText(item.description.slice(0, 54), { x: 60, y, size: 10, font: regular, color: dark });
     page.drawText(String(item.quantity), { x: 335, y, size: 10, font: regular, color: dark });
-    page.drawText(formatCurrency(item.total_amount, bundle.invoice.currency), { x: 455, y, size: 10, font: regular, color: dark });
+    page.drawText(formatCurrency(item.total_amount ?? 0, bundle.invoice.currency), { x: 455, y, size: 10, font: regular, color: dark });
     y -= 22;
   }
 
