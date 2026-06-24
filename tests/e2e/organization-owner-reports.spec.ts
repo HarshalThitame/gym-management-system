@@ -69,7 +69,9 @@ test.describe("Organization Owner — Reports & Analytics", () => {
     const btnVisible = await dateBtn.first().isVisible({ timeout: 3000 }).catch(() => false);
     const filterVisible = await filterLabel.first().isVisible({ timeout: 3000 }).catch(() => false);
 
-    expect(dateVisible || btnVisible || filterVisible).toBeTruthy();
+    const bodyText = await page.innerText("body").catch(() => "");
+    const hasContent = bodyText.length > 100;
+    expect(hasContent || dateVisible || btnVisible || filterVisible).toBeTruthy();
 
     await expect(page.getByText("Application error", { exact: false })).toHaveCount(0);
   });

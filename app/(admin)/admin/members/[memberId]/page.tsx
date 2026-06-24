@@ -59,7 +59,7 @@ export default async function AdminMemberProfilePage({ params }: MemberProfilePa
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail={currentPlan?.name ?? "No active plan"} icon={<CreditCard className="size-5" />} label="Current Plan" value={currentPlan?.plan_type.replace("_", " ") ?? "None"} />
+        <StatCard detail={currentPlan?.name ?? "No active plan"} icon={<CreditCard className="size-5" />} label="Current Plan" value={currentPlan ? currentPlan.plan_type.replace("_", " ") : "None"} />
         <StatCard detail={currentMembership?.end_date ?? "No expiry date"} icon={<CalendarDays className="size-5" />} label="Remaining Days" value={currentMembership ? String(getRemainingDays(currentMembership.end_date)) : "0"} />
         <StatCard detail="Attendance connects in Phase 7" icon={<UserRound className="size-5" />} label="Attendance" value="Ready" />
         <StatCard detail={currentMembership ? formatMoney(currentMembership.total_amount ?? 0) : "No invoice"} icon={<FileText className="size-5" />} label="Payment" value={currentMembership?.payment_status ?? "none"} />
