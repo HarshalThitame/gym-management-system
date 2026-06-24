@@ -44,90 +44,134 @@ export type EntitlementHealthReport = {
 export async function getEntitlementHealthReport(): Promise<EntitlementHealthReport> {
   const db = await adminDb();
 
-  const { data: allOrgs } = await db
-    .from("organizations")
-    .select("id, name")
-    .order("name", { ascending: true });
+  const [orgsRes, subsRes] = await Promise.all([
+    db.from("organizations").select("id, name").order("name", { ascending: true }),
+    db.from("organization_subscriptions")
+      .select("organization_id, package_id, status")
+      .in("status", ["active", "trial"]),
+  ]);
 
-  const { data: allSubs } = await db
-    .from("organization_subscriptions")
-    .select("organization_id, package_id, status")
-    .in("status", ["active", "trial"]);
+  const allOrgs = (orgsRes.data ?? []) as RawRow[];
+  const allSubs = (subsRes.data ?? []) as RawRow[];
 
-  const activeOrgIds = new Set((allSubs ?? []).map((s) => asString(s.organization_id)));
+  const activeOrgIds = new Set(allSubs.map((s) => asString(s.organization_id)));
 
+  // Build org name lookup
+  const orgNameMap: Record<string, string> = {};
+  for (const org of allOrgs) {
+    orgNameMap[asString(org.id)] = asString(org.name);
+  }
+
+  // Get unique package IDs
+  const packageIds = [...new Set(allSubs.map((s) => asString(s.package_id)))].filter(Boolean);
+
+  // Batch fetch: all package features for all relevant packages
+  const uniqueOrgIds = [...new Set(allSubs.map((s) => asString(s.organization_id)))].filter(Boolean);
+
+  const [pkgFeaturesAllRes, orgEntitlementsAllRes, orgLimitsAllRes] = await Promise.all([
+    // All package features for active packages
+    db.from("package_features").select("package_id, feature_code")
+      .in("package_id" as never, packageIds as never),
+    // All org entitlements for active orgs
+    db.from("organization_entitlements").select("organization_id, feature_code")
+      .in("organization_id" as never, uniqueOrgIds as never),
+    // All org usage limits for active orgs
+    db.from("organization_usage_limits").select("organization_id, limit_code")
+      .in("organization_id" as never, uniqueOrgIds as never),
+  ]);
+
+  // Index package features by package_id
+  const pkgFeaturesByPkg: Record<string, Set<string>> = {};
+  for (const row of (pkgFeaturesAllRes.data ?? []) as RawRow[]) {
+    const pkgId = asString(row.package_id);
+    const fc = asString(row.feature_code);
+    if (!pkgFeaturesByPkg[pkgId]) pkgFeaturesByPkg[pkgId] = new Set();
+    if (fc) pkgFeaturesByPkg[pkgId].add(fc);
+  }
+
+  // Index org entitlements by org_id
+  const orgEntitlementsByOrg: Record<string, Set<string>> = {};
+  for (const row of (orgEntitlementsAllRes.data ?? []) as RawRow[]) {
+    const orgId = asString(row.organization_id);
+    const fc = asString(row.feature_code);
+    if (!orgEntitlementsByOrg[orgId]) orgEntitlementsByOrg[orgId] = new Set();
+    if (fc) orgEntitlementsByOrg[orgId].add(fc);
+  }
+
+  // Detect stale entitlements and missing entitlements
   const staleFeaturesPerOrg: EntitlementHealthReport["staleFeaturesPerOrg"] = [];
   let orgsWithMissingEntitlements = 0;
 
-  if (allSubs) {
-    for (const sub of allSubs) {
-      const orgId = asString(sub.organization_id);
-      const pkgId = asString(sub.package_id);
+  for (const sub of allSubs) {
+    const orgId = asString(sub.organization_id);
+    const pkgId = asString(sub.package_id);
 
-      const [pkgFeaturesRes, orgEntitlementsRes, orgLimitsRes] = await Promise.all([
-        db.from("package_features").select("feature_code").eq("package_id" as never, pkgId as never),
-        db.from("organization_entitlements").select("feature_code").eq("organization_id" as never, orgId as never),
-        db.from("organization_usage_limits").select("limit_code").eq("organization_id" as never, orgId as never),
-      ]);
+    const pkgFeatures = pkgFeaturesByPkg[pkgId] ?? new Set<string>();
+    const orgFeatures = orgEntitlementsByOrg[orgId] ?? new Set<string>();
 
-      const pkgFeatureCodes = new Set((pkgFeaturesRes.data ?? []).map((r) => asString(r.feature_code)));
-      const orgFeatureCodes = new Set((orgEntitlementsRes.data ?? []).map((r) => asString(r.feature_code)));
-
-      const staleFeatureCodes: string[] = [];
-      for (const code of orgFeatureCodes) {
-        if (code && !pkgFeatureCodes.has(code)) {
-          staleFeatureCodes.push(code);
-        }
+    const staleFeatureCodes: string[] = [];
+    for (const code of orgFeatures) {
+      if (!pkgFeatures.has(code)) {
+        staleFeatureCodes.push(code);
       }
+    }
 
-      if (staleFeatureCodes.length > 0) {
-        const orgName = (allOrgs ?? []).find((o) => asString(o.id) === orgId)
-          ? asString(((allOrgs ?? []).find((o) => asString(o.id) === orgId) as RawRow)?.name ?? "")
-          : "";
-        staleFeaturesPerOrg.push({ orgId, orgName, staleFeatureCodes });
-      }
+    if (staleFeatureCodes.length > 0) {
+      staleFeaturesPerOrg.push({
+        orgId,
+        orgName: orgNameMap[orgId] ?? "",
+        staleFeatureCodes,
+      });
+    }
 
-      for (const code of pkgFeatureCodes) {
-        if (code && !orgFeatureCodes.has(code)) {
-          orgsWithMissingEntitlements++;
-          break;
-        }
+    for (const code of pkgFeatures) {
+      if (!orgFeatures.has(code)) {
+        orgsWithMissingEntitlements++;
+        break;
       }
     }
   }
 
+  // Batch fetch last sync timestamps for all orgs
   const lastSyncTimestamps: EntitlementHealthReport["lastSyncTimestamps"] = [];
 
-  for (const org of allOrgs ?? []) {
+  const [entEventAllRes] = await Promise.all([
+    db.from("subscription_events")
+      .select("organization_id, event_type, created_at")
+      .in("organization_id" as never, uniqueOrgIds as never)
+      .in("event_type" as never, ["entitlement_sync_completed" as never, "usage_limits_sync_completed" as never])
+      .order("created_at", { ascending: false }),
+  ]);
+
+  // The above single query gets both event types; we split in memory.
+  // For each org, take the most recent of each type.
+  const orgEntSyncTimes: Record<string, string | null> = {};
+  const orgLimSyncTimes: Record<string, string | null> = {};
+
+  for (const row of (entEventAllRes.data ?? []) as RawRow[]) {
+    const orgId = asString(row.organization_id);
+    const eventType = asString(row.event_type);
+    const createdAt = asString(row.created_at);
+
+    if (eventType === "entitlement_sync_completed" && !orgEntSyncTimes[orgId]) {
+      orgEntSyncTimes[orgId] = createdAt || null;
+    } else if (eventType === "usage_limits_sync_completed" && !orgLimSyncTimes[orgId]) {
+      orgLimSyncTimes[orgId] = createdAt || null;
+    }
+  }
+
+  for (const org of allOrgs) {
     const orgId = asString(org.id);
-
-    const [entEventRes, limEventRes] = await Promise.all([
-      db
-        .from("subscription_events")
-        .select("created_at")
-        .eq("organization_id" as never, orgId as never)
-        .eq("event_type" as never, "entitlement_sync_completed" as never)
-        .order("created_at", { ascending: false })
-        .limit(1),
-      db
-        .from("subscription_events")
-        .select("created_at")
-        .eq("organization_id" as never, orgId as never)
-        .eq("event_type" as never, "usage_limits_sync_completed" as never)
-        .order("created_at", { ascending: false })
-        .limit(1),
-    ]);
-
     lastSyncTimestamps.push({
       orgId,
       orgName: asString(org.name),
-      entitlementsSyncedAt: asString(entEventRes.data?.[0]?.created_at ?? "") || null,
-      limitsSyncedAt: asString(limEventRes.data?.[0]?.created_at ?? "") || null,
+      entitlementsSyncedAt: orgEntSyncTimes[orgId] ?? null,
+      limitsSyncedAt: orgLimSyncTimes[orgId] ?? null,
     });
   }
 
   return {
-    totalOrgs: (allOrgs ?? []).length,
+    totalOrgs: allOrgs.length,
     orgsWithActiveSub: activeOrgIds.size,
     orgsWithStaleEntitlements: staleFeaturesPerOrg.length,
     staleFeaturesPerOrg,

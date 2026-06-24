@@ -186,29 +186,146 @@ function getImplementationInfo(featureCode: string): FeatureImplInfo {
 }
 
 function findCategoryForFeature(featureCode: string): string {
-  for (const category of FEATURE_CATEGORIES) {
-    const categoryFeaturePrefixes: Record<string, string[]> = {
-      ai: ["ai_"],
-      attendance: ["attendance_", "manual_attendance", "qr_attendance", "dynamic_qr_attendance", "trainer_attendance", "staff_attendance", "branch_attendance", "biometric_attendance", "fingerprint_attendance", "face_recognition_attendance", "rfid_attendance", "nfc_attendance", "geo_fencing_attendance", "attendance_api", "attendance_reports"],
-      billing: ["billing_", "receipts", "payment_", "online_payment_", "renewal_reminders", "auto_billing", "discount_promo", "corporate_bulk", "payment_failure", "partial_payment", "razorpay", "multi_currency", "franchise_fee", "multi_gstin", "pos_merchandise", "branch_revenue"],
-      communication: ["email_", "in_app_", "whatsapp_", "sms_", "birthday_", "broadcast_", "cross_branch_member"],
-      crm: ["lead_", "trial_management", "re_engagement", "advanced_crm", "referral_", "loyalty_", "network_wide_campaign", "member_nps"],
-      enterprise: ["franchise_", "multi_branch_", "api_access", "webhooks", "audit_logs", "advanced_rbac", "priority_support", "staff_management", "tally_", "rest_api", "role_based", "multi_branch_staff", "hr_document", "custom_roles", "sso_", "dedicated_", "response_sla", "named_account", "automated_backups", "uptime_sla", "staff_training", "custom_feature_requests"],
-      membership: ["member_", "membership_", "expiry_", "goal_", "progress_", "membership_pause", "member_tagging", "member_progress", "custom_member", "member_data"],
-      platform: ["member_portal", "trainer_portal", "branded_mobile", "diet_workout", "google_calendar", "white_label_mobile", "in_app_push", "digital_membership", "loyalty_rewards"],
-      reports: ["basic_reports", "advanced_reports", "custom_dashboards", "trainer_performance", "class_occupancy", "lead_conversion", "branch_revenue_comparison", "franchise_rollup", "scheduled_report", "equipment_inventory", "data_export", "custom_dashboards_kpis"],
-      trainer: ["trainer_", "workout_", "nutrition_", "pt_sessions", "class_booking", "waitlist_", "cross_branch_class", "trainer_commissions", "staff_attendance_leave", "class_attendance", "payroll_export", "network_wide_class", "trainer_sharing"],
-      white_label: ["white_label", "custom_domain", "custom_branding"],
-    };
+  // Built from FEATURE_KEYS in feature-registry.ts — each category block
+  // corresponds to a section of the FEATURE_KEYS array.
+  const keyToCategory: Record<string, string> = {
+    // ai
+    ai_recommendations: "AI Features",
+    ai_coach: "AI Features",
+    ai_retention_analysis: "AI Features",
+    ai_revenue_insights: "AI Features",
+    // attendance
+    manual_attendance: "Attendance",
+    qr_attendance: "Attendance",
+    dynamic_qr_attendance: "Attendance",
+    trainer_attendance: "Attendance",
+    staff_attendance: "Attendance",
+    branch_attendance: "Attendance",
+    biometric_attendance: "Attendance",
+    fingerprint_attendance: "Attendance",
+    face_recognition_attendance: "Attendance",
+    rfid_attendance: "Attendance",
+    nfc_attendance: "Attendance",
+    geo_fencing_attendance: "Attendance",
+    attendance_api: "Attendance",
+    attendance_reports: "Attendance",
+    // billing
+    billing_invoices: "Billing & Payments",
+    receipts: "Billing & Payments",
+    payment_tracking: "Billing & Payments",
+    online_payment_links: "Billing & Payments",
+    renewal_reminders: "Billing & Payments",
+    auto_billing: "Billing & Payments",
+    discount_promo_codes: "Billing & Payments",
+    corporate_bulk_memberships: "Billing & Payments",
+    payment_failure_handling: "Billing & Payments",
+    partial_payment_dues: "Billing & Payments",
+    razorpay_payu_integration: "Billing & Payments",
+    multi_currency_billing: "Billing & Payments",
+    franchise_fee_management: "Billing & Payments",
+    multi_gstin_support: "Billing & Payments",
+    pos_merchandise_supplements: "Billing & Payments",
+    branch_revenue_split: "Billing & Payments",
+    // communication
+    email_notifications: "Communication",
+    in_app_notifications: "Communication",
+    whatsapp_integration: "Communication",
+    sms_integration: "Communication",
+    birthday_greetings: "Communication",
+    broadcast_messages: "Communication",
+    email_campaigns: "Communication",
+    whatsapp_business_api: "Communication",
+    cross_branch_member_access: "Communication",
+    // crm
+    lead_management: "CRM & Sales",
+    trial_management: "CRM & Sales",
+    lead_followup_reminders: "CRM & Sales",
+    re_engagement_automation: "CRM & Sales",
+    advanced_crm_lead_pipeline: "CRM & Sales",
+    referral_program: "CRM & Sales",
+    loyalty_points_system: "CRM & Sales",
+    network_wide_campaign_manager: "CRM & Sales",
+    member_nps_surveys: "CRM & Sales",
+    // enterprise
+    franchise_management: "Enterprise",
+    multi_branch_management: "Enterprise",
+    api_access: "Enterprise",
+    webhooks: "Enterprise",
+    audit_logs: "Enterprise",
+    advanced_rbac: "Enterprise",
+    priority_support: "Enterprise",
+    staff_management: "Enterprise",
+    tally_zoho_books_integration: "Enterprise",
+    rest_api_access: "Enterprise",
+    role_based_permissions: "Enterprise",
+    multi_branch_staff_assignment: "Enterprise",
+    hr_document_storage: "Enterprise",
+    custom_roles_granular_permissions: "Enterprise",
+    sso_saml_login: "Enterprise",
+    dedicated_cloud_infrastructure: "Enterprise",
+    dedicated_onboarding_manager: "Enterprise",
+    response_sla: "Enterprise",
+    named_account_manager: "Enterprise",
+    automated_backups_90_day_retention: "Enterprise",
+    uptime_sla_99_9: "Enterprise",
+    staff_training_sessions: "Enterprise",
+    custom_feature_requests: "Enterprise",
+    // membership
+    member_management: "Membership Management",
+    membership_renewals: "Membership Management",
+    expiry_tracking: "Membership Management",
+    goal_tracking: "Membership Management",
+    progress_photos: "Membership Management",
+    membership_pause_freeze: "Membership Management",
+    member_tagging_segments: "Membership Management",
+    member_progress_tracking: "Membership Management",
+    custom_member_fields: "Membership Management",
+    member_data_import_export: "Membership Management",
+    // platform
+    member_portal: "Platform",
+    trainer_portal: "Platform",
+    branded_mobile_app: "Platform",
+    diet_workout_plans: "Platform",
+    google_calendar_sync: "Platform",
+    white_label_mobile_app: "Platform",
+    in_app_push_notifications: "Platform",
+    digital_membership_card: "Platform",
+    loyalty_rewards_in_app: "Platform",
+    // reports
+    basic_reports: "Reports & Analytics",
+    advanced_reports: "Reports & Analytics",
+    custom_dashboards: "Reports & Analytics",
+    trainer_performance_report: "Reports & Analytics",
+    class_occupancy_report: "Reports & Analytics",
+    lead_conversion_report: "Reports & Analytics",
+    branch_revenue_comparison: "Reports & Analytics",
+    franchise_rollup_reports: "Reports & Analytics",
+    scheduled_report_delivery: "Reports & Analytics",
+    equipment_inventory_maintenance: "Reports & Analytics",
+    data_export_csv_download: "Reports & Analytics",
+    franchise_rollup_dashboard: "Reports & Analytics",
+    custom_dashboards_kpis: "Reports & Analytics",
+    // trainer
+    trainer_management: "Trainer Management",
+    workout_assignment: "Trainer Management",
+    nutrition_plans: "Trainer Management",
+    pt_sessions: "Trainer Management",
+    class_booking: "Trainer Management",
+    waitlist_management: "Trainer Management",
+    cross_branch_class_booking: "Trainer Management",
+    trainer_commissions_payroll: "Trainer Management",
+    staff_attendance_leave: "Trainer Management",
+    class_attendance_tracking: "Trainer Management",
+    payroll_export: "Trainer Management",
+    network_wide_class_calendar: "Trainer Management",
+    trainer_sharing_across_branches: "Trainer Management",
+    // white_label
+    white_label: "White Label",
+    custom_domain: "White Label",
+    custom_branding: "White Label",
+  };
 
-    const prefixes = categoryFeaturePrefixes[category.code] ?? [];
-    for (const prefix of prefixes) {
-      if (featureCode.startsWith(prefix)) {
-        return category.name;
-      }
-    }
-  }
-  return "Uncategorized";
+  return keyToCategory[featureCode] ?? "Uncategorized";
 }
 
 export async function buildFeatureAuditReport(): Promise<FeatureAuditReport> {

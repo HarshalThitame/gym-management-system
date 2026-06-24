@@ -12,8 +12,14 @@ import {
   Filter,
   Activity,
   ShieldCheck,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import type { FeatureAuditRow, PlanAudit, FeatureAuditReport } from "../services/feature-audit-types";
+
+type SortColumn = "featureCode" | "category" | "status" | "gapSeverity" | "planValue";
+type SortDirection = "asc" | "desc";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   FULLY_IMPLEMENTED:  { label: "Implemented",  color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="size-3.5" /> },
@@ -83,6 +89,17 @@ export function FeatureAuditView({ report }: { report: FeatureAuditReport }) {
   const [severityFilter, setSeverityFilter] = useState<FilterSeverity>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showGapsOnly, setShowGapsOnly] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("featureCode");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const toggleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
 
   const activePlan = report.plans[activePlanIdx];
 
@@ -94,7 +111,7 @@ export function FeatureAuditView({ report }: { report: FeatureAuditReport }) {
 
   const filteredFeatures = useMemo(() => {
     if (!activePlan) return [];
-    return activePlan.features.filter((f) => {
+    const filtered = activePlan.features.filter((f) => {
       if (search && !f.featureCode.toLowerCase().includes(search.toLowerCase()) && !f.category.toLowerCase().includes(search.toLowerCase())) {
         return false;
       }
@@ -104,7 +121,39 @@ export function FeatureAuditView({ report }: { report: FeatureAuditReport }) {
       if (showGapsOnly && f.status === "FULLY_IMPLEMENTED") return false;
       return true;
     });
-  }, [activePlan, search, statusFilter, severityFilter, categoryFilter, showGapsOnly]);
+
+    const severityOrder: Record<string, number> = { "P0": 0, "P1": 1, "P2": 2, "N/A": 3 };
+    const statusOrder: Record<string, number> = {
+      "FULLY_IMPLEMENTED": 0, "PARTIAL": 1, "CONFIGURED_ONLY": 2, "NOT_IMPLEMENTED": 3, "SERVICE_OR_INFRA": 4
+    };
+
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      const dir = sortDirection === "asc" ? 1 : -1;
+      switch (sortColumn) {
+        case "featureCode":
+          cmp = a.featureCode.localeCompare(b.featureCode);
+          break;
+        case "category":
+          cmp = a.category.localeCompare(b.category) || a.featureCode.localeCompare(b.featureCode);
+          break;
+        case "status":
+          cmp = (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99) || a.featureCode.localeCompare(b.featureCode);
+          break;
+        case "gapSeverity":
+          cmp = (severityOrder[a.gapSeverity] ?? 99) - (severityOrder[b.gapSeverity] ?? 99) || a.featureCode.localeCompare(b.featureCode);
+          break;
+        case "planValue":
+          cmp = a.planValue.localeCompare(b.planValue) || a.featureCode.localeCompare(b.featureCode);
+          break;
+        default:
+          cmp = 0;
+      }
+      return cmp * dir;
+    });
+
+    return filtered;
+  }, [activePlan, search, statusFilter, severityFilter, categoryFilter, showGapsOnly, sortColumn, sortDirection]);
 
   if (!activePlan) {
     return (
@@ -241,15 +290,39 @@ export function FeatureAuditView({ report }: { report: FeatureAuditReport }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/50 border-b">
-                <th className="text-left p-3 font-semibold">Feature Code</th>
-                <th className="text-left p-3 font-semibold">Category</th>
-                <th className="text-left p-3 font-semibold">Plan Value</th>
+                {([
+                  { col: "featureCode" as SortColumn, label: "Feature Code", align: "text-left" },
+                  { col: "category" as SortColumn, label: "Category", align: "text-left" },
+                  { col: "planValue" as SortColumn, label: "Plan Value", align: "text-left" },
+                ]).map(({ col, label, align }) => (
+                  <th key={col} className={`${align} p-3 font-semibold cursor-pointer select-none hover:bg-muted/80 transition-colors`} onClick={() => toggleSort(col)}>
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {sortColumn === col
+                        ? (sortDirection === "asc" ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />)
+                        : <ArrowUpDown className="size-3.5 text-muted-foreground/40" />
+                      }
+                    </span>
+                  </th>
+                ))}
                 <th className="text-center p-3 font-semibold">Sidebar</th>
                 <th className="text-center p-3 font-semibold">Route</th>
                 <th className="text-center p-3 font-semibold">Actions</th>
                 <th className="text-center p-3 font-semibold">UI</th>
-                <th className="text-center p-3 font-semibold">Status</th>
-                <th className="text-center p-3 font-semibold">Gap</th>
+                {([
+                  { col: "status" as SortColumn, label: "Status" },
+                  { col: "gapSeverity" as SortColumn, label: "Gap" },
+                ]).map(({ col, label }) => (
+                  <th key={col} className="text-center p-3 font-semibold cursor-pointer select-none hover:bg-muted/80 transition-colors" onClick={() => toggleSort(col)}>
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {sortColumn === col
+                        ? (sortDirection === "asc" ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />)
+                        : <ArrowUpDown className="size-3.5 text-muted-foreground/40" />
+                      }
+                    </span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
