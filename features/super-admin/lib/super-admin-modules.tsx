@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   Building2,
   CreditCard,
@@ -256,6 +257,17 @@ export const superAdminModules = [
     iconKey: "receipt",
     responsibilities: ["Review logins, role changes, payments, settings updates, and tenant events", "Export audit reports", "Track emergency override usage", "Support compliance investigations"],
     safeguards: ["Audit records are append-only by policy", "Exports are logged", "Sensitive member records require emergency override workflow"]
+  },
+  {
+    slug: "feature-audit",
+    href: "/super-admin/feature-audit",
+    label: "Feature Audit",
+    title: "Feature Availability Audit",
+    description: "Compare what each SaaS plan promises against what is actually implemented in the application. Detect gaps, stale entitlements, and sync organization entitlements.",
+    icon: <Activity className="size-5" />,
+    iconKey: "activity",
+    responsibilities: ["Audit package_features against app implementation", "Detect configured-but-not-implemented gaps", "View implementation rate per plan", "Sync organization entitlements and limits", "Cleanup stale entitlement records"],
+    safeguards: ["Read-only audit view — no data mutations from the report", "Sync and cleanup actions require Super Admin confirmation", "All sync operations are idempotent and audited"]
   },
   {
     slug: "feature-flags",
