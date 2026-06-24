@@ -119,12 +119,13 @@ export function isCurrentMonth(dateValue: string) {
   return !isBefore(value, startOfMonth(today)) && !isAfter(value, endOfMonth(today));
 }
 
-export function formatMoney(amount: number, currency = "INR") {
+export function formatMoney(amount?: number | null, currency = "INR") {
+  const safe = amount ?? 0;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
     maximumFractionDigits: 0
-  }).format(amount / 100);
+  }).format(safe / 100);
 }
 
 export function membershipStatusTone(status: MembershipStatus) {

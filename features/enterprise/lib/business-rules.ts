@@ -118,10 +118,11 @@ export function formatCompactNumber(value: number) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: value >= 100 ? 0 : 1 }).format(value);
 }
 
-export function formatCurrency(value: number, currency = "INR") {
+export function formatCurrency(value?: number | null, currency = "INR") {
+  const safe = value ?? 0;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
     maximumFractionDigits: 0
-  }).format(value);
+  }).format(safe);
 }

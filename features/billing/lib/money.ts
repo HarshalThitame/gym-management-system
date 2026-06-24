@@ -20,13 +20,14 @@ const CURRENCY_LOCALE: Record<string, string> = {
   CAD: "en-CA",
 };
 
-export function formatCurrency(amount: number, currency = "INR") {
+export function formatCurrency(amount?: number | null, currency = "INR") {
+  const safe = amount ?? 0;
   const locale = CURRENCY_LOCALE[currency] ?? "en-US";
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     maximumFractionDigits: 0
-  }).format(amount / 100);
+  }).format(safe / 100);
 }
 
 export function calculateDiscount(input: {

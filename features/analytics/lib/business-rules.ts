@@ -41,12 +41,13 @@ export function formatCompactNumber(value: number) {
   }).format(value);
 }
 
-export function formatCurrency(value: number, currency = "INR") {
+export function formatCurrency(value?: number | null, currency = "INR") {
+  const safe = value ?? 0;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
     maximumFractionDigits: 0
-  }).format(value);
+  }).format(safe);
 }
 
 export function estimateLifetimeValue(monthRevenue: number, activeMembers: number, retentionRate: number) {

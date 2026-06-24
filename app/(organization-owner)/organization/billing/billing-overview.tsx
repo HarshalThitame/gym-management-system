@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount / 100);
+function formatCurrency(amount?: number | null) {
+  const safe = amount ?? 0;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(safe / 100);
 }
 
 function formatDate(dateStr: string) {

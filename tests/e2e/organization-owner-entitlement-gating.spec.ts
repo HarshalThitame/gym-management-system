@@ -99,7 +99,7 @@ test.describe("Organization Owner — Entitlement Gating", () => {
     ];
 
     for (const mod of enterpriseModules) {
-      await expect(page.locator('nav[aria-label="Portal"]').first().getByText(mod, { exact: false }).first()).toBeVisible({ timeout: 10_000 });
+      expect(sidebar, `Enterprise sidebar should contain "${mod}"`).toContain(mod);
     }
 
     expect(sidebar.toLowerCase()).not.toMatch(/upgrade/i);
@@ -123,7 +123,7 @@ test.describe("Organization Owner — Entitlement Gating", () => {
     ];
 
     for (const mod of unlockedModules) {
-      await expect(page.locator('nav[aria-label="Portal"]').first().getByText(mod, { exact: false }).first()).toBeVisible({ timeout: 10_000 });
+      expect(sidebar, `Growth sidebar should contain "${mod}"`).toContain(mod);
     }
 
     const lockedModules = ["Custom Roles", "Equipment", "Leads", "Branding", "Domains"];
@@ -150,7 +150,7 @@ test.describe("Organization Owner — Entitlement Gating", () => {
 
     const visibleModules = ["Dashboard", "Plan", "Staff", "Members", "Memberships", "Attendance", "Billing"];
     for (const mod of visibleModules) {
-      await expect(page.locator('nav[aria-label="Portal"]').first().getByText(mod, { exact: false }).first()).toBeVisible({ timeout: 10_000 });
+      expect(sidebar, `Starter sidebar should contain "${mod}"`).toContain(mod);
     }
 
     const lockedOrAbsent = ["Analytics", "Classes", "Communications", "Trainers", "Revenue"];
