@@ -11,6 +11,10 @@ import {
   SearchX,
   Inbox,
   Trash2,
+  List,
+  KanbanSquare,
+  CheckSquare,
+  Zap,
 } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import type { LeadRow } from "@/features/organization-owner/services/lead-service";
@@ -24,12 +28,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
 import { showToast } from "@/components/ui/toast";
 import { formatCompactNumber } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements";
+import { cn } from "@/lib/utils";
 import {
   getOrgLeads,
   updateLeadStatus,
   convertLeadToMember,
   deleteLead,
 } from "@/features/organization-owner/actions/lead-actions";
+import { LeadPipelinePanel } from "@/features/organization-owner/components/modules/LeadPipelinePanel";
+import { LeadFollowUpPanel } from "@/features/organization-owner/components/modules/LeadFollowUpPanel";
+import { LeadAutomationPanel } from "@/features/organization-owner/components/modules/LeadAutomationPanel";
 
 type LeadsModuleProps = {
   dashboard: OrganizationOwnerDashboard;
@@ -91,6 +100,11 @@ export function LeadsModule({ dashboard, moduleData, moduleFilters }: LeadsModul
   const [convertGymId, setConvertGymId] = useState("");
   const [detailNotes, setDetailNotes] = useState("");
 
+  const [activeTab, setActiveTab] = useState<"leads" | "pipeline" | "tasks" | "automation">("leads");
+  const hasPipeline = useHasFeature("advanced_crm_lead_pipeline");
+  const hasFollowUp = useHasFeature("lead_followup_reminders");
+  const hasAutomation = useHasFeature("re_engagement_automation");
+
   const orgId = dashboard.organization.id;
 
   const fetchLeads = useCallback(async () => {
@@ -120,7 +134,15 @@ export function LeadsModule({ dashboard, moduleData, moduleFilters }: LeadsModul
     setDetailLead(lead);
     setDetailNotes(lead.notes ?? "");
     setConvertGymId(lead.gym_id ?? dashboard.gyms[0]?.id ?? "");
+    setActiveTab("leads");
   }, [dashboard.gyms]);
+
+  const handleOpenLead = useCallback(async (leadId: string) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (lead) {
+      openDetail(lead);
+    }
+  }, [leads, openDetail]);
 
   const closeDetail = useCallback(() => {
     setDetailLead(null);
@@ -221,6 +243,66 @@ export function LeadsModule({ dashboard, moduleData, moduleFilters }: LeadsModul
 
   return (
     <div className="space-y-6">
+      {/* ═══ SUB-TABS ═══ */}
+      <div className="flex gap-1 rounded-lg border border-border bg-surface-muted p-1">
+        <button
+          onClick={() => setActiveTab("leads")}
+          className={cn("flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all", activeTab === "leads" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+          type="button"
+        >
+          <List className="size-4" />
+          All Leads
+        </button>
+        {hasPipeline ? (
+          <button
+            onClick={() => setActiveTab("pipeline")}
+            className={cn("flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all", activeTab === "pipeline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            type="button"
+          >
+            <KanbanSquare className="size-4" />
+            Pipeline
+          </button>
+        ) : null}
+        {hasFollowUp ? (
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={cn("flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all", activeTab === "tasks" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            type="button"
+          >
+            <CheckSquare className="size-4" />
+            Tasks
+          </button>
+        ) : null}
+        {hasAutomation ? (
+          <button
+            onClick={() => setActiveTab("automation")}
+            className={cn("flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all", activeTab === "automation" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            type="button"
+          >
+            <Zap className="size-4" />
+            Automation
+          </button>
+        ) : null}
+      </div>
+
+      {/* ═══ PIPELINE TAB ═══ */}
+      {activeTab === "pipeline" ? (
+        <LeadPipelinePanel dashboard={dashboard} hasFeature={hasPipeline} onOpenDetail={openDetail} />
+      ) : null}
+
+      {/* ═══ TASKS TAB ═══ */}
+      {activeTab === "tasks" ? (
+        <LeadFollowUpPanel dashboard={dashboard} hasFeature={hasFollowUp} onOpenLead={handleOpenLead} />
+      ) : null}
+
+      {/* ═══ AUTOMATION TAB ═══ */}
+      {activeTab === "automation" ? (
+        <LeadAutomationPanel dashboard={dashboard} hasFeature={hasAutomation} />
+      ) : null}
+
+      {/* ═══ ALL LEADS TAB (DEFAULT) ═══ */}
+      {activeTab !== "leads" ? null : (
+        <>
       {/* KPIs */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total leads captured" icon={<UserRoundPlus className="size-5" />} label="Total Leads" value={formatCompactNumber(total)} />
@@ -270,6 +352,8 @@ export function LeadsModule({ dashboard, moduleData, moduleFilters }: LeadsModul
           onPageChange={(p) => navigate({ page: p })}
           pageSize={filters.pageSize ?? 12}
         />
+      )}
+        </>
       )}
 
       {/* Detail Drawer */}

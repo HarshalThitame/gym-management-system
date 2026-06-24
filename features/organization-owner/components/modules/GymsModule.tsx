@@ -17,6 +17,8 @@ import { useModuleFilters } from "@/features/organization-owner/lib/use-module-f
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatCurrency } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements";
+import { CrossBranchAccessPanel } from "@/features/organization-owner/components/modules/CrossBranchAccessPanel";
 import type { GymRow } from "@/types/enterprise";
 import type { Database } from "@/types/database";
 
@@ -40,6 +42,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const [expandedGymId, setExpandedGymId] = useState<string | null>(null);
   const [detailGym, setDetailGym] = useState<GymRow | null>(null);
   const [savingStatus, setSavingStatus] = useState<"idle" | "saving">("idle");
+  const [moduleTab, setModuleTab] = useState<"locations" | "cross-branch">("locations");
   const [state, formAction] = useActionState(saveGymAction, initialAuthActionState);
   const [branchState, branchFormAction] = useActionState(saveBranchAction, initialAuthActionState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -47,6 +50,8 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const initialItems = ((moduleData?.items ?? dashboard.gyms) as GymRow[]);
   const { items: gyms, addOptimistic, updateOptimistic, removeOptimistic } = useOptimisticList<GymRow>(initialItems);
   const branches = dashboard.branches;
+
+  const hasCrossBranchFeature = useHasFeature("cross_branch_member_access");
 
   // ── KPIs ──
   const activeGyms = gyms.filter((g) => g.status === "active").length;
@@ -179,6 +184,30 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
 
   return (
     <div className="space-y-6">
+      {/* ═══ SUB-TABS ═══ */}
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1">
+        <button
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all ${moduleTab === "locations" ? "bg-surface shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setModuleTab("locations")}
+          type="button"
+        >
+          <Building2 className="size-4" /> Locations
+        </button>
+        {hasCrossBranchFeature ? (
+          <button
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all ${moduleTab === "cross-branch" ? "bg-surface shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setModuleTab("cross-branch")}
+            type="button"
+          >
+            <ShieldCheck className="size-4" /> Cross-Branch Access
+          </button>
+        ) : null}
+      </div>
+
+      {moduleTab === "cross-branch" ? (
+        <CrossBranchAccessPanel dashboard={dashboard} />
+      ) : (
+        <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total locations across your organization" icon={<Building2 className="size-5" />} label="Total Locations" value={String(gyms.length)} />
@@ -301,6 +330,8 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
 
       {/* ═══ GYM DETAIL PANEL ═══ */}
       {detailGym ? <GymDetailPanel gym={detailGym} dashboard={dashboard} onClose={() => setDetailGym(null)} /> : null}
+        </>
+      )}
     </div>
   );
 }

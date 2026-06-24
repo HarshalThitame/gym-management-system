@@ -158,12 +158,57 @@ export function getPrimaryRole(roles: readonly RoleName[]) {
   return rolePriority.find((role) => roles.includes(role)) ?? null;
 }
 
-export function can(role: RoleName, resource: AuthResource, action: PermissionAction) {
-  return Boolean(ROLE_PERMISSIONS[role][resource]?.includes(action));
+export function can(
+  role: RoleName,
+  resource: AuthResource,
+  action: PermissionAction,
+  customPermissions?: readonly Record<string, string[]>[]
+) {
+  if (Boolean(ROLE_PERMISSIONS[role][resource]?.includes(action))) return true;
+  if (customPermissions?.length) {
+    return customPermissions.some((cp) => (cp[resource] as string[] | undefined)?.includes(action));
+  }
+  return false;
 }
 
-export function canAny(roles: readonly RoleName[], resource: AuthResource, action: PermissionAction) {
-  return roles.some((role) => can(role, resource, action));
+export function canAny(
+  roles: readonly RoleName[],
+  resource: AuthResource,
+  action: PermissionAction,
+  customPermissions?: readonly Record<string, string[]>[]
+) {
+  return roles.some((role) => can(role, resource, action, customPermissions));
+}
+
+export function mergePermissions(
+  builtInRoles: readonly RoleName[],
+  customPermissions?: readonly Record<string, string[]>[]
+): Record<string, string[]> {
+  const merged: Record<string, Set<string>> = {};
+
+  for (const role of builtInRoles) {
+    const perms = ROLE_PERMISSIONS[role];
+    if (!perms) continue;
+    for (const [resource, actions] of Object.entries(perms)) {
+      if (!actions) continue;
+      if (!merged[resource]) merged[resource] = new Set();
+      for (const a of actions) merged[resource].add(a);
+    }
+  }
+
+  if (customPermissions) {
+    for (const cp of customPermissions) {
+      for (const [resource, actions] of Object.entries(cp)) {
+        if (!Array.isArray(actions)) continue;
+        if (!merged[resource]) merged[resource] = new Set();
+        for (const a of actions) merged[resource].add(a);
+      }
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(merged).map(([k, v]) => [k, Array.from(v)])
+  );
 }
 
 export function hasRequiredRole(roles: readonly RoleName[], allowedRoles: readonly RoleName[]) {

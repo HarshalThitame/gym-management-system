@@ -18,8 +18,9 @@ import { TrainerPerformanceReport } from "@/features/organization-owner/componen
 import { ClassOccupancyReport } from "@/features/organization-owner/components/modules/reports/ClassOccupancyReport";
 import { LeadConversionReport } from "@/features/organization-owner/components/modules/reports/LeadConversionReport";
 import { BranchRevenueReport } from "@/features/organization-owner/components/modules/reports/BranchRevenueReport";
+import { ReportSchedulesPanel } from "@/features/organization-owner/components/modules/ReportSchedulesPanel";
 
-type AnalyticsTab = "overview" | "revenue" | "members" | "utilization" | "trainer_perf" | "class_occ" | "lead_conv" | "branch_rev";
+type AnalyticsTab = "overview" | "revenue" | "members" | "utilization" | "trainer_perf" | "class_occ" | "lead_conv" | "branch_rev" | "scheduled";
 
 type AnalyticsEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
 
@@ -34,6 +35,7 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
   const hasClassOcc = useHasFeature("class_occupancy_report");
   const hasLeadConv = useHasFeature("lead_conversion_report");
   const hasBranchRev = useHasFeature("branch_revenue_comparison");
+  const hasScheduledReports = useHasFeature("scheduled_report_delivery");
 
   const handleApply = useCallback((f: Record<string, string>) => { navigate({ q: f.q }); }, [navigate]);
   const branchMetrics = (moduleData?.items ?? dashboard.branchMetrics) as typeof dashboard.branchMetrics;
@@ -163,6 +165,7 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
           hasClassOcc ? { key: "class_occ", label: "Class Occupancy" } : null,
           hasLeadConv ? { key: "lead_conv", label: "Lead Conversion" } : null,
           hasBranchRev ? { key: "branch_rev", label: "Branch Revenue" } : null,
+          hasScheduledReports ? { key: "scheduled", label: "Scheduled Reports" } : null,
         ] as { key: AnalyticsTab; label: string }[])
           .filter((t): t is { key: AnalyticsTab; label: string } => t !== null)
           .map((tab) => (
@@ -371,6 +374,9 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
 
       {/* ═══ TAB: BRANCH REVENUE ═══ */}
       {activeTab === "branch_rev" ? <BranchRevenueReport organizationId={dashboard.organization.id} hasFeature={hasBranchRev} /> : null}
+
+      {/* ═══ TAB: SCHEDULED REPORTS ═══ */}
+      {activeTab === "scheduled" ? <ReportSchedulesPanel dashboard={dashboard} hasFeature={hasScheduledReports} /> : null}
 
       {/* ═══ RAW DATA (only for built-in tabs) ═══ */}
       {(["overview", "revenue", "members", "utilization"] as string[]).includes(activeTab) ? (

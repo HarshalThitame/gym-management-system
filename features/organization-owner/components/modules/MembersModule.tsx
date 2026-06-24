@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useActionState, useEffect } from "react";
-import { Ban, CalendarDays, CreditCard, Download, Dumbbell, Edit3, Eye, FileUp, LayoutList, Plus, UserRound, UsersRound, VenetianMask } from "lucide-react";
+import { Award, Ban, Building2, CalendarDays, CreditCard, Download, Dumbbell, Edit3, Eye, FileUp, Gift, LayoutList, Plus, TrendingUp, UserRound, UsersRound, VenetianMask } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
@@ -22,6 +22,9 @@ import { useHasFeature } from "@/features/organization-owner/entitlements/entitl
 import { CustomMemberFieldsPanel } from "@/features/organization-owner/components/modules/CustomMemberFieldsPanel";
 import { MemberImportPanel } from "@/features/organization-owner/components/modules/MemberImportPanel";
 import { MemberExportPanel } from "@/features/organization-owner/components/modules/MemberExportPanel";
+import { CorporateMembershipsPanel } from "@/features/organization-owner/components/modules/CorporateMembershipsPanel";
+import { ReferralProgramPanel } from "@/features/organization-owner/components/modules/ReferralProgramPanel";
+import { LoyaltyPointsPanel } from "@/features/organization-owner/components/modules/LoyaltyPointsPanel";
 import type { CustomField } from "@/features/organization-owner/actions/member-field-actions";
 import type { Database } from "@/types/database";
 
@@ -53,6 +56,9 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
   const [transferState, transferFormAction] = useActionState(transferMemberAction, initialAuthActionState);
   const hasCustomFields = useHasFeature("custom_member_fields");
   const hasImportExport = useHasFeature("member_data_import_export");
+  const hasCorporate = useHasFeature("corporate_bulk_memberships");
+  const hasReferral = useHasFeature("referral_program");
+  const hasLoyalty = useHasFeature("loyalty_points_system");
 
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [memberCustomValues, setMemberCustomValues] = useState<Record<string, string>>({});
@@ -61,6 +67,10 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [detailCustomValues, setDetailCustomValues] = useState<{ field: { id: string; field_name: string; field_type: string }; value: string }[]>([]);
   const [detailCustomLoading, setDetailCustomLoading] = useState(false);
+  const [detailLoyaltyBalance, setDetailLoyaltyBalance] = useState<number | null>(null);
+  const [detailLoyaltyConfig, setDetailLoyaltyConfig] = useState<{ pointsRedemptionRate: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"members" | "corporate" | "referrals" | "loyalty">("members");
+  const [corporateAccounts, setCorporateAccounts] = useState<{ id: string; company_name: string }[]>([]);
 
   const initialMembers = (moduleData?.items ?? dashboard.members) as MemberRow[];
   const { items: members } = useOptimisticList<MemberRow>(initialMembers);
@@ -95,8 +105,15 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
         setCustomFields(fields);
       } catch { /* ignore */ }
     }
+    if (hasCorporate) {
+      try {
+        const { getCorporateAccounts } = await import("@/features/organization-owner/actions/corporate-actions");
+        const result = await getCorporateAccounts(dashboard.organization.id, { page: 1, pageSize: 100 });
+        setCorporateAccounts(result.accounts.map((a) => ({ id: a.id, company_name: a.company_name })));
+      } catch { setCorporateAccounts([]); }
+    }
     setDrawerOpen(true);
-  }, [hasCustomFields, dashboard.organization.id]);
+  }, [hasCustomFields, hasCorporate, dashboard.organization.id]);
 
   const openEdit = useCallback(async (m: MemberRow) => {
     setEditingMember(m);
@@ -113,8 +130,15 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
         setMemberCustomValues(valMap);
       } catch { /* ignore */ }
     }
+    if (hasCorporate) {
+      try {
+        const { getCorporateAccounts } = await import("@/features/organization-owner/actions/corporate-actions");
+        const result = await getCorporateAccounts(dashboard.organization.id, { page: 1, pageSize: 100 });
+        setCorporateAccounts(result.accounts.map((a) => ({ id: a.id, company_name: a.company_name })));
+      } catch { setCorporateAccounts([]); }
+    }
     setDrawerOpen(true);
-  }, [hasCustomFields, dashboard.organization.id]);
+  }, [hasCustomFields, hasCorporate, dashboard.organization.id]);
   const openTransfer = useCallback((m: MemberRow) => { setTransferringMember(m); setTransferDrawerOpen(true); }, []);
   const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingMember(null); }, []);
   const closeTransfer = useCallback(() => { setTransferDrawerOpen(false); setTransferringMember(null); }, []);
@@ -125,6 +149,35 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
   const detailTrainer = detailMember?.assigned_trainer_id ? dashboard.trainers.find((t) => t.id === detailMember.assigned_trainer_id) : null;
   const detailMemberships = detailMember ? dashboard.memberships.filter((m) => m.member_id === detailMember.id) : [];
   const detailPayments = detailMember ? dashboard.payments.filter((p) => p.member_id === detailMember.id) : [];
+
+  useEffect(() => {
+    if (!detailMember || !hasLoyalty) {
+      setDetailLoyaltyBalance(null);
+      setDetailLoyaltyConfig(null);
+      return;
+    }
+    let cancelled = false;
+    const fetchLoyalty = async () => {
+      try {
+        const { getMemberPointsBalance, getLoyaltyConfig } = await import("@/features/organization-owner/actions/loyalty-actions");
+        const [balance, config] = await Promise.all([
+          getMemberPointsBalance(dashboard.organization.id, detailMember.id),
+          getLoyaltyConfig(dashboard.organization.id).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setDetailLoyaltyBalance(balance);
+          setDetailLoyaltyConfig(config ? { pointsRedemptionRate: config.points_redemption_rate } : null);
+        }
+      } catch {
+        if (!cancelled) {
+          setDetailLoyaltyBalance(null);
+          setDetailLoyaltyConfig(null);
+        }
+      }
+    };
+    fetchLoyalty();
+    return () => { cancelled = true; };
+  }, [detailMember, hasLoyalty, dashboard.organization.id]);
 
   useEffect(() => {
     if (!detailMember || !hasCustomFields) {
@@ -185,6 +238,55 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
 
   return (
     <div className="space-y-6">
+      {/* ═══ TAB BAR ═══ */}
+      {(hasCorporate || hasReferral || hasLoyalty) ? (
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1">
+          <button
+            className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold transition-all ${activeTab === "members" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setActiveTab("members")}
+            type="button"
+          >
+            <UsersRound className="size-4" /> Members
+          </button>
+          {hasCorporate ? (
+            <button
+              className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold transition-all ${activeTab === "corporate" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setActiveTab("corporate")}
+              type="button"
+            >
+              <Building2 className="size-4" /> Corporate
+            </button>
+          ) : null}
+          {hasReferral ? (
+            <button
+              className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold transition-all ${activeTab === "referrals" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setActiveTab("referrals")}
+              type="button"
+            >
+              <Gift className="size-4" /> Referrals
+            </button>
+          ) : null}
+          {hasLoyalty ? (
+            <button
+              className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-bold transition-all ${activeTab === "loyalty" ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setActiveTab("loyalty")}
+              type="button"
+            >
+              <Award className="size-4" /> Loyalty
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* ═══ CORPORATE TAB ═══ */}
+      {hasCorporate && activeTab === "corporate" ? (
+        <CorporateMembershipsPanel dashboard={dashboard} hasFeature={hasCorporate} />
+      ) : hasReferral && activeTab === "referrals" ? (
+        <ReferralProgramPanel dashboard={dashboard} hasFeature={hasReferral} />
+      ) : hasLoyalty && activeTab === "loyalty" ? (
+        <LoyaltyPointsPanel dashboard={dashboard} hasFeature={hasLoyalty} />
+      ) : (
+        <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total members across all gyms" icon={<UsersRound className="size-5" />} label="Total Members" value={formatCompactNumber(members.length)} />
@@ -302,6 +404,19 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
             <DrawerField label="Address">
               <input className={selectClass} defaultValue={editingMember?.address ?? ""} name="address" type="text" />
             </DrawerField>
+            {hasCorporate && corporateAccounts.length > 0 ? (
+              <DrawerField label="Corporate Account">
+                <select className={selectClass} defaultValue={editingMember?.corporate_account_id ?? ""} name="corporateAccountId">
+                  <option value="">None</option>
+                  {corporateAccounts.map((c) => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+                </select>
+              </DrawerField>
+            ) : null}
+            {hasReferral && !editingMember ? (
+              <DrawerField label="Referral Code">
+                <input className={selectClass} name="referralCode" type="text" placeholder="Enter referral code (optional)" />
+              </DrawerField>
+            ) : null}
           </div>
           {hasCustomFields && customFields.length > 0 ? (
             <div className="space-y-5 border-t border-border pt-5">
@@ -437,6 +552,31 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
                 </CardContent>
               </Card>
 
+              {/* Loyalty Points */}
+              {hasLoyalty && detailLoyaltyBalance !== null ? (
+                <Card>
+                  <CardHeader><h3 className="text-lg font-black">Loyalty Points</h3></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between rounded-md border border-border bg-background p-3">
+                      <div className="flex items-center gap-2">
+                        <Award className="size-4 text-amber-500" />
+                        <span className="text-sm font-bold">Points Balance</span>
+                      </div>
+                      <span className="text-lg font-black">{formatCompactNumber(detailLoyaltyBalance)}</span>
+                    </div>
+                    {detailLoyaltyConfig && detailLoyaltyBalance > 0 ? (
+                      <div className="flex items-center justify-between rounded-md border border-border bg-background p-3">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="size-4 text-green-500" />
+                          <span className="text-sm font-bold">Redeemable Value</span>
+                        </div>
+                        <span className="text-lg font-black text-green-600">{formatCurrency(Math.floor(detailLoyaltyBalance / detailLoyaltyConfig.pointsRedemptionRate))}</span>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
+
               {/* Custom Fields */}
               {hasCustomFields && detailCustomValues.length > 0 ? (
                 <Card>
@@ -473,6 +613,8 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
           onClose={() => setShowExportPanel(false)}
         />
       ) : null}
+        </>
+      )}
     </div>
   );
 }

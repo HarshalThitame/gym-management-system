@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useActionState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, useActionState, useEffect, type ReactNode } from "react";
 import { Ban, Download, Edit3, Mail, ShieldCheck, UserPlus, UsersRound, Clock, ArrowLeftRight, FileText } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
@@ -21,6 +21,7 @@ import { StaffAttendancePanel } from "@/features/organization-owner/components/m
 import { StaffLeavePanel } from "@/features/organization-owner/components/modules/StaffLeavePanel";
 import { StaffBranchAssignmentPanel } from "@/features/organization-owner/components/modules/StaffBranchAssignmentPanel";
 import { HRDocumentsPanel } from "@/features/organization-owner/components/modules/HRDocumentsPanel";
+import { CustomRoleAssignmentPanel } from "@/features/organization-owner/components/modules/CustomRoleAssignmentPanel";
 import { cn } from "@/lib/utils";
 
 type StaffModuleProps = {
@@ -79,13 +80,36 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
   const hasAttendanceLeave = useHasFeature("staff_attendance_leave");
     const hasMultiBranch = useHasFeature("multi_branch_staff_assignment");
     const hasHRDocs = useHasFeature("hr_document_storage");
-    const [activeTab, setActiveTab] = useState<"staff" | "attendance" | "leave" | "branchAccess" | "documents">("staff");
+    const hasCustomRoles = useHasFeature("custom_roles_granular_permissions");
+    const [activeTab, setActiveTab] = useState<"staff" | "attendance" | "leave" | "branchAccess" | "documents" | "customRoles">("staff");
     const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [selectedCustomRoleIds, setSelectedCustomRoleIds] = useState<string[]>([]);
+  const [availableCustomRoles, setAvailableCustomRoles] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
 
   const { filters, navigate, currentPage } = useModuleFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffItem | null>(null);
+
+  // Fetch custom roles when drawer opens (if feature enabled)
+  useEffect(() => {
+    if (drawerOpen && hasCustomRoles && !editingStaff) {
+      import("@/features/organization-owner/actions/custom-roles-actions").then((m) => {
+        m.getCustomRoles(dashboard.organization.id).then((roles) => {
+          setAvailableCustomRoles(roles.map((r) => ({ id: r.id, name: r.name, description: r.description })));
+        });
+      });
+    }
+  }, [drawerOpen, hasCustomRoles, editingStaff, dashboard.organization.id]);
+
   const [inviteState, inviteFormAction] = useActionState(inviteStaffAction, initialAuthActionState);
+  const [userCustomRoleNames, setUserCustomRoleNames] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    if (!hasCustomRoles) return;
+    import("@/features/organization-owner/actions/custom-roles-actions").then((m) => {
+      m.getBulkUserCustomRoles(dashboard.organization.id).then(setUserCustomRoleNames).catch(() => {});
+    });
+  }, [hasCustomRoles, dashboard.organization.id]);
 
   const initialItems = ((moduleData?.items ?? dashboard.branchUsers) as Record<string, unknown>[]).map((bu) => toStaffItem(bu, dashboard.branches));
   const { items: staffItems, addOptimistic, removeOptimistic } = useOptimisticList(initialItems);
@@ -97,9 +121,9 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
   const receptionCount = staffItems.filter((s) => s.roleName === "reception_staff").length;
   const trainerCount = staffItems.filter((s) => s.roleName === "trainer").length;
 
-  const openInvite = useCallback(() => { setEditingStaff(null); setDrawerOpen(true); }, []);
+  const openInvite = useCallback(() => { setEditingStaff(null); setSelectedCustomRoleIds([]); setDrawerOpen(true); }, []);
   const openEdit = useCallback((item: StaffItem) => { setEditingStaff(item); setDrawerOpen(true); }, []);
-  const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingStaff(null); }, []);
+  const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingStaff(null); setSelectedCustomRoleIds([]); }, []);
 
   const handleApplyFilters = useCallback((f: Record<string, string>) => {
     navigate({ q: f.q, role: f.role, status: f.status, gymId: f.gymId });
@@ -136,6 +160,9 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       avatar: <StaffAvatar name={item.fullName} email={item.email} />,
       sections: [
         { label: "Role", value: formatEnterpriseLabel(item.roleName) },
+        ...(hasCustomRoles && (userCustomRoleNames[item.userId]?.length ?? 0) > 0
+          ? [{ label: "Custom Roles", value: userCustomRoleNames[item.userId]!.join(", ") }]
+          : []),
         { label: "Branch Role", value: formatEnterpriseLabel(item.branchRole) },
         { label: "Access Scope", value: formatEnterpriseLabel(item.accessScope) },
         { label: "Gym", value: gym?.name ?? "—" },
@@ -168,8 +195,11 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
     if (hasHRDocs) {
       t.push({ key: "documents", label: "Documents", icon: <FileText className="size-4" /> });
     }
+    if (hasCustomRoles) {
+      t.push({ key: "customRoles", label: "Custom Roles", icon: <ShieldCheck className="size-4" /> });
+    }
     return t;
-  }, [hasAttendanceLeave, hasMultiBranch, hasHRDocs]);
+  }, [hasAttendanceLeave, hasMultiBranch, hasHRDocs, hasCustomRoles]);
 
   const totalItems = moduleData?.items?.length ?? dashboard.branchUsers.length;
 
@@ -208,6 +238,9 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
 
       {/* ═══ DOCUMENTS PANEL ═══ */}
       {activeTab === "documents" ? <HRDocumentsPanel dashboard={dashboard} hasFeature={hasHRDocs} /> : null}
+
+      {/* ═══ CUSTOM ROLES PANEL ═══ */}
+      {activeTab === "customRoles" ? <CustomRoleAssignmentPanel dashboard={dashboard} hasFeature={hasCustomRoles} /> : null}
 
       {/* ═══ STAFF TAB (DEFAULT) ═══ */}
       {activeTab !== "staff" ? null : (
@@ -356,6 +389,34 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
               </select>
             </DrawerField>
           </div>
+
+          {!editingStaff && hasCustomRoles && availableCustomRoles.length > 0 ? (
+            <div className="space-y-3 rounded-md border border-border bg-surface-muted p-4">
+              <p className="text-sm font-bold">Custom Roles</p>
+              <p className="text-xs text-muted-foreground">Select custom roles to assign to this staff member. Each grants specific granular permissions.</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {availableCustomRoles.map((cr) => (
+                  <label key={cr.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      className="size-4 rounded border-border text-primary focus:ring-primary"
+                      name="customRoleIds"
+                      type="checkbox"
+                      value={cr.id}
+                      checked={selectedCustomRoleIds.includes(cr.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedCustomRoleIds((prev) => [...prev, cr.id]);
+                        else setSelectedCustomRoleIds((prev) => prev.filter((id) => id !== cr.id));
+                      }}
+                    />
+                    <div>
+                      <span className="text-sm">{cr.name}</span>
+                      {cr.description ? <span className="ml-2 text-xs text-muted-foreground">{cr.description}</span> : null}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={closeDrawer} type="button">Cancel</button>

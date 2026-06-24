@@ -13,6 +13,7 @@ import { UsageDashboardCard } from "@/features/organization-owner/entitlements";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import { getOrgNewLeadsCount } from "@/features/organization-owner/actions/lead-actions";
+import { getCrossBranchCheckInsToday } from "@/features/organization-owner/actions/cross-branch-actions";
 
 type EnterpriseDashboardProps = {
   dashboard: OrganizationOwnerDashboard;
@@ -80,6 +81,7 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
   const [period, setPeriod] = useState<"7d" | "30d" | "90d" | "1y">("30d");
   const [refreshing, setRefreshing] = useState(false);
   const [newLeadsThisMonth, setNewLeadsThisMonth] = useState(0);
+  const [crossBranchCheckIns, setCrossBranchCheckIns] = useState(0);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -90,7 +92,10 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
     if (planContext?.features?.leadManagement) {
       getOrgNewLeadsCount(dashboard.organization.id).then(setNewLeadsThisMonth).catch(() => {});
     }
-  }, [dashboard.organization.id, planContext?.features?.leadManagement]);
+    if (planContext?.features?.crossBranchMemberAccess) {
+      getCrossBranchCheckInsToday(dashboard.organization.id).then(setCrossBranchCheckIns).catch(() => {});
+    }
+  }, [dashboard.organization.id, planContext?.features?.leadManagement, planContext?.features?.crossBranchMemberAccess]);
 
   // ── Compute KPIs with trends ──
   const { kpis, sparklines } = useMemo(() => {
@@ -242,6 +247,12 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
         <EnhancedKpiWidget detail="Memberships expiring in 30 days" icon={<AlertTriangle className="size-4" />} label="Expiring Soon" value={String(expiryCount)} status={(expiryCount > 10 ? "risk" : expiryCount > 5 ? "watch" : "good") as "good" | "watch" | "risk"} />
         {planContext?.features?.leadManagement ? (
           <EnhancedKpiWidget detail="New leads captured this month" icon={<UserRoundPlus className="size-4" />} label="New Leads" value={formatCompactNumber(newLeadsThisMonth)} />
+        ) : null}
+        {planContext?.features?.crossBranchMemberAccess ? (
+          <EnhancedKpiWidget detail="Cross-branch check-ins today" icon={<Globe2 className="size-4" />} label="Cross-Branch Check-ins" value={String(crossBranchCheckIns)} />
+        ) : null}
+        {planContext?.features?.corporateBulkMemberships ? (
+          <EnhancedKpiWidget detail="Corporate accounts with employees" icon={<Building2 className="size-4" />} label="Corporate Members" value="Enterprise" status="good" />
         ) : null}
         <EnhancedKpiWidget detail="Open or investigating security events" icon={<ShieldCheck className="size-4" />} label="Security Alerts" value={formatCompactNumber(dashboard.metrics.openSecurityEvents)} status={(dashboard.metrics.openSecurityEvents > 0 ? "watch" : "good") as "good" | "watch" | "risk"} />
       </div>

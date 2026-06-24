@@ -36,6 +36,12 @@ Step 2: Understand the current role assignment flow.
   a jsonb permissions field. When checking permissions, can() merges built-in ROLE_PERMISSIONS
   with the user's custom role permissions. Custom roles are organization-scoped.
 
+Supabase connection — reference .env.local:
+  URL:  https://bobqiyhljubfrzmhqnqq.supabase.co
+  Key:  SUPABASE_SERVICE_ROLE_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY
+  Use createSupabaseServerClient() for server actions and getSupabaseAdminClient() for admin ops.
+  When querying, always batch independent reads into Promise.all for parallel execution.
+
 Step 3: Create migration for custom_roles table.
   File: supabase/migrations/YYYYMMDD_create_custom_roles.sql
 
@@ -104,6 +110,33 @@ Step 4: Create custom roles server actions.
 
   Import: requireOrgFeatureAccess from @/features/entitlement.
   Import: createSupabaseServerClient from @/lib/supabase/server.
+
+  Parallel DB pattern — always batch independent Supabase calls in Promise.all:
+
+    // Inside getCustomRoles — fetch roles and user counts in parallel
+    const [rolesResult, countsResult] = await Promise.all([
+      supabase.from("custom_roles").select("*").eq("organization_id", orgId).order("created_at", { ascending: false }),
+      supabase.from("user_custom_roles").select("custom_role_id").eq("organization_id", orgId),
+    ]);
+    // Then combine in JS — far faster than two sequential queries.
+
+    // Inside deleteCustomRole — delete role and user assignments in parallel
+    await Promise.all([
+      supabase.from("user_custom_roles").delete().eq("custom_role_id", roleId),
+      supabase.from("custom_roles").delete().eq("id", roleId).eq("organization_id", orgId),
+    ]);
+
+    // Inside assignCustomRoleToUser — check existing + insert in sequence (unique constraint),
+    // but can batch validation reads:
+    const [existing, roles] = await Promise.all([
+      supabase.from("user_custom_roles").select("id").eq("user_id", userId).eq("custom_role_id", customRoleId).maybeSingle(),
+      supabase.from("custom_roles").select("id").eq("organization_id", orgId).eq("id", customRoleId).maybeSingle(),
+    ]);
+    if (existing.data) throw new Error("User already has this custom role.");
+    if (!roles.data) throw new Error("Custom role not found in your organization.");
+    await supabase.from("user_custom_roles").insert({ user_id: userId, custom_role_id: customRoleId, organization_id: orgId });
+
+  Use this pattern for ALL Supabase queries in this file.
 
 Step 5: Extend the RBAC system to support custom roles.
   File: lib/rbac.ts
@@ -227,6 +260,26 @@ Step 11: Add permission check to existing server actions.
   in lib/rbac.ts or a new file that takes AuthContext and returns the merged permissions:
     export async function getEffectivePermissions(auth: AuthContext): Promise<Record<string, string[]>>
   This fetches built-in + custom roles and merges them. Server actions call this once.
+
+  Implementation of getEffectivePermissions (add to lib/rbac.ts):
+    import { createSupabaseServerClient } from "@/lib/supabase/server";
+    export async function getEffectivePermissions(userId: string, orgId: string): Promise<Record<string, string[]>> {
+      const supabase = await createSupabaseServerClient();
+      // Fetch custom role permissions in parallel with other needed data
+      const { data: userCustomRoles } = await supabase
+        .from("user_custom_roles")
+        .select("custom_role_id, custom_roles!inner(permissions)")
+        .eq("user_id", userId)
+        .eq("organization_id", orgId);
+      const merged: Record<string, string[]> = {};
+      for (const ucr of (userCustomRoles ?? [])) {
+        const perms = (ucr.custom_roles as any)?.permissions ?? {};
+        for (const [resource, actions] of Object.entries(perms)) {
+          merged[resource] = [...new Set([...(merged[resource] ?? []), ...(actions as string[])])];
+        }
+      }
+      return merged;
+    }
 
 Step 12: Validation.
   Run: npm run typecheck (0 errors)

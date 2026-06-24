@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { CheckCircle2, Download, Gauge, Settings as SettingsIcon, ShieldCheck, ToggleLeft, ToggleRight, XCircle } from "lucide-react";
+import { Calendar, CheckCircle2, Download, ExternalLink, Gauge, Settings as SettingsIcon, ShieldCheck, ToggleLeft, ToggleRight, XCircle } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
@@ -13,13 +13,18 @@ import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { toggleFeatureFlagAction } from "@/features/organization-owner/actions/settings-actions";
+import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
+import { GoogleCalendarPanel } from "@/features/organization-owner/components/modules/GoogleCalendarPanel";
+import { WebhookPanel } from "@/features/organization-owner/components/modules/WebhookPanel";
 
 type SettingsEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
 
 export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnterpriseModuleProps) {
   const { filters, navigate, currentPage } = useModuleFilters();
-  const [activeTab, setActiveTab] = useState<"flags" | "branch" | "compliance" | "notifications">("flags");
+  const [activeTab, setActiveTab] = useState<"flags" | "branch" | "compliance" | "notifications" | "integrations_calendar" | "integrations_webhooks">("flags");
   const [flagFilter, setFlagFilter] = useState<string>("all");
+  const hasGoogleCalendar = useHasFeature("google_calendar_sync");
+  const hasWebhooks = useHasFeature("webhooks");
 
   const flags = (moduleData?.items ?? dashboard.featureFlags) as typeof dashboard.featureFlags;
   const branchSettings = dashboard.branchSettings;
@@ -111,12 +116,37 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
       </section>
 
       {/* ═══ TAB BAR ═══ */}
-      <div className="flex gap-1 rounded-lg border border-border bg-surface p-1" role="tablist">
+      <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 flex-wrap" role="tablist">
         {(["flags", "branch", "compliance", "notifications"] as const).map((tab) => (
           <button key={tab} className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${activeTab === tab ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setActiveTab(tab)} role="tab" aria-selected={activeTab === tab} type="button">
             {tab === "flags" ? "Feature Flags" : tab === "branch" ? "Branch Settings" : tab === "compliance" ? "Compliance" : "Notifications"}
           </button>
         ))}
+        {(hasGoogleCalendar || hasWebhooks) && (
+          <span className="flex items-center px-2 text-xs font-bold text-muted-foreground whitespace-nowrap">Integrations:</span>
+        )}
+        {hasGoogleCalendar && (
+          <button
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition flex items-center gap-1.5 ${activeTab === "integrations_calendar" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setActiveTab("integrations_calendar")}
+            role="tab"
+            aria-selected={activeTab === "integrations_calendar"}
+            type="button"
+          >
+            <Calendar className="size-3.5" /> Calendar
+          </button>
+        )}
+        {hasWebhooks && (
+          <button
+            className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition flex items-center gap-1.5 ${activeTab === "integrations_webhooks" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setActiveTab("integrations_webhooks")}
+            role="tab"
+            aria-selected={activeTab === "integrations_webhooks"}
+            type="button"
+          >
+            <ExternalLink className="size-3.5" /> Webhooks
+          </button>
+        )}
       </div>
 
       {/* ═══ TAB: FEATURE FLAGS ═══ */}
@@ -231,6 +261,16 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
           </CardContent>
         </Card>
       ) : null}
+
+      {/* ═══ TAB: INTEGRATIONS — GOOGLE CALENDAR ═══ */}
+      {activeTab === "integrations_calendar" && (
+        <GoogleCalendarPanel dashboard={dashboard} hasFeature={hasGoogleCalendar} />
+      )}
+
+      {/* ═══ TAB: INTEGRATIONS — WEBHOOKS ═══ */}
+      {activeTab === "integrations_webhooks" && (
+        <WebhookPanel dashboard={dashboard} hasFeature={hasWebhooks} />
+      )}
     </div>
   );
 }

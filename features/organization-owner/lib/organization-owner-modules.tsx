@@ -17,7 +17,8 @@ import {
   Tags,
   UserRound,
   UserRoundPlus,
-  UsersRound
+  UsersRound,
+  Wrench
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { PortalNavItem } from "@/components/layout/portal-shell";
@@ -221,6 +222,26 @@ export const organizationOwnerModules = [
     icon: <ShieldCheck className="size-5" />,
     iconKey: "bell",
     featureKey: "audit_logs" as FeatureKey,
+  },
+  {
+    slug: "custom-roles",
+    href: "/organization/custom-roles",
+    label: "Custom Roles",
+    title: "Custom Roles & Permissions",
+    description: "Create custom roles with granular permissions for staff members.",
+    icon: <ShieldCheck className="size-5" />,
+    iconKey: "users",
+    featureKey: "custom_roles_granular_permissions" as FeatureKey,
+  },
+  {
+    slug: "equipment",
+    href: "/organization/equipment",
+    label: "Equipment",
+    title: "Equipment Inventory & Maintenance",
+    description: "Track gym equipment, service schedules, warranty, and AMC expiries.",
+    icon: <Wrench className="size-5" />,
+    iconKey: "settings",
+    featureKey: "equipment_inventory_maintenance" as FeatureKey,
   }
 ] satisfies OrganizationOwnerModule[];
 

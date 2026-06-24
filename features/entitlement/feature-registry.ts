@@ -287,6 +287,8 @@ export const MODULE_FEATURE_MAP: Record<string, FeatureKey> = {
   domains: "custom_domain",
   nutrition: "nutrition_plans",
   security: "audit_logs",
+  "custom-roles": "custom_roles_granular_permissions",
+  equipment: "equipment_inventory_maintenance",
   // dashboard, plan, profile, settings, billing, support are always available
 };
 

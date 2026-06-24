@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState, useActionState, useMemo, type ReactNode } from "react";
-import { Banknote, Download, Dumbbell, Edit3, Eye, FileText, Percent, Plus, UserRound, UsersRound } from "lucide-react";
+import { useCallback, useState, useActionState, useMemo, useRef, type ReactNode } from "react";
+import { Banknote, Download, Dumbbell, Edit3, Eye, FileText, Percent, Plus, UserRound, UsersRound, GitBranch } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { saveTrainerAction, assignMemberToTrainerAction } from "@/features/organization-owner/actions/trainer-actions";
+import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { Button } from "@/components/ui/button";
 import { useOptimisticList } from "@/features/organization-owner/lib/use-optimistic-crud";
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
@@ -45,6 +46,8 @@ export function TrainersEnterpriseModule({ dashboard, moduleData, planContext }:
   const [assigningTrainer, setAssigningTrainer] = useState<TrainerRow | null>(null);
   const [state, formAction] = useActionState(saveTrainerAction, initialAuthActionState);
   const [assignState, assignFormAction] = useActionState(assignMemberToTrainerAction, initialAuthActionState);
+  const [additionalGymIds, setAdditionalGymIds] = useState<string[]>([]);
+  const hasTrainerSharing = useHasFeature("trainer_sharing_across_branches");
 
   const initial = (moduleData?.items ?? dashboard.trainers) as TrainerRow[];
   const { items: trainers, addOptimistic, updateOptimistic } = useOptimisticList<TrainerRow>(initial);
@@ -59,8 +62,8 @@ export function TrainersEnterpriseModule({ dashboard, moduleData, planContext }:
   const totalAssignedMembers = dashboard.members.filter((m) => m.assigned_trainer_id).length;
   const totalTrainerSessions = (dashboard as unknown as { trainerSessions?: Array<unknown> }).trainerSessions?.length ?? 0;
 
-  const openCreate = useCallback(() => { setEditingTrainer(null); setDrawerOpen(true); }, []);
-  const openEdit = useCallback((t: TrainerRow) => { setEditingTrainer(t); setDrawerOpen(true); }, []);
+  const openCreate = useCallback(() => { setEditingTrainer(null); setAdditionalGymIds([]); setDrawerOpen(true); }, []);
+  const openEdit = useCallback((t: TrainerRow) => { setEditingTrainer(t); setAdditionalGymIds([]); setDrawerOpen(true); }, []);
   const openAssign = useCallback((t: TrainerRow) => { setAssigningTrainer(t); setAssignDrawerOpen(true); }, []);
   const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingTrainer(null); }, []);
   const closeAssign = useCallback(() => { setAssignDrawerOpen(false); setAssigningTrainer(null); }, []);
@@ -75,7 +78,7 @@ export function TrainersEnterpriseModule({ dashboard, moduleData, planContext }:
     return {
       id: t.id,
       title: t.display_name,
-      subtitle: `${gym?.name ?? "Unknown gym"} · ${t.employee_code ?? "No code"}`,
+      subtitle: `${gym?.name ?? "Unknown gym"} · ${t.employee_code ?? "No code"}${hasTrainerSharing ? ` · ${1} gym` : ""}`,
       meta: `${formatEnterpriseLabel(t.employment_type)} · ${t.years_experience ?? 0} yrs · Joined ${t.joined_at ? new Date(t.joined_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}`,
       badge: t.status,
       badgeVariant: (t.status === "active" ? "success" : t.status === "on_leave" ? "warning" : "neutral") as "success" | "warning" | "neutral",
@@ -86,6 +89,7 @@ export function TrainersEnterpriseModule({ dashboard, moduleData, planContext }:
         { label: "Members", value: `${activeMembers} active · ${assignedMembers.length} total` },
         { label: "PT Revenue", value: formatCurrency(ptRevenue) },
         { label: "Experience", value: `${t.years_experience ?? 0} years` },
+        ...(hasTrainerSharing ? [{ label: "Gym", value: gym?.name ?? "—" }] : []),
       ],
       actions: [
         { label: "Details", onClick: () => setDetailTrainer(t), variant: "secondary" as const, icon: <Eye className="size-3.5" /> },
@@ -235,6 +239,46 @@ export function TrainersEnterpriseModule({ dashboard, moduleData, planContext }:
               </select>
             </DrawerField>
           </div>
+          {/* ═══ ADDITIONAL GYMS (trainer sharing) ═══ */}
+          {hasTrainerSharing ? (
+            <div className="rounded-md border border-border p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <GitBranch className="size-4 text-muted-foreground" />
+                <p className="text-sm font-bold">Additional Gym Assignments</p>
+              </div>
+              <p className="text-xs text-muted-foreground">Select additional gyms where this trainer can teach classes.</p>
+              <div className="flex flex-wrap gap-2">
+                {dashboard.gyms
+                  .filter((g) => editingTrainer ? g.id !== editingTrainer.gym_id : true)
+                  .map((g) => (
+                    <label
+                      key={g.id}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-bold transition",
+                        additionalGymIds.includes(g.id)
+                          ? "border-accent bg-accent/10 text-accent"
+                          : "border-border hover:border-border-strong"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={additionalGymIds.includes(g.id)}
+                        onChange={() => {
+                          setAdditionalGymIds((prev) =>
+                            prev.includes(g.id) ? prev.filter((id) => id !== g.id) : [...prev, g.id]
+                          );
+                        }}
+                      />
+                      {g.name}
+                    </label>
+                  ))}
+              </div>
+              {additionalGymIds.length > 0 ? (
+                <input type="hidden" name="additionalGymIds" value={additionalGymIds.join(",")} />
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={closeDrawer} type="button">Cancel</button>
             <DrawerSubmitButton>{editingTrainer ? "Update" : "Add Trainer"}</DrawerSubmitButton>
@@ -281,6 +325,7 @@ function TrainerDetailPanel({ trainer, dashboard, onClose }: { trainer: TrainerR
   const gym = dashboard.gyms.find((g) => g.id === trainer.gym_id);
   const assignedMembers = dashboard.members.filter((m) => m.assigned_trainer_id === trainer.id);
   const activeMembers = assignedMembers.filter((m) => m.status === "active");
+  const hasTrainerSharing = useHasFeature("trainer_sharing_across_branches");
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm" onClick={onClose}>
@@ -310,6 +355,29 @@ function TrainerDetailPanel({ trainer, dashboard, onClose }: { trainer: TrainerR
               <div><p className="text-xs text-muted-foreground">Joined</p><p className="text-sm font-bold">{trainer.joined_at ? new Date(trainer.joined_at).toLocaleDateString("en-IN") : "—"}</p></div>
             </CardContent>
           </Card>
+
+          {/* ═══ GYM ASSIGNMENTS (trainer sharing) ═══ */}
+          {hasTrainerSharing ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-black">Gym Assignments</h3>
+                  <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">{dashboard.gyms.filter((g) => g.id === trainer.gym_id).length > 0 ? 1 : 0} gym{1 !== 1 ? "s" : ""}</span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {dashboard.gyms.filter((g) => g.id === trainer.gym_id).map((g) => (
+                  <div key={g.id} className="flex items-center gap-2 rounded-md border border-border bg-background p-2.5">
+                    <span className="text-sm font-bold">{g.name}</span>
+                    <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent">Primary</span>
+                  </div>
+                ))}
+                {dashboard.gyms.filter((g) => g.id !== trainer.gym_id).length > 0 ? (
+                  <p className="text-xs text-muted-foreground pt-1">Additional gym assignments are managed via the edit form.</p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>

@@ -19,6 +19,8 @@ import {
   requireOrganizationFeatureAccess,
   type FeatureKey,
 } from "@/features/entitlement";
+import { applySplitRules } from "@/features/organization-owner/actions/revenue-split-actions";
+import { autoEarnReferralRewardsForMember } from "@/features/organization-owner/actions/referral-actions";
 import type { MemberDocumentType, MembershipEvent, MembershipPlanRow, MembershipRow, MembershipStatus } from "@/types/membership";
 import {
   calculateEndDate,
@@ -441,7 +443,39 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
   }
 
   const previousEndDate = membership.end_date;
-  const renewalDiscountAmount = normalizeMembershipDiscount(parsed.data.paymentStatus, parsed.data.discountAmount, plan.price_amount);
+  let renewalDiscountAmount = normalizeMembershipDiscount(parsed.data.paymentStatus, parsed.data.discountAmount, plan.price_amount);
+
+  // ─── Loyalty points redemption (Step 6 — points-based renewal discount) ──
+  const redeemPointsRaw = formData.get("redeemPoints");
+  const redeemPoints = redeemPointsRaw ? Number(redeemPointsRaw) : 0;
+  let loyaltyDiscountPaise = 0;
+  if (redeemPoints > 0 && membership.gym_id) {
+    try {
+      const orgId = await getOrganizationIdForGym(supabase, membership.gym_id);
+      if (orgId) {
+        const { getLoyaltyConfig, redeemPoints: redeemPointsAction } = await import("@/features/organization-owner/actions/loyalty-actions");
+        const loyaltyConfig = await getLoyaltyConfig(orgId).catch(() => null);
+        if (loyaltyConfig && loyaltyConfig.is_active) {
+          const balance = await supabase
+            .from("loyalty_points")
+            .select("points")
+            .eq("member_id", membership.member_id);
+          const currentBalance = (balance.data ?? []).reduce((sum: number, r: { points: number }) => sum + r.points, 0);
+          if (currentBalance >= redeemPoints && redeemPoints >= loyaltyConfig.min_points_to_redeem) {
+            loyaltyDiscountPaise = Math.round(redeemPoints * 100 / loyaltyConfig.points_redemption_rate);
+            const subtotal = plan.price_amount;
+            const maxRedemptionPaise = Math.floor(subtotal * loyaltyConfig.max_redemption_percentage / 100);
+            if (loyaltyDiscountPaise > maxRedemptionPaise) {
+              loyaltyDiscountPaise = maxRedemptionPaise;
+            }
+            if (loyaltyDiscountPaise > 0) {
+              renewalDiscountAmount += loyaltyDiscountPaise;
+            }
+          }
+        }
+      }
+    } catch { /* loyalty redemption validation is best-effort — don't block renewal */ }
+  }
   const { data: updatedMembership, error } = await supabase
     .from("memberships")
     .update({
@@ -511,6 +545,49 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
 
   revalidatePath(`/admin/members/${membership.member_id}`);
   revalidatePath("/admin");
+
+  // Auto-earn referral rewards after renewal (membership may now be mature)
+  autoEarnReferralRewardsForMember(membership.member_id).catch(() => {});
+
+  // Fire outgoing webhook for membership renewal (never blocks)
+  if (membership.gym_id) {
+    getOrganizationIdForGym(supabase, membership.gym_id).then((orgId) => {
+      if (orgId) {
+        import("@/features/webhooks/trigger").then(({ triggerWebhook }) =>
+          triggerWebhook(orgId, "membership.renewed", {
+            memberId: membership.member_id,
+            membershipId: membership.id,
+            planId: plan.id,
+            planName: plan.name,
+          }).catch(() => {})
+        ).catch(() => {});
+      }
+    }).catch(() => {});
+  }
+
+  // Award loyalty points for renewal (fire and forget)
+  if (membership.gym_id) {
+    getOrganizationIdForGym(supabase, membership.gym_id).then((orgId) => {
+      if (orgId) {
+        const subtotal = updatedMembership.price_amount + updatedMembership.joining_fee_amount;
+        const discount = Math.min(updatedMembership.discount_amount, subtotal);
+        const paymentAmount = Math.max(subtotal - discount, 0);
+        if (paymentAmount > 0) {
+          import("@/features/organization-owner/actions/loyalty-actions").then(({ earnPoints }) =>
+            earnPoints(orgId, membership.member_id, "renewal", membership.id, `Membership renewal`, paymentAmount).catch(() => {})
+          ).catch(() => {});
+        }
+        // Record loyalty redemption if points were redeemed during this renewal
+        if (loyaltyDiscountPaise > 0 && billing.invoiceId) {
+          import("@/features/organization-owner/actions/loyalty-actions").then(({ redeemPoints: redeemPointsAction }) =>
+            redeemPointsAction(orgId, membership.member_id, redeemPoints, billing.invoiceId!, `Renewal discount (${redeemPoints} pts)`)
+              .catch(() => {})
+          ).catch(() => {});
+        }
+      }
+    }).catch(() => {});
+  }
+
   return { status: "success", message: "Membership renewed." };
 }
 
@@ -923,6 +1000,9 @@ async function createMembershipRecord(input: {
     })
   ]);
 
+  // Auto-earn referral rewards if member was referred and membership is mature
+  autoEarnReferralRewardsForMember(input.memberId).catch(() => {});
+
   return { ok: true, membership: data } as const;
 }
 
@@ -1095,6 +1175,22 @@ async function createMembershipBillingRecords(input: {
         metadata: { invoiceId: invoice.id, membershipId: input.membership.id } as Json
       })
     ]);
+  }
+
+  const orgId = await getOrganizationIdForGym(input.supabase, input.gymId);
+  if (orgId && payment.id) {
+    applySplitRules(orgId, payment.id, totalAmount, input.gymId).catch(() => undefined);
+    // Fire outgoing webhook for payment received (never blocks)
+    import("@/features/webhooks/trigger").then(({ triggerWebhook }) =>
+      triggerWebhook(orgId, "payment.received", {
+        memberId: input.memberId,
+        membershipId: input.membership.id,
+        paymentId: payment.id,
+        invoiceId: invoice.id,
+        amount: totalAmount,
+        planName: input.planName,
+      }).catch(() => {})
+    ).catch(() => {});
   }
 
   return { ok: true, invoiceId: invoice.id, paymentId: payment.id } as const;

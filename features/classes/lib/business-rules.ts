@@ -90,7 +90,8 @@ export function buildScheduleDates(schedule: Pick<ClassScheduleRow, "recurrence"
 
 export function hasScheduleConflict(
   candidate: { trainerId: string | null; sessionDate: string; startsAt: string; endsAt: string },
-  existing: Array<{ primary_trainer_id: string | null; substitute_trainer_id: string | null; session_date: string; starts_at: string; ends_at: string; status: string }>
+  existing: Array<{ primary_trainer_id: string | null; substitute_trainer_id: string | null; gym_id?: string | null; session_date: string; starts_at: string; ends_at: string; status: string }>,
+  trainerAssignedGyms?: string[] | null
 ) {
   if (!candidate.trainerId) {
     return false;
@@ -101,6 +102,10 @@ export function hasScheduleConflict(
   return existing.some((session) => {
     const sessionTrainerId = session.substitute_trainer_id ?? session.primary_trainer_id;
     if (sessionTrainerId !== candidate.trainerId || session.session_date !== candidate.sessionDate || session.status === "cancelled") {
+      return false;
+    }
+    // If trainerAssignedGyms provided, only check conflicts within trainer's assigned gyms
+    if (trainerAssignedGyms && trainerAssignedGyms.length > 0 && session.gym_id && !trainerAssignedGyms.includes(session.gym_id)) {
       return false;
     }
     const otherStart = timeToMinutes(session.starts_at);

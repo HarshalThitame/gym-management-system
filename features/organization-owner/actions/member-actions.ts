@@ -8,6 +8,8 @@ import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit } from "../lib/entitlement-guards";
 import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 import { saveMemberCustomFieldValues } from "./member-field-actions";
+import { generateReferralCode, processReferralOnJoin } from "./referral-actions";
+import { triggerWebhook } from "@/features/webhooks/trigger";
 
 type MemberInsert = Database["public"]["Tables"]["members"]["Insert"];
 type MemberUpdate = Database["public"]["Tables"]["members"]["Update"];
@@ -21,7 +23,16 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
     const gymId = formData.get("gymId") as string;
     const fullName = formData.get("fullName") as string;
     const phone = formData.get("phone") as string;
+    const corporateAccountId = (formData.get("corporateAccountId") as string) || null;
+    const referralCode = (formData.get("referralCode") as string) || null;
     if (!gymId || !fullName || !phone) return { ...prevState, status: "error", message: "Gym, name, and phone are required." };
+
+    // Validate corporate account if provided
+    if (corporateAccountId) {
+      await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "corporate_bulk_memberships", actionName: "member.link_corporate" });
+      const { data: corp } = await supabase.from("corporate_accounts").select("id").eq("id", corporateAccountId).eq("organization_id", ctx.organizationId).single();
+      if (!corp) return { ...prevState, status: "error", message: "Corporate account not found in your organization." };
+    }
 
     const { data: gym } = await supabase.from("gyms").select("organization_id").eq("id", gymId).single();
     if (!gym || gym.organization_id !== ctx.organizationId) return { ...prevState, status: "error", message: "Gym not in your organization." };
@@ -41,11 +52,18 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
         emergency_contact_phone: (formData.get("emergencyContactPhone") as string) || null,
         address: (formData.get("address") as string) || null,
         assigned_trainer_id: (formData.get("assignedTrainerId") as string) || null,
+        corporate_account_id: corporateAccountId,
         updated_at: new Date().toISOString()
       };
       const { error } = await supabase.from("members").update(update as never).eq("id", memberId);
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_member", entityType: "member", entityId: memberId });
+
+      // Background: generate referral code if member doesn't have one yet
+      generateReferralCode(memberId).catch(() => {});
+
+      // Background: fire webhook (never blocks)
+      triggerWebhook(ctx.organizationId, "member.updated", { memberId, fullName, phone, gymId }).catch(() => {});
 
       if (customFieldValues.length > 0) {
         await saveMemberCustomFieldValues(memberId, customFieldValues);
@@ -69,6 +87,7 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
         emergency_contact_phone: (formData.get("emergencyContactPhone") as string) || null,
         address: (formData.get("address") as string) || null,
         assigned_trainer_id: (formData.get("assignedTrainerId") as string) || null,
+        corporate_account_id: corporateAccountId,
         status: "active", joined_at: new Date().toISOString()
       };
       const { data, error } = await supabase.from("members").insert(insert as never).select("id").single();
@@ -78,6 +97,15 @@ export async function saveMemberAction(prevState: AuthActionState, formData: For
       if (customFieldValues.length > 0 && data) {
         await saveMemberCustomFieldValues(data.id, customFieldValues);
       }
+
+      // Background: generate referral code for new member (don't block creation)
+      generateReferralCode(data.id).catch(() => {});
+      // Process referral if code provided
+      if (referralCode && data) {
+        processReferralOnJoin(ctx.organizationId, data.id, referralCode).catch(() => {});
+      }
+      // Background: fire webhook (never blocks)
+      triggerWebhook(ctx.organizationId, "member.created", { memberId: data.id, fullName, phone, gymId }).catch(() => {});
     }
 
     revalidateOrgModules(["/organization/members"]);

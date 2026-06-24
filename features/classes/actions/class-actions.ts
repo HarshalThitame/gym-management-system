@@ -8,7 +8,9 @@ import { requireRole } from "@/lib/auth/guards";
 import { hasRequiredRole } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assertFeature } from "@/lib/tenant";
+import { hasFeatureAccess } from "@/features/entitlement";
 import { calculateCommissionsForSession } from "@/features/organization-owner/actions/commission-actions";
+import { triggerWebhook } from "@/features/webhooks/trigger";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { AuthContext } from "@/types/auth";
 import type { ClassRow, ClassSessionRow } from "@/types/classes";
@@ -208,10 +210,11 @@ export async function saveClassSessionAction(_previousState: AuthActionState, fo
     sessionDate: parsed.data.sessionDate,
     startsAt: parsed.data.startsAt,
     endsAt: parsed.data.endsAt,
-    ignoreSessionId: parsed.data.sessionId || null
+    ignoreSessionId: parsed.data.sessionId || null,
+    sessionGymId: classRow.gym_id,
   });
   if (conflict) {
-    return { status: "error", message: "Trainer already has a class at this time." };
+    return { status: "error", message: typeof conflict === "string" ? conflict : "Trainer already has a class at this time." };
   }
 
   const payload = {
@@ -298,6 +301,36 @@ export async function generateClassScheduleAction(_previousState: AuthActionStat
 
   const schedule = scheduleResult.data;
   const dates = buildScheduleDates(schedule, 80);
+
+  // Check trainer is assigned to this gym if trainer sharing is active
+  let assignedGymIds: string[] | null = null;
+  if (primaryTrainer) {
+    const orgId = await getOrganizationIdForGym(supabase, classRow.gym_id);
+    if (orgId) {
+      const { hasFeatureAccess: checkFeature } = await import("@/features/entitlement");
+      const hasSharing = await checkFeature(orgId, "trainer_sharing_across_branches");
+      if (hasSharing) {
+        const { data: assignments } = await supabase
+          .from("trainer_gym_assignments")
+          .select("gym_id")
+          .eq("trainer_id", primaryTrainer.trainer_id)
+          .eq("organization_id", orgId);
+        assignedGymIds = (assignments ?? []).map((a) => a.gym_id);
+        if (assignedGymIds.length === 0) {
+          const { data: trainer } = await supabase
+            .from("trainers")
+            .select("gym_id")
+            .eq("id", primaryTrainer.trainer_id)
+            .maybeSingle();
+          if (trainer?.gym_id) assignedGymIds = [trainer.gym_id];
+        }
+        if (classRow.gym_id && !assignedGymIds.includes(classRow.gym_id)) {
+          return { status: "error", message: "Trainer is not assigned to this gym." };
+        }
+      }
+    }
+  }
+
   const existingResult = primaryTrainer
     ? await supabase.from("class_sessions").select("*").eq("primary_trainer_id", primaryTrainer.trainer_id).gte("session_date", dates[0] ?? parsed.data.startDate).lte("session_date", dates.at(-1) ?? parsed.data.startDate)
     : { data: [], error: null };
@@ -310,7 +343,7 @@ export async function generateClassScheduleAction(_previousState: AuthActionStat
       sessionDate,
       startsAt: parsed.data.startsAt,
       endsAt: parsed.data.endsAt
-    }, existingResult.data ?? []))
+    }, existingResult.data ?? [], assignedGymIds))
     .map((sessionDate) => ({
       gym_id: classRow.gym_id,
       class_id: classRow.id,
@@ -360,7 +393,15 @@ export async function bookClassAction(_previousState: AuthActionState, formData:
     return { status: "error", message: "Class session not found." };
   }
   if (bundle.session.gym_id !== member.gym_id) {
-    return { status: "error", message: "Member cannot book classes outside their gym." };
+    const orgId = getContextOrganizationId(context);
+    if (orgId) {
+      const hasCrossBranch = await hasFeatureAccess(orgId, "cross_branch_class_booking");
+      if (!hasCrossBranch) {
+        return { status: "error", message: "Member cannot book classes outside their gym." };
+      }
+    } else {
+      return { status: "error", message: "Member cannot book classes outside their gym." };
+    }
   }
   const featureError = await requireClassSchedulingFeature(supabase, getContextOrganizationId(context), bundle.session.gym_id);
   if (featureError) {
@@ -422,6 +463,10 @@ export async function bookClassAction(_previousState: AuthActionState, formData:
         writeClassAudit(context, "class.booking_created", "class_booking", booking.id, { sessionId: bundle.session.id, memberId: member.id })
       ]);
       revalidateClassPaths();
+      const orgId = getContextOrganizationId(context);
+      if (orgId) {
+        triggerWebhook(orgId, "class.booked", { sessionId: bundle.session.id, className: bundle.classRow.name, memberId: member.id, memberName: member.full_name }).catch(() => {});
+      }
       return { status: "success", message: "Class booked successfully." };
     }
   }
@@ -659,13 +704,50 @@ async function getPrimaryTrainerForClass(supabase: AppSupabase, classId: string)
   return data;
 }
 
-async function hasTrainerSessionConflict(supabase: AppSupabase, input: { trainerId: string | null; sessionDate: string; startsAt: string; endsAt: string; ignoreSessionId: string | null }) {
+async function hasTrainerSessionConflict(
+  supabase: AppSupabase,
+  input: { trainerId: string | null; sessionDate: string; startsAt: string; endsAt: string; ignoreSessionId: string | null; sessionGymId?: string | null }
+) {
   if (!input.trainerId) {
     return false;
   }
+
+  let assignedGymIds: string[] | null = null;
+
+  // With trainer sharing, verify trainer is assigned to the session's gym
+  if (input.sessionGymId) {
+    const orgId = await getOrganizationIdForGym(supabase, input.sessionGymId);
+    if (orgId) {
+      const { hasFeatureAccess: checkFeature } = await import("@/features/entitlement");
+      const hasSharing = await checkFeature(orgId, "trainer_sharing_across_branches");
+      if (hasSharing) {
+        const { data: assignments } = await supabase
+          .from("trainer_gym_assignments")
+          .select("gym_id")
+          .eq("trainer_id", input.trainerId)
+          .eq("organization_id", orgId);
+        assignedGymIds = (assignments ?? []).map((a) => a.gym_id);
+        if (assignedGymIds.length === 0) {
+          // Check primary gym fallback
+          const { data: trainer } = await supabase
+            .from("trainers")
+            .select("gym_id")
+            .eq("id", input.trainerId)
+            .maybeSingle();
+          if (trainer?.gym_id) {
+            assignedGymIds = [trainer.gym_id];
+          }
+        }
+        if (!assignedGymIds.includes(input.sessionGymId)) {
+          return "Trainer is not assigned to this gym." as unknown as boolean;
+        }
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from("class_sessions")
-    .select("id,primary_trainer_id,substitute_trainer_id,session_date,starts_at,ends_at,status")
+    .select("id,gym_id,primary_trainer_id,substitute_trainer_id,session_date,starts_at,ends_at,status")
     .eq("session_date", input.sessionDate)
     .or(`primary_trainer_id.eq.${input.trainerId},substitute_trainer_id.eq.${input.trainerId}`)
     .in("status", ["scheduled", "in_progress"]);
@@ -677,7 +759,7 @@ async function hasTrainerSessionConflict(supabase: AppSupabase, input: { trainer
     sessionDate: input.sessionDate,
     startsAt: input.startsAt,
     endsAt: input.endsAt
-  }, (data ?? []).filter((session) => session.id !== input.ignoreSessionId));
+  }, (data ?? []).filter((session) => session.id !== input.ignoreSessionId), assignedGymIds);
 }
 
 async function getBookingMember(supabase: AppSupabase, context: AuthContext, requestedMemberId: string | null): Promise<MemberRow | null> {

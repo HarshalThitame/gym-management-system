@@ -91,6 +91,33 @@ export async function inviteStaffAction(prevState: AuthActionState, formData: Fo
       }
     }
 
+    // Assign custom roles if provided
+    const customRoleIdsRaw = formData.getAll("customRoleIds");
+    if (customRoleIdsRaw.length > 0) {
+      try {
+        await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "custom_roles_granular_permissions", actionName: "staff.invite_custom_roles" });
+
+        for (const crId of customRoleIdsRaw as string[]) {
+          // Verify the custom role belongs to this org
+          const { data: customRole } = await supabase
+            .from("custom_roles")
+            .select("id, organization_id")
+            .eq("id", crId)
+            .eq("organization_id", ctx.organizationId)
+            .maybeSingle();
+          if (!customRole) continue;
+
+          await supabase.from("user_custom_roles").insert({
+            user_id: profileId,
+            custom_role_id: crId,
+            organization_id: ctx.organizationId
+          } as never);
+        }
+      } catch (e) {
+        // Non-fatal: custom role assignment failure does not block the invitation
+      }
+    }
+
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.invite_staff", entityType: "profile", entityId: profileId, metadata: { role: roleName, gymId } as never });
     revalidateOrgModules(["/organization/staff"]);
     return { ...prevState, status: "success", message: "Staff invited." };
@@ -113,6 +140,8 @@ export async function deactivateStaffAction(prevState: AuthActionState, formData
 
     const { error: branchError } = await supabase.from("branch_users").update({ status: "revoked" } as never).eq("user_id", userId).eq("organization_id", ctx.organizationId);
     if (branchError) throw new Error(branchError.message);
+
+    await supabase.from("user_custom_roles").delete().eq("user_id", userId).eq("organization_id", ctx.organizationId);
 
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.deactivate_staff", entityType: "profile", entityId: userId });
     revalidateOrgModules(["/organization/staff"]);

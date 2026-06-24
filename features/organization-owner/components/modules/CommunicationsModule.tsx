@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useMemo, useState, useActionState } from "react";
-import { CalendarDays, Download, Edit3, Eye, Mail, MessageSquare, Plus, Send } from "lucide-react";
+import { CalendarDays, Download, Edit3, Eye, Globe, Mail, MessageSquare, Plus, Send } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
@@ -19,10 +19,15 @@ import { useModuleFilters } from "@/features/organization-owner/lib/use-module-f
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements";
+import { NetworkCampaignPanel } from "@/features/organization-owner/components/modules/NetworkCampaignPanel";
+import { NPSSurveyPanel } from "@/features/organization-owner/components/modules/NPSSurveyPanel";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
 type CommunicationsEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
 type CampaignRow = Database["public"]["Tables"]["campaigns"]["Row"];
+type CommsTab = "campaigns" | "network" | "nps";
 
 const CHART_COLORS = ["#0891b2", "#16a34a", "#f59e0b", "#8b5cf6"];
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
@@ -33,6 +38,9 @@ export function CommunicationsEnterpriseModule({ dashboard, moduleData }: Commun
   const [detailCampaign, setDetailCampaign] = useState<CampaignRow | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<CampaignRow | null>(null);
   const [state, formAction] = useActionState(saveCampaignAction, initialAuthActionState);
+  const [activeTab, setActiveTab] = useState<CommsTab>("campaigns");
+  const hasNetworkCampaigns = useHasFeature("network_wide_campaign_manager");
+  const hasNpsSurveys = useHasFeature("member_nps_surveys");
 
   const campaigns = (moduleData?.items ?? dashboard.campaigns) as CampaignRow[];
   const notifications = dashboard.notifications;
@@ -103,6 +111,57 @@ export function CommunicationsEnterpriseModule({ dashboard, moduleData }: Commun
 
   return (
     <div className="space-y-6">
+      {/* ═══ SUB-TABS ═══ */}
+      {hasNetworkCampaigns || hasNpsSurveys ? (
+        <div className="flex gap-1 rounded-lg border border-border bg-surface-muted p-1">
+          <button
+            onClick={() => setActiveTab("campaigns")}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all",
+              activeTab === "campaigns"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            type="button"
+          >
+            <Mail className="size-4" />
+            Campaigns
+          </button>
+          {hasNetworkCampaigns ? (
+            <button
+              onClick={() => setActiveTab("network")}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all",
+                activeTab === "network"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              type="button"
+            >
+              <Globe className="size-4" />
+              Network Campaigns
+            </button>
+          ) : null}
+          {hasNpsSurveys ? (
+            <button
+              onClick={() => setActiveTab("nps")}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all",
+                activeTab === "nps"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              type="button"
+            >
+              <MessageSquare className="size-4" />
+              NPS Surveys
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {activeTab === "network" ? <NetworkCampaignPanel dashboard={dashboard} /> : activeTab === "nps" ? <NPSSurveyPanel dashboard={dashboard} /> : (
+        <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total notifications in the system" icon={<MessageSquare className="size-5" />} label="Notifications" value={formatCompactNumber(notifications.length)} />
@@ -243,6 +302,8 @@ export function CommunicationsEnterpriseModule({ dashboard, moduleData }: Commun
 
       {/* ═══ DETAIL PANEL ═══ */}
       {detailCampaign ? <CampaignDetailPanel campaign={detailCampaign} dashboard={dashboard} onClose={() => setDetailCampaign(null)} /> : null}
+        </>
+      )}
     </div>
   );
 }

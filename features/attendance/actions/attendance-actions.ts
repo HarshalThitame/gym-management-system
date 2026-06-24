@@ -490,6 +490,19 @@ async function processCheckIn(input: {
 
   const contextGymId = getContextGymId(input.context);
   if (contextGymId && validation.member.gym_id !== contextGymId) {
+    const orgId = (input.context as AuthContext & { organizationId?: string | null }).organizationId ?? null;
+    const crossBranchResult = orgId ? await tryCrossBranchAccess(
+      orgId,
+      supabase,
+      input,
+      validation,
+      contextGymId
+    ) : null;
+
+    if (crossBranchResult !== null) {
+      return crossBranchResult;
+    }
+
     await recordDeniedAccess(supabase, input.context, {
       ...validation,
       allowed: false,
@@ -643,6 +656,18 @@ async function processCheckIn(input: {
     refreshAttendanceMetric(supabase, gymId, session.check_in_at),
     writeAttendanceAudit(input.context, "attendance.checked_in", "attendance_session", session.id, { memberId: validation.member.id, source: input.source, branchId: branchScope.branchId })
   ]);
+
+  // Award loyalty points for check-in (fire and forget — don't block check-in)
+  const orgId = (input.context as AuthContext & { organizationId?: string | null }).organizationId ?? null;
+  if (orgId && validation.member) {
+    import("@/features/organization-owner/actions/loyalty-actions").then(({ earnPoints }) =>
+      earnPoints(orgId, validation.member!.id, "check_in", session.id, "Daily check-in").catch(() => {})
+    ).catch(() => {});
+    // Fire outgoing webhook (never blocks check-in)
+    import("@/features/webhooks/trigger").then(({ triggerWebhook }) =>
+      triggerWebhook(orgId, "check_in", { memberId: validation.member!.id, name: validation.member!.full_name, gymId, sessionId: session.id }).catch(() => {})
+    ).catch(() => {});
+  }
 
   return { status: "success", message: `${validation.member.full_name} checked in.` };
 }
@@ -982,6 +1007,76 @@ async function resolveAttendanceBranchScope(
   }
 
   return { ok: true, branchId: branch.id };
+}
+
+async function tryCrossBranchAccess(
+  organizationId: string,
+  supabase: AppSupabase,
+  input: {
+    context: AuthContext;
+    memberId: string;
+    source: "reception" | "qr";
+    deviceId: string | null;
+    qrTokenId: string | null;
+    notes: string | null;
+  },
+  validation: AccessValidationResult,
+  contextGymId: string
+): Promise<AuthActionState | null> {
+  try {
+    const { evaluateCrossBranchAccess } = await import(
+      "@/features/organization-owner/actions/cross-branch-actions"
+    );
+
+    const access = await evaluateCrossBranchAccess(
+      organizationId,
+      input.memberId,
+      validation.member!.gym_id,
+      contextGymId,
+      validation.member!.branch_id
+    );
+
+    if (access.allowed) {
+      await supabase.from("cross_branch_access_logs").insert({
+        organization_id: organizationId,
+        member_id: input.memberId,
+        from_gym_id: validation.member!.gym_id,
+        to_gym_id: contextGymId,
+        rule_id: access.ruleId ?? null,
+        rule_name: access.ruleName ?? null,
+        decision: "allowed",
+        reason: "Cross-branch access allowed"
+      });
+      return null;
+    }
+
+    await supabase.from("cross_branch_access_logs").insert({
+      organization_id: organizationId,
+      member_id: input.memberId,
+      from_gym_id: validation.member!.gym_id,
+      to_gym_id: contextGymId,
+      rule_id: access.ruleId ?? null,
+      rule_name: access.ruleName ?? null,
+      decision: "denied",
+      reason: access.reason ?? "No cross-branch access rule"
+    });
+
+    await recordDeniedAccess(supabase, input.context, {
+      ...validation,
+      allowed: false,
+      reasonCode: "cross_branch_denied",
+      message: "Cross-branch access not permitted for this member."
+    }, {
+      gymId: contextGymId,
+      qrTokenId: input.qrTokenId,
+      deviceId: input.deviceId,
+      source: input.source
+    });
+
+    return { status: "error", message: "Cross-branch access not permitted." };
+  } catch {
+    return null;
+  }
 }
 
 function revalidateAttendancePaths(memberId?: string) {

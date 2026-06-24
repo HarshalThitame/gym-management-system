@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, BarChart3, Building2, CreditCard, Dumbbell, Gauge, Globe2, MessageSquare, ShieldCheck, Tags, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Building2, CreditCard, Dumbbell, Gauge, Globe2, MessageSquare, ShieldCheck, Tags, UsersRound, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -29,6 +29,9 @@ import { ProfileEnterpriseModule } from "@/features/organization-owner/component
 import { SettingsEnterpriseModule } from "@/features/organization-owner/components/modules/SettingsModule";
 import { SecurityEnterpriseModule } from "@/features/organization-owner/components/modules/SecurityModule";
 import { LeadsModule } from "@/features/organization-owner/components/modules/LeadsModule";
+import { CustomRolesModule } from "@/features/organization-owner/components/modules/CustomRolesModule";
+import { CustomRoleAssignmentPanel } from "@/features/organization-owner/components/modules/CustomRoleAssignmentPanel";
+import { EquipmentModule } from "@/features/organization-owner/components/modules/EquipmentModule";
 import type { OrganizationOwnerModule } from "@/features/organization-owner/lib/organization-owner-modules";
 import { organizationOwnerModules } from "@/features/organization-owner/lib/organization-owner-modules";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
@@ -94,7 +97,7 @@ function ModuleContent({ dashboard, module, moduleData, moduleFilters, planConte
     case "revenue": return <RevenueEnterpriseModule dashboard={dashboard} />;
     case "trainers": return <TrainersEnterpriseModule dashboard={dashboard} planContext={planContext} />;
     case "attendance": return <AttendanceEnterpriseModule dashboard={dashboard} />;
-    case "classes": return <ClassesEnterpriseModule dashboard={dashboard} />;
+    case "classes": return <ClassesEnterpriseModule dashboard={dashboard} {...(moduleData ? { moduleData: moduleData as { items: Record<string, unknown>[]; crossBranchCounts?: Record<string, number> } } : {})} />;
     case "communications": return <CommunicationsEnterpriseModule dashboard={dashboard} />;
     case "analytics": return <AnalyticsEnterpriseModule dashboard={dashboard} />;
     case "branding": return <BrandingEnterpriseModule dashboard={dashboard} />;
@@ -106,6 +109,8 @@ function ModuleContent({ dashboard, module, moduleData, moduleFilters, planConte
     case "settings": return <SettingsEnterpriseModule dashboard={dashboard} />;
     case "security": return <SecurityEnterpriseModule dashboard={dashboard} />;
     case "leads": return <LeadsModule dashboard={dashboard} moduleFilters={moduleFilters} />;
+    case "custom-roles": return <CustomRolesModule dashboard={dashboard} moduleData={moduleData as never} moduleFilters={moduleFilters} hasFeature={planContext?.features?.customRolesGranularPermissions ?? false} />;
+    case "equipment": return <EquipmentModule dashboard={dashboard} />;
     default: return null;
   }
 }

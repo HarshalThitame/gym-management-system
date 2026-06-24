@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useCallback, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Banknote, BarChart3, CreditCard, Download, Eye, PieChart as PieChartIcon, ReceiptText, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Banknote, BarChart3, CreditCard, Download, Eye, PieChart as PieChartIcon, ReceiptText, TrendingUp, GitBranch } from "lucide-react";
 
 import { Bar, BarChart, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
@@ -15,6 +15,8 @@ import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterpri
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCurrency, formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
+import { RevenueSplitPanel } from "@/features/organization-owner/components/modules/RevenueSplitPanel";
 import type { Database } from "@/types/database";
 
 type RevenueEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
@@ -26,6 +28,8 @@ export function RevenueEnterpriseModule({ dashboard, moduleData }: RevenueEnterp
   const { filters, navigate, currentPage } = useModuleFilters();
   const [detailPayment, setDetailPayment] = useState<PaymentRow | null>(null);
   const [chartTab, setChartTab] = useState<"trend" | "gym" | "status">("trend");
+  const [revenueTab, setRevenueTab] = useState<"overview" | "split">("overview");
+  const hasBranchRevenueSplit = useHasFeature("branch_revenue_split");
 
   const payments = (moduleData?.items ?? dashboard.payments) as typeof dashboard.payments;
 
@@ -115,8 +119,30 @@ export function RevenueEnterpriseModule({ dashboard, moduleData }: RevenueEnterp
 
   return (
     <div className="space-y-6">
-      {/* ═══ KPI GRID ═══ */}
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {hasBranchRevenueSplit && (
+        <div className="flex gap-1 rounded-lg border border-border bg-surface p-0.5">
+          <button
+            className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${revenueTab === "overview" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
+            onClick={() => setRevenueTab("overview")} type="button"
+          >
+            Overview
+          </button>
+          <button
+            className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${revenueTab === "split" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
+            onClick={() => setRevenueTab("split")} type="button"
+          >
+            <GitBranch className="size-3.5 mr-1 inline" />
+            Revenue Split
+          </button>
+        </div>
+      )}
+
+      {revenueTab === "split" ? (
+        <RevenueSplitPanel dashboard={dashboard} />
+      ) : (
+        <>
+          {/* ═══ KPI GRID ═══ */}
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total collected revenue" icon={<CreditCard className="size-5" />} label="Collected" value={formatCurrency(totalCollected)} />
         <StatCard detail="Month-over-month revenue change" icon={monthOverMonth >= 0 ? <ArrowUp className="size-5" /> : <ArrowDown className="size-5" />} label="MoM Change" status={monthOverMonth >= 0 ? "good" : "risk"} value={`${monthOverMonth >= 0 ? "+" : ""}${monthOverMonth}%`} />
         <StatCard detail="Average transaction value" icon={<TrendingUp className="size-5" />} label="Avg Transaction" value={formatCurrency(avgTransaction)} />
@@ -257,8 +283,10 @@ export function RevenueEnterpriseModule({ dashboard, moduleData }: RevenueEnterp
         pageSize={filters.pageSize ?? 12}
       />
 
-      {/* ═══ DETAIL PANEL ═══ */}
-      {detailPayment ? <PaymentDetailPanel payment={detailPayment} dashboard={dashboard} onClose={() => setDetailPayment(null)} /> : null}
+          {/* ═══ DETAIL PANEL ═══ */}
+          {detailPayment ? <PaymentDetailPanel payment={detailPayment} dashboard={dashboard} onClose={() => setDetailPayment(null)} /> : null}
+        </>
+      )}
     </div>
   );
 }

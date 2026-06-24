@@ -16,7 +16,7 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
     const ctx = await getOrgOwnerContext("/organization/trainers");
     await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "trainer_management", actionName: "trainer.save" });
     const supabase = await createSupabaseServerClient();
-    const trainerId = formData.get("trainerId") as string | null;
+    let trainerId = formData.get("trainerId") as string | null;
     const gymId = formData.get("gymId") as string;
     const displayName = formData.get("displayName") as string;
     if (!gymId || !displayName) return { ...prevState, status: "error", message: "Gym and trainer name are required." };
@@ -48,7 +48,51 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
       const insert: Record<string, unknown> = { gym_id: gymId, employee_code: employeeCode, display_name: displayName, email, phone, years_experience: yearsExperience, employment_type: employmentType, status };
       const { data, error } = await supabase.from("trainers").insert(insert as never).select("id").single();
       if (error) throw new Error(error.message);
+      trainerId = data.id;
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.create_trainer", entityType: "trainer", entityId: data.id });
+    }
+
+    // ── Multi-gym assignment (trainer sharing) ──
+    const additionalGymIdsRaw = (formData.get("additionalGymIds") as string) || "";
+    if (additionalGymIdsRaw && trainerId) {
+      const { hasFeatureAccess: getHasFeature } = await import("@/features/entitlement");
+      const hasSharing = await getHasFeature(ctx.organizationId, "trainer_sharing_across_branches");
+      if (hasSharing) {
+        const additionalIds = additionalGymIdsRaw.split(",").map((id) => id.trim()).filter(Boolean);
+        const { data: existingAssignments } = await supabase
+          .from("trainer_gym_assignments")
+          .select("gym_id")
+          .eq("trainer_id", trainerId)
+          .eq("organization_id", ctx.organizationId);
+        const existingGymIds = new Set((existingAssignments ?? []).map((a) => a.gym_id));
+
+        // Remove unchecked assignments (except primary)
+        for (const assign of (existingAssignments ?? [])) {
+          if (assign.gym_id !== gymId && !additionalIds.includes(assign.gym_id)) {
+            await supabase
+              .from("trainer_gym_assignments")
+              .delete()
+              .eq("trainer_id", trainerId)
+              .eq("gym_id", assign.gym_id)
+              .eq("organization_id", ctx.organizationId);
+          }
+        }
+
+        // Insert new assignments
+        for (const addGymId of additionalIds) {
+          if (!existingGymIds.has(addGymId)) {
+            const { data: addGym } = await supabase.from("gyms").select("organization_id").eq("id", addGymId).single();
+            if (addGym && addGym.organization_id === ctx.organizationId) {
+              await supabase.from("trainer_gym_assignments").insert({
+                trainer_id: trainerId,
+                gym_id: addGymId,
+                organization_id: ctx.organizationId,
+                is_primary: addGymId === gymId,
+              });
+            }
+          }
+        }
+      }
     }
 
     revalidateOrgModules(["/organization/trainers"]);

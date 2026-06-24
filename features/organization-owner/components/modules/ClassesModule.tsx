@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState, useActionState } from "react";
-import { CalendarDays, Download, Edit3, Eye, Plus, UsersRound, XCircle } from "lucide-react";
+import { useCallback, useMemo, useState, useActionState, type ReactNode } from "react";
+import { CalendarDays, Download, Edit3, Eye, Plus, UsersRound, XCircle, GitBranch, Calendar } from "lucide-react";
 import { LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Line } from "recharts";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
@@ -17,22 +17,39 @@ import { useModuleFilters } from "@/features/organization-owner/lib/use-module-f
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { useHasFeature } from "@/features/organization-owner/entitlements";
+import { NetworkClassCalendar } from "@/features/organization-owner/components/modules/NetworkClassCalendar";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
-type ClassesEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
+type ClassesEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[]; crossBranchCounts?: Record<string, number> } | undefined };
 type ClassSessionRow = Database["public"]["Tables"]["class_sessions"]["Row"];
 
 const CHART_COLORS = ["#16a34a", "#0891b2", "#f59e0b", "#dc2626"];
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
 export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterpriseModuleProps) {
+  const [activeTab, setActiveTab] = useState<"sessions" | "calendar">("sessions");
   const { filters, navigate, currentPage } = useModuleFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailSession, setDetailSession] = useState<ClassSessionRow | null>(null);
   const [editingSession, setEditingSession] = useState<ClassSessionRow | null>(null);
   const [state, formAction] = useActionState(saveClassSessionAction, initialAuthActionState);
+  const hasCrossBranchFeature = useHasFeature("cross_branch_class_booking");
+  const hasNetworkCalendar = useHasFeature("network_wide_class_calendar");
+
+  const tabs = useMemo(() => {
+    const t: Array<{ key: typeof activeTab; label: string; icon: ReactNode }> = [
+      { key: "sessions", label: "Sessions", icon: <CalendarDays className="size-4" /> },
+    ];
+    if (hasNetworkCalendar) {
+      t.push({ key: "calendar", label: "Network Calendar", icon: <Calendar className="size-4" /> });
+    }
+    return t;
+  }, [hasNetworkCalendar]);
 
   const sessions = (moduleData?.items ?? dashboard.classSessions) as ClassSessionRow[];
+  const crossBranchCounts = moduleData?.crossBranchCounts ?? {};
 
   const openCreate = useCallback(() => { setEditingSession(null); setDrawerOpen(true); }, []);
   const openEdit = useCallback((s: ClassSessionRow) => { setEditingSession(s); setDrawerOpen(true); }, []);
@@ -52,6 +69,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
   const totalBooked = sessions.reduce((t, s) => t + Number(s.booked_count ?? 0), 0);
   const totalCapacity = sessions.reduce((t, s) => t + Number(s.capacity ?? 0), 0);
   const totalWaitlist = sessions.reduce((t, s) => t + Number(s.waitlist_count ?? 0), 0);
+  const totalCrossBranch = Object.values(crossBranchCounts).reduce((t, v) => t + v, 0);
   const fillRate = totalCapacity > 0 ? Math.round((totalBooked / totalCapacity) * 100) : 0;
 
   // ── Weekly trend ──
@@ -71,20 +89,22 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
     const gym = dashboard.gyms.find((g) => g.id === s.gym_id);
     const trainer = s.primary_trainer_id ? dashboard.trainers.find((t) => t.id === s.primary_trainer_id) : null;
     const sessionFillRate = Number(s.capacity) > 0 ? Math.round((Number(s.booked_count ?? 0) / Number(s.capacity)) * 100) : 0;
+    const crossCount = crossBranchCounts[s.id] ?? 0;
 
     return {
       id: s.id,
       title: `${s.session_date} · ${s.starts_at?.slice(0, 5) ?? ""} - ${s.ends_at?.slice(0, 5) ?? ""}`,
-      subtitle: `${gym?.name ?? "—"} · ${trainer?.display_name ?? "No trainer"}`,
+      subtitle: `${gym?.name ?? "—"} · ${trainer?.display_name ?? "No trainer"}${hasCrossBranchFeature && crossCount > 0 ? ` · Cross-branch: ${crossCount}` : ""}`,
       meta: `${s.location ?? "No location"} · Booked ${s.booked_count}/${s.capacity} (${sessionFillRate}%) · Waitlist: ${s.waitlist_count ?? 0}`,
-      badge: s.status,
-      badgeVariant: (s.status === "scheduled" ? "success" : s.status === "cancelled" ? "error" : "neutral") as "success" | "error" | "neutral",
+      badge: hasCrossBranchFeature && crossCount > 0 ? `${crossCount} cross-branch` : s.status,
+      badgeVariant: hasCrossBranchFeature && crossCount > 0 ? "info" : (s.status === "scheduled" ? "success" : s.status === "cancelled" ? "error" : "neutral") as "success" | "error" | "neutral" | "info",
       status: s.status,
       sections: [
         { label: "Date", value: s.session_date },
         { label: "Time", value: `${s.starts_at?.slice(0, 5) ?? ""} - ${s.ends_at?.slice(0, 5) ?? ""}` },
         { label: "Fill Rate", value: `${sessionFillRate}%` },
         { label: "Trainer", value: trainer?.display_name ?? "—" },
+        ...(hasCrossBranchFeature && crossCount > 0 ? [{ label: "Cross-branch", value: `${crossCount}`, icon: <GitBranch className="size-3.5" /> }] : []),
       ],
       actions: [
         { label: "Details", onClick: () => setDetailSession(s), variant: "secondary" as const, icon: <Eye className="size-3.5" /> },
@@ -100,6 +120,33 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
 
   return (
     <div className="space-y-6">
+      {/* ═══ SUB-TABS ═══ */}
+      {tabs.length > 1 ? (
+        <div className="flex gap-1 rounded-lg border border-border bg-surface-muted p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all",
+                activeTab === tab.key
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* ═══ NETWORK CALENDAR TAB ═══ */}
+      {activeTab === "calendar" ? <NetworkClassCalendar dashboard={dashboard} /> : null}
+
+      {/* ═══ SESSIONS TAB (DEFAULT) ═══ */}
+      {activeTab !== "sessions" ? null : (
+        <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total class sessions" icon={<CalendarDays className="size-5" />} label="Total" value={String(sessions.length)} />
@@ -110,6 +157,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
         <StatCard detail="Overall class fill rate" icon={<CalendarDays className="size-5" />} label="Fill Rate" status={fillRate >= 80 ? "good" : fillRate >= 50 ? "watch" : "risk"} value={`${fillRate}%`} />
         <StatCard detail="Waitlisted requests" icon={<UsersRound className="size-5" />} label="Waitlist" value={formatCompactNumber(totalWaitlist)} />
         <StatCard detail="Total class capacity" icon={<CalendarDays className="size-5" />} label="Capacity" value={formatCompactNumber(totalCapacity)} />
+        {hasCrossBranchFeature ? <StatCard detail="Cross-branch bookings" icon={<GitBranch className="size-5" />} label="Cross-branch" value={formatCompactNumber(totalCrossBranch)} /> : null}
       </section>
 
       {/* ═══ FILL RATE CHART ═══ */}
@@ -203,12 +251,14 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
       </OrgOwnerDrawer>
 
       {/* ═══ DETAIL PANEL ═══ */}
-      {detailSession ? <ClassDetailPanel session={detailSession} dashboard={dashboard} onClose={() => setDetailSession(null)} /> : null}
+      {detailSession ? <ClassDetailPanel session={detailSession} dashboard={dashboard} crossBranchCount={crossBranchCounts[detailSession.id] ?? 0} hasCrossBranchFeature={hasCrossBranchFeature} onClose={() => setDetailSession(null)} /> : null}
+        </>
+      )}
     </div>
   );
 }
 
-function ClassDetailPanel({ session, dashboard, onClose }: { session: ClassSessionRow; dashboard: OrganizationOwnerDashboard; onClose: () => void }) {
+function ClassDetailPanel({ session, dashboard, crossBranchCount, hasCrossBranchFeature, onClose }: { session: ClassSessionRow; dashboard: OrganizationOwnerDashboard; crossBranchCount: number; hasCrossBranchFeature: boolean; onClose: () => void }) {
   const gym = dashboard.gyms.find((g) => g.id === session.gym_id);
   const trainer = session.primary_trainer_id ? dashboard.trainers.find((t) => t.id === session.primary_trainer_id) : null;
   const fillRate = Number(session.capacity) > 0 ? Math.round((Number(session.booked_count ?? 0) / Number(session.capacity)) * 100) : 0;
@@ -265,6 +315,12 @@ function ClassDetailPanel({ session, dashboard, onClose }: { session: ClassSessi
                   <p className="text-xl font-black">{Math.max(0, Number(session.capacity) - Number(session.booked_count ?? 0))}</p>
                 </div>
               </div>
+              {hasCrossBranchFeature && crossBranchCount > 0 ? (
+                <div className="rounded-md border border-border bg-background p-3 text-center mt-3">
+                  <p className="text-xs text-muted-foreground">Cross-branch bookings</p>
+                  <p className="text-xl font-black">{crossBranchCount}</p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>
