@@ -645,7 +645,7 @@ async function updateInvoicePaidAmount(admin: AppSupabase, invoiceId: string, pa
     return;
   }
 
-  const nextPaid = Math.min(invoice.total_amount, invoice.amount_paid + paymentAmount);
+  const nextPaid = Math.min(invoice.total_amount ?? 0, invoice.amount_paid + paymentAmount);
   const status: InvoiceRow["status"] = nextPaid >= invoice.total_amount ? "paid" : "partially_paid";
   await admin.from("invoices").update({
     amount_paid: nextPaid,

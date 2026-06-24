@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   assertFeature,
@@ -10,10 +11,15 @@ import {
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import type { OrgFeatureFlags } from "@/lib/tenant/feature-flags";
 
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdminClient: vi.fn()
+}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: vi.fn()
 }));
 
+const getSupabaseAdminClientMock = vi.mocked(getSupabaseAdminClient);
 const createSupabaseServerClientMock = vi.mocked(createSupabaseServerClient);
 
 const safeDefaultFlags: OrgFeatureFlags = {
@@ -139,11 +145,11 @@ function mockClientForQuery(query: QueryMock) {
 }
 
 function mockFeatureClient(data: unknown, error: { message: string } | null = null) {
-  createSupabaseServerClientMock.mockResolvedValueOnce(createFeatureClient(data, error) as never);
+  getSupabaseAdminClientMock.mockReturnValue(createFeatureClient(data, error) as never);
 }
 
 function mockFeatureClientThrow(error: Error) {
-  createSupabaseServerClientMock.mockResolvedValueOnce(mockClientForQuery(createThrowingQuery(error)) as never);
+  getSupabaseAdminClientMock.mockReturnValue(mockClientForQuery(createThrowingQuery(error)) as never);
 }
 
 function activeSubscription(packageRow = standardPackage) {

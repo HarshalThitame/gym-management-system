@@ -64,7 +64,7 @@ export default async function ReceptionPaymentsPage() {
   );
 }
 
-function PaymentStatus({ status }: { status: "pending" | "processing" | "paid" | "failed" | "refunded" | "partially_refunded" | "cancelled" }) {
+function PaymentStatus({ status }: { status: string }) {
   if (status === "paid") return <Badge variant="success">paid</Badge>;
   if (status === "failed" || status === "cancelled" || status === "refunded") return <Badge variant="error">{status.replaceAll("_", " ")}</Badge>;
   return <Badge variant="warning">{status.replaceAll("_", " ")}</Badge>;

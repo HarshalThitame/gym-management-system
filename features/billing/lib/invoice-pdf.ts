@@ -73,7 +73,7 @@ function drawAmountLine(
   page: ReturnType<PDFDocument["addPage"]>,
   font: Awaited<ReturnType<PDFDocument["embedFont"]>>,
   label: string,
-  amount: number,
+  amount: number | null,
   currency: string,
   y: number
 ) {
