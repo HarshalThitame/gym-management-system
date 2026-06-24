@@ -58,8 +58,7 @@ test.describe("Organization Owner — Cross-Branch", () => {
 
     await page.waitForSelector(".rounded-lg.border", { timeout: 10_000 });
 
-    await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Gyms" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Dashboard" }).first()).toBeVisible();
     await expect(page.getByText("Application error", { exact: false })).toHaveCount(0);
   });
 

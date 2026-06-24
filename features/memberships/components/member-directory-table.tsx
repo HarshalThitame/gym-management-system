@@ -52,7 +52,7 @@ export function MemberDirectoryTable({ members, total, page, pageSize }: MemberD
                   <p>{member.current_membership?.end_date ?? "-"}</p>
                   {member.current_membership ? <p className="mt-1 text-muted-foreground">{getRemainingDays(member.current_membership.end_date)} days left</p> : null}
                 </td>
-                <td className="px-4 py-4">{member.current_membership ? formatMoney(member.current_membership.total_amount) : "-"}</td>
+                <td className="px-4 py-4">{member.current_membership ? formatMoney(member.current_membership.total_amount ?? 0) : "-"}</td>
                 <td className="px-4 py-4">
                   <ButtonLink href={`/admin/members/${member.id}`} size="sm" variant="secondary">Open</ButtonLink>
                 </td>

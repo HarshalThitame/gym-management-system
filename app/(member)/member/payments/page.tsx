@@ -153,7 +153,7 @@ function InvoiceRowItem({ invoice }: { invoice: InvoiceRow }) {
             Issued {invoice.issued_at ? new Date(invoice.issued_at).toLocaleDateString("en-IN") : new Date(invoice.created_at).toLocaleDateString("en-IN")}
           </p>
         </div>
-        <p className="text-lg font-black">{formatCurrency(invoice.total_amount, invoice.currency)}</p>
+        <p className="text-lg font-black">{formatCurrency(invoice.total_amount ?? 0, invoice.currency)}</p>
       </div>
       <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
         <Amount label="Paid" value={formatCurrency(invoice.amount_paid, invoice.currency)} />

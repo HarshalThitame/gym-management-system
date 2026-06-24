@@ -64,7 +64,7 @@ export default async function MemberDashboardPage() {
               </div>
               <div className="rounded-md border border-border bg-surface-muted p-4">
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Amount</p>
-                <p className="mt-2 font-black">{formatMoney(membership.total_amount)}</p>
+                <p className="mt-2 font-black">{formatMoney(membership.total_amount ?? 0)}</p>
               </div>
             </div>
           ) : (

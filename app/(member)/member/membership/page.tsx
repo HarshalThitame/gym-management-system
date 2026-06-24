@@ -53,7 +53,7 @@ export default async function MemberMembershipPage() {
             <MemberField label="Start Date" value={membership.start_date} />
             <MemberField label="Expiry Date" value={membership.end_date} />
             <MemberField label="Remaining Days" value={String(getRemainingDays(membership.end_date))} />
-            <MemberField label="Invoice Amount" value={formatMoney(membership.total_amount)} />
+            <MemberField label="Invoice Amount" value={formatMoney(membership.total_amount ?? 0)} />
             <MemberField label="Payment Status" value={membership.payment_status.replace(/_/g, " ")} />
           </div>
         ) : (

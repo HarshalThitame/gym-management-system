@@ -47,7 +47,7 @@ export function membershipRowsToCsv(rows: ReportRow[]) {
     row.membership.start_date,
     row.membership.end_date,
     row.membership.payment_status,
-    formatMoney(row.membership.total_amount)
+    formatMoney(row.membership.total_amount ?? 0)
   ]);
 
   return [headers, ...body].map((line) => line.map(escapeCsvValue).join(",")).join("\n");
