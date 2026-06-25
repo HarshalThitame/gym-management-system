@@ -730,8 +730,8 @@ function UsageLimitsView({ orgId }: { orgId: string }) {
     async function load() {
       setLoading(true);
       try {
-        const { getOrgUsage } = await import("@/features/super-admin/services/subscription-usage-service");
-        const data = await getOrgUsage(orgId);
+        const { getOrgUsageAction } = await import("@/features/super-admin/actions/usage-actions");
+        const data = await getOrgUsageAction(orgId);
         setUsage(data);
       } catch { setUsage(null); }
       setLoading(false);
