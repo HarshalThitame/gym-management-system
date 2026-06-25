@@ -8,7 +8,6 @@ import {
   HeartPulse,
   ShieldCheck
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -16,6 +15,7 @@ import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterpri
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { OrgDetailActions } from "@/features/super-admin/components/organizations/OrgDetailActions";
 import { OrgUsageTab } from "@/features/super-admin/components/organizations/OrgUsageTab";
+import { OrganizationRevenueChart } from "@/features/super-admin/components/organizations/OrganizationRevenueChart";
 import { OrganizationApprovalReviewPanel } from "@/features/super-admin/components/organizations/OrganizationApprovalReviewPanel";
 import { OrganizationGovernanceControlPanel } from "@/features/super-admin/components/organizations/OrganizationGovernanceControlPanel";
 import { PackageBadge } from "@/features/super-admin/components/subscriptions/PackageBadge";
@@ -428,23 +428,7 @@ function BillingTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getO
           <h3 className="text-xl font-black">Revenue Trend (Last 12 Months)</h3>
         </CardHeader>
         <CardContent>
-          {chartData.some((d) => d.revenue > 0) ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#888" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#888" />
-                  <Tooltip
-                    contentStyle={{ fontSize: 13 }}
-                    formatter={(value) => formatCurrency(Number(value))}
-                  />
-                  <Bar dataKey="revenue" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-sm font-semibold text-muted-foreground">No revenue data available for chart rendering.</p>
-          )}
+          <OrganizationRevenueChart data={chartData} />
         </CardContent>
       </Card>
 
