@@ -8,11 +8,14 @@ import {
   HeartPulse,
   ShieldCheck
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { OrgDetailActions } from "@/features/super-admin/components/organizations/OrgDetailActions";
+import { OrgUsageTab } from "@/features/super-admin/components/organizations/OrgUsageTab";
 import { OrganizationApprovalReviewPanel } from "@/features/super-admin/components/organizations/OrganizationApprovalReviewPanel";
 import { OrganizationGovernanceControlPanel } from "@/features/super-admin/components/organizations/OrganizationGovernanceControlPanel";
 import { PackageBadge } from "@/features/super-admin/components/subscriptions/PackageBadge";
@@ -26,7 +29,7 @@ type OrganizationDetailPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const tabs = ["profile", "governance", "users", "gyms", "billing", "audit", "security", "domains"] as const;
+const tabs = ["profile", "governance", "users", "usage", "gyms", "billing", "audit", "security", "domains"] as const;
 type DetailTab = (typeof tabs)[number];
 
 export default async function SuperAdminOrganizationDetailPage({ params, searchParams }: OrganizationDetailPageProps) {
@@ -61,6 +64,7 @@ export default async function SuperAdminOrganizationDetailPage({ params, searchP
   const record = data.record;
 
   return (
+    <OrgDetailActions criticalSuperAdminEmail={criticalSuperAdminEmail} data={data}>
     <div className="space-y-6">
       <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <Card>
@@ -110,7 +114,7 @@ export default async function SuperAdminOrganizationDetailPage({ params, searchP
         </Card>
       </section>
 
-      <nav className="flex gap-2 overflow-x-auto rounded-md border border-border bg-surface p-2">
+      <nav className="flex gap-2 overflow-x-auto rounded-md border border-border bg-background/90 backdrop-blur p-2 sticky top-0 z-[5]">
         {tabs.map((tab) => (
           <ButtonLink
             className={activeTab === tab ? "bg-primary text-primary-foreground hover:bg-primary" : ""}
@@ -126,12 +130,14 @@ export default async function SuperAdminOrganizationDetailPage({ params, searchP
       {activeTab === "profile" ? <ProfileTab data={data} /> : null}
       {activeTab === "governance" ? <GovernanceTab criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} /> : null}
       {activeTab === "users" ? <UsersTab data={data} /> : null}
+      {activeTab === "usage" ? <OrgUsageTab record={data.record} /> : null}
       {activeTab === "gyms" ? <GymsTab data={data} /> : null}
       {activeTab === "billing" ? <BillingTab data={data} /> : null}
       {activeTab === "audit" ? <AuditTab data={data} /> : null}
       {activeTab === "security" ? <SecurityTab data={data} /> : null}
       {activeTab === "domains" ? <DomainsTab data={data} /> : null}
     </div>
+    </OrgDetailActions>
   );
 }
 
@@ -253,63 +259,255 @@ function UsersTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrg
 }
 
 function GymsTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrganizationDetailData>>> }) {
+  const branches = data.branches || [];
+  const gyms = data.gyms || [];
+  const totalMembers = branches.reduce((sum, b) => sum + (b.capacity || 0), 0);
+  const totalRevenue = (data.recentPayments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const activeGyms = gyms.filter((g) => g.status === "active").length;
+  const activeBranches = branches.filter((b) => b.status === "active").length;
+
   return (
-    <section className="grid gap-5 xl:grid-cols-2">
-      <div className="space-y-3">
-        <RecordGrid emptyText="No locations were found." title="Locations">
-          {data.gyms.map((gym) => (
-            <div className="rounded-md border border-border bg-background p-4" key={gym.id}>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-black">{gym.name}</p>
-                <EnterpriseStatusBadge status={gym.status} />
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">{gym.slug} · {gym.timezone} · {gym.currency}</p>
-            </div>
-          ))}
-        </RecordGrid>
-        <DetailPaginationControls organizationId={data.record.organization.id} pageParam="gymsPage" pageSizeParam="gymsPageSize" pagination={data.listPagination.gyms} tab="gyms" />
+    <section className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Total Gyms</p>
+          <p className="mt-1 text-2xl font-black">{formatCompactNumber(gyms.length)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{activeGyms} active</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Total Branches</p>
+          <p className="mt-1 text-2xl font-black">{formatCompactNumber(branches.length)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{activeBranches} active</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Members (capacity)</p>
+          <p className="mt-1 text-2xl font-black">{formatCompactNumber(totalMembers)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Across all branches</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-xs">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Revenue</p>
+          <p className="mt-1 text-2xl font-black">{formatCurrency(totalRevenue)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">All payments</p>
+        </div>
       </div>
-      <div className="space-y-3">
-        <RecordGrid emptyText="No branches were found." title="Branches">
-          {data.branches.map((branch) => (
-            <div className="rounded-md border border-border bg-background p-4" key={branch.id}>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black">Locations</h3>
+            <span className="text-sm text-muted-foreground">{gyms.length} gym(s)</span>
+          </div>
+          {gyms.length > 0 ? gyms.map((gym) => {
+            const gymBranches = branches.filter((b) => b.gym_id === gym.id);
+            return (
+              <details key={gym.id} className="group rounded-md border border-border bg-background transition-all hover:border-border-strong">
+                <summary className="flex cursor-pointer items-center justify-between p-4 text-left list-none">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-black">{gym.name}</p>
+                    <EnterpriseStatusBadge status={gym.status} />
+                    {gymBranches.length > 0 && (
+                      <span className="text-xs font-semibold text-muted-foreground">{gymBranches.length} branch(es)</span>
+                    )}
+                    <span className="size-2 rounded-full bg-green-500" title="Admin assigned" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{gym.slug}</span>
+                    <svg className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </div>
+                </summary>
+                <div className="border-t border-border p-4 space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div><p className="text-xs text-muted-foreground">Timezone</p><p className="text-sm font-black">{gym.timezone}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Currency</p><p className="text-sm font-black">{gym.currency}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Branches</p><p className="text-sm font-black">{formatCompactNumber(gymBranches.length)}</p></div>
+                  </div>
+                  {gymBranches.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Branches</p>
+                      {gymBranches.map((branch) => (
+                        <div key={branch.id} className="flex items-center justify-between rounded-md border border-border bg-surface p-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{branch.name}</p>
+                            <EnterpriseStatusBadge status={branch.status} />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{branch.branch_code} · {formatCompactNumber(branch.capacity)} cap</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {gymBranches.length === 0 && (
+                    <p className="text-xs font-semibold text-muted-foreground">No branches under this gym.</p>
+                  )}
+                </div>
+              </details>
+            );
+          }) : (
+            <div className="rounded-md border border-dashed border-border bg-background p-5 text-sm font-semibold text-muted-foreground">No locations were found.</div>
+          )}
+          <DetailPaginationControls organizationId={data.record.organization.id} pageParam="gymsPage" pageSizeParam="gymsPageSize" pagination={data.listPagination.gyms} tab="gyms" />
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black">Branches</h3>
+            <span className="text-sm text-muted-foreground">{branches.length} branch(es)</span>
+          </div>
+          {branches.length > 0 ? branches.map((branch) => (
+            <div key={branch.id} className="rounded-md border border-border bg-background p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-black">{branch.name}</p>
                 <EnterpriseStatusBadge status={branch.status} />
+                {branch.gym_id && <span className="text-xs text-muted-foreground">Gym: {gyms.find((g) => g.id === branch.gym_id)?.name ?? "Unknown"}</span>}
               </div>
               <p className="mt-2 text-sm text-muted-foreground">{branch.branch_code} · {branch.city ?? "No city"} · {formatCompactNumber(branch.capacity)} capacity</p>
             </div>
-          ))}
-        </RecordGrid>
-        <DetailPaginationControls organizationId={data.record.organization.id} pageParam="branchesPage" pageSizeParam="branchesPageSize" pagination={data.listPagination.branches} tab="gyms" />
+          )) : (
+            <div className="rounded-md border border-dashed border-border bg-background p-5 text-sm font-semibold text-muted-foreground">No branches were found.</div>
+          )}
+          <DetailPaginationControls organizationId={data.record.organization.id} pageParam="branchesPage" pageSizeParam="branchesPageSize" pagination={data.listPagination.branches} tab="gyms" />
+        </div>
       </div>
     </section>
   );
 }
 
 function BillingTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrganizationDetailData>>> }) {
+  const payments = data.recentPayments || [];
+  const totalRevenue = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const currentMonthPayments = payments.filter((p) => {
+    const d = new Date(p.created_at);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  });
+  const currentMonthRevenue = currentMonthPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const thisYearPayments = payments.filter((p) => new Date(p.created_at).getFullYear() === currentYear);
+  const thisYearRevenue = thisYearPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const avgPaymentValue = payments.length > 0 ? totalRevenue / payments.length : 0;
+
+  const monthlyData: Record<string, { month: string; revenue: number; count: number }> = {};
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(currentYear, currentMonth - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    monthlyData[key] = { month: label, revenue: 0, count: 0 };
+  }
+  for (const p of payments) {
+    const d = new Date(p.created_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (monthlyData[key]) {
+      monthlyData[key].revenue += Number(p.amount || 0);
+      monthlyData[key].count += 1;
+    }
+  }
+  const chartData = Object.values(monthlyData);
+
+  const gymRevenue: Record<string, { name: string; revenue: number; count: number }> = {};
+  for (const p of payments) {
+    const gymId = String((p as Record<string, unknown>).gym_id || "unknown");
+    if (!gymRevenue[gymId]) {
+      const gym = data.gyms.find((g) => g.id === gymId);
+      gymRevenue[gymId] = { name: gym?.name ?? "Unknown Gym", revenue: 0, count: 0 };
+    }
+    gymRevenue[gymId].revenue += Number(p.amount || 0);
+    gymRevenue[gymId].count += 1;
+  }
+
   return (
-    <section className="grid gap-5 xl:grid-cols-2">
-      <InfoCard title="Subscription" icon={<CreditCard className="size-5" />}>
-        <Line label="Package" value={data.record.subscription.packageName ?? "Unassigned"} />
-        <Line label="Status" value={data.record.subscription.status ? formatEnterpriseLabel(data.record.subscription.status) : "Unassigned"} />
-        <Line label="Started" value={formatDate(data.record.subscription.startedAt)} />
-        <Line label="Expires" value={data.record.subscription.expiresAt ? formatDate(data.record.subscription.expiresAt) : "Never"} />
-        <Line label="Member limit" value={limitLabel(data.record.subscription.maxMembers)} />
-        <Line label="Branch limit" value={limitLabel(data.record.subscription.maxBranches)} />
-      </InfoCard>
-      <RecordGrid emptyText="No payments were found." title="Recent Payments">
-        {data.recentPayments.map((payment) => (
-          <div className="rounded-md border border-border bg-background p-4" key={payment.id}>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-black">{payment.payment_number}</p>
-              <EnterpriseStatusBadge status={payment.status} />
+    <section className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <RevenueKpiCard label="Total Revenue" value={formatCurrency(totalRevenue)} />
+        <RevenueKpiCard label="Current Month Revenue" value={formatCurrency(currentMonthRevenue)} />
+        <RevenueKpiCard label="Average Payment Value" value={formatCurrency(avgPaymentValue)} />
+        <RevenueKpiCard label="Revenue This Year" value={formatCurrency(thisYearRevenue)} />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <h3 className="text-xl font-black">Revenue Trend (Last 12 Months)</h3>
+        </CardHeader>
+        <CardContent>
+          {chartData.some((d) => d.revenue > 0) ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#888" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#888" />
+                  <Tooltip
+                    contentStyle={{ fontSize: 13 }}
+                    formatter={(value) => formatCurrency(Number(value))}
+                  />
+                  <Bar dataKey="revenue" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">{formatCurrency(Number(payment.amount), payment.currency)} · {formatEnterpriseLabel(payment.method)} · {formatDateTime(payment.created_at)}</p>
-          </div>
-        ))}
-      </RecordGrid>
+          ) : (
+            <p className="text-sm font-semibold text-muted-foreground">No revenue data available for chart rendering.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <InfoCard title="Subscription" icon={<CreditCard className="size-5" />}>
+          <Line label="Package" value={data.record.subscription.packageName ?? "Unassigned"} />
+          <Line label="Status" value={data.record.subscription.status ? formatEnterpriseLabel(data.record.subscription.status) : "Unassigned"} />
+          <Line label="Started" value={formatDate(data.record.subscription.startedAt)} />
+          <Line label="Expires" value={data.record.subscription.expiresAt ? formatDate(data.record.subscription.expiresAt) : "Never"} />
+          <Line label="Member limit" value={limitLabel(data.record.subscription.maxMembers)} />
+          <Line label="Branch limit" value={limitLabel(data.record.subscription.maxBranches)} />
+        </InfoCard>
+
+        {Object.keys(gymRevenue).length > 1 && (
+          <Card>
+            <CardHeader>
+              <h3 className="text-xl font-black">Revenue by Gym</h3>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {Object.values(gymRevenue).map((gym) => (
+                <div key={gym.name} className="rounded-md border border-border bg-background p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-black">{gym.name}</p>
+                    <p className="text-sm font-black">{formatCurrency(gym.revenue)}</p>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{gym.count} payment(s)</span>
+                    <span>·</span>
+                    <span>{totalRevenue > 0 ? `${((gym.revenue / totalRevenue) * 100).toFixed(1)}%` : "0%"}</span>
+                  </div>
+                  {totalRevenue > 0 && (
+                    <div className="mt-2 h-1.5 rounded-full bg-surface-muted">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${(gym.revenue / totalRevenue) * 100}%` }} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        <RecordGrid emptyText="No payments were found." title="Recent Payments">
+          {payments.map((payment) => (
+            <div className="rounded-md border border-border bg-background p-4" key={payment.id}>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-black">{payment.payment_number}</p>
+                <EnterpriseStatusBadge status={payment.status} />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">{formatCurrency(Number(payment.amount), payment.currency)} · {formatEnterpriseLabel(payment.method)} · {formatDateTime(payment.created_at)}</p>
+            </div>
+          ))}
+        </RecordGrid>
+      </div>
     </section>
+  );
+}
+
+function RevenueKpiCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-5 shadow-xs reveal-up">
+      <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-black">{value}</p>
+    </div>
   );
 }
 

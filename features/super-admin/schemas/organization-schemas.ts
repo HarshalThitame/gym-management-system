@@ -39,7 +39,9 @@ export const organizationLifecycleActionSchema = z.object({
   action: z.enum(["suspend", "activate", "delete", "restore", "purge"]),
   confirmation: z.string().trim(),
   stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
-  reason: z.string().trim().max(500).optional()
+  reason: z.string().trim().max(500).optional(),
+  forceDelete: z.string().trim().optional(),
+  forceConfirm: z.string().trim().optional()
 });
 
 export const organizationLegalHoldActionSchema = z.object({
@@ -52,13 +54,14 @@ export const organizationLegalHoldActionSchema = z.object({
 
 export const bulkOrganizationActionSchema = z.object({
   organizationIds: z.array(z.string().uuid()).min(1, "Select at least one organization.").max(100, "Bulk actions are limited to 100 organizations."),
-  action: z.enum(["suspend", "activate", "assign_package", "tag"]),
+  action: z.enum(["suspend", "activate", "assign_package", "tag", "delete"]),
   packageId: optionalUuid,
   status: z.enum(["active", "trial", "expired", "suspended", "cancelled"]).optional(),
   tags: z.string().trim().max(240).optional(),
   confirmation: z.string().trim(),
   stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
-  reason: z.string().trim().max(500).optional()
+  reason: z.string().trim().max(500).optional(),
+  deleteReason: z.string().trim().max(160).optional()
 }).superRefine((value, context) => {
   if (value.action === "assign_package" && !value.packageId) {
     context.addIssue({
@@ -74,6 +77,24 @@ export const bulkOrganizationActionSchema = z.object({
       message: "Enter at least one tag.",
       path: ["tags"]
     });
+  }
+
+  if (value.action === "delete") {
+    const expected = `BULK_DELETE:${value.organizationIds.length}`;
+    if (value.confirmation !== expected) {
+      context.addIssue({
+        code: "custom",
+        message: `Type ${expected} to confirm bulk deletion.`,
+        path: ["confirmation"]
+      });
+    }
+    if (!value.deleteReason?.trim()) {
+      context.addIssue({
+        code: "custom",
+        message: "Select a reason for bulk deletion.",
+        path: ["deleteReason"]
+      });
+    }
   }
 });
 

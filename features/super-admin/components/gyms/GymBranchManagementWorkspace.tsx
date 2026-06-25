@@ -90,74 +90,78 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-stretch">
-        <SummaryCard icon={<Building2 className="size-5" />} label="Locations" value={formatCompactNumber(data.summary.gyms)} detail={`${formatCompactNumber(data.summary.activeGyms)} active`} />
-        <SummaryCard icon={<GitBranch className="size-5" />} label="Branches" value={formatCompactNumber(data.summary.branches)} detail={`${formatCompactNumber(data.summary.activeBranches)} active`} />
-        <SummaryCard icon={<UserRoundCog className="size-5" />} label="Missing Admins" value={formatCompactNumber(data.summary.branchesWithoutAdmins)} detail="Branches without active gym admin" />
-        <SummaryCard icon={<ShieldAlert className="size-5" />} label="Warnings" value={formatCompactNumber(data.summary.consistencyWarnings)} detail="Hierarchy and data consistency checks" />
-        <SummaryCard icon={<ShieldAlert className="size-5" />} label="Approvals" value={formatCompactNumber(data.summary.pendingApprovals)} detail="Pending approval requests" />
-        <SummaryCard icon={<AlertTriangle className="size-5" />} label="Unresolved Scope" value={formatCompactNumber(data.summary.unresolvedBranchRecords)} detail="Gym-scoped operational records" />
-      </section>
-
-      <Card>
-        <CardContent className="p-5 md:p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <h3 className="text-2xl font-black">Branch and Location Governance</h3>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">
-                Manage tenant location hierarchy, gym admin ownership, branch operating rules, lifecycle state, and cross-organization movement controls.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <ButtonLink href="/api/super-admin/gyms/export?format=csv" variant="secondary">
-                <Download aria-hidden="true" className="size-4" />
-                Export CSV
-              </ButtonLink>
-              <ButtonLink href="/api/super-admin/gyms/export?format=pdf" variant="secondary">
-                <Download aria-hidden="true" className="size-4" />
-                Export PDF
-              </ButtonLink>
-              <Button onClick={() => setDrawer({ type: "create_gym" })} variant="accent">
-                <Plus aria-hidden="true" className="size-5" /> Create Location
-              </Button>
-              <Button onClick={() => setDrawer({ type: "create_branch" })} variant="secondary">
-                <Plus aria-hidden="true" className="size-4" />
-                Create Branch
-              </Button>
-            </div>
+      <div className="bg-background/90 backdrop-blur sticky top-0 z-10 border-b border-border -mx-5 px-5 py-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-black">Branch &amp; Location Governance</h1>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/api/super-admin/gyms/export?format=csv" variant="secondary" size="sm">
+              <Download aria-hidden="true" className="size-4" />
+              CSV
+            </ButtonLink>
+            <ButtonLink href="/api/super-admin/gyms/export?format=pdf" variant="secondary" size="sm">
+              <Download aria-hidden="true" className="size-4" />
+              PDF
+            </ButtonLink>
+            <Button onClick={() => setDrawer({ type: "create_gym" })} variant="accent" size="sm">
+              <Plus aria-hidden="true" className="size-4" /> New Gym
+            </Button>
+            <Button onClick={() => setDrawer({ type: "create_branch" })} variant="secondary" size="sm">
+              <Plus aria-hidden="true" className="size-4" />
+              New Branch
+            </Button>
           </div>
-          <form
-            className="mt-5 grid gap-3 xl:grid-cols-[1fr_220px_190px_140px_auto]"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const formData = new FormData(event.currentTarget);
-              applyFilters(1, {
-                query: String(formData.get("q") ?? ""),
-                organizationId: String(formData.get("organizationId") ?? "all"),
-                status: String(formData.get("status") ?? "all"),
-                pageSize: String(formData.get("pageSize") ?? pageSize)
-              });
-            }}
-          >
-            <label className="relative block">
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" name="q" onChange={(event) => setQuery(event.target.value)} placeholder="Search gym, branch, code, city, organization..." value={query} />
-            </label>
-            <select aria-label="Filter by organization" className={selectClass} name="organizationId" onChange={(event) => setOrganizationId(event.target.value)} value={organizationId}>
-              <option value="all">All organizations</option>
-              {data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
-            </select>
-            <select aria-label="Filter by status" className={selectClass} name="status" onChange={(event) => setStatus(event.target.value)} value={status}>
-              <option value="all">All statuses</option>
-              {[...new Set([...gymStatuses, ...branchStatuses])].map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
-            </select>
-            <select aria-label="Page size" className={selectClass} name="pageSize" onChange={(event) => setPageSize(event.target.value)} value={pageSize}>
-              {[10, 20, 30, 50].map((size) => <option key={size} value={size}>{size} / page</option>)}
-            </select>
-            <Button type="submit" variant="primary">Apply</Button>
-          </form>
-        </CardContent>
-      </Card>
+        </div>
+        <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-stretch">
+          {[
+            { icon: <Building2 className="size-5" />, label: "Locations", value: formatCompactNumber(data.summary.gyms), detail: `${formatCompactNumber(data.summary.activeGyms)} active` },
+            { icon: <GitBranch className="size-5" />, label: "Branches", value: formatCompactNumber(data.summary.branches), detail: `${formatCompactNumber(data.summary.activeBranches)} active` },
+            { icon: <UserRoundCog className="size-5" />, label: "Missing Admins", value: formatCompactNumber(data.summary.branchesWithoutAdmins), detail: "Branches without active gym admin" },
+            { icon: <ShieldAlert className="size-5" />, label: "Warnings", value: formatCompactNumber(data.summary.consistencyWarnings), detail: "Hierarchy and data consistency checks" },
+            { icon: <ShieldAlert className="size-5" />, label: "Approvals", value: formatCompactNumber(data.summary.pendingApprovals), detail: "Pending approval requests" },
+            { icon: <AlertTriangle className="size-5" />, label: "Unresolved Scope", value: formatCompactNumber(data.summary.unresolvedBranchRecords), detail: "Gym-scoped operational records" }
+          ].map((kpi, i) => (
+            <div key={kpi.label}
+              className="reveal-up rounded-lg border border-border bg-surface shadow-[0_18px_60px_rgb(17_18_20/0.06)] p-4 transition-all hover:shadow-md hover:border-border-strong"
+              style={{"--reveal-delay": `${i * 0.05}s`} as React.CSSProperties}
+            >
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{kpi.label}</p>
+              <p className="mt-1 text-3xl font-black text-foreground">{kpi.value}</p>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">{kpi.detail}</p>
+            </div>
+          ))}
+        </section>
+      </div>
+
+      <form
+        className="sticky top-[73px] z-[9] bg-background/80 backdrop-blur-sm border-b border-border py-3 -mx-5 px-5 grid gap-3 xl:grid-cols-[1fr_220px_190px_140px_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          applyFilters(1, {
+            query: String(formData.get("q") ?? ""),
+            organizationId: String(formData.get("organizationId") ?? "all"),
+            status: String(formData.get("status") ?? "all"),
+            pageSize: String(formData.get("pageSize") ?? pageSize)
+          });
+        }}
+      >
+        <label className="relative block">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-9" name="q" onChange={(event) => setQuery(event.target.value)} placeholder="Search gym, branch, code, city, organization..." value={query} />
+        </label>
+        <select aria-label="Filter by organization" className={selectClass} name="organizationId" onChange={(event) => setOrganizationId(event.target.value)} value={organizationId}>
+          <option value="all">All organizations</option>
+          {data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+        </select>
+        <select aria-label="Filter by status" className={selectClass} name="status" onChange={(event) => setStatus(event.target.value)} value={status}>
+          <option value="all">All statuses</option>
+          {[...new Set([...gymStatuses, ...branchStatuses])].map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
+        </select>
+        <select aria-label="Page size" className={selectClass} name="pageSize" onChange={(event) => setPageSize(event.target.value)} value={pageSize}>
+          {[10, 20, 30, 50].map((size) => <option key={size} value={size}>{size} / page</option>)}
+        </select>
+        <Button type="submit" variant="primary">Apply</Button>
+      </form>
 
       <ApprovalReviewPanel approvals={data.approvalRequests} />
 
@@ -465,7 +469,7 @@ function LifecycleForm({ drawer, onClose }: { drawer: Extract<DrawerState, { typ
   const entityId = entityType === "gym" ? drawer.gym.gym.id : drawer.branch.branch.id;
   const currentStatus = entityType === "gym" ? drawer.gym.gym.status : drawer.branch.branch.status;
   const statusOptions = entityType === "gym" ? gymStatuses : branchStatuses;
-  const [nextStatus, setNextStatus] = useState<LocationStatus>(currentStatus);
+  const [nextStatus, setNextStatus] = useState<LocationStatus>(currentStatus as LocationStatus);
   const confirmation = `${entityType.toUpperCase()}:${nextStatus.toUpperCase()}`;
   useCloseOnSuccess(state.status, onClose);
   useRefreshOnSuccess(state.status, router);

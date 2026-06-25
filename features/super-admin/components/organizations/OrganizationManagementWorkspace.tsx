@@ -94,12 +94,36 @@ export function OrganizationManagementWorkspace({ criticalSuperAdminEmail, data 
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 xl:grid-cols-4">
-        <MiniSummary icon={<Building2 className="size-5" />} label="Organizations" value={formatCompactNumber(data.summary.totalOrganizations)} />
-        <MiniSummary icon={<HeartPulse className="size-5" />} label="Avg health" value={`${data.summary.averageHealthScore}/100`} />
-        <MiniSummary icon={<ShieldAlert className="size-5" />} label="Pending approvals" value={formatCompactNumber(data.summary.pendingApprovals)} />
-        <MiniSummary icon={<KeyRound className="size-5" />} label="Unassigned plans" value={formatCompactNumber(data.summary.unassignedPlans)} />
-      </section>
+      <div className="bg-background/90 backdrop-blur sticky top-0 z-10 border-b border-border -mx-5 px-5 py-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-black">Organizations</h1>
+          <Button onClick={() => setDrawer({ type: "create" })} variant="accent">
+            <Plus aria-hidden="true" className="size-4" />
+            Create Organization
+          </Button>
+        </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { icon: <Building2 className="size-5" />, label: "Organizations", value: formatCompactNumber(data.summary.totalOrganizations) },
+            { icon: <HeartPulse className="size-5" />, label: "Avg health", value: `${data.summary.averageHealthScore}/100` },
+            { icon: <ShieldAlert className="size-5" />, label: "Pending approvals", value: formatCompactNumber(data.summary.pendingApprovals) },
+            { icon: <KeyRound className="size-5" />, label: "Unassigned plans", value: formatCompactNumber(data.summary.unassignedPlans) }
+          ].map((kpi, i) => (
+            <div key={kpi.label}
+              className="reveal-up rounded-lg border border-border bg-surface shadow-[0_18px_60px_rgb(17_18_20/0.06)] p-4 transition-all hover:shadow-md hover:border-border-strong"
+              style={{"--reveal-delay": `${i * 0.05}s`} as React.CSSProperties}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{kpi.label}</p>
+                  <p className="mt-1 text-3xl font-black text-foreground">{kpi.value}</p>
+                </div>
+                <div className="grid size-11 place-items-center rounded-md bg-accent/20">{kpi.icon}</div>
+              </div>
+            </div>
+          ))}
+        </section>
+      </div>
 
       <Card>
         <CardContent className="p-5 md:p-6">
@@ -108,13 +132,9 @@ export function OrganizationManagementWorkspace({ criticalSuperAdminEmail, data 
               <h3 className="text-2xl font-black">Organization Registry</h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">Create tenants, govern lifecycle, transfer ownership, and review tenant health from one controlled workspace.</p>
             </div>
-            <Button onClick={() => setDrawer({ type: "create" })} variant="accent">
-              <Plus aria-hidden="true" className="size-4" />
-              Create Organization
-            </Button>
           </div>
           <form
-            className="mt-5 grid gap-3 xl:grid-cols-[1fr_190px_190px_140px_auto]"
+            className="sticky top-[73px] z-[9] bg-background/80 backdrop-blur-sm border-b border-border py-3 -mx-5 px-5 mt-5 grid gap-3 xl:grid-cols-[1fr_190px_190px_140px_auto]"
             onSubmit={(event) => {
               event.preventDefault();
               applyFilters(1);
@@ -193,6 +213,18 @@ export function OrganizationManagementWorkspace({ criticalSuperAdminEmail, data 
       </section>
 
       <PaginationControls data={data} onPageChange={applyFilters} />
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-lg border border-border bg-surface/95 backdrop-blur shadow-2xl px-4 py-3 flex items-center gap-3 animate-slide-in-right">
+          <span className="text-sm font-black">{selectedIds.length} selected</span>
+          <div className="w-px h-5 bg-border" />
+          <button onClick={() => setDrawer({ type: "bulk", selectedIds })} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-muted transition-all">
+            <Tags className="size-4" /> Bulk Actions
+          </button>
+          <button onClick={() => setSelectedIds([])} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-muted transition-all">
+            Clear
+          </button>
+        </div>
+      )}
       <OrganizationDrawer criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} drawer={drawer} onClose={() => setDrawer({ type: "closed" })} />
     </div>
   );
@@ -403,52 +435,7 @@ function HealthBadge({ record }: { record: OrganizationManagementRecord }) {
   return <Badge variant={variant}><HeartPulse aria-hidden="true" className="mr-1 size-3" />{record.health.score}/100 {record.health.label}</Badge>;
 }
 
-function SubscriptionSummary({ record }: { record: OrganizationManagementRecord }) {
-  return (
-    <section className="rounded-md border border-border bg-background p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="font-black">Subscription Summary</h4>
-        <PackageBadge packageName={record.subscription.packageName} />
-      </div>
-      <div className="mt-4 space-y-3">
-        <SummaryLine label="Status" value={record.subscription.status ? formatEnterpriseLabel(record.subscription.status) : "Unassigned"} />
-        <SummaryLine label="Started" value={record.subscription.startedAt ? <HydrationSafeDate date={record.subscription.startedAt} /> : "No date"} />
-        <SummaryLine label="Expires" value={record.subscription.expiresAt ? <HydrationSafeDate date={record.subscription.expiresAt} /> : "Never"} />
-        <SummaryLine label="Member limit" value={limitLabel(record.subscription.maxMembers)} />
-        <SummaryLine label="Branch limit" value={limitLabel(record.subscription.maxBranches)} />
-        <SummaryLine label="Enabled features" value={`${record.subscription.enabledFeatures}/11`} />
-      </div>
-    </section>
-  );
-}
-
-function AuditTimeline({ record }: { record: OrganizationManagementRecord }) {
-  return (
-    <section className="rounded-md border border-border bg-background p-4">
-      <h4 className="font-black">Audit Timeline</h4>
-      <div className="mt-4 space-y-3">
-        {record.auditTimeline.length > 0 ? record.auditTimeline.slice(0, 5).map((event) => (
-          <div className="rounded-md border border-border bg-surface p-3" key={`${event.source}-${event.id}`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <EnterpriseStatusBadge status={event.severity} />
-              <p className="text-sm font-black">{formatEnterpriseLabel(event.action)}</p>
-            </div>
-            <p className="mt-2 text-xs font-semibold text-muted-foreground">
-              <HydrationSafeDate date={event.createdAt} format="datetime" /> · {event.actorName ?? event.actorId ?? "System"}
-            </p>
-            <p className="mt-1 break-words text-xs font-semibold text-muted-foreground">
-              {event.ipAddress ?? "No IP"} · {event.userAgent ? compactUserAgent(event.userAgent) : "No device"}
-            </p>
-          </div>
-        )) : (
-          <p className="rounded-md border border-dashed border-border bg-surface p-4 text-sm font-semibold text-muted-foreground">No organization audit activity yet.</p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function OrganizationDrawer({ criticalSuperAdminEmail, data, drawer, onClose }: { criticalSuperAdminEmail: string; data: OrganizationManagementData; drawer: DrawerState; onClose: () => void }) {
+function OrganizationDrawer({ data, drawer, onClose }: { criticalSuperAdminEmail?: string; data: OrganizationManagementData; drawer: DrawerState; onClose: () => void }) {
   if (drawer.type === "closed") {
     return null;
   }
@@ -458,14 +445,14 @@ function OrganizationDrawer({ criticalSuperAdminEmail, data, drawer, onClose }: 
   }
 
   if (drawer.type === "transfer") {
-    return <TransferOwnerDrawer candidates={data.ownerCandidates} criticalSuperAdminEmail={criticalSuperAdminEmail} onClose={onClose} record={drawer.record} />;
+    return <TransferOwnerDrawer candidates={data.ownerCandidates} onClose={onClose} record={drawer.record} />;
   }
 
   if (drawer.type === "bulk") {
-    return <BulkActionDrawer criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} onClose={onClose} selectedIds={drawer.selectedIds} />;
+    return <BulkActionDrawer data={data} onClose={onClose} selectedIds={drawer.selectedIds} />;
   }
 
-  return <LifecycleConfirmDrawer action={drawer.action} criticalSuperAdminEmail={criticalSuperAdminEmail} onClose={onClose} record={drawer.record} />;
+  return <LifecycleConfirmDrawer action={drawer.action} onClose={onClose} record={drawer.record} />;
 }
 
 function OrganizationEditDrawer({ data, onClose, record }: { data: OrganizationManagementData; onClose: () => void; record: OrganizationManagementRecord | null }) {
@@ -533,7 +520,7 @@ function OrganizationEditDrawer({ data, onClose, record }: { data: OrganizationM
   );
 }
 
-function TransferOwnerDrawer({ candidates, criticalSuperAdminEmail, onClose, record }: { candidates: OrganizationOwnerCandidate[]; criticalSuperAdminEmail: string; onClose: () => void; record: OrganizationManagementRecord }) {
+function TransferOwnerDrawer({ candidates, onClose, record }: { candidates: OrganizationOwnerCandidate[]; criticalSuperAdminEmail?: string; onClose: () => void; record: OrganizationManagementRecord }) {
   const router = useRouter();
   const [state, formAction] = useActionState(transferOrganizationOwnerAction, initialAuthActionState);
 
@@ -567,7 +554,8 @@ function TransferOwnerDrawer({ candidates, criticalSuperAdminEmail, onClose, rec
   );
 }
 
-function BulkActionDrawer({ criticalSuperAdminEmail, data, onClose, selectedIds }: { criticalSuperAdminEmail: string; data: OrganizationManagementData; onClose: () => void; selectedIds: string[] }) {
+function BulkActionDrawer({ data, onClose, selectedIds }: { criticalSuperAdminEmail?: string; data: OrganizationManagementData; onClose: () => void; selectedIds: string[] }) {
+  const deleteReasons = ["GDPR Request", "Duplicate Account", "Fraud", "Abandoned", "Other"];
   const router = useRouter();
   const [state, formAction] = useActionState(bulkOrganizationAction, initialAuthActionState);
   const [action, setAction] = useState("suspend");
@@ -596,6 +584,7 @@ function BulkActionDrawer({ criticalSuperAdminEmail, data, onClose, selectedIds 
             <option value="activate">Activate organizations</option>
             <option value="assign_package">Assign package</option>
             <option value="tag">Add tags</option>
+            <option value="delete">Delete organizations</option>
           </select>
         </label>
         {action === "assign_package" ? (
@@ -619,27 +608,53 @@ function BulkActionDrawer({ criticalSuperAdminEmail, data, onClose, selectedIds 
             <Input name="tags" placeholder="enterprise, priority, migration" />
           </Field>
         ) : null}
+        {action === "delete" ? (
+          <label className="space-y-2">
+            <span className="text-sm font-bold">Delete reason</span>
+            <select className={selectClass} name="deleteReason" defaultValue="">
+              <option value="">Select a reason</option>
+              {deleteReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+            </select>
+            <FieldError message={state.fieldErrors?.deleteReason?.[0]} />
+          </label>
+        ) : null}
+        {action === "delete" ? (
+          <Field error={state.fieldErrors?.confirmation?.[0]} label={`Type BULK_DELETE:${selectedIds.length} to confirm`}>
+            <Input name="confirmation" placeholder={`BULK_DELETE:${selectedIds.length}`} />
+          </Field>
+        ) : (
+          <Field error={state.fieldErrors?.confirmation?.[0]} label='Type BULK to confirm'>
+            <Input name="confirmation" placeholder="BULK" />
+          </Field>
+        )}
         <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason">
           <Textarea className="min-h-24" name="reason" placeholder="Reason for bulk operation." />
         </Field>
         <InlineMfaStepUp />
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">Bulk suspension and bulk package assignment create MFA-protected approval requests per organization. Bulk delete is intentionally unavailable.</div>
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900">
+          {action === "delete"
+            ? "Bulk deletion is permanent (soft-delete with 30-day restore window). This action is rate-limited to 1 request per 120 seconds."
+            : "Bulk suspension and bulk package assignment create MFA-protected approval requests per organization."}
+        </div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
-          <SubmitButton variant={action === "suspend" ? "destructive" : "primary"}>Run Bulk Action</SubmitButton>
+          <SubmitButton variant={action === "suspend" || action === "delete" ? "destructive" : "primary"}>Run Bulk Action</SubmitButton>
         </div>
       </form>
     </DrawerShell>
   );
 }
 
-function LifecycleConfirmDrawer({ action, criticalSuperAdminEmail, onClose, record }: { action: LifecycleAction; criticalSuperAdminEmail: string; onClose: () => void; record: OrganizationManagementRecord }) {
+function LifecycleConfirmDrawer({ action, onClose, record }: { action: LifecycleAction; criticalSuperAdminEmail?: string; onClose: () => void; record: OrganizationManagementRecord }) {
   const router = useRouter();
   const [state, formAction] = useActionState(organizationLifecycleAction, initialAuthActionState);
   const isDelete = action === "delete";
   const isRestore = action === "restore";
   const isPurge = action === "purge";
-  const confirmation = action === "suspend" ? "SUSPEND" : action === "activate" ? "ACTIVATE" : isRestore ? "RESTORE" : isPurge ? `PURGE:${record.organization.slug}` : record.organization.slug;
+
+  const [forceDelete, setForceDelete] = useState(false);
+  const [forceConfirmation, setForceConfirmation] = useState("");
+  const [forceConfirmation2, setForceConfirmation2] = useState("");
 
   useEffect(() => {
     if (state.status === "success") {
@@ -662,20 +677,60 @@ function LifecycleConfirmDrawer({ action, criticalSuperAdminEmail, onClose, reco
           <Textarea className="min-h-24" name="reason" placeholder="Reason for audit trail." />
         </Field>
         <InlineMfaStepUp />
+
+        {isDelete && (
+          <label className="flex items-center gap-3 rounded-md border border-border bg-background p-4">
+            <input
+              type="checkbox"
+              checked={forceDelete}
+              onChange={(e) => setForceDelete(e.target.checked)}
+              className="size-4 rounded border-border accent-destructive"
+            />
+            <div>
+              <p className="text-sm font-black text-destructive">Emergency: Bypass approval and delete immediately</p>
+              <p className="mt-1 text-xs text-muted-foreground">This will skip the maker-checker approval flow.</p>
+            </div>
+          </label>
+        )}
+
+        <input name="forceDelete" type="hidden" value={isDelete && forceDelete ? "true" : ""} />
+
+        {isDelete && forceDelete && (
+          <div className="space-y-4 rounded-md border border-red-200 bg-red-50 p-4">
+            <div className="flex items-start gap-2 text-sm font-semibold leading-6 text-red-800">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+              <span>Deleting this organization immediately will permanently remove all associated data. This action cannot be undone.</span>
+            </div>
+            {record.usage.branches > 0 && (
+              <div className="rounded-md border border-red-200 bg-red-100 p-3 text-sm font-semibold text-red-800">
+                Blockers: {record.usage.branches} active branch(es), {record.usage.activeMembers} active member(s), {record.usage.gyms} gym(s)
+              </div>
+            )}
+            <Field error={state.fieldErrors?.confirmation?.[0]} label='Type the organization slug to confirm'>
+              <Input name="confirmation" placeholder={record.organization.slug} value={forceConfirmation} onChange={(e) => setForceConfirmation(e.target.value)} />
+            </Field>
+            <Field label='Type "I UNDERSTAND THE CONSEQUENCES" to proceed'>
+              <Input name="forceConfirm" placeholder="I UNDERSTAND THE CONSEQUENCES" value={forceConfirmation2} onChange={(e) => setForceConfirmation2(e.target.value)} />
+            </Field>
+          </div>
+        )}
+
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-800">
-          {isDelete
+          {isDelete && !forceDelete
             ? "Soft delete creates an approval request. If approved, the tenant is archived and can be restored for 30 days."
-            : isRestore
-              ? "Restore reactivates a soft-deleted tenant inside its restore window and is fully audited."
-              : isPurge
-                ? "Permanent purge creates an approval request. If approved, customer-identifying data is purged to a retained governance tombstone."
-                : action === "suspend"
-                  ? "Suspension creates an approval request. Tenant access changes only after another Super Admin approves it."
-                  : "Activation applies immediately after MFA and is audited."}
+            : isDelete && forceDelete
+              ? "Force delete bypasses approval. The organization will be archived immediately with all auth users deleted."
+              : isRestore
+                ? "Restore reactivates a soft-deleted tenant inside its restore window and is fully audited."
+                : isPurge
+                  ? "Permanent purge creates an approval request. If approved, customer-identifying data is purged to a retained governance tombstone."
+                  : action === "suspend"
+                    ? "Suspension creates an approval request. Tenant access changes only after another Super Admin approves it."
+                    : "Activation applies immediately after MFA and is audited."}
         </div>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button onClick={onClose} type="button" variant="secondary">Close</Button>
-          <SubmitButton variant={action === "suspend" || action === "delete" || action === "purge" ? "destructive" : "primary"}>{action === "delete" ? "Request Soft Delete" : action === "purge" ? "Request Purge" : action === "suspend" ? "Request Suspension" : isRestore ? "Restore Organization" : "Activate Organization"}</SubmitButton>
+          <SubmitButton variant={action === "suspend" || action === "delete" || action === "purge" ? "destructive" : "primary"}>{isDelete && forceDelete ? "Force Delete Immediately" : action === "delete" ? "Request Soft Delete" : action === "purge" ? "Request Purge" : action === "suspend" ? "Request Suspension" : isRestore ? "Restore Organization" : "Activate Organization"}</SubmitButton>
         </div>
       </form>
     </DrawerShell>
@@ -722,7 +777,7 @@ function SelectField<T extends readonly string[]>({ defaultValue, label, name, o
   );
 }
 
-function Field({ children, error, label }: { children: ReactNode; error: string | undefined; label: string }) {
+function Field({ children, error, label }: { children: ReactNode; error?: string | undefined; label: string }) {
   return (
     <label className="space-y-2">
       <span className="text-sm font-bold">{label}</span>
@@ -757,20 +812,6 @@ function SummaryLine({ label, value }: { label: string; value: ReactNode }) {
       <span className="text-sm font-semibold text-muted-foreground">{label}</span>
       <span className="text-right text-sm font-black">{value}</span>
     </div>
-  );
-}
-
-function MiniSummary({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="flex items-center justify-between gap-4 p-5">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-black">{value}</p>
-        </div>
-        <div className="grid size-11 place-items-center rounded-md bg-accent/20">{icon}</div>
-      </CardContent>
-    </Card>
   );
 }
 

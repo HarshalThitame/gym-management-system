@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * NOTE: This component is superseded by GymBranchManagementWorkspace
+ * (features/super-admin/components/gyms/GymBranchManagementWorkspace.tsx).
+ * The branches page now renders the real workspace with live server actions.
+ * This file is kept for reference only and is no longer the active rendering component.
+ */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,

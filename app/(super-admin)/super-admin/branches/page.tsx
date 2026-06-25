@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 import { getGymBranchManagementData } from "@/features/super-admin/services/gym-branch-management-service";
 import type { GymBranchManagementData } from "@/features/super-admin/services/gym-branch-management-service";
-import { BranchesClient } from "./branches-client";
+import { GymBranchManagementWorkspace } from "@/features/super-admin/components/gyms/GymBranchManagementWorkspace";
 
 export const metadata: Metadata = createMetadata({
   title: "Branch & Location Management",
@@ -19,7 +19,7 @@ async function BranchesContent() {
   await requireRole(["super_admin"], "/super-admin/branches");
   const data: GymBranchManagementData = await getGymBranchManagementData();
 
-  return <BranchesClient data={data} />;
+  return <GymBranchManagementWorkspace data={data} />;
 }
 
 export default function SuperAdminBranchesPage() {

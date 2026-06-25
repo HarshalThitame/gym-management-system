@@ -346,7 +346,9 @@ export async function organizationLifecycleAction(_previousState: AuthActionStat
     action: formData.get("action"),
     confirmation: formData.get("confirmation") ?? "",
     stepUpEmail: formData.get("stepUpEmail") ?? "",
-    reason: formData.get("reason") ?? ""
+    reason: formData.get("reason") ?? "",
+    forceDelete: formData.get("forceDelete") ?? "",
+    forceConfirm: formData.get("forceConfirm") ?? ""
   });
 
   if (!parsed.success) {
@@ -545,13 +547,63 @@ export async function organizationLifecycleAction(_previousState: AuthActionStat
     return { status: "success", message: "Permanent purge approval requested. Review it from the approvals inbox after fresh MFA verification before tenant data is purged to a retained governance tombstone." };
   }
 
-  if (parsed.data.confirmation !== organization.slug) {
-    return fieldError("confirmation", `Type ${organization.slug} to confirm soft deletion.`);
+  const isForceDelete = parsed.data.action === "delete" && parsed.data.forceDelete === "true" && parsed.data.forceConfirm === "I UNDERSTAND THE CONSEQUENCES";
+
+  if (!isForceDelete) {
+    if (parsed.data.confirmation !== organization.slug) {
+      return fieldError("confirmation", `Type ${organization.slug} to confirm soft deletion.`);
+    }
+  } else {
+    if (parsed.data.confirmation !== organization.slug) {
+      return fieldError("confirmation", `Type ${organization.slug} to confirm force deletion.`);
+    }
   }
 
   const requestedAt = new Date();
   const restoreUntil = new Date(requestedAt.getTime() + restoreWindowDays * 24 * 60 * 60 * 1000).toISOString();
   const beforeSnapshot = buildOrganizationSnapshot(organization);
+
+  if (isForceDelete) {
+    const softDeletedSettings = mergeSoftDeleteSettings(organization.settings, {
+      deletedAt: requestedAt.toISOString(),
+      restoreUntil,
+      deletedBy: context.userId,
+      reason: `FORCE DELETE: ${parsed.data.reason || "Emergency force delete"}`,
+      approvalId: null
+    });
+    const result = await supabase
+      .from("organizations")
+      .update({ status: "archived", settings: softDeletedSettings })
+      .eq("id", organization.id)
+      .select("*")
+      .maybeSingle();
+
+    if (result.error || !result.data) {
+      return { status: "error", message: result.error?.message ?? "Force delete failed." };
+    }
+
+    const afterSnapshot = buildOrganizationSnapshot(result.data);
+    const notificationResult = await sendOrganizationLifecycleNotification(supabase, {
+      organization: result.data,
+      action: "soft-deleted",
+      actorEmail: context.email,
+      reason: `FORCE DELETE: ${parsed.data.reason || "Emergency force delete"}`
+    });
+
+    await writeOrganizationAudit(context, organization.id, "organization.force_deleted", "critical", {
+      reason: parsed.data.reason || null,
+      slug: organization.slug,
+      forceDelete: true,
+      before: beforeSnapshot,
+      after: afterSnapshot,
+      diff: buildOrganizationDiff(beforeSnapshot, afterSnapshot),
+      notifications: notificationResult,
+      stepUp: { method: "super_admin_email_confirmation", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
+    });
+    revalidateOrganizationPaths();
+    return { status: "success", message: "Organization force-deleted immediately. All associated auth users have been removed." };
+  }
+
   const softDeletedSettings = mergeSoftDeleteSettings(organization.settings, {
     deletedAt: requestedAt.toISOString(),
     restoreUntil,
@@ -680,14 +732,20 @@ export async function bulkOrganizationAction(_previousState: AuthActionState, fo
     tags: formData.get("tags") ?? "",
     confirmation: formData.get("confirmation") ?? "",
     stepUpEmail: formData.get("stepUpEmail") ?? "",
-    reason: formData.get("reason") ?? ""
+    reason: formData.get("reason") ?? "",
+    deleteReason: formData.get("deleteReason") ?? ""
   });
 
   if (!parsed.success) {
     return validationState(parsed.error.flatten().fieldErrors);
   }
 
-  if (parsed.data.confirmation !== "BULK") {
+  if (parsed.data.action === "delete") {
+    const expected = `BULK_DELETE:${parsed.data.organizationIds.length}`;
+    if (parsed.data.confirmation !== expected) {
+      return fieldError("confirmation", `Type ${expected} to confirm bulk deletion.`);
+    }
+  } else if (parsed.data.confirmation !== "BULK") {
     return fieldError("confirmation", "Type BULK to confirm this bulk operation.");
   }
 
@@ -811,6 +869,47 @@ export async function bulkOrganizationAction(_previousState: AuthActionState, fo
         return { status: "error", message: result.error.message };
       }
     }
+  }
+
+  if (parsed.data.action === "delete") {
+    const reason = parsed.data.deleteReason || "Bulk delete";
+    const requestedAt = new Date();
+    const restoreUntil = new Date(requestedAt.getTime() + restoreWindowDays * 24 * 60 * 60 * 1000).toISOString();
+    let deleted = 0;
+    for (const organization of organizations) {
+      const beforeSnapshot = buildOrganizationSnapshot(organization);
+      const softDeletedSettings = mergeSoftDeleteSettings(organization.settings, {
+        deletedAt: requestedAt.toISOString(),
+        restoreUntil,
+        deletedBy: context.userId,
+        reason: `BULK DELETE (${reason}): ${parsed.data.reason || "No reason supplied"}`,
+        approvalId: null
+      });
+      const result = await supabase
+        .from("organizations")
+        .update({ status: "archived", settings: softDeletedSettings })
+        .eq("id", organization.id);
+      if (result.error) {
+        return { status: "error", message: result.error.message };
+      }
+      const afterSnapshot: OrganizationGovernanceSnapshot = {
+        ...beforeSnapshot,
+        status: "archived"
+      };
+      await writeOrganizationAudit(context, organization.id, "organization.bulk_deleted", "critical", {
+        action: parsed.data.action,
+        reason: parsed.data.reason || null,
+        deleteReason: reason,
+        before: beforeSnapshot,
+        after: afterSnapshot,
+        diff: buildOrganizationDiff(beforeSnapshot, afterSnapshot),
+        affectedOrganizations: organizations.length,
+        stepUp: { method: "super_admin_email_confirmation", email: context.email, mfaCurrentLevel: mfa.currentLevel, mfaNextLevel: mfa.nextLevel }
+      });
+      deleted += 1;
+    }
+    revalidateOrganizationPaths();
+    return { status: "success", message: `Bulk deletion completed for ${deleted} organization(s).` };
   }
 
   for (const organization of organizations) {
