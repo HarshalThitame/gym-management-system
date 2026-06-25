@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   Activity,
-  Download,
   Globe,
   Lock,
   LogIn,
@@ -18,7 +17,9 @@ import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterpri
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import { getUserDetailData } from "@/features/super-admin/services/user-management-service";
+import { UserDetailActions } from "@/features/super-admin/components/users/UserDetailActions";
 import type { UserActivityEvent, LoginHistoryEntry } from "@/features/super-admin/services/user-management-service";
 
 type UserDetailPageProps = {
@@ -51,111 +52,129 @@ export default async function SuperAdminUserDetailPage({ params, searchParams }:
 
   const { record, loginHistory, activityTimeline, loginHistoryPagination } = data;
 
+  const [orgs, branches, gyms] = await Promise.all([
+    getOrgData(userId),
+    getBranchData(userId),
+    getGymData(userId)
+  ]);
+
+  async function getOrgData(_userId: string) {
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const supabase = await createSupabaseServerClient();
+    const { data: orgs } = await supabase.from("organizations").select("id, name, slug, status").limit(5000);
+    return orgs ?? [];
+  }
+
+  async function getBranchData(_userId: string) {
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.from("branches").select("id, name, branch_code, gym_id, organization_id").limit(5000);
+    return data ?? [];
+  }
+
+  async function getGymData(_userId: string) {
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.from("gyms").select("id, name, slug, organization_id").limit(5000);
+    return data ?? [];
+  }
+
+  const criticalSuperAdminEmail = getCriticalSuperAdminEmail();
+
+  const detailActionsData = {
+    organizations: orgs.map((o) => ({ id: o.id, name: o.name, slug: o.slug, status: o.status })),
+    allBranches: branches,
+    allGyms: gyms
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-3xl font-black md:text-4xl">{record.user.full_name}</h1>
-            <EnterpriseStatusBadge status={record.user.status} />
-          </div>
-          <p className="mt-2 text-sm font-semibold text-muted-foreground">
-            {record.user.email ?? "No email"} · {record.user.phone ?? "No phone"} · Created {formatDate(record.user.created_at)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink href={`/api/super-admin/users/export?format=csv`} variant="secondary">
-            <Download aria-hidden="true" className="size-4" />
-            Export CSV
-          </ButtonLink>
-          <ButtonLink href="/super-admin/users" variant="secondary">Back to Users</ButtonLink>
-        </div>
-      </div>
+    <UserDetailActions record={record} criticalSuperAdminEmail={criticalSuperAdminEmail} data={detailActionsData}>
+      <div className="space-y-6 mt-6">
+        <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard icon={<UserCheck className="size-5" />} label="Status" value={formatEnterpriseLabel(record.user.status)} />
+          <StatCard icon={<ShieldCheck className="size-5" />} label="Roles" value={record.roles.map(formatEnterpriseLabel).join(", ") || "None"} />
+          <StatCard icon={<LogIn className="size-5" />} label="Logins" value={formatCompactNumber(record.loginCount)} />
+          <StatCard icon={<Activity className="size-5" />} label="Last Activity" value={record.lastActivityAt ? formatDateTime(record.lastActivityAt) : "No activity"} />
+        </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<UserCheck className="size-5" />} label="Status" value={formatEnterpriseLabel(record.user.status)} />
-        <StatCard icon={<ShieldCheck className="size-5" />} label="Roles" value={record.roles.map(formatEnterpriseLabel).join(", ") || "None"} />
-        <StatCard icon={<LogIn className="size-5" />} label="Logins" value={formatCompactNumber(record.loginCount)} />
-        <StatCard icon={<Activity className="size-5" />} label="Last Activity" value={record.lastActivityAt ? formatDateTime(record.lastActivityAt) : "No activity"} />
-      </section>
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <LogIn aria-hidden="true" className="size-5 text-muted-foreground" />
+                  <h2 className="text-xl font-black">Login History</h2>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loginHistory.length > 0 ? loginHistory.map((entry) => (
+                <LoginHistoryEntryCard key={entry.id} entry={entry} />
+              )) : (
+                <p className="rounded-md border border-dashed border-border bg-background p-4 text-sm font-semibold text-muted-foreground">No login history found.</p>
+              )}
+              <div className="flex items-center justify-between text-sm font-semibold text-muted-foreground">
+                <span>Page {loginHistoryPagination.page} of {loginHistoryPagination.totalPages}</span>
+                <div className="flex gap-2">
+                  <ButtonLink
+                    aria-disabled={loginHistoryPagination.page <= 1}
+                    href={`/super-admin/users/${userId}?loginPage=${loginHistoryPagination.page - 1}&activityPage=${activityPage}`}
+                    size="sm"
+                    variant="secondary">Previous</ButtonLink>
+                  <ButtonLink
+                    aria-disabled={loginHistoryPagination.page >= loginHistoryPagination.totalPages}
+                    href={`/super-admin/users/${userId}?loginPage=${loginHistoryPagination.page + 1}&activityPage=${activityPage}`}
+                    size="sm"
+                    variant="secondary">Next</ButtonLink>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <Card>
+            <CardHeader>
               <div className="flex items-center gap-2">
-                <LogIn aria-hidden="true" className="size-5 text-muted-foreground" />
-                <h2 className="text-xl font-black">Login History</h2>
+                <Activity aria-hidden="true" className="size-5 text-muted-foreground" />
+                <h2 className="text-xl font-black">Activity Timeline</h2>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {loginHistory.length > 0 ? loginHistory.map((entry) => (
-              <LoginHistoryEntryCard key={entry.id} entry={entry} />
-            )) : (
-              <p className="rounded-md border border-dashed border-border bg-background p-4 text-sm font-semibold text-muted-foreground">No login history found.</p>
-            )}
-            <div className="flex items-center justify-between text-sm font-semibold text-muted-foreground">
-              <span>Page {loginHistoryPagination.page} of {loginHistoryPagination.totalPages}</span>
-              <div className="flex gap-2">
-                <ButtonLink
-                  aria-disabled={loginHistoryPagination.page <= 1}
-                  href={`/super-admin/users/${userId}?loginPage=${loginHistoryPagination.page - 1}&activityPage=${activityPage}`}
-                  size="sm"
-                  variant="secondary">Previous</ButtonLink>
-                <ButtonLink
-                  aria-disabled={loginHistoryPagination.page >= loginHistoryPagination.totalPages}
-                  href={`/super-admin/users/${userId}?loginPage=${loginHistoryPagination.page + 1}&activityPage=${activityPage}`}
-                  size="sm"
-                  variant="secondary">Next</ButtonLink>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {activityTimeline.length > 0 ? activityTimeline.slice(0, 50).map((event) => (
+                <ActivityEventCard key={`${event.source}-${event.id}`} event={event} />
+              )) : (
+                <p className="rounded-md border border-dashed border-border bg-background p-4 text-sm font-semibold text-muted-foreground">No activity events found.</p>
+              )}
+              <div className="flex items-center justify-between text-sm font-semibold text-muted-foreground">
+                <span>Showing {Math.min(50, activityTimeline.length)} of {formatCompactNumber(activityTimeline.length)} events</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </section>
 
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Activity aria-hidden="true" className="size-5 text-muted-foreground" />
-              <h2 className="text-xl font-black">Activity Timeline</h2>
+              <UserCheck aria-hidden="true" className="size-5 text-muted-foreground" />
+              <h2 className="text-xl font-black">Organization Access</h2>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {activityTimeline.length > 0 ? activityTimeline.slice(0, 50).map((event) => (
-              <ActivityEventCard key={`${event.source}-${event.id}`} event={event} />
-            )) : (
-              <p className="rounded-md border border-dashed border-border bg-background p-4 text-sm font-semibold text-muted-foreground">No activity events found.</p>
+          <CardContent>
+            {record.organizations.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {record.organizations.map((org) => (
+                  <div className="rounded-md border border-border bg-surface p-4" key={org.id}>
+                    <p className="font-black">{org.name}</p>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">{org.slug}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-muted-foreground">No organization access assigned.</p>
             )}
-            <div className="flex items-center justify-between text-sm font-semibold text-muted-foreground">
-              <span>Showing {Math.min(50, activityTimeline.length)} of {formatCompactNumber(activityTimeline.length)} events</span>
-            </div>
           </CardContent>
         </Card>
-      </section>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <UserCheck aria-hidden="true" className="size-5 text-muted-foreground" />
-            <h2 className="text-xl font-black">Organization Access</h2>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {record.organizations.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {record.organizations.map((org) => (
-                <div className="rounded-md border border-border bg-surface p-4" key={org.id}>
-                  <p className="font-black">{org.name}</p>
-                  <p className="mt-1 text-xs font-semibold text-muted-foreground">{org.slug}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm font-semibold text-muted-foreground">No organization access assigned.</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      </div>
+    </UserDetailActions>
   );
 }
 

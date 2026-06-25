@@ -13,6 +13,7 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import {
+  accountNoteSchema,
   bulkUserActionSchema,
   deleteUserSchema,
   forceLogoutUserSchema,
@@ -21,10 +22,11 @@ import {
   resetUserPasswordSchema,
   revokeInviteSchema,
   transferUserRoleSchema,
+  updateUserProfileSchema,
   updateUserStatusSchema
 } from "../schemas/user-management-schemas";
-import { deleteUserCascade, getPendingInvites } from "../services/user-management-service";
-import type { Database } from "@/types/database";
+import { deleteUserCascade } from "../services/user-management-service";
+import type { Database, Json } from "@/types/database";
 import { checkRateLimit } from "@/lib/rate-limiter";
 
 const superAdminRoles = ["super_admin"] as const;
@@ -47,6 +49,8 @@ type AuthAdminClient = SupabaseClient<Database> & {
         error: { message: string } | null;
       }>;
       deleteUser(id: string): Promise<{ error: { message: string } | null }>;
+      signOut(id: string): Promise<{ error: { message: string } | null }>;
+      updateUserById(id: string, attrs: { password?: string; user_metadata?: Record<string, unknown> }): Promise<{ error: { message: string } | null }>;
       listUsers(): Promise<{ data: { users: Array<{ id: string; email?: string }> } | null; error: { message: string } | null }>;
     };
   };
@@ -288,9 +292,12 @@ export async function forceLogoutUserAction(_previousState: AuthActionState, for
   }
 
   const adminClient = supabase as AuthAdminClient;
-  const { error } = await adminClient.auth.admin.deleteUser(parsed.data.userId);
+  const { error } = await adminClient.auth.admin.signOut(parsed.data.userId);
 
-  if (error) return { status: "error", message: error.message };
+  if (error) {
+    console.error("[super-admin-users] Force logout signOut error:", error.message);
+    return { status: "error", message: `Failed to sign out user sessions: ${error.message}` };
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: loginError } = await (supabase as any).from("login_history").insert({
@@ -329,6 +336,8 @@ export async function resetUserPasswordAction(_previousState: AuthActionState, f
     email: formData.get("email"),
     confirmation: formData.get("confirmation") ?? "",
     stepUpEmail: formData.get("stepUpEmail") ?? "",
+    isTemporary: formData.get("isTemporary") ?? false,
+    temporaryPassword: formData.get("temporaryPassword") ?? "",
     reason: formData.get("reason") ?? ""
   });
 
@@ -343,6 +352,52 @@ export async function resetUserPasswordAction(_previousState: AuthActionState, f
   }
 
   const adminClient = supabase as AuthAdminClient;
+
+  if (parsed.data.isTemporary && parsed.data.temporaryPassword) {
+    const { error: updateError } = await adminClient.auth.admin.updateUserById(parsed.data.userId, {
+      password: parsed.data.temporaryPassword,
+      user_metadata: { force_password_change: true }
+    });
+
+    if (updateError) return { status: "error", message: updateError.message };
+
+    const emailResult = await sendEmail({
+      to: parsed.data.email.toLowerCase().trim(),
+      subject: "Temporary Password Set by Super Admin",
+      html: renderBrandedEmail({
+        title: "Temporary Password Assigned",
+        preview: "A Super Admin has set a temporary password for your account.",
+        body: [
+          `<p>A platform Super Admin has set a temporary password for your account.</p>`,
+          `<p>Your temporary password is: <strong>${escapeHtml(parsed.data.temporaryPassword)}</strong></p>`,
+          parsed.data.reason ? `<p><strong>Reason:</strong> ${escapeHtml(parsed.data.reason)}</p>` : "",
+          `<p>You will be required to change your password on your next login.</p>`,
+          `<p>Sign in at ${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/login</p>`
+        ].join(""),
+        ctaLabel: "Sign In Now",
+        ctaUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? "") + "/login"
+      })
+    });
+
+    await writeAuditLog({
+      actorId: context.userId,
+      action: "user.temp_password_set",
+      entityType: "profile",
+      entityId: parsed.data.userId,
+      metadata: {
+        email: parsed.data.email.toLowerCase().trim(),
+        reason: parsed.data.reason || null,
+        emailSent: emailResult.sent
+      }
+    });
+
+    revalidateUserPaths();
+    return {
+      status: "success",
+      message: `Temporary password set for ${parsed.data.email}. The user must change it on next login.`
+    };
+  }
+
   const linkResult = await adminClient.auth.admin.generateLink({
     type: "recovery",
     email: parsed.data.email.toLowerCase().trim()
@@ -502,7 +557,12 @@ export async function bulkUserActionAction(_previousState: AuthActionState, form
   for (const profile of profiles) {
     if (action === "force_logout") {
       const adminClient = supabase as AuthAdminClient;
-      await adminClient.auth.admin.deleteUser(profile.id).catch((err) => { console.error("Auth delete rollback failed:", err); });
+      const { error: signoutErr } = await adminClient.auth.admin.signOut(profile.id);
+      if (signoutErr) {
+        console.error("[super-admin-users] Bulk force logout signOut failed for", profile.id, signoutErr.message);
+      } else {
+        successCount++;
+      }
     } else {
       const { error } = await supabase.from("profiles").update({ status: nextStatus }).eq("id", profile.id);
       if (!error) successCount++;
@@ -532,12 +592,15 @@ export async function saveUserProfileAction(_previousState: AuthActionState, for
   const context = await requireRole(superAdminRoles, "/super-admin/users");
   const rateCheck = checkRateLimit(`save_profile:${context.userId}`, 20, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: "Too many profile save requests. Slow down." };
-  const userId = String(formData.get("userId") ?? "");
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
+  const parsed = updateUserProfileSchema.safeParse({
+    userId: formData.get("userId"),
+    fullName: formData.get("fullName"),
+    phone: formData.get("phone") ?? ""
+  });
 
-  if (!userId) return { status: "error", message: "User ID is required." };
-  if (fullName.length < 2) return fieldError("fullName", "Full name is required.");
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const { userId, fullName, phone } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("profiles").update({ full_name: fullName, phone: phone || null }).eq("id", userId);
@@ -641,36 +704,113 @@ export async function revokeInviteAction(_previousState: AuthActionState, formDa
   return { status: "success", message: "Invitation revoked and user archived." };
 }
 
+export async function addAccountNoteAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(superAdminRoles, "/super-admin/users");
+  const rateCheck = checkRateLimit(`note:${context.userId}`, 30, 60_000);
+  if (!rateCheck.allowed) return { status: "error", message: "Too many note submissions. Slow down." };
+  const parsed = accountNoteSchema.safeParse({
+    userId: formData.get("userId"),
+    content: formData.get("content")
+  });
+  if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  const supabase = await createSupabaseServerClient();
+  const note = {
+    id: crypto.randomUUID(),
+    content: parsed.data.content,
+    authorId: context.userId,
+    authorName: context.email ?? "Unknown",
+    createdAt: new Date().toISOString()
+  };
+
+  const { data: profile } = await supabase.from("profiles").select("metadata").eq("id", parsed.data.userId).maybeSingle();
+  if (!profile) return { status: "error", message: "User not found." };
+  const currentMeta = profile.metadata as Record<string, unknown> | null ?? {};
+  const existingNotes = (currentMeta.notes as Array<Record<string, unknown>>) ?? [];
+  const updatedNotes = [...existingNotes, note] as unknown as Json;
+
+  const { error } = await supabase.from("profiles").update({
+    metadata: { ...currentMeta, notes: updatedNotes } as unknown as Json
+  }).eq("id", parsed.data.userId);
+
+  if (error) return { status: "error", message: error.message };
+
+  await writeAuditLog({
+    actorId: context.userId,
+    action: "user.account_note_added",
+    entityType: "profile",
+    entityId: parsed.data.userId,
+    metadata: { noteId: note.id }
+  });
+
+  revalidateUserPaths();
+  return { status: "success", message: "Note added to user account." };
+}
+
 export async function deleteUserAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
-  const rateCheck = checkRateLimit(`delete_user:${context.userId}`, 5, 60_000);
+  const isPermanent = formData.get("kind") === "permanent_purge";
+  const rateLimitKey = isPermanent ? `purge_user:${context.userId}` : `delete_user:${context.userId}`;
+  const rateLimit = isPermanent ? 3 : 5;
+  const rateCheck = checkRateLimit(rateLimitKey, rateLimit, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: "Too many delete requests. Slow down." };
   const parsed = deleteUserSchema.safeParse({
     userId: formData.get("userId"),
     confirmation: formData.get("confirmation") ?? "",
     stepUpEmail: formData.get("stepUpEmail") ?? "",
+    kind: formData.get("kind") ?? "soft_delete",
     reason: formData.get("reason") ?? ""
   });
   if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
-  if (parsed.data.confirmation !== "DELETE") return fieldError("confirmation", "Type DELETE to confirm permanent deletion.");
+
+  const expectedConfirmation = isPermanent ? "PERMANENT_PURGE" : "DELETE";
+  if (parsed.data.confirmation !== expectedConfirmation) {
+    return fieldError("confirmation", `Type ${expectedConfirmation} to confirm.`);
+  }
 
   const supabase = await createSupabaseServerClient();
   const criticalAccess = await verifyCriticalSuperAdminAccess(context, supabase, parsed.data.stepUpEmail);
   if (!criticalAccess.ok) return criticalAccess.state;
 
-  await writeAuditLog({
-    actorId: context.userId,
-    action: "user.deleted",
-    entityType: "profile",
-    entityId: parsed.data.userId,
-    metadata: { reason: parsed.data.reason || null, method: "cascade" }
+  if (isPermanent) {
+    await writeAuditLog({
+      actorId: context.userId,
+      action: "user.permanent_purge",
+      entityType: "profile",
+      entityId: parsed.data.userId,
+      metadata: { reason: parsed.data.reason || null, method: "cascade", gdpr: true }
+    });
+
+    await deleteUserCascade(parsed.data.userId);
+
+    revalidateUserPaths();
+    return { status: "success", message: "User permanently purged with all associated data (GDPR compliant)." };
+  }
+
+  const { data: profile } = await supabase.from("profiles").select("status").eq("id", parsed.data.userId).maybeSingle();
+  if (!profile) return { status: "error", message: "User not found." };
+  if (profile.status === "deleted") return { status: "success", message: "User is already soft-deleted." };
+
+  const { error: updateError } = await supabase.from("profiles").update({ status: "deleted" }).eq("id", parsed.data.userId);
+  if (updateError) return { status: "error", message: updateError.message };
+
+  const adminClient = supabase as AuthAdminClient;
+  await adminClient.auth.admin.signOut(parsed.data.userId).catch((err) => {
+    console.error("[super-admin-users] Soft-delete signOut failed:", err.message);
   });
 
-  await deleteUserCascade(parsed.data.userId);
+  await writeAuditLog({
+    actorId: context.userId,
+    action: "user.soft_deleted",
+    entityType: "profile",
+    entityId: parsed.data.userId,
+    metadata: { reason: parsed.data.reason || null, previousStatus: profile.status }
+  });
 
   revalidateUserPaths();
-  return { status: "success", message: "User permanently deleted with all associated data." };
+  return { status: "success", message: "User soft-deleted. They have been signed out from all sessions." };
 }
 
 async function verifyCriticalSuperAdminAccess(

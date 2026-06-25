@@ -3,7 +3,7 @@ import type { Database, Json } from "@/types/database";
 import type { RoleName, ProfileStatus } from "@/types/auth";
 import type { OrganizationRow, BranchRow, GymRow } from "@/types/enterprise";
 
-export const userSortOptions = ["created_desc", "name_asc", "email_asc", "role_asc", "org_asc"] as const;
+export const userSortOptions = ["created_desc", "name_asc", "email_asc", "role_asc", "org_asc", "last_login_desc"] as const;
 export type UserSortOption = (typeof userSortOptions)[number];
 
 export type UserManagementFilters = {
@@ -35,8 +35,9 @@ export type UserManagementRecord = {
   branches: Array<{ id: string; name: string; branchCode: string }>;
   loginCount: number;
   lastLoginAt: string | null;
+  lastLoginSuccess: boolean | null;
   lastActivityAt: string | null;
-  hasActiveSessions: boolean;
+  activeAssignments: number;
   pendingApprovals: number;
 };
 
@@ -106,7 +107,7 @@ export type UserDetailData = {
   activityPagination: UserManagementPagination;
 };
 
-type ProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "gym_id" | "full_name" | "email" | "phone" | "avatar_url" | "status" | "created_at" | "updated_at">;
+type ProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "gym_id" | "full_name" | "email" | "phone" | "avatar_url" | "status" | "created_at" | "updated_at" | "metadata">;
 type BranchUserRow = Pick<Database["public"]["Tables"]["branch_users"]["Row"], "id" | "user_id" | "organization_id" | "branch_id" | "role_name" | "status">;
 type AuthAdminClient = import("@supabase/supabase-js").SupabaseClient<Database> & {
   auth: {
@@ -165,7 +166,40 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
   const userIds = profiles.map((p) => p.id);
   const assignmentByUser = groupAssignmentsByUser(allAssignments.filter((a) => userIds.includes(a.user_id)));
 
+  let loginStatsMap = new Map<string, { loginCount: number; lastLoginAt: string | null; lastLoginSuccess: boolean | null }>();
+  if (userIds.length > 0) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: loginRows } = await (supabase as any)
+        .from("login_history")
+        .select("user_id, status, created_at")
+        .in("user_id", userIds)
+        .order("created_at", { ascending: false })
+        .limit(userIds.length * 50);
+
+      if (loginRows && Array.isArray(loginRows)) {
+        const grouped = new Map<string, Array<{ status: string; created_at: string }>>();
+        for (const row of loginRows) {
+          const entries = grouped.get(row.user_id) ?? [];
+          entries.push(row);
+          grouped.set(row.user_id, entries);
+        }
+        for (const [uid, entries] of grouped) {
+          const successEntry = entries.find((e) => e.status === "success");
+          loginStatsMap.set(uid, {
+            loginCount: entries.length,
+            lastLoginAt: entries[0]?.created_at ?? null,
+            lastLoginSuccess: successEntry ? true : entries[0]?.status === "success" ? true : false
+          });
+        }
+      }
+    } catch {
+      // login_history table may not exist — graceful fallback
+    }
+  }
+
   const records: UserManagementRecord[] = profiles.map((profile) => {
+    const loginStats = loginStatsMap.get(profile.id);
     const assignments = assignmentByUser.get(profile.id) ?? [];
     const roles = Array.from(new Set(assignments.map((a) => a.role_name))) as RoleName[];
     const activeAssignments = assignments.filter((a) => a.status === "active");
@@ -188,10 +222,11 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
       organizations: assignedOrgs.map((o) => ({ id: o.id, name: o.name, slug: o.slug })),
       gyms: assignedGyms.map((g) => ({ id: g.id, name: g.name, slug: g.slug })),
       branches: assignedBranches.map((b) => ({ id: b.id, name: b.name, branchCode: b.branch_code })),
-      loginCount: 0,
-      lastLoginAt: null,
+      loginCount: loginStats?.loginCount ?? 0,
+      lastLoginAt: loginStats?.lastLoginAt ?? null,
+      lastLoginSuccess: loginStats?.lastLoginSuccess ?? null,
       lastActivityAt: null,
-      hasActiveSessions: activeAssignments.length > 0,
+      activeAssignments: activeAssignments.length,
       pendingApprovals: 0
     };
   });
@@ -258,7 +293,7 @@ export async function getUserDetailData(
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at")
+    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at, metadata")
     .eq("id", userId)
     .maybeSingle();
 
@@ -328,8 +363,9 @@ export async function getUserDetailData(
     branches: assignedBranches,
     loginCount: loginResult.count ?? loginHistory.length,
     lastLoginAt: loginHistory.find((e) => e.status === "success")?.createdAt ?? null,
+    lastLoginSuccess: loginHistory.some((e) => e.status === "success"),
     lastActivityAt: activityTimeline[0]?.createdAt ?? null,
-    hasActiveSessions: activeAssignments.length > 0,
+    activeAssignments: activeAssignments.length,
     pendingApprovals: 0
   };
 
@@ -361,7 +397,7 @@ export function normalizeUserManagementFilters(input: Partial<UserManagementFilt
 async function queryProfilesPage(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, filters: UserManagementFilters) {
   let query = supabase
     .from("profiles")
-    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at", { count: "exact" });
+    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at, metadata", { count: "exact" });
 
   if (filters.status !== "all") {
     query = query.eq("status", filters.status as ProfileStatus);
@@ -566,6 +602,12 @@ function sortRecords(records: UserManagementRecord[], sort: UserSortOption) {
     sorted.sort((a, b) => (a.primaryRole ?? "").localeCompare(b.primaryRole ?? ""));
   } else if (sort === "org_asc") {
     sorted.sort((a, b) => (a.primaryOrganization?.name ?? "").localeCompare(b.primaryOrganization?.name ?? ""));
+  } else if (sort === "last_login_desc") {
+    sorted.sort((a, b) => {
+      const aDate = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : -1;
+      const bDate = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : -1;
+      return bDate - aDate;
+    });
   } else {
     sorted.sort((a, b) => new Date(b.user.created_at).getTime() - new Date(a.user.created_at).getTime());
   }

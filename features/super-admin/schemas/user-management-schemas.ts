@@ -45,7 +45,12 @@ export const resetUserPasswordSchema = z.object({
   email: z.string().trim().email(),
   confirmation: z.string().trim(),
   stepUpEmail,
+  isTemporary: z.union([z.boolean(), z.string().transform((v) => v === "true" || v === "1")]).optional().default(false),
+  temporaryPassword: z.string().trim().min(8, "Temporary password must be at least 8 characters.").max(72).optional(),
   reason: z.string().trim().max(500).optional()
+}).refine((data) => !data.isTemporary || data.temporaryPassword, {
+  message: "Temporary password is required when setting a temporary password.",
+  path: ["temporaryPassword"]
 });
 
 export const transferUserRoleSchema = z.object({
@@ -92,12 +97,31 @@ export const deleteUserSchema = z.object({
   userId: z.string().uuid(),
   confirmation: z.string().trim(),
   stepUpEmail,
+  kind: z.enum(["soft_delete", "permanent_purge"]).optional().default("soft_delete"),
   reason: z.string().trim().max(500).optional()
 });
 
 export const accountNoteSchema = z.object({
   userId: z.string().uuid(),
   content: z.string().trim().min(1, "Note content is required.").max(2000)
+});
+
+export const createOrgOwnerSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address."),
+  fullName: z.string().trim().min(2, "Full name is required.").max(140),
+  password: z.string().trim().min(8, "Password must be at least 8 characters.").max(72),
+  phone: z.string().trim().max(24).optional(),
+  orgName: z.string().trim().min(2, "Organization name is required.").max(140),
+  orgSlug: z.string().trim().min(2, "Slug is required.").max(60).regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens."),
+  orgDescription: z.string().trim().max(500).optional(),
+  timezone: z.string().trim().optional().default("Asia/Kolkata"),
+  currency: z.string().trim().optional().default("INR"),
+  packageTier: z.enum(["starter", "growth", "enterprise"]),
+  trialDays: z.coerce.number().int().min(0).max(365).optional().default(14),
+  billingPeriod: z.enum(["monthly", "annual"]).optional().default("monthly"),
+  confirmation: z.string().trim(),
+  stepUpEmail,
+  reason: z.string().trim().max(500).optional()
 });
 
 export type UserManagementFiltersInput = z.infer<typeof userManagementFiltersSchema>;
@@ -112,3 +136,4 @@ export type ResendInviteInput = z.infer<typeof resendInviteSchema>;
 export type RevokeInviteInput = z.infer<typeof revokeInviteSchema>;
 export type DeleteUserInput = z.infer<typeof deleteUserSchema>;
 export type AccountNoteInput = z.infer<typeof accountNoteSchema>;
+export type CreateOrgOwnerInput = z.infer<typeof createOrgOwnerSchema>;
