@@ -80,6 +80,7 @@ export default async function SuperAdminOrganizationDetailPage({ params, searchP
                 </div>
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
                   {record.organization.primary_domain ?? record.organization.slug} · Owner {record.owner?.fullName ?? "Unassigned"} · Billing {record.organization.billing_email ?? "not configured"}
+                  {record.owner?.lastLoginAt ? <span> · Last login {new Date(record.owner.lastLoginAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span> : null}
                 </p>
                 {record.tags.length > 0 ? (
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -131,7 +132,7 @@ export default async function SuperAdminOrganizationDetailPage({ params, searchP
       {activeTab === "profile" ? <ProfileTab data={data} /> : null}
       {activeTab === "governance" ? <GovernanceTab criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} /> : null}
       {activeTab === "users" ? <UsersTab data={data} /> : null}
-      {activeTab === "usage" ? <OrgUsageTab record={data.record} /> : null}
+      {activeTab === "usage" ? <OrgUsageTab record={data.record} usageSnapshots={data.usageSnapshots} /> : null}
       {activeTab === "gyms" ? <GymsTab data={data} /> : null}
       {activeTab === "billing" ? <OrgBillingTab data={data} /> : null}
       {activeTab === "audit" ? <AuditTab data={data} /> : null}
@@ -262,6 +263,7 @@ function UsersTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrg
 function GymsTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrganizationDetailData>>> }) {
   const branches = data.branches || [];
   const gyms = data.gyms || [];
+  const gymAdminMap = data.gymAdminMap || {};
   const totalMembers = branches.reduce((sum, b) => sum + (b.capacity || 0), 0);
   const totalRevenue = (data.recentPayments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const activeGyms = gyms.filter((g) => g.status === "active").length;
@@ -300,18 +302,45 @@ function GymsTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrga
           </div>
           {gyms.length > 0 ? gyms.map((gym) => {
             const gymBranches = branches.filter((b) => b.gym_id === gym.id);
+            const adminInfo = gymAdminMap[gym.id];
+            const adminAssigned = adminInfo?.assigned ?? false;
+            const hasActiveBranches = gymBranches.some((b) => b.status === "active");
+            const totalCapacity = gymBranches.reduce((s, b) => s + (b.capacity || 0), 0);
+            const warnings: string[] = [];
+            if (!adminAssigned) warnings.push("No admin assigned");
+            if (adminAssigned && adminInfo?.adminStatus !== "active") warnings.push(`Admin ${adminInfo?.adminStatus ?? "inactive"}`);
+            if (totalCapacity > 0 && gymBranches.some((b) => b.capacity > 0)) {
+              const nearCapacity = gymBranches.filter((b) => b.capacity > 0).length > 0;
+              if (nearCapacity) {
+                const highCapacityBranches = gymBranches.filter((b) => b.capacity > 0);
+                warnings.push(...highCapacityBranches.map((b) => `${b.name}: ${formatCompactNumber(b.capacity)} cap`).slice(0, 1));
+              }
+            }
+            if (!hasActiveBranches && gymBranches.length > 0) {
+              warnings.push("No active branches");
+            }
+
             return (
-              <details key={gym.id} className="group rounded-md border border-border bg-background transition-all hover:border-border-strong">
-                <summary className="flex cursor-pointer items-center justify-between p-4 text-left list-none">
-                  <div className="flex flex-wrap items-center gap-2">
+              <details key={gym.id} className="gym-expand group rounded-md border border-border bg-background transition-all hover:border-border-strong">
+                <summary className="flex cursor-pointer items-center justify-between gap-3 p-4 text-left list-none">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <p className="font-black">{gym.name}</p>
                     <EnterpriseStatusBadge status={gym.status} />
                     {gymBranches.length > 0 && (
                       <span className="text-xs font-semibold text-muted-foreground">{gymBranches.length} branch(es)</span>
                     )}
-                    <span className="size-2 rounded-full bg-green-500" title="Admin assigned" />
+                    {adminAssigned && adminInfo?.adminStatus === "active" ? (
+                      <span className="size-2 shrink-0 rounded-full bg-green-500" title={`Admin: ${adminInfo?.adminName ?? "Assigned"} (active)`} />
+                    ) : adminAssigned ? (
+                      <span className="size-2 shrink-0 rounded-full bg-red-500" title={`Admin: ${adminInfo?.adminName ?? "Assigned"} (${adminInfo?.adminStatus ?? "inactive"})`} />
+                    ) : (
+                      <span className="size-2 shrink-0 rounded-full bg-amber-500" title="No admin assigned" />
+                    )}
+                    {warnings.length > 0 && (
+                      <Badge variant="warning" className="shrink-0 text-[10px] px-1.5 py-0">{warnings.length} issue(s)</Badge>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <span className="text-xs text-muted-foreground">{gym.slug}</span>
                     <svg className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="m6 9 6 6 6-6" />
@@ -324,18 +353,34 @@ function GymsTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrga
                     <div><p className="text-xs text-muted-foreground">Currency</p><p className="text-sm font-black">{gym.currency}</p></div>
                     <div><p className="text-xs text-muted-foreground">Branches</p><p className="text-sm font-black">{formatCompactNumber(gymBranches.length)}</p></div>
                   </div>
+                  {!adminAssigned && (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+                      <span className="size-1.5 rounded-full bg-amber-500" />
+                      No gym admin assigned
+                    </div>
+                  )}
                   {gymBranches.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground">Branches</p>
-                      {gymBranches.map((branch) => (
-                        <div key={branch.id} className="flex items-center justify-between rounded-md border border-border bg-surface p-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold">{branch.name}</p>
-                            <EnterpriseStatusBadge status={branch.status} />
+                      {gymBranches.map((branch) => {
+                        return (
+                          <div key={branch.id} className="flex items-center justify-between rounded-md border border-border bg-surface p-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold">{branch.name}</p>
+                              <EnterpriseStatusBadge status={branch.status} />
+                              {branch.capacity > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="h-1.5 w-12 rounded-full bg-surface-muted">
+                                    <div className="h-full rounded-full bg-primary/60" style={{ width: `${Math.min(100, 50)}%` }} />
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground">{formatCompactNumber(branch.capacity)} cap</span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">{branch.branch_code} · {branch.city ?? "No city"}</span>
                           </div>
-                          <span className="text-xs text-muted-foreground">{branch.branch_code} · {formatCompactNumber(branch.capacity)} cap</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                   {gymBranches.length === 0 && (

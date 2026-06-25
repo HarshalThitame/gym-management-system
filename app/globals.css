@@ -215,13 +215,16 @@ input[type="radio"] {
   animation: slide-in-right 0.3s cubic-bezier(0.2, 0, 0, 1) both;
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+details.gym-expand {
+  display: grid;
+  grid-template-rows: auto 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.2, 0, 0, 1);
 }
 
-.animate-shimmer {
-  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--surface) 50%, var(--surface-muted) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+details.gym-expand[open] {
+  grid-template-rows: auto 1fr;
+}
+
+details.gym-expand > :not(summary) {
+  overflow: hidden;
 }

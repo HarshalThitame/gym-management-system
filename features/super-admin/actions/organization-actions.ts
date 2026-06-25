@@ -28,6 +28,7 @@ import {
   type OrganizationGovernanceSnapshot
 } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
+import { checkRateLimit } from "@/lib/rate-limiter";
 import {
   bulkOrganizationActionSchema,
   organizationLegalHoldActionSchema,
@@ -549,6 +550,13 @@ export async function organizationLifecycleAction(_previousState: AuthActionStat
 
   const isForceDelete = parsed.data.action === "delete" && parsed.data.forceDelete === "true" && parsed.data.forceConfirm === "I UNDERSTAND THE CONSEQUENCES";
 
+  if (isForceDelete) {
+    const forceDeleteRate = checkRateLimit(`force_delete:${context.userId}`, 3, 60_000);
+    if (!forceDeleteRate.allowed) {
+      return { status: "error", message: `Force delete rate limit exceeded. Try again in ${Math.ceil(forceDeleteRate.retryAfterMs / 1000)}s.` };
+    }
+  }
+
   if (!isForceDelete) {
     if (parsed.data.confirmation !== organization.slug) {
       return fieldError("confirmation", `Type ${organization.slug} to confirm soft deletion.`);
@@ -583,6 +591,23 @@ export async function organizationLifecycleAction(_previousState: AuthActionStat
     }
 
     const afterSnapshot = buildOrganizationSnapshot(result.data);
+
+    const orgBranchesResult = await supabase.from("branches").select("id").eq("organization_id", organization.id);
+    const orgBranchIds = (orgBranchesResult.data ?? []).map((b) => b.id);
+    const branchUserResult = orgBranchIds.length > 0
+      ? await supabase.from("branch_users").select("user_id").in("branch_id", orgBranchIds)
+      : { data: [] as { user_id: string }[] };
+    const userIdsToDelete = [...new Set([
+      ...(organization.owner_user_id ? [organization.owner_user_id] : []),
+      ...(branchUserResult.data ?? []).map((r) => r.user_id)
+    ])];
+    const adminClient = getSupabaseAdminClient();
+    if (adminClient) {
+      for (const uid of userIdsToDelete) {
+        await adminClient.auth.admin.deleteUser(uid).catch(() => {});
+      }
+    }
+
     const notificationResult = await sendOrganizationLifecycleNotification(supabase, {
       organization: result.data,
       action: "soft-deleted",
@@ -872,6 +897,11 @@ export async function bulkOrganizationAction(_previousState: AuthActionState, fo
   }
 
   if (parsed.data.action === "delete") {
+    const bulkDeleteRate = checkRateLimit(`bulk_delete:${context.userId}`, 1, 120_000);
+    if (!bulkDeleteRate.allowed) {
+      return { status: "error", message: `Bulk delete rate limit exceeded. Try again in ${Math.ceil(bulkDeleteRate.retryAfterMs / 1000)}s.` };
+    }
+
     const reason = parsed.data.deleteReason || "Bulk delete";
     const requestedAt = new Date();
     const restoreUntil = new Date(requestedAt.getTime() + restoreWindowDays * 24 * 60 * 60 * 1000).toISOString();

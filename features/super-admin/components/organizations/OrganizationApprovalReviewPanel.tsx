@@ -81,13 +81,14 @@ export function OrganizationApprovalReviewPanel({
         </Card>
       ) : (
         <div className="space-y-5">
-          {approvals.map((approval) => (
-            <ApprovalCard
-              key={approval.id}
-              approval={approval}
-              formAction={formAction}
-              showOrganization={showOrganization}
-            />
+          {approvals.map((approval, i) => (
+            <div key={approval.id} className="reveal-up" style={{"--reveal-delay": `${i * 0.05}s`} as React.CSSProperties}>
+              <ApprovalCard
+                approval={approval}
+                formAction={formAction}
+                showOrganization={showOrganization}
+              />
+            </div>
           ))}
         </div>
       )}

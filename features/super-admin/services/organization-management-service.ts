@@ -49,6 +49,7 @@ export type OrganizationOwnerCandidate = {
   email: string | null;
   phone: string | null;
   status: string;
+  lastLoginAt: string | null;
 };
 
 export type OrganizationUsageSummary = {
@@ -206,6 +207,18 @@ export type OrganizationUserAssignment = Database["public"]["Tables"]["branch_us
   profile: OrganizationOwnerCandidate | null;
 };
 
+export type UsageSnapshotRow = {
+  id: string;
+  organization_id: string;
+  snapshot_date: string;
+  member_count: number;
+  branch_count: number;
+  active_trainers: number;
+  storage_gb: number;
+  api_calls_last_30d: number;
+  created_at: string;
+};
+
 export type OrganizationDetailData = {
   record: OrganizationManagementRecord;
   packages: PackageRow[];
@@ -218,6 +231,8 @@ export type OrganizationDetailData = {
   approvalRequests: OrganizationApprovalRequest[];
   auditTimeline: OrganizationAuditTimelineItem[];
   recentPayments: PaymentRow[];
+  usageSnapshots: UsageSnapshotRow[];
+  gymAdminMap: Record<string, { assigned: boolean; adminName: string | null; adminStatus: string | null }>;
   auditFilters: OrganizationDetailAuditFilters;
   listFilters: OrganizationDetailListFilters;
   listPagination: {
@@ -465,6 +480,48 @@ export async function getOrganizationDetailData(
     ? await getRecentPaymentsForGyms(supabase, gymIds)
     : [];
 
+  const gymAdminMap = new Map<string, { assigned: boolean; adminName: string | null; adminStatus: string | null }>();
+  if (gymIds.length > 0) {
+    const branchIdsForGyms = (branchesResult.data ?? [])
+      .filter((b) => b.gym_id && gymIds.includes(b.gym_id))
+      .map((b) => b.id);
+    if (branchIdsForGyms.length > 0) {
+      const { data: gymAdminRows } = await supabase
+        .from("branch_users")
+        .select("user_id, branch_id, role_name")
+        .in("branch_id", branchIdsForGyms)
+        .eq("role_name", "gym_admin");
+      const adminUserIds = [...new Set((gymAdminRows ?? []).map((r) => r.user_id))];
+      const adminProfiles = adminUserIds.length > 0
+        ? (await supabase.from("profiles").select("id, full_name, status").in("id", adminUserIds)).data ?? []
+        : [];
+      const adminNameMap = new Map(adminProfiles.map((p) => [p.id, p.full_name]));
+      const adminStatusMap = new Map(adminProfiles.map((p) => [p.id, p.status]));
+      const adminBranchesByGym = new Map<string, Set<string>>();
+      for (const br of branchesResult.data ?? []) {
+        if (!br.gym_id) continue;
+        if (!adminBranchesByGym.has(br.gym_id)) adminBranchesByGym.set(br.gym_id, new Set());
+        adminBranchesByGym.get(br.gym_id)!.add(br.id);
+      }
+      for (const gId of gymIds) {
+        const gymBranchIds = adminBranchesByGym.get(gId) ?? new Set();
+        const adminForGym = (gymAdminRows ?? []).find((r) => gymBranchIds.has(r.branch_id));
+        gymAdminMap.set(gId, {
+          assigned: adminForGym != null,
+          adminName: adminForGym ? adminNameMap.get(adminForGym.user_id) ?? "Admin" : null,
+          adminStatus: adminForGym ? adminStatusMap.get(adminForGym.user_id) ?? null : null
+        });
+      }
+    }
+  }
+
+  const { data: usageSnapshotsData } = await supabase
+    .from("subscription_usage_snapshots")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("snapshot_date", { ascending: false })
+    .limit(12);
+
   return {
     record,
     packages,
@@ -477,6 +534,8 @@ export async function getOrganizationDetailData(
     approvalRequests: record.approvalRequests,
     auditTimeline: record.auditTimeline,
     recentPayments,
+    usageSnapshots: usageSnapshotsData ?? [],
+    gymAdminMap: Object.fromEntries(gymAdminMap),
     auditFilters: filters,
     listFilters,
     listPagination: {
@@ -1451,7 +1510,29 @@ async function getOwnerCandidates(client: OrganizationManagementSupplementClient
     return [];
   }
 
-  return (data ?? []).map(profileToOwnerCandidate);
+  const profiles = data ?? [];
+  const userIds = profiles.map((p) => p.id);
+  const lastLoginByUser = new Map<string, string>();
+  if (userIds.length > 0) {
+    const supabase = await createSupabaseServerClient();
+    const { data: loginData } = await supabase
+      .from("login_history")
+      .select("user_id, created_at")
+      .in("user_id", userIds)
+      .eq("status", "success")
+      .order("created_at", { ascending: false })
+      .limit(2000);
+    for (const entry of loginData ?? []) {
+      if (!lastLoginByUser.has(entry.user_id)) {
+        lastLoginByUser.set(entry.user_id, entry.created_at);
+      }
+    }
+  }
+
+  return profiles.map((profile) => ({
+    ...profileToOwnerCandidate(profile),
+    lastLoginAt: lastLoginByUser.get(profile.id) ?? null
+  }));
 }
 
 async function getProfilesById(client: OrganizationManagementSupplementClient, ids: string[]) {
@@ -1548,7 +1629,8 @@ function profileToOwnerCandidate(profile: ProfileRow): OrganizationOwnerCandidat
     fullName: profile.full_name || profile.email || profile.id,
     email: profile.email,
     phone: profile.phone,
-    status: profile.status
+    status: profile.status,
+    lastLoginAt: null
   };
 }
 
