@@ -469,7 +469,7 @@ function SecurityTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof get
               <EnterpriseStatusBadge status={event.status} />
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{event.description}</p>
-            <p className="mt-2 text-xs font-semibold text-muted-foreground">{formatDateTime(event.created_at)} · {event.source_ip ?? "No source IP"}</p>
+            <p className="mt-2 text-xs font-semibold text-muted-foreground">{formatDateTime(event.created_at)} · {String(event.source_ip ?? "No source IP")}</p>
           </div>
         ))}
       </RecordGrid>

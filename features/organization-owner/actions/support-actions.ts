@@ -3,13 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireOrgFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 import { getOrgOwnerContext } from "./action-utils";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
 
 export async function createTicketAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const ctx = await getOrgOwnerContext("/organization/support");
   try {
-    const ctx = await getOrgOwnerContext("/organization/support");
+    await requireOrgFeatureAccess(ctx.organizationId, "member_management");
     const supabase = await createSupabaseServerClient();
     const subject = formData.get("subject") as string;
     const description = formData.get("description") as string;
@@ -38,13 +40,14 @@ export async function createTicketAction(prevState: ActionState, formData: FormD
     revalidatePath("/organization/support");
     return { status: "success", message: "Support ticket created. Our team will respond shortly." };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to create ticket." };
+    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to create ticket." };
   }
 }
 
 export async function updateTicketStatusAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const ctx = await getOrgOwnerContext("/organization/support");
   try {
-    const ctx = await getOrgOwnerContext("/organization/support");
+    await requireOrgFeatureAccess(ctx.organizationId, "member_management");
     const supabase = await createSupabaseServerClient();
     const ticketId = formData.get("ticketId") as string;
     const status = formData.get("status") as string;
@@ -66,7 +69,7 @@ export async function updateTicketStatusAction(prevState: ActionState, formData:
     revalidatePath("/organization/support");
     return { status: "success", message: `Ticket ${status}.` };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to update ticket." };
+    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to update ticket." };
   }
 }
 

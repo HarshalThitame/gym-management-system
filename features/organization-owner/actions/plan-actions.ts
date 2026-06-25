@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { requireOrgFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 import { getOrgOwnerContext } from "./action-utils";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 
@@ -13,6 +14,7 @@ type ActionState = { status: "idle" | "success" | "error"; message?: string };
 export async function toggleAutoRenewAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await requireOrganizationOwner("/organization/plan");
+    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     const supabase = getSupabaseAdminClient();
     if (!supabase) return { status: "error", message: "Database connection failed." };
 
@@ -36,13 +38,14 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
     revalidatePath("/organization/plan");
     return { status: "success", message: `Auto-renew ${enabled ? "enabled" : "disabled"}.` };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to update auto-renew." };
+    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to update auto-renew." };
   }
 }
 
 export async function cancelSubscriptionAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await requireOrganizationOwner("/organization/plan");
+    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     if (!ctx.userId) {
       return { status: "error", message: "Authenticated user could not be resolved." };
     }
@@ -114,13 +117,14 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
     revalidatePath("/organization");
     return { status: "success", message: "Subscription cancelled. Auto-renewal is disabled and data will be retained for 30 days." };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to cancel subscription." };
+    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to cancel subscription." };
   }
 }
 
 export async function assignAddonAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/plan");
+    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     const addonName = formData.get("addonName") as string;
     const addonPrice = Number(formData.get("addonPrice"));
 
@@ -137,13 +141,14 @@ export async function assignAddonAction(prevState: ActionState, formData: FormDa
     revalidatePath("/organization/plan");
     return { status: "success", message: `Add-on "${addonName}" requested. Our team will activate it shortly.` };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to request add-on." };
+    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to request add-on." };
   }
 }
 
 export async function removeAddonAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/plan");
+    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     const addonName = formData.get("addonName") as string;
 
     await writeAuditLog({
@@ -157,6 +162,6 @@ export async function removeAddonAction(prevState: ActionState, formData: FormDa
     revalidatePath("/organization/plan");
     return { status: "success", message: `Removal request for "${addonName}" submitted.` };
   } catch (e) {
-    return { status: "error", message: e instanceof Error ? e.message : "Failed to request add-on removal." };
+    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to request add-on removal." };
   }
 }

@@ -4,11 +4,13 @@ import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
+import { requireOrgFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 
 export async function saveOrganizationProfileAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   try {
     const context = await getOrgOwnerContext("/organization/profile");
+    await requireOrgFeatureAccess(context.organizationId, "member_management");
     const supabase = await createSupabaseServerClient();
     const organizationId = context.organizationId;
     const name = formData.get("name") as string;
@@ -32,6 +34,6 @@ export async function saveOrganizationProfileAction(prevState: AuthActionState, 
     revalidateOrgModules(["/organization/profile"]);
     return { ...prevState, status: "success", message: "Organization profile updated." };
   } catch (error) {
-    return { ...prevState, status: "error", message: error instanceof Error ? error.message : "Failed to update profile." };
+    return entitlementActionCatch(error) ?? { ...prevState, status: "error", message: error instanceof Error ? error.message : "Failed to update profile." };
   }
 }
