@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireApiAuth } from "@/lib/auth/api-guards";
 import { writeAuditLog } from "@/lib/audit";
 import { requireApiFeatureAccess } from "@/features/entitlement";
+import { sanitizeFilename } from "@/lib/security/sanitize";
 
 const ALLOWED_TYPES = [
   "application/pdf",
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
 
     const supabase = await createSupabaseServerClient();
 
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeFileName = sanitizeFilename(file.name);
     const timestamp = Date.now();
     const filePath = `${organizationId}/${timestamp}-${safeFileName}`;
 

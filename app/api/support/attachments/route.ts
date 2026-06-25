@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadAttachment } from "@/features/support/services/support-ticket-service";
+import { sanitizeFilename } from "@/lib/security/sanitize";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
 
     const supabase = await createSupabaseServerClient();
     const buffer = Buffer.from(await file.arrayBuffer());
-    const storagePath = `support/tickets/${ticketId}/${Date.now()}-${file.name}`;
+    const storagePath = `support/tickets/${ticketId}/${Date.now()}-${sanitizeFilename(file.name)}`;
 
     const { error: uploadError } = await supabase.storage
       .from("attachments")
