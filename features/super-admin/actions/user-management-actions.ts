@@ -26,7 +26,7 @@ import {
   updateUserStatusSchema
 } from "../schemas/user-management-schemas";
 import { deleteUserCascade } from "../services/user-management-service";
-import type { Database, Json } from "@/types/database";
+import type { Database } from "@/types/database";
 import { checkRateLimit } from "@/lib/rate-limiter";
 
 const superAdminRoles = ["super_admin"] as const;
@@ -724,24 +724,27 @@ export async function addAccountNoteAction(_previousState: AuthActionState, form
     createdAt: new Date().toISOString()
   };
 
-  const { data: profile } = await supabase.from("profiles").select("metadata").eq("id", parsed.data.userId).maybeSingle();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", parsed.data.userId)
+    .maybeSingle();
+
+  if (profileError) return { status: "error", message: profileError.message };
   if (!profile) return { status: "error", message: "User not found." };
-  const currentMeta = profile.metadata as Record<string, unknown> | null ?? {};
-  const existingNotes = (currentMeta.notes as Array<Record<string, unknown>>) ?? [];
-  const updatedNotes = [...existingNotes, note] as unknown as Json;
-
-  const { error } = await supabase.from("profiles").update({
-    metadata: { ...currentMeta, notes: updatedNotes } as unknown as Json
-  }).eq("id", parsed.data.userId);
-
-  if (error) return { status: "error", message: error.message };
 
   await writeAuditLog({
     actorId: context.userId,
     action: "user.account_note_added",
     entityType: "profile",
     entityId: parsed.data.userId,
-    metadata: { noteId: note.id }
+    metadata: {
+      noteId: note.id,
+      content: note.content,
+      authorId: note.authorId,
+      authorName: note.authorName,
+      createdAt: note.createdAt
+    }
   });
 
   revalidateUserPaths();

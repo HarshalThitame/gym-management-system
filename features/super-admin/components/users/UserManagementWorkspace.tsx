@@ -1285,12 +1285,8 @@ function formatTimeAgo(dateStr: string) {
 
 function AccountNotesForm({ record, onClose }: { record: UserManagementRecord; onClose: () => void }) {
   const [state, formAction] = useActionState(addAccountNoteAction, initialAuthActionState);
-  const [noteKey, setNoteKey] = useState(0);
-  const notes = React.useMemo(() => {
-    const meta = record.user.metadata as Record<string, unknown> | null;
-    return (meta?.notes as Array<Record<string, unknown>> ?? []) as Array<{ id: string; content: string; authorName: string; createdAt: string }>;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [record.user.metadata, noteKey]);
+  const [, setNoteKey] = useState(0);
+  const notes = record.accountNotes;
 
   useEffect(() => {
     if (state.status === "success") {

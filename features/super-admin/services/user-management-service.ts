@@ -39,6 +39,7 @@ export type UserManagementRecord = {
   lastActivityAt: string | null;
   activeAssignments: number;
   pendingApprovals: number;
+  accountNotes: AccountNote[];
 };
 
 export type UserManagementSummary = {
@@ -99,6 +100,14 @@ export type UserActivityEvent = {
   source: "activity_events" | "audit_logs" | "login_history";
 };
 
+export type AccountNote = {
+  id: string;
+  content: string;
+  authorId: string | null;
+  authorName: string;
+  createdAt: string;
+};
+
 export type UserDetailData = {
   record: UserManagementRecord;
   loginHistory: LoginHistoryEntry[];
@@ -107,7 +116,7 @@ export type UserDetailData = {
   activityPagination: UserManagementPagination;
 };
 
-type ProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "gym_id" | "full_name" | "email" | "phone" | "avatar_url" | "status" | "created_at" | "updated_at" | "metadata">;
+type ProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "gym_id" | "full_name" | "email" | "phone" | "avatar_url" | "status" | "created_at" | "updated_at">;
 type BranchUserRow = Pick<Database["public"]["Tables"]["branch_users"]["Row"], "id" | "user_id" | "organization_id" | "branch_id" | "role_name" | "status">;
 type AuthAdminClient = import("@supabase/supabase-js").SupabaseClient<Database> & {
   auth: {
@@ -165,8 +174,9 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
   const orgById = new Map(organizations.map((o) => [o.id, o]));
   const userIds = profiles.map((p) => p.id);
   const assignmentByUser = groupAssignmentsByUser(allAssignments.filter((a) => userIds.includes(a.user_id)));
+  const notesByUser = userIds.length > 0 ? await fetchAccountNotesByUser(supabase, userIds) : new Map<string, AccountNote[]>();
 
-  let loginStatsMap = new Map<string, { loginCount: number; lastLoginAt: string | null; lastLoginSuccess: boolean | null }>();
+  const loginStatsMap = new Map<string, { loginCount: number; lastLoginAt: string | null; lastLoginSuccess: boolean | null }>();
   if (userIds.length > 0) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -227,7 +237,8 @@ export async function getUserManagementData(input: Partial<UserManagementFilters
       lastLoginSuccess: loginStats?.lastLoginSuccess ?? null,
       lastActivityAt: null,
       activeAssignments: activeAssignments.length,
-      pendingApprovals: 0
+      pendingApprovals: 0,
+      accountNotes: notesByUser.get(profile.id) ?? []
     };
   });
 
@@ -293,7 +304,7 @@ export async function getUserDetailData(
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at, metadata")
+    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at")
     .eq("id", userId)
     .maybeSingle();
 
@@ -325,10 +336,11 @@ export async function getUserDetailData(
     ? await supabase.from("gyms").select("id, name, slug").in("id", uniqueGymIds).then((r) => r.data ?? [])
     : [];
 
-  const [loginResult, activityResult, auditResult] = await Promise.all([
+  const [loginResult, activityResult, auditResult, notesByUser] = await Promise.all([
     getLoginHistoryForUser(supabase, userId, loginPage, loginPageSize),
     getActivityEventsForUser(supabase, userId, activityPage, activityPageSize),
-    getAuditLogsForUser(supabase, userId, activityPage, activityPageSize)
+    getAuditLogsForUser(supabase, userId, activityPage, activityPageSize),
+    fetchAccountNotesByUser(supabase, [userId])
   ]);
 
   const loginHistory: LoginHistoryEntry[] = ((loginResult.data ?? []) as LoginHistoryRow[]).map((row) => ({
@@ -366,7 +378,8 @@ export async function getUserDetailData(
     lastLoginSuccess: loginHistory.some((e) => e.status === "success"),
     lastActivityAt: activityTimeline[0]?.createdAt ?? null,
     activeAssignments: activeAssignments.length,
-    pendingApprovals: 0
+    pendingApprovals: 0,
+    accountNotes: notesByUser.get(userId) ?? []
   };
 
   return {
@@ -397,7 +410,7 @@ export function normalizeUserManagementFilters(input: Partial<UserManagementFilt
 async function queryProfilesPage(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, filters: UserManagementFilters) {
   let query = supabase
     .from("profiles")
-    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at, metadata", { count: "exact" });
+    .select("id, gym_id, full_name, email, phone, avatar_url, status, created_at, updated_at", { count: "exact" });
 
   if (filters.status !== "all") {
     query = query.eq("status", filters.status as ProfileStatus);
@@ -526,6 +539,47 @@ async function getAuditLogsForUser(supabase: Awaited<ReturnType<typeof createSup
   return { data: data ?? [] };
 }
 
+async function fetchAccountNotesByUser(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, AccountNote[]>();
+
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select("id, actor_id, entity_id, metadata, created_at")
+    .eq("action", "user.account_note_added")
+    .eq("entity_type", "profile")
+    .in("entity_id", userIds)
+    .order("created_at", { ascending: true })
+    .limit(Math.max(500, userIds.length * 20));
+
+  if (error) return new Map<string, AccountNote[]>();
+
+  const byUser = new Map<string, AccountNote[]>();
+  for (const row of data ?? []) {
+    if (!row.entity_id) continue;
+    const metadata = asRecord(row.metadata);
+    const content = typeof metadata.content === "string" ? metadata.content : null;
+    if (!content) continue;
+
+    const note: AccountNote = {
+      id: typeof metadata.noteId === "string" ? metadata.noteId : row.id,
+      content,
+      authorId: typeof metadata.authorId === "string" ? metadata.authorId : row.actor_id,
+      authorName: typeof metadata.authorName === "string" ? metadata.authorName : "Unknown",
+      createdAt: typeof metadata.createdAt === "string" ? metadata.createdAt : row.created_at
+    };
+
+    const notes = byUser.get(row.entity_id) ?? [];
+    notes.push(note);
+    byUser.set(row.entity_id, notes);
+  }
+
+  return byUser;
+}
+
+function asRecord(value: Json): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
 function groupAssignmentsByUser(assignments: BranchUserRow[]) {
   const byUser = new Map<string, BranchUserRow[]>();
   for (const assignment of assignments) {
@@ -625,7 +679,7 @@ function activityToEvent(row: ActivityEventRow): UserActivityEvent {
     severity: row.severity as UserActivityEvent["severity"],
     createdAt: row.created_at,
     metadata: row.metadata,
-    ipAddress: row.ip_address,
+    ipAddress: typeof row.ip_address === "string" ? row.ip_address : null,
     userAgent: row.user_agent,
     source: "activity_events"
   };
@@ -642,7 +696,7 @@ function auditToEvent(row: AuditLogRow): UserActivityEvent {
     severity: severityFromAction(row.action),
     createdAt: row.created_at,
     metadata: row.metadata,
-    ipAddress: row.ip_address,
+    ipAddress: typeof row.ip_address === "string" ? row.ip_address : null,
     userAgent: row.user_agent,
     source: "audit_logs"
   };
