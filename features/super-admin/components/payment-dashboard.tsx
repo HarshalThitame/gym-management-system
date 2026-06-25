@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { CreditCard, Loader2, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileText, Copy, RefreshCw, BarChart3, Ban, Eye, ExternalLink } from "lucide-react";
+import { CreditCard, Loader2, AlertTriangle, CheckCircle2, XCircle, Clock, Search, FileText, Copy, RefreshCw, BarChart3, Ban, Eye, ExternalLink, CalendarPlus, PauseCircle, Play, RotateCcw, RefreshCw as RetryIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { StatCard } from "@/components/ui/stat-card";
+import { formatCurrency } from "@/features/billing/lib/money";
+import { retrySubscriptionPaymentAction, extendGracePeriodAction, suspendSubscriptionForNonPaymentAction, reactivateAfterPaymentAction } from "@/features/super-admin/actions/dunning-actions";
 
 type PaymentDashboardProps = {
   organizations: any[];
@@ -21,7 +24,7 @@ const PAGE_SIZES = [25, 50, 100];
 /* ─── Normalize MRR ─── */
 function computeMrr(price: number, period: string): number {
   if (!price) return 0;
-  const divisors: Record<string, number> = { monthly: 1, annual: 12, quarterly: 3, half_yearly: 6 };
+  const divisors: Record<string, number> = { monthly: 1, quarterly: 3, half_yearly: 6, annual: 12, yearly: 12 };
   return Math.round(price / (divisors[period] || 1));
 }
 
@@ -32,6 +35,8 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [dunningModal, setDunningModal] = useState<{ type: string; invoice: any } | null>(null);
+  const [dunningLoading, setDunningLoading] = useState<string | null>(null);
 
   // Compute all invoices flat list
   const allInvoices = useMemo(() => Object.values(invoicesByOrg).flat(), [invoicesByOrg]);
@@ -122,11 +127,11 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
       {tab === "overview" && (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Monthly Revenue (MRR)" value={`₹${Intl.NumberFormat("en-IN").format(Math.round(mrr / 100))}`} detail={`From ${activeSubs.length} active subscriptions`} status="good" />
-            <StatCard label="Annual Run Rate (ARR)" value={`₹${Intl.NumberFormat("en-IN").format(Math.round(mrr * 12 / 100))}`} detail="MRR × 12" status="good" />
-            <StatCard label="Paid Invoices" value={String(paidInvoices.length)} detail={`₹${Intl.NumberFormat("en-IN").format(Math.round(totalPaid / 100))} total collected`} status="good" />
-            <StatCard label="Pending" value={String(pendingInvoices.length)} detail={`₹${Intl.NumberFormat("en-IN").format(Math.round(totalPending / 100))} awaiting payment`} status={pendingInvoices.length > 0 ? "watch" : "good"} />
-            <StatCard label="Failed Payments" value={String(failedInvoices.length)} detail={`₹${Intl.NumberFormat("en-IN").format(Math.round(totalFailed / 100))} failed`} status={failedInvoices.length > 0 ? "risk" : "good"} />
+            <StatCard label="Monthly Revenue (MRR)" value={formatCurrency(mrr)} detail={`From ${activeSubs.length} active subscriptions`} status="good" />
+            <StatCard label="Annual Run Rate (ARR)" value={formatCurrency(mrr * 12)} detail="MRR × 12" status="good" />
+            <StatCard label="Paid Invoices" value={String(paidInvoices.length)} detail={`${formatCurrency(totalPaid)} total collected`} status="good" />
+            <StatCard label="Pending" value={String(pendingInvoices.length)} detail={`${formatCurrency(totalPending)} awaiting payment`} status={pendingInvoices.length > 0 ? "watch" : "good"} />
+            <StatCard label="Failed Payments" value={String(failedInvoices.length)} detail={`${formatCurrency(totalFailed)} failed`} status={failedInvoices.length > 0 ? "risk" : "good"} />
             <StatCard label="Overdue" value={String(overdueInvoices.length)} detail="Past due date" status={overdueInvoices.length > 0 ? "risk" : "good"} />
             <StatCard label="Webhook Health" value={String(successfulWebhooks)} detail={`${failedWebhooks} failed · Last: ${lastWebhook ? new Date(lastWebhook.created_at).toLocaleDateString("en-IN") : "N/A"}`} status={failedWebhooks > 0 ? "watch" : "good"} />
             <StatCard label="Upcoming Renewals" value={String(subscriptions.filter((s: any) => s.next_billing_date && new Date(s.next_billing_date) > new Date() && new Date(s.next_billing_date).getTime() - Date.now() < 30 * 86400000).length)} detail="Within 30 days" status="good" />
@@ -140,7 +145,7 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
               <div className="rounded-lg border border-amber-200 bg-white p-3"><p className="text-xs font-black uppercase text-amber-600">Overdue</p><p className="text-xl font-black mt-1">{dunningOverdue.length}</p></div>
               <div className="rounded-lg border border-orange-200 bg-white p-3"><p className="text-xs font-black uppercase text-orange-600">Grace Period</p><p className="text-xl font-black mt-1">{dunningGrace.length}</p></div>
               <div className="rounded-lg border border-red-200 bg-white p-3"><p className="text-xs font-black uppercase text-red-600">Suspended</p><p className="text-xl font-black mt-1">{dunningSuspended.length}</p></div>
-              <div className="rounded-lg border border-gray-200 bg-white p-3"><p className="text-xs font-black uppercase text-gray-600">Total Dunning Amount</p><p className="text-xl font-black mt-1">₹{Intl.NumberFormat("en-IN").format(Math.round(dunningTotalAmount / 100))}</p></div>
+              <div className="rounded-lg border border-gray-200 bg-white p-3"><p className="text-xs font-black uppercase text-gray-600">Total Dunning Amount</p><p className="text-xl font-black mt-1">{formatCurrency(dunningTotalAmount)}</p></div>
             </div>
           </div>
         </div>
@@ -176,7 +181,7 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
                   <tr key={inv.id} className="border-b border-border hover:bg-accent/5">
                     <td className="px-4 py-3 font-semibold text-xs">{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
                     <td className="px-4 py-3 text-xs">{getOrgName(inv.organization_id)}</td>
-                    <td className="px-4 py-3 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))}</td>
+                    <td className="px-4 py-3 text-xs font-semibold">{formatCurrency(inv.total_amount ?? inv.subtotal_amount ?? 0)}</td>
                     <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold border", (inv.provider_environment ?? "test") === "live" ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700")}>{inv.provider_environment ?? "test"}</span></td>
                     <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
                     <td className="px-4 py-3">
@@ -209,33 +214,83 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
       {/* ═══ DUNNING ═══ */}
       {tab === "dunning" && (
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4"><p className="text-xs font-black uppercase text-red-700">Failed Payments</p><p className="text-2xl font-black mt-1 text-red-700">{dunningFailed.length}</p></div>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-black uppercase text-amber-700">Grace Period</p><p className="text-2xl font-black mt-1 text-amber-700">{dunningGrace.length}</p></div>
-            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4"><p className="text-xs font-black uppercase text-orange-700">Suspended</p><p className="text-2xl font-black mt-1 text-orange-700">{dunningSuspended.length}</p></div>
+          {/* Dunning Summary KPIs */}
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-border bg-surface shadow-[0_18px_60px_rgb(17_18_20/0.06)] p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Active Dunning Cases</p><p className="text-2xl font-black mt-1">{dunningCases.length}</p></div>
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 border-l-4 border-l-red-500"><p className="text-xs font-black uppercase text-red-700">Past Grace Period</p><p className="text-2xl font-black mt-1 text-red-700">{dunningOverdue.length}</p></div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 border-l-4 border-l-amber-500"><p className="text-xs font-black uppercase text-amber-700">Pending Retry Today</p><p className="text-2xl font-black mt-1 text-amber-700">{dunningCases.filter((i: any) => i.dunning_next_retry_at && new Date(i.dunning_next_retry_at) <= new Date()).length}</p></div>
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 border-l-4 border-l-green-500"><p className="text-xs font-black uppercase text-green-700">Recently Resolved</p><p className="text-2xl font-black mt-1 text-green-700">{allInvoices.filter((i: any) => i.dunning_status === "resolved" || i.dunning_status === "waived").length}</p></div>
           </div>
 
-          <div className="rounded-xl border border-border bg-background overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="px-4 py-3">Organization</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Dunning</th><th className="px-4 py-3">Attempts</th><th className="px-4 py-3">Next Retry</th><th className="px-4 py-3">Grace End</th><th className="px-4 py-3">Reason</th>
-              </tr></thead>
-              <tbody>
-                {dunningCases.slice(0, 50).length === 0 ? <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No dunning cases</td></tr> :
-                dunningCases.slice(0, 50).map((inv: any) => (
-                  <tr key={inv.id} className="border-b border-border hover:bg-accent/5">
-                    <td className="px-4 py-3 text-xs">{getOrgName(inv.organization_id)}</td>
-                    <td className="px-4 py-3 text-xs">{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
-                    <td className="px-4 py-3 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))}</td>
-                    <td className="px-4 py-3"><StatusBadgeDK status={inv.dunning_status} /></td>
-                    <td className="px-4 py-3 text-xs">{inv.dunning_attempts ?? 0}</td>
-                    <td className="px-4 py-3 text-[10px] text-muted-foreground" suppressHydrationWarning>{inv.dunning_next_retry_at ? new Date(inv.dunning_next_retry_at).toLocaleDateString("en-IN") : "—"}</td>
-                    <td className="px-4 py-3 text-[10px] text-muted-foreground" suppressHydrationWarning>{inv.dunning_grace_period_ends_at ? new Date(inv.dunning_grace_period_ends_at).toLocaleDateString("en-IN") : "—"}</td>
-                    <td className="px-4 py-3 text-[10px] text-muted-foreground max-w-[120px] truncate">{inv.dunning_last_failure_reason ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Dunning Case Cards */}
+          <div className="space-y-3">
+            {dunningCases.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-background p-12 text-center"><p className="text-sm text-muted-foreground">No dunning cases</p></div>
+            ) : dunningCases.slice(0, 50).map((inv: any) => {
+              const attempts = inv.dunning_attempts ?? 0;
+              const isGrace = inv.dunning_status === "grace_period";
+              const isFailed = inv.dunning_status === "payment_failed" || inv.dunning_status === "retry_scheduled";
+              const isSuspended = inv.dunning_status === "suspended";
+              const borderColor = isSuspended ? "border-l-red-500" : isGrace ? "border-l-green-500" : "border-l-amber-500";
+              return (
+                <div key={inv.id} className={`rounded-lg border border-border bg-surface shadow-[0_18px_60px_rgb(17_18_20/0.06)] p-4 border-l-4 ${borderColor} transition-all hover:shadow-md`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                          <div className="text-sm font-black">{getOrgName(inv.organization_id)}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {(inv.subscription_id ? getPkgName(subscriptions.find((s: any) => s.id === inv.subscription_id)?.package_id) : "") && <span>{getPkgName(subscriptions.find((s: any) => s.id === inv.subscription_id)?.package_id)} · </span>}
+                            Invoice {inv.invoice_number ?? inv.id.slice(0, 8)} · Attempt {attempts}/3
+                            {inv.dunning_next_retry_at && <span> · Next retry: {new Date(inv.dunning_next_retry_at).toLocaleDateString("en-IN")}</span>}
+                            {inv.dunning_last_attempt_at && <span> · {Math.floor((Date.now() - new Date(inv.dunning_last_attempt_at).getTime()) / 86400000)}d since last attempt</span>}
+                          </div>
+                          <div className="mt-0.5 text-xs font-black text-destructive">{formatCurrency(inv.total_amount ?? inv.subtotal_amount ?? 0)} overdue</div>
+                          {inv.dunning_last_failure_reason && <div className="mt-0.5 text-[10px] text-muted-foreground">{inv.dunning_last_failure_reason}</div>}
+                          {inv.dunning_grace_period_ends_at && (
+                            <div className="mt-0.5 text-[10px]">
+                              <span className={new Date(inv.dunning_grace_period_ends_at) < new Date() ? "text-red-600 font-bold" : "text-amber-600"}>
+                                Grace ends: {new Date(inv.dunning_grace_period_ends_at).toLocaleDateString("en-IN")}
+                              </span>
+                            </div>
+                          )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!isSuspended && (
+                        <button onClick={async () => {
+                          setDunningLoading(`retry-${inv.id}`);
+                          const sub = subscriptions.find((s: any) => s.organization_id === inv.organization_id);
+                          const result = await retrySubscriptionPaymentAction({ invoiceId: inv.id, subscriptionId: sub?.id ?? "", organizationId: inv.organization_id });
+                          if (result.status === "success") {
+                            const orderId = result.message?.replace("Retry order created: ", "") || "";
+                            showToast(`Payment retry initiated. Order: ${orderId}`, "success");
+                          } else {
+                            showToast(result.message || "Retry failed", "error");
+                          }
+                          setDunningLoading(null);
+                        }} className="size-8 rounded-md border border-border bg-background hover:bg-surface-muted transition-all grid place-items-center" title="Retry Payment" type="button">
+                          {dunningLoading === `retry-${inv.id}` ? <Loader2 className="size-4 animate-spin" /> : <RetryIcon className="size-4" />}
+                        </button>
+                      )}
+                      <button onClick={() => setDunningModal({ type: "extend_grace", invoice: inv })} className="size-8 rounded-md border border-border bg-background hover:bg-surface-muted transition-all grid place-items-center" title="Extend Grace Period" type="button">
+                        <CalendarPlus className="size-4" />
+                      </button>
+                      {!isSuspended && (
+                        <button onClick={() => setDunningModal({ type: "suspend", invoice: inv })} className="size-8 rounded-md border border-border bg-background hover:bg-destructive/10 hover:border-destructive/30 text-destructive transition-all grid place-items-center" title="Suspend for Non-Payment" type="button">
+                          <PauseCircle className="size-4" />
+                        </button>
+                      )}
+                      {isSuspended && (
+                        <button onClick={() => setDunningModal({ type: "reactivate", invoice: inv })} className="size-8 rounded-md border border-border bg-background hover:bg-green-50 hover:border-green-300 text-green-600 transition-all grid place-items-center" title="Reactivate After Payment" type="button">
+                          <Play className="size-4" />
+                        </button>
+                      )}
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold border ml-1 ${isSuspended ? "border-red-200 bg-red-50 text-red-700" : isGrace ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                        {isSuspended ? "Suspended" : isGrace ? "Grace" : attempts >= 3 ? "Max Retries" : attempts > 0 ? `Retry ${attempts}` : "Failed"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -263,7 +318,7 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
                     <tr key={inv.id} className="border-b border-border hover:bg-accent/5">
                       <td className="px-4 py-3 text-xs">{inv.invoice_number ?? inv.id.slice(0, 8)}</td>
                       <td className="px-4 py-3 text-xs">{getOrgName(inv.organization_id)}</td>
-                      <td className="px-4 py-3 text-xs font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))}</td>
+                    <td className="px-4 py-3 text-xs font-semibold">{formatCurrency(inv.total_amount ?? inv.subtotal_amount ?? 0)}</td>
                       <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
                       <td className="px-4 py-3"><StatusBadge status={inv.paid_at ? "paid" : inv.status} /></td>
                       <td className="px-4 py-3 text-[10px] font-mono">{inv.razorpay_order_id?.slice(0, 16) ?? "—"}</td>
@@ -330,6 +385,35 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
         </div>
       )}
 
+      {/* ═══ DUNNING MODALS ═══ */}
+      {dunningModal?.type === "extend_grace" && (
+        <DunningExtendGraceModal
+          invoice={dunningModal.invoice}
+          organizations={organizations}
+          subscriptions={subscriptions}
+          onClose={() => setDunningModal(null)}
+          onSuccess={() => { showToast("Grace period extended", "success"); setDunningModal(null); }}
+        />
+      )}
+      {dunningModal?.type === "suspend" && (
+        <DunningSuspendModal
+          invoice={dunningModal.invoice}
+          organizations={organizations}
+          subscriptions={subscriptions}
+          onClose={() => setDunningModal(null)}
+          onSuccess={() => { showToast("Subscription suspended", "success"); setDunningModal(null); }}
+        />
+      )}
+      {dunningModal?.type === "reactivate" && (
+        <DunningReactivateModal
+          invoice={dunningModal.invoice}
+          organizations={organizations}
+          subscriptions={subscriptions}
+          onClose={() => setDunningModal(null)}
+          onSuccess={() => { showToast("Subscription reactivated", "success"); setDunningModal(null); }}
+        />
+      )}
+
       {/* ═══ INVOICE DETAIL DRAWER ═══ */}
       {selectedInvoice && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setSelectedInvoice(null)}>
@@ -343,9 +427,9 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
                 <Row label="Invoice" value={selectedInvoice.invoice_number ?? "—"} />
                 <Row label="Organization" value={getOrgName(selectedInvoice.organization_id)} />
                 <Row label="Status" value={selectedInvoice.status} />
-                <Row label="Subtotal" value={`₹${Intl.NumberFormat("en-IN").format(Math.round((selectedInvoice.subtotal_amount ?? 0) / 100))}`} />
-                {selectedInvoice.tax_amount > 0 && <Row label="Tax" value={`₹${Intl.NumberFormat("en-IN").format(Math.round(selectedInvoice.tax_amount / 100))}`} />}
-                <Row label="Total" value={`₹${Intl.NumberFormat("en-IN").format(Math.round((selectedInvoice.total_amount ?? selectedInvoice.subtotal_amount ?? 0) / 100))}`} />
+                <Row label="Subtotal" value={formatCurrency(selectedInvoice.subtotal_amount ?? 0)} />
+                {selectedInvoice.tax_amount > 0 && <Row label="Tax" value={formatCurrency(selectedInvoice.tax_amount)} />}
+                <Row label="Total" value={formatCurrency(selectedInvoice.total_amount ?? selectedInvoice.subtotal_amount ?? 0)} />
                 <Row label="Currency" value={selectedInvoice.currency ?? "INR"} />
                 <Row label="Billing Period" value={`${selectedInvoice.billing_period_start ? new Date(selectedInvoice.billing_period_start).toLocaleDateString("en-IN") : "—"} → ${selectedInvoice.billing_period_end ? new Date(selectedInvoice.billing_period_end).toLocaleDateString("en-IN") : "—"}`} />
                 <Row label="Due" value={selectedInvoice.due_at ? new Date(selectedInvoice.due_at).toLocaleDateString("en-IN") : "—"} />
@@ -360,6 +444,117 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ═══ DUNNING MODAL COMPONENTS ═══ */
+
+function DunningExtendGraceModal({ invoice, organizations, subscriptions, onClose, onSuccess }: {
+  invoice: any; organizations: any[]; subscriptions: any[]; onClose: () => void; onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [newGraceDate, setNewGraceDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
+  const [reason, setReason] = useState("");
+  const orgName = organizations.find((o: any) => o.id === invoice.organization_id)?.name ?? invoice.organization_id.slice(0, 8);
+
+  const handleSubmit = async () => {
+    if (!newGraceDate || !reason.trim()) { showToast("Date and reason required", "error"); return; }
+    setLoading(true);
+    const sub = subscriptions.find((s: any) => s.organization_id === invoice.organization_id);
+    const result = await extendGracePeriodAction({
+      subscriptionId: sub?.id ?? "", invoiceId: invoice.id, organizationId: invoice.organization_id,
+      newGraceEndDate: new Date(newGraceDate).toISOString(), reason: reason.trim(),
+    });
+    setLoading(false);
+    if (result.status === "success") onSuccess(); else showToast(result.message || "Failed", "error");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-black mb-4">Extend Grace Period</h3>
+        <p className="text-sm text-muted-foreground mb-4">{orgName} · Invoice {invoice.invoice_number ?? invoice.id.slice(0, 8)}</p>
+        <div className="space-y-3">
+          <div><label className="text-xs font-black uppercase text-muted-foreground">New Grace End Date</label><input type="date" value={newGraceDate} onChange={(e) => setNewGraceDate(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" /></div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Reason</label><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 h-20 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Reason for extension..." /></div>
+          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!newGraceDate || !reason.trim() || loading}>{loading ? <Loader2 className="size-4 animate-spin" /> : null}Extend</Button></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DunningSuspendModal({ invoice, organizations, subscriptions, onClose, onSuccess }: {
+  invoice: any; organizations: any[]; subscriptions: any[]; onClose: () => void; onSuccess: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const orgName = organizations.find((o: any) => o.id === invoice.organization_id)?.name ?? invoice.organization_id.slice(0, 8);
+
+  const handleSubmit = async () => {
+    if (reason.trim().length < 10) { showToast("Reason must be at least 10 characters", "error"); return; }
+    if (confirmText !== "SUSPEND") { showToast('Type "SUSPEND" to confirm', "error"); return; }
+    setLoading(true);
+    const sub = subscriptions.find((s: any) => s.organization_id === invoice.organization_id);
+    const result = await suspendSubscriptionForNonPaymentAction({
+      subscriptionId: sub?.id ?? "", invoiceId: invoice.id, organizationId: invoice.organization_id, reason: reason.trim(),
+    });
+    setLoading(false);
+    if (result.status === "success") onSuccess(); else showToast(result.message || "Failed", "error");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border-2 border-red-200 bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 mb-4"><div className="rounded-full bg-red-50 p-2"><AlertTriangle className="size-5 text-red-600" /></div><div><h3 className="text-lg font-black">Suspend for Non-Payment</h3><p className="text-xs text-muted-foreground">This will block all organization users</p></div></div>
+        <div className="rounded-md bg-red-50 border border-red-200 p-3 mb-4"><p className="text-xs text-red-800 font-semibold">Suspending will block all organization users until the payment is resolved and the subscription is reactivated.</p></div>
+        <div className="space-y-3">
+          <p className="text-xs font-semibold">{orgName} · {formatCurrency(invoice.total_amount ?? invoice.subtotal_amount ?? 0)} overdue</p>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Reason (min 10 chars)</label><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 h-20 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Why is this being suspended?" /></div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Type "SUSPEND" to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="SUSPEND" /></div>
+          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="destructive" onClick={handleSubmit} disabled={reason.trim().length < 10 || confirmText !== "SUSPEND" || loading}>{loading ? <Loader2 className="size-4 animate-spin" /> : <PauseCircle className="size-4" />}Suspend</Button></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DunningReactivateModal({ invoice, organizations, subscriptions, onClose, onSuccess }: {
+  invoice: any; organizations: any[]; subscriptions: any[]; onClose: () => void; onSuccess: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const orgName = organizations.find((o: any) => o.id === invoice.organization_id)?.name ?? invoice.organization_id.slice(0, 8);
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) { showToast("Reason is required", "error"); return; }
+    if (confirmText !== "REACTIVATE") { showToast('Type "REACTIVATE" to confirm', "error"); return; }
+    setLoading(true);
+    const sub = subscriptions.find((s: any) => s.organization_id === invoice.organization_id);
+    const result = await reactivateAfterPaymentAction({
+      subscriptionId: sub?.id ?? "", invoiceId: invoice.id, organizationId: invoice.organization_id, reason: reason.trim(),
+    });
+    setLoading(false);
+    if (result.status === "success") onSuccess(); else showToast(result.message || "Failed", "error");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border-2 border-green-200 bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 mb-4"><div className="rounded-full bg-green-50 p-2"><Play className="size-5 text-green-600" /></div><div><h3 className="text-lg font-black">Reactivate After Payment</h3><p className="text-xs text-muted-foreground">Restore access after payment resolution</p></div></div>
+        <div className="space-y-3">
+          <p className="text-xs font-semibold">{orgName} · Currently suspended</p>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Reason</label><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 h-20 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Reason for reactivation..." /></div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Type "REACTIVATE" to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="REACTIVATE" /></div>
+          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!reason.trim() || confirmText !== "REACTIVATE" || loading}>{loading ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}Reactivate</Button></div>
+        </div>
+      </div>
     </div>
   );
 }

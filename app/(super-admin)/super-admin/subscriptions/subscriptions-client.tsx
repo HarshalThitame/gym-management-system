@@ -4,22 +4,27 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useMemo, useCallback } from "react";
-import { BarChart3, Package, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Trash2, Calendar, Puzzle, DollarSign } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { BarChart3, Package, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Trash2, Calendar, Puzzle, DollarSign, PauseCircle, Gauge, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StatCard } from "@/components/ui/stat-card";
+
+
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
 import { PaymentDashboard } from "@/features/super-admin/components/payment-dashboard";
+import { SuspendModal } from "@/features/super-admin/components/subscriptions/SuspendModal";
+import { GenerateInvoiceModal } from "@/features/super-admin/components/billing/GenerateInvoiceModal";
+import { formatCurrency } from "@/features/billing/lib/money";
 import { syncEntitlementsAction, syncUsageLimitsAction } from "@/features/subscription/super-admin-actions";
 import {
   upgradePlanAction, downgradePlanAction, cancelSubscriptionAction,
   reactivateSubscriptionAction, extendTrialAction, convertTrialAction,
   assignAddonAction, removeAddonAction, scheduleChangeAction, cancelScheduledChangeAction,
-  overrideSubscriptionPriceAction,
+  overrideSubscriptionPriceAction, bulkUpdateSubscriptionStatusAction,
 } from "@/features/super-admin/actions/subscription-enterprise-actions";
+import { syncAllOrganizationEntitlements, cleanupStaleEntitlements } from "@/features/super-admin/actions/entitlement-sync-actions";
 
 type Data = { error: string | null; organizations: any[]; packages: any[]; subscriptions: any[]; invoicesByOrg: Record<string, any[]>; eventsByOrg: Record<string, any[]>; availableAddons: any[]; subAddonsBySub: Record<string, any[]>; schedChangesBySub: Record<string, any[]>; };
 const PAGE_SIZES = [25, 50, 100];
@@ -36,6 +41,11 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ synced: 0, total: 0, failed: 0 });
+  const [showTrialSection, setShowTrialSection] = useState(false);
 
   const activeSubs = data.subscriptions.filter((s: any) => s.status === "active").length;
   const trialSubs = data.subscriptions.filter((s: any) => s.status === "trial").length;
@@ -44,7 +54,7 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   // Normalize MRR by billing period
   const computeMrr = (price: number, period: string) => {
     if (!price) return 0;
-    const divisors: Record<string, number> = { monthly: 1, annual: 12 };
+    const divisors: Record<string, number> = { monthly: 1, quarterly: 3, half_yearly: 6, annual: 12, yearly: 12 };
     return Math.round(price / (divisors[period] || 1));
   };
 
@@ -97,10 +107,38 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   return (
     <div className="space-y-6">
       <ToastContainer />
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Super Admin</p>
-        <h1 className="text-3xl font-black md:text-4xl">Subscription Management</h1>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">Enterprise subscription lifecycle, billing, and operations</p>
+      <div className="sticky top-0 z-10 bg-background/90 backdrop-blur border-b border-border -mx-5 px-5 py-4 space-y-4">
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Super Admin</p>
+          <h1 className="text-3xl font-black md:text-4xl">Subscription Management</h1>
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">Enterprise subscription lifecycle, billing, and operations</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={async () => {
+            setSyncing(true);
+            setSyncProgress({ synced: 0, total: 0, failed: 0 });
+            const result = await syncAllOrganizationEntitlements(null);
+            setSyncProgress({ synced: result.synced, total: result.synced + result.failed, failed: result.failed });
+            showToast(result.success ? `Synced ${result.synced} orgs successfully` : `Synced ${result.synced}/${result.synced + result.failed} orgs, ${result.failed} failed`, result.success ? "success" : "error");
+            setSyncing(false);
+            router.refresh();
+          }} disabled={syncing}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-muted transition-all">
+            {syncing ? <><Loader2 className="size-4 animate-spin" /> Syncing ({syncProgress.synced}/{syncProgress.total || "..."})...</> : <><RefreshCw className="size-4" /> Sync All Entitlements</>}
+          </button>
+          <button onClick={async () => {
+            const result = await cleanupStaleEntitlements(null);
+            showToast(`Cleaned up ${result.deletedEntitlements} entitlements and ${result.deletedLimits} limits`, "success");
+            router.refresh();
+          }}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-muted transition-all">
+            <Activity className="size-4" /> Cleanup Stale
+          </button>
+          <button onClick={() => setShowTrialSection(!showTrialSection)}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-muted transition-all">
+            <Clock className="size-4" /> {showTrialSection ? "Hide" : "Show"} Trial Management
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1" role="tablist">
@@ -113,11 +151,23 @@ export function SubscriptionsClient({ data }: { data: Data }) {
       {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Monthly Revenue (MRR)" value={`₹${Intl.NumberFormat("en-IN").format(Math.round(totalMonthlyRevenue / 100))}`} detail={`${activeSubs} active subscriptions`} status="good" />
-            <StatCard label="Annual Run Rate (ARR)" value={`₹${Intl.NumberFormat("en-IN").format(Math.round(totalMonthlyRevenue * 12 / 100))}`} detail={`${trialSubs} in trial`} status={trialSubs > 0 ? "watch" : "good"} />
-            <StatCard label="Invoices" value={String(totalInvoices)} detail={`${pendingInvoices} pending · ${overdueInvoices} overdue`} status={overdueInvoices > 0 ? "risk" : pendingInvoices > 0 ? "watch" : "good"} />
-            <StatCard label="Unassigned" value={String(unassigned)} detail={`${failedEvents} failed events`} status={unassigned > 0 || failedEvents > 0 ? "risk" : "good"} />
+            {([
+              { label: "Monthly Revenue (MRR)", value: formatCurrency(totalMonthlyRevenue), detail: `${activeSubs} active subscriptions`, status: "good" },
+              { label: "Annual Run Rate (ARR)", value: formatCurrency(totalMonthlyRevenue * 12), detail: `${trialSubs} in trial`, status: trialSubs > 0 ? "watch" : "good" },
+              { label: "Invoices", value: String(totalInvoices), detail: `${pendingInvoices} pending · ${overdueInvoices} overdue`, status: overdueInvoices > 0 ? "risk" : pendingInvoices > 0 ? "watch" : "good" },
+              { label: "Unassigned", value: String(unassigned), detail: `${failedEvents} failed events`, status: unassigned > 0 || failedEvents > 0 ? "risk" : "good" },
+            ] as { label: string; value: string; detail: string; status: string }[]).map((kpi, i) => (
+              <div key={kpi.label} className="reveal-up rounded-lg border border-border bg-surface shadow-[0_18px_60px_rgb(17_18_20/0.06)] p-4 transition-all hover:shadow-md hover:border-border-strong"
+                style={{"--reveal-delay": `${i * 0.05}s`} as React.CSSProperties}>
+                <div className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{kpi.label}</div>
+                <div className="mt-1 text-3xl font-black text-foreground">{kpi.value}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{kpi.detail}</div>
+              </div>
+            ))}
           </div>
+
+          {/* Trial Management Section */}
+          {showTrialSection && <TrialManagementSection data={data} onOpenDrawer={(org, sub) => setDrawerOrgData({ org, sub, pkg: sub ? data.packages.find((p: any) => p.id === sub.package_id) : null })} />}
 
           {/* Subscription Health Risks */}
           {(() => {
@@ -133,7 +183,21 @@ export function SubscriptionsClient({ data }: { data: Data }) {
               if (invs.filter((i: any) => i.status === "issued" && !i.paid_at && i.due_at && new Date(i.due_at) < new Date()).length > 0) risks.push({ org, issue: "Overdue invoice", severity: "risk" });
             });
             if (risks.length === 0) return null;
-            return (<div className="rounded-xl border border-red-200 bg-red-50/50 p-4"><div className="flex items-center gap-2 mb-2"><AlertTriangle className="size-4 text-red-600" /><h2 className="text-sm font-black text-red-800">Risks ({risks.length})</h2></div><div className="flex flex-wrap gap-2">{risks.slice(0, 6).map((r, i) => (<button key={i} onClick={() => { const sub = data.subscriptions.find((x: any) => x.organization_id === r.org.id); setDrawerOrgData({ org: r.org, sub, pkg: sub ? data.packages.find((p: any) => p.id === sub.package_id) : null }); }} className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", r.severity === "risk" ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-700")} type="button">{r.org.name}: {r.issue}</button>))}{risks.length > 6 && <span className="text-xs text-muted-foreground self-center">+{risks.length - 6} more</span>}</div></div>);
+            return (<div className="rounded-xl border border-red-200 bg-red-50/50 p-4"><div className="flex items-center gap-2 mb-2"><AlertTriangle className="size-4 text-red-600" /><h2 className="text-sm font-black text-red-800">Risks ({risks.length})</h2></div><div className="flex flex-wrap gap-2">{risks.slice(0, 8).map((r, i) => (<button key={i} onClick={() => { const sub = data.subscriptions.find((x: any) => x.organization_id === r.org.id); setDrawerOrgData({ org: r.org, sub, pkg: sub ? data.packages.find((p: any) => p.id === sub.package_id) : null }); }} className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", r.severity === "risk" ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-700")} type="button">{r.org.name}: {r.issue}</button>))}{risks.length > 8 && <span className="text-xs text-muted-foreground self-center">+{risks.length - 8} more</span>}</div></div>);
+          })()}
+
+          {/* Usage Alerts — orgs with known over-limit indicators */}
+          {(() => {
+            const alerts: { org: any; issue: string }[] = [];
+            data.organizations.forEach((org: any) => {
+              const s = data.subscriptions.find((x: any) => x.organization_id === org.id);
+              if (!s) return;
+              const invs = data.invoicesByOrg[org.id] || [];
+              const failedPayments = invs.filter((i: any) => i.dunning_status && i.dunning_status !== "none" && i.dunning_status !== "resolved").length;
+              if (failedPayments > 0) alerts.push({ org, issue: `${failedPayments} payment${failedPayments > 1 ? "s" : ""} in dunning` });
+            });
+            if (alerts.length === 0) return null;
+            return (<div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4"><div className="flex items-center gap-2 mb-2"><AlertTriangle className="size-4 text-amber-600" /><h2 className="text-sm font-black text-amber-800">Payment Alerts ({alerts.length})</h2></div><div className="flex flex-wrap gap-2">{alerts.slice(0, 6).map((r, i) => (<button key={i} onClick={() => { const sub = data.subscriptions.find((x: any) => x.organization_id === r.org.id); setDrawerOrgData({ org: r.org, sub, pkg: sub ? data.packages.find((p: any) => p.id === sub.package_id) : null }); }} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700" type="button">{r.org.name}: {r.issue}</button>))}</div></div>);
           })()}
 
           <div className="rounded-xl border border-border bg-background">
@@ -148,9 +212,48 @@ export function SubscriptionsClient({ data }: { data: Data }) {
                 </div>
               </div>
             </div>
-            <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground"><th className="px-5 py-3">Organization</th><th className="px-5 py-3">Package</th><th className="px-5 py-3">Billing</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Next</th><th className="px-5 py-3">Trial</th><th className="px-5 py-3"></th></tr></thead>
-              <tbody>{pagedOrgs.length === 0 ? <tr><td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">No matches</td></tr> : pagedOrgs.map((org: any) => { const orgSub = data.subscriptions.find((s: any) => s.organization_id === org.id); const pkg = orgSub ? data.packages.find((p: any) => p.id === orgSub.package_id) : null; const tEnd = orgSub?.trial_ends_at ? new Date(orgSub.trial_ends_at) : null; const tLeft = tEnd ? Math.max(0, Math.ceil((tEnd.getTime() - Date.now()) / 86400000)) : null; return (<tr key={org.id} className="border-b border-border hover:bg-accent/5"><td className="px-5 py-3"><button onClick={() => setDrawerOrgData({ org, sub: orgSub, pkg })} className="font-semibold hover:text-primary text-left" type="button">{org.name}</button>{!org.billing_email && orgSub && <span className="ml-1 inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 border border-amber-200">No email</span>}</td><td className="px-5 py-3">{pkg ? <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{pkg.name}</span> : <span className="text-muted-foreground text-xs">—</span>}</td><td className="px-5 py-3 text-xs capitalize">{orgSub?.billing_period ?? "—"}</td><td className="px-5 py-3"><StatusBadge status={orgSub?.status ?? "unassigned"} /></td><td className="px-5 py-3 text-xs text-muted-foreground" suppressHydrationWarning>{orgSub?.next_billing_date ? new Date(orgSub.next_billing_date).toLocaleDateString("en-IN") : orgSub?.expires_at ? new Date(orgSub.expires_at).toLocaleDateString("en-IN") : "—"}</td><td className="px-5 py-3 text-xs">{tLeft !== null ? <span className={cn("font-semibold", tLeft <= 3 ? "text-red-600" : "text-blue-600")}>{tLeft}d</span> : <span className="text-muted-foreground">—</span>}</td><td className="px-5 py-3"><button onClick={() => setDrawerOrgData({ org, sub: orgSub, pkg })} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10" type="button"><Eye className="size-4" /></button></td></tr>); })}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground"><th className="px-3 py-3 w-10"><input type="checkbox" onChange={(e) => { if (e.target.checked) setSelectedIds(pagedOrgs.map((o: any) => o.id)); else setSelectedIds([]); }} checked={selectedIds.length === pagedOrgs.length && pagedOrgs.length > 0} className="rounded" /></th><th className="px-5 py-3">Organization</th><th className="px-5 py-3">Package</th><th className="px-5 py-3">Billing</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Next</th><th className="px-5 py-3">Trial</th><th className="px-5 py-3"></th></tr></thead>
+              <tbody>{pagedOrgs.length === 0 ? <tr><td colSpan={8} className="px-5 py-12 text-center text-muted-foreground">No matches</td></tr> : pagedOrgs.map((org: any) => { const orgSub = data.subscriptions.find((s: any) => s.organization_id === org.id); const pkg = orgSub ? data.packages.find((p: any) => p.id === orgSub.package_id) : null; const tEnd = orgSub?.trial_ends_at ? new Date(orgSub.trial_ends_at) : null; const tLeft = tEnd ? Math.max(0, Math.ceil((tEnd.getTime() - Date.now()) / 86400000)) : null; const isSelected = selectedIds.includes(org.id); return (<tr key={org.id} className={cn("border-b border-border transition-colors", isSelected ? "bg-accent/5" : "hover:bg-accent/5")}><td className="px-3 py-3"><input type="checkbox" checked={isSelected} onChange={() => setSelectedIds(prev => prev.includes(org.id) ? prev.filter((id: string) => id !== org.id) : [...prev, org.id])} className="rounded" /></td><td className="px-5 py-3"><button onClick={() => setDrawerOrgData({ org, sub: orgSub, pkg })} className="font-semibold hover:text-primary text-left" type="button">{org.name}</button>{!org.billing_email && orgSub && <span className="ml-1 inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 border border-amber-200">No email</span>}</td><td className="px-5 py-3">{pkg ? <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{pkg.name}</span> : <span className="text-muted-foreground text-xs">—</span>}</td><td className="px-5 py-3 text-xs capitalize">{orgSub?.billing_period ?? "—"}</td><td className="px-5 py-3"><StatusBadge status={orgSub?.status ?? "unassigned"} /></td><td className="px-5 py-3 text-xs text-muted-foreground" suppressHydrationWarning>{orgSub?.next_billing_date ? new Date(orgSub.next_billing_date).toLocaleDateString("en-IN") : orgSub?.expires_at ? new Date(orgSub.expires_at).toLocaleDateString("en-IN") : "—"}</td><td className="px-5 py-3 text-xs">{tLeft !== null ? <span className={cn("font-semibold", tLeft <= 3 ? "text-red-600" : "text-blue-600")}>{tLeft}d</span> : <span className="text-muted-foreground">—</span>}</td><td className="px-5 py-3"><button onClick={() => setDrawerOrgData({ org, sub: orgSub, pkg })} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10" type="button"><Eye className="size-4" /></button></td></tr>); })}</tbody></table></div>
             {pageCount > 1 && (<div className="flex items-center justify-between border-t border-border px-5 py-3"><span className="text-xs text-muted-foreground">Page {page + 1} of {pageCount}</span><div className="flex gap-1"><button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 hover:bg-accent/10" type="button">Prev</button>{Array.from({ length: Math.min(pageCount, 5) }).map((_, i) => { const start = Math.max(0, Math.min(page - 2, pageCount - 5)); const p = start + i; if (p >= pageCount) return null; return <button key={p} onClick={() => setPage(p)} className={cn("rounded-md border px-3 py-1.5 text-xs font-semibold", p === page ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-accent/10")} type="button">{p + 1}</button>;})}<button onClick={() => setPage(Math.min(pageCount - 1, page + 1))} disabled={page >= pageCount - 1} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 hover:bg-accent/10" type="button">Next</button></div></div>)}
+          {/* Bulk Action Bar */}
+          {selectedIds.length > 0 && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-lg border border-border bg-surface/95 backdrop-blur shadow-2xl px-4 py-3 flex items-center gap-3 animate-slide-in-right">
+              <span className="text-sm font-black">{selectedIds.length} selected</span>
+              <div className="w-px h-5 bg-border" />
+              <select value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-2 text-xs">
+                <option value="">Bulk action...</option>
+                <option value="active">Set Active</option>
+                <option value="suspended">Set Suspended</option>
+                <option value="expired">Set Expired</option>
+                <option value="sync">Sync Entitlements</option>
+              </select>
+              <button disabled={!bulkAction} onClick={async () => {
+                if (bulkAction === "sync") {
+                  showToast(`Syncing ${selectedIds.length} orgs...`, "info");
+                  setSyncing(true);
+                  for (const id of selectedIds) {
+                    if (id) try { await triggeredSync(id); } catch { /* skip */ }
+                  }
+                  setSyncing(false);
+                  showToast(`Synced ${selectedIds.length} orgs`, "success");
+                } else {
+                  const subIds = selectedIds.map((id: string) => {
+                    const s = data.subscriptions.find((x: any) => x.organization_id === id);
+                    return s?.id;
+                  }).filter(Boolean);
+                  if (subIds.length > 0) {
+                    const result = await bulkUpdateSubscriptionStatusAction({ subscriptionIds: subIds, status: bulkAction });
+                    showToast(result.status === "success" ? `Updated ${subIds.length} subscriptions` : result.message || "Bulk update failed", result.status === "success" ? "success" : "error");
+                    router.refresh();
+                  }
+                }
+                setSelectedIds([]);
+                setBulkAction("");
+              }} className="h-9 rounded-md border border-border bg-background px-3 text-xs font-black hover:bg-surface-muted transition-all">
+                {syncing ? <Loader2 className="size-3 animate-spin" /> : "Apply"}
+              </button>
+            </div>
+          )}
           </div>
         </div>
       )}
@@ -191,7 +294,7 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
   triggeredSync: (orgId: string) => void; actionLoading: string | null; packages: any[]; refreshKey: number;
 }) {
   const { org, sub, pkg } = drawerOrg;
-  const [tab, setTab] = useState<"overview" | "invoices" | "events" | "addons" | "scheduled">("overview");
+  const [tab, setTab] = useState<"overview" | "invoices" | "events" | "addons" | "usage" | "scheduled">("overview");
   const [modal, setModal] = useState<any>(null);
   const invoices = (data.invoicesByOrg[org.id] ?? []) as any[];
   const events = (data.eventsByOrg[org.id] ?? []) as any[];
@@ -200,15 +303,15 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
   const scheduledChanges = (sub?.id ? data.schedChangesBySub[sub.id] ?? [] : []) as any[];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
-      <div className="w-full max-w-lg bg-surface border-l border-border shadow-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-surface border-b border-border px-5 py-4 flex items-center justify-between z-10">
+    <div className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg bg-surface border-l border-border shadow-2xl overflow-y-auto animate-slide-in-right" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-background/90 backdrop-blur border-b border-border px-5 py-4 flex items-center justify-between z-10">
           <div><h2 className="text-lg font-black">{org.name}</h2><p className="text-xs text-muted-foreground flex items-center gap-2">{pkg ? <span className="font-semibold text-indigo-600">{pkg.name}</span> : <span className="text-gray-500">No plan</span>}{sub && <StatusBadge status={sub.status} />}{sub?.billing_period && <span className="capitalize">· {sub.billing_period}</span>}</p></div>
-          <button onClick={onClose} className="rounded-md p-1.5 hover:bg-accent/10" type="button"><X className="size-5" /></button>
+          <button onClick={onClose} className="size-8 rounded-md border border-border bg-background hover:bg-surface-muted grid place-items-center" type="button"><X className="size-4" /></button>
         </div>
 
         <div className="flex border-b border-border bg-accent/5 px-5">
-          {[{ id: "overview", label: "Overview", icon: CreditCard }, { id: "invoices", label: `Invoices (${invoices.length})`, icon: Receipt }, { id: "addons", label: "Add-ons", icon: Puzzle }, { id: "scheduled", label: "Scheduled", icon: Calendar }, { id: "events", label: "Events", icon: History }].map((t) => (
+          {[{ id: "overview", label: "Overview", icon: CreditCard }, { id: "invoices", label: `Invoices (${invoices.length})`, icon: Receipt }, { id: "addons", label: "Add-ons", icon: Puzzle }, { id: "usage", label: "Usage", icon: Gauge }, { id: "scheduled", label: "Scheduled", icon: Calendar }, { id: "events", label: "Events", icon: History }].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id as any)} className={cn("px-4 py-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5", tab === t.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground")} type="button"><t.icon className="size-3.5" />{t.label}</button>
           ))}
         </div>
@@ -221,7 +324,7 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <Detail label="Plan" value={pkg?.name ?? "—"} /><Detail label="Status" value={sub?.status ?? "—"} />
                 <Detail label="Billing Cycle" value={sub?.billing_period ? sub.billing_period.charAt(0).toUpperCase() + sub.billing_period.slice(1) : "—"} />
-                <Detail label="Price" value={sub ? `₹${Intl.NumberFormat("en-IN").format(Math.round((sub.price_override ?? pkg?.price ?? 0) / 100))}/mo` : "—"} />
+                <Detail label="Price" value={sub ? `${formatCurrency(sub.price_override ?? pkg?.price ?? 0)}/mo` : "—"} />
                 <Detail label="Started" value={sub?.started_at ? new Date(sub.started_at).toLocaleDateString("en-IN") : "—"} />
                 <Detail label="Next Billing" value={sub?.next_billing_date ? new Date(sub.next_billing_date).toLocaleDateString("en-IN") : sub?.expires_at ? new Date(sub.expires_at).toLocaleDateString("en-IN") : "—"} />
                 {sub?.trial_ends_at && <Detail label="Trial Ends" value={`${new Date(sub.trial_ends_at).toLocaleDateString("en-IN")}${new Date(sub.trial_ends_at) > new Date() ? ` (${Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / 86400000)}d left)` : " (expired)"}`} />}
@@ -245,6 +348,7 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
                   <p className="text-xs font-black uppercase text-muted-foreground">Lifecycle</p>
                   <div className="grid grid-cols-2 gap-2">
                     <ActionBtn icon={<RefreshCw className="size-3" />} label="Sync Entitlements" onClick={() => triggeredSync(org.id)} loading={actionLoading === `sync-${org.id}`} />
+                    {(sub.status === "active" || sub.status === "trial") && <ActionBtn icon={<PauseCircle className="size-3" />} label="Suspend" onClick={() => setModal({ type: "suspend" })} loading={false} />}
                     {sub.status === "active" && <ActionBtn icon={<Ban className="size-3" />} label="Cancel" onClick={() => setModal({ type: "cancel" })} loading={false} />}
                     {(sub.status === "cancelled" || sub.status === "expired") && <ActionBtn icon={<Play className="size-3" />} label="Reactivate" onClick={() => setModal({ type: "reactivate" })} loading={false} />}
                     {sub.status === "trial" && <ActionBtn icon={<Clock className="size-3" />} label="Extend Trial" onClick={() => setModal({ type: "extend_trial" })} loading={false} />}
@@ -259,12 +363,15 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
         {/* ─── INVOICES ─── */}
         {tab === "invoices" && (
           <div className="p-5 space-y-3">
-            <p className="text-xs font-black uppercase text-muted-foreground">Invoices & Payments</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-black uppercase text-muted-foreground">Invoices & Payments</p>
+              <button onClick={() => setModal({ type: "generate_invoice" })} className="inline-flex items-center gap-1 rounded-md bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 text-xs font-semibold hover:bg-primary/20" type="button"><Plus className="size-3" /> Generate Invoice</button>
+            </div>
             {invoices.length === 0 ? <div className="py-12 text-center text-muted-foreground text-sm">No invoices yet</div>
             : invoices.map((inv: any) => (
               <div key={inv.id} className="rounded-lg border border-border bg-background p-3 space-y-1.5">
                 <div className="flex items-center justify-between"><span className="text-xs font-bold">{inv.invoice_number ?? "—"}</span><span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold border", inv.paid_at ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200")}>{inv.paid_at ? "Paid" : inv.status}</span></div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground"><span>₹{Intl.NumberFormat("en-IN").format(Math.round((inv.total_amount ?? inv.subtotal_amount ?? 0) / 100))} {inv.currency}</span><span suppressHydrationWarning>{inv.issued_at ? new Date(inv.issued_at).toLocaleDateString("en-IN") : "—"} · Due {inv.due_at ? new Date(inv.due_at).toLocaleDateString("en-IN") : "—"}</span></div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground"><span>{formatCurrency(inv.total_amount ?? inv.subtotal_amount ?? 0)} {inv.currency}</span><span suppressHydrationWarning>{inv.issued_at ? new Date(inv.issued_at).toLocaleDateString("en-IN") : "—"} · Due {inv.due_at ? new Date(inv.due_at).toLocaleDateString("en-IN") : "—"}</span></div>
                 <div className="flex flex-wrap gap-1.5 text-[10px]">{inv.tax_amount > 0 && <span className="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.5 text-blue-700">GST</span>}{inv.razorpay_order_id && <span className="font-mono text-muted-foreground truncate max-w-[200px]">Order: {inv.razorpay_order_id}</span>}{!inv.paid_at && inv.due_at && new Date(inv.due_at) < new Date() && <span className="inline-flex items-center rounded-full bg-red-50 px-1.5 py-0.5 text-red-700">Overdue</span>}</div>
               </div>
             ))}
@@ -283,7 +390,7 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
                     <div key={sa.id} className="rounded-lg border border-border bg-background p-3 flex items-center justify-between">
                       <div>
                         <p className="text-xs font-semibold">{addon?.name ?? sa.addon_id}</p>
-                        <p className="text-[10px] text-muted-foreground">Qty: {sa.quantity} · ₹{Intl.NumberFormat("en-IN").format(Math.round((sa.unit_price ?? 0) / 100))}/mo</p>
+                        <p className="text-[10px] text-muted-foreground">Qty: {sa.quantity} · {formatCurrency(sa.unit_price ?? 0)}/mo</p>
                       </div>
                       <button onClick={() => setModal({ type: "remove_addon", assignedAddon: sa, addon })} className="rounded-md p-1 text-muted-foreground hover:text-red-600" type="button" aria-label="Remove"><Trash2 className="size-3.5" /></button>
                     </div>
@@ -294,13 +401,25 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">Available Add-ons</p>
                     {availableAddons.filter((a: any) => a.is_active !== false && !assignedAddons.find((s: any) => s.addon_id === a.id)).map((addon: any) => (
                       <div key={addon.id} className="flex items-center justify-between rounded-md border border-dashed border-border bg-surface-muted/30 p-2 text-xs">
-                        <span>{addon.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((addon.unit_price ?? 0) / 100))}/mo</span>
+                        <span>{addon.name} — {formatCurrency(addon.unit_price ?? 0)}/mo</span>
                         <button onClick={() => setModal({ type: "assign_addon" })} className="text-primary underline" type="button">Assign</button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── USAGE ─── */}
+        {tab === "usage" && (
+          <div className="p-5 space-y-4" key={refreshKey}>
+            <p className="text-xs font-black uppercase text-muted-foreground">Usage & Limits</p>
+            {!sub ? (
+              <div className="py-8 text-center text-muted-foreground text-sm border border-dashed border-border rounded-lg">Assign a plan first to view usage.</div>
+            ) : (
+              <UsageLimitsView orgId={org.id} />
             )}
           </div>
         )}
@@ -360,6 +479,22 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
       {modal?.type === "assign_addon" && sub && <AssignAddonModal sub={sub} orgId={org.id} availableAddons={availableAddons} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
       {modal?.type === "remove_addon" && sub && <RemoveAddonModal assignedAddon={modal.assignedAddon} addon={modal.addon} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
       {modal?.type === "cancel_scheduled" && sub && <CancelScheduledModal change={modal.change} orgId={org.id} onClose={() => setModal(null)} execAction={execAction} actionLoading={actionLoading} />}
+      {modal?.type === "suspend" && sub && (
+        <SuspendModal
+          sub={sub}
+          orgId={org.id}
+          onClose={() => setModal(null)}
+          onSuccess={() => { showToast("Subscription suspended", "success"); }}
+        />
+      )}
+      {modal?.type === "generate_invoice" && (
+        <GenerateInvoiceModal
+          organizations={[]}
+          preSelectedOrgId={org.id}
+          onClose={() => setModal(null)}
+          onSuccess={() => { showToast("Invoice generated", "success"); }}
+        />
+      )}
     </div>
   );
 }
@@ -383,12 +518,12 @@ function ChangePlanModal({ sub, pkg, packages, onClose, execAction, actionLoadin
         <div className="space-y-3">
           <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm">
             <option value="">Select target...</option>
-            {higherPlans.map((p: any) => <option key={p.id} value={p.id}>↑ {p.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((p.price ?? 0) / 100))}/mo</option>)}
+            {higherPlans.map((p: any) => <option key={p.id} value={p.id}>↑ {p.name} — {formatCurrency(p.price ?? 0)}/mo</option>)}
             {lowerPlans.length > 0 && <option disabled>───</option>}
-            {lowerPlans.map((p: any) => <option key={p.id} value={p.id}>↓ {p.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((p.price ?? 0) / 100))}/mo</option>)}
+            {lowerPlans.map((p: any) => <option key={p.id} value={p.id}>↓ {p.name} — {formatCurrency(p.price ?? 0)}/mo</option>)}
           </select>
           {isDowngrade && <div className="rounded-md bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800 flex items-start gap-2"><AlertTriangle className="size-3.5 shrink-0 mt-0.5" />Downgrade may remove access to features in the current plan.</div>}
-          {targetPkg && <div className="rounded-md bg-accent/5 p-2 text-xs space-y-1"><p><span className="font-semibold">New:</span> {targetPkg.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((targetPkg.price ?? 0) / 100))}/mo</p>{targetPkg._limits?.max_members > 0 && <p><span className="font-semibold">Members:</span> {targetPkg._limits?.max_members === -1 ? "Unlimited" : targetPkg._limits?.max_members}</p>}</div>}
+          {targetPkg && <div className="rounded-md bg-accent/5 p-2 text-xs space-y-1"><p><span className="font-semibold">New:</span> {targetPkg.name} — {formatCurrency(targetPkg.price ?? 0)}/mo</p>{targetPkg._limits?.max_members > 0 && <p><span className="font-semibold">Members:</span> {targetPkg._limits?.max_members === -1 ? "Unlimited" : targetPkg._limits?.max_members}</p>}</div>}
           <div><label className="text-xs font-black uppercase text-muted-foreground">Reason</label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1" placeholder="Optional reason..." /></div>
           <InlineMfaStepUp compact />
           <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!targetId || !!actionLoading} className="gap-2">{actionLoading === "change_plan" ? <Loader2 className="size-4 animate-spin" /> : null}{isDowngrade ? "Downgrade" : "Upgrade"}</Button></div>
@@ -467,7 +602,7 @@ function ConvertTrialModal({ sub, packages, onClose, execAction, actionLoading }
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-black mb-4">Convert to Paid</h3>
         <select value={pkgId} onChange={(e) => setPkgId(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm">
-          <option value="">Select package...</option>{packages.filter((p: any) => p.is_active).map((p: any) => <option key={p.id} value={p.id}>{p.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((p.price ?? 0) / 100))}/mo</option>)}
+          <option value="">Select package...</option>{packages.filter((p: any) => p.is_active).map((p: any) => <option key={p.id} value={p.id}>{p.name} — {formatCurrency(p.price ?? 0)}/mo</option>)}
         </select>
         <div className="flex justify-end gap-3 pt-4"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!pkgId || !!actionLoading} className="gap-2">{actionLoading === "convert_trial" ? <Loader2 className="size-4 animate-spin" /> : null}Convert</Button></div>
       </div>
@@ -485,7 +620,7 @@ function OverridePriceModal({ sub, orgId, onClose, execAction, actionLoading }: 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-black mb-1">Override Price</h3><p className="text-sm text-muted-foreground mb-4">Current: ₹{Intl.NumberFormat("en-IN").format(Math.round((sub.price_override ?? 0) / 100))}/mo</p>
+        <h3 className="text-lg font-black mb-1">Override Price</h3><p className="text-sm text-muted-foreground mb-4">Current: {formatCurrency(sub.price_override ?? 0)}/mo</p>
         <div className="space-y-3">
           <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="New price in paise" />
           <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1" placeholder="Reason for override (min 10 chars)" />
@@ -532,11 +667,11 @@ function AssignAddonModal({ sub, orgId, availableAddons, onClose, execAction, ac
         <div className="space-y-3">
           {availableAddons?.filter((a: any) => a.is_active !== false).length > 0 ? (
             <select value={addonId} onChange={(e) => setAddonId(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm">
-              {availableAddons.filter((a: any) => a.is_active !== false).map((a: any) => <option key={a.id} value={a.id}>{a.name} — ₹{Intl.NumberFormat("en-IN").format(Math.round((a.unit_price ?? 0) / 100))}/mo{a.max_quantity > 0 ? ` (max ${a.max_quantity})` : ""}</option>)}
+              {availableAddons.filter((a: any) => a.is_active !== false).map((a: any) => <option key={a.id} value={a.id}>{a.name} — {formatCurrency(a.unit_price ?? 0)}/mo{a.max_quantity > 0 ? ` (max ${a.max_quantity})` : ""}</option>)}
             </select>
           ) : <div className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No active add-ons are configured for this package.</div>}
           {selectedAddon?.max_quantity > 0 && <p className="text-xs text-muted-foreground">Max quantity: {selectedAddon.max_quantity}{selectedAddon.description ? ` · ${selectedAddon.description}` : ""}</p>}
-          <div className="flex items-center gap-3"><input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} min={1} max={selectedAddon?.max_quantity || 999} className="h-11 w-24 rounded-md border border-border bg-surface px-3 text-sm" /><span className="text-xs text-muted-foreground">× ₹{Intl.NumberFormat("en-IN").format(Math.round((selectedAddon?.unit_price ?? 0) / 100))} = ₹{Intl.NumberFormat("en-IN").format(Math.round((selectedAddon?.unit_price ?? 0) * qty / 100))}/mo</span></div>
+            <div className="flex items-center gap-3"><input type="number" value={qty} onChange={(e) => setQty(Number(e.target.value))} min={1} max={selectedAddon?.max_quantity || 999} className="h-11 w-24 rounded-md border border-border bg-surface px-3 text-sm" /><span className="text-xs text-muted-foreground">× {formatCurrency(selectedAddon?.unit_price ?? 0)} = {formatCurrency((selectedAddon?.unit_price ?? 0) * qty)}/mo</span></div>
           <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1" placeholder="Reason for assigning add-on" />
           <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!addonId || reason.trim().length < 5 || !!actionLoading} className="gap-2">{actionLoading === "assign_addon" ? <Loader2 className="size-4 animate-spin" /> : null}Assign</Button></div>
         </div>
@@ -579,6 +714,138 @@ function CancelScheduledModal({ change, orgId, onClose, execAction, actionLoadin
         <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="mt-1" placeholder="Reason for cancellation" />
         <div className="flex justify-end gap-3 pt-4"><Button type="button" variant="secondary" onClick={onClose}>Back</Button><Button type="button" variant="destructive" onClick={handleSubmit} disabled={reason.trim().length < 5 || !!actionLoading} className="gap-2">{actionLoading === "cancel_scheduled" ? <Loader2 className="size-4 animate-spin" /> : null}Cancel Change</Button></div>
       </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════ */
+/*  USAGE LIMITS VIEW                      */
+/* ════════════════════════════════════════ */
+
+function UsageLimitsView({ orgId }: { orgId: string }) {
+  const [usage, setUsage] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const { getOrgUsage } = await import("@/features/super-admin/services/subscription-usage-service");
+        const data = await getOrgUsage(orgId);
+        setUsage(data);
+      } catch { setUsage(null); }
+      setLoading(false);
+    }
+    load();
+  }, [orgId]);
+
+  if (loading) return <div className="flex items-center justify-center py-8"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>;
+  if (!usage) return <div className="py-8 text-center text-muted-foreground text-sm border border-dashed border-border rounded-lg">No usage data available.</div>;
+
+  const limits = [
+    { name: "Members", current: usage.memberCount, limit: usage.memberLimit, percent: usage.memberPercent, isOver: usage.isOverMemberLimit, key: "members" },
+    { name: "Branches", current: usage.branchCount, limit: usage.branchLimit, percent: usage.branchPercent, isOver: usage.isOverBranchLimit, key: "branches" },
+    { name: "Trainers", current: 0, limit: usage.trainerLimit ?? -1, percent: 0, isOver: false, key: "trainers" },
+    { name: "Storage (GB)", current: 0, limit: usage.storageLimit ?? -1, percent: 0, isOver: false, key: "storage" },
+    { name: "API Calls", current: 0, limit: usage.apiCallLimit ?? -1, percent: 0, isOver: false, key: "api_calls" },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {limits.map((l) => (
+        <div key={l.key} className="rounded-lg border border-border bg-background p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-black">{l.name}</span>
+            <span className={`text-xs font-black ${l.isOver ? "text-destructive" : "text-muted-foreground"}`}>
+              {l.current} / {l.limit === -1 ? "∞" : l.limit}
+            </span>
+          </div>
+          {l.limit > 0 ? (
+            <div className="mt-2 h-2 rounded-full bg-surface-muted">
+              <div className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(l.percent, 100)}%`,
+                  backgroundColor: l.percent < 70 ? "#16A34A" : l.percent < 90 ? "#D97706" : "#D92D20"
+                }}
+              />
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">{l.limit === -1 ? "Unlimited on this plan" : "No limit set"}</p>
+          )}
+          {l.isOver && <p className="mt-1 text-xs font-black text-destructive">⚠ Over limit by {l.current - l.limit}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════ */
+/*  TRIAL MANAGEMENT SECTION               */
+/* ════════════════════════════════════════ */
+
+function TrialManagementSection({ data, onOpenDrawer }: { data: Data; onOpenDrawer?: (org: any, sub: any) => void }) {
+  const trialSubs = data.subscriptions.filter((s: any) => s.status === "trial");
+  const expiredTrials = data.subscriptions.filter((s: any) => s.status === "expired" && s.trial_ends_at);
+  const expiringSoon = trialSubs.filter((s: any) => {
+    const end = s.trial_ends_at ? new Date(s.trial_ends_at) : null;
+    return end && end.getTime() > Date.now() && end.getTime() - Date.now() < 7 * 86400000;
+  });
+  const totalTrials = trialSubs.length;
+  const convertedTrials = data.subscriptions.filter((s: any) => s.status === "active" && s.trial_ends_at && new Date(s.trial_ends_at) < new Date()).length;
+  const conversionRate = totalTrials > 0 ? Math.round((convertedTrials / totalTrials) * 100) : 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-black">Trial Management</h2>
+        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 border border-blue-200">{conversionRate}% conversion</span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3 mb-4">
+        <div className="rounded-lg border border-border bg-surface p-3"><p className="text-xs font-black uppercase text-muted-foreground">Active Trials</p><p className="text-xl font-black mt-1">{trialSubs.length}</p></div>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-black uppercase text-amber-700">Expiring in 7 days</p><p className="text-xl font-black mt-1 text-amber-700">{expiringSoon.length}</p></div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3"><p className="text-xs font-black uppercase text-red-700">Recently Expired</p><p className="text-xl font-black mt-1 text-red-700">{expiredTrials.length}</p></div>
+      </div>
+
+      {trialSubs.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase">Active Trials</p>
+          {trialSubs.slice(0, 10).map((s: any) => {
+            const org = data.organizations.find((o: any) => o.id === s.organization_id);
+            const pkg = data.packages.find((p: any) => p.id === s.package_id);
+            const tEnd = s.trial_ends_at ? new Date(s.trial_ends_at) : null;
+            const daysLeft = tEnd ? Math.ceil((tEnd.getTime() - Date.now()) / 86400000) : null;
+            return (
+              <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-surface p-3">
+                <div>
+                  <p className="text-xs font-semibold">{org?.name ?? s.organization_id.slice(0, 8)}</p>
+                  <p className="text-[10px] text-muted-foreground">{pkg?.name ?? "—"} · {daysLeft !== null ? `${daysLeft}d left` : "—"}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  {daysLeft !== null && daysLeft <= 3 && <span className="inline-flex items-center rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 border border-red-200">Expiring</span>}
+                  <button onClick={() => onOpenDrawer?.(org, s)} className="rounded-md bg-primary/10 text-primary border border-primary/20 px-2 py-1 text-[10px] font-bold hover:bg-primary/20" type="button">Convert</button>
+                  <button onClick={() => onOpenDrawer?.(org, s)} className="rounded-md bg-red-50 text-red-700 border border-red-200 px-2 py-1 text-[10px] font-bold hover:bg-red-100" type="button">Cancel</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {expiredTrials.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase">Recently Expired</p>
+          {expiredTrials.slice(0, 5).map((s: any) => {
+            const org = data.organizations.find((o: any) => o.id === s.organization_id);
+            return (
+              <div key={s.id} className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-xs font-semibold text-red-800">{org?.name ?? s.organization_id.slice(0, 8)}</p>
+                <span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">Expired</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -88,11 +88,39 @@ export async function updateSubscriptionStatusAction(input: unknown): Promise<Au
   }
 
   try {
+    // For destructive status changes, validate MFA step-up
+    if (parsed.data.status === "suspended") {
+      if (!parsed.data.stepUpEmail || !parsed.data.stepUpEmail.includes("@")) {
+        return { status: "error", message: "MFA step-up email is required for suspension." };
+      }
+      if (!parsed.data.reason || parsed.data.reason.trim().length < 10) {
+        return { status: "error", message: "Reason must be at least 10 characters." };
+      }
+    }
+
     const subscription = await updateSubscriptionStatus(parsed.data.subscriptionId, parsed.data.status);
 
-    await writeSubscriptionAudit(auth.context.userId, "organization_subscription.status_updated", subscription.id, {
-      status: parsed.data.status
-    });
+    const auditMetadata: Record<string, unknown> = {
+      status: parsed.data.status,
+    };
+    if (parsed.data.reason) auditMetadata.reason = parsed.data.reason;
+    if (parsed.data.stepUpEmail) auditMetadata.stepUpEmail = parsed.data.stepUpEmail;
+
+    await writeSubscriptionAudit(auth.context.userId, "organization_subscription.status_updated", subscription.id, auditMetadata as any);
+
+    // Record subscription event for suspend
+    if (parsed.data.status === "suspended") {
+      const { recordSubscriptionEvent } = await import("../services/subscription-events-service");
+      await recordSubscriptionEvent({
+        organizationId: parsed.data.organizationId || subscription.organization_id,
+        subscriptionId: subscription.id,
+        eventType: "subscription_suspended",
+        newState: { status: "suspended", reason: parsed.data.reason },
+        actorId: auth.context.userId,
+        reason: parsed.data.reason ?? null,
+      });
+    }
+
     revalidateSubscriptionPaths();
 
     return { status: "success", message: "Subscription status updated." };

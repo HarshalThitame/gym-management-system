@@ -413,7 +413,7 @@ function PackageDetailView({ pkg, onClose, onEdit, subs }: {
   const activeOrgs = orgAssigned.filter((s: any) => s.status === "active").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -534,7 +534,7 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -749,7 +749,7 @@ function DeleteConfirmationModal({ pkg, deleteContext, deleteState, deletePendin
   const { assignedCount, activeCount, hasSubscribers } = deleteContext;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { if (!deletePending) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm p-4" onClick={() => { if (!deletePending) onClose(); }}>
       <div className="w-full max-w-md rounded-xl border-2 border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()} style={{ borderColor: hasSubscribers ? "#d97706" : "#dc2626" }}>
         <div className="flex items-start gap-4">
           <div className={`rounded-full p-2 ${hasSubscribers ? "bg-amber-50" : "bg-red-50"}`}>

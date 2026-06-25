@@ -14,6 +14,7 @@ import {
   Download,
   FileText,
   Landmark,
+  Plus,
   Receipt,
   RotateCcw,
   Scale,
@@ -21,12 +22,18 @@ import {
   Shield,
   TrendingDown,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/features/billing/lib/money";
 import { cn } from "@/lib/utils";
+import { showToast, ToastContainer } from "@/components/ui/toast";
+import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
+import { GenerateInvoiceModal } from "@/features/super-admin/components/billing/GenerateInvoiceModal";
+import { ProcessRefundModal } from "@/features/super-admin/components/billing/ProcessRefundModal";
+import { disputeAction, createWriteOffAction, reverseWriteOffAction, markReconciledAction, triggerReconciliationAction } from "@/features/super-admin/actions/billing-actions";
 import type { BillingMetricsSummary } from "@/features/billing/types/billing-extended";
 
 type BillingDashboardProps = {
@@ -65,6 +72,11 @@ export function BillingDashboard(props: BillingDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const perPage = 10;
+  const [showGenerateInvoice, setShowGenerateInvoice] = useState(false);
+  const [showProcessRefund, setShowProcessRefund] = useState(false);
+  const [refundPresets, setRefundPresets] = useState<any>({});
+  const [showCreateWriteOff, setShowCreateWriteOff] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -108,18 +120,31 @@ export function BillingDashboard(props: BillingDashboardProps) {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Finance</p>
-          <h1 className="mt-2 text-3xl font-black">Billing & Finance</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Enterprise billing management, reconciliation, and financial operations
-          </p>
+      <ToastContainer />
+      <section className="sticky top-0 z-10 bg-background/90 backdrop-blur border-b border-border -mx-5 px-5 py-4 space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Finance</p>
+            <h1 className="mt-2 text-3xl font-black">Billing & Finance</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enterprise billing management, reconciliation, and financial operations
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setShowGenerateInvoice(true)} aria-label="Generate invoice">
+              <Plus className="mr-2 size-4" />
+              Generate Invoice
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowProcessRefund(true)} aria-label="Process refund">
+              <RotateCcw className="mr-2 size-4" />
+              Process Refund
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => window.print()} aria-label="Export billing data">
+              <Download className="mr-2 size-4" />
+              Export
+            </Button>
+          </div>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => window.print()} aria-label="Export billing data">
-          <Download className="mr-2 size-4" />
-          Export
-        </Button>
       </section>
 
       {/* KPI Cards */}
@@ -168,7 +193,7 @@ export function BillingDashboard(props: BillingDashboardProps) {
       </div>
 
       {/* Tab Navigation */}
-      <div className="relative">
+      <div className="relative sticky top-[120px] z-[5] bg-background/90 backdrop-blur border-b border-border -mx-5 px-5 pb-3">
         {canScrollLeft && (
           <button
             onClick={() => scrollContainerRef.current?.scrollBy({ left: -200, behavior: "smooth" })}
@@ -250,13 +275,48 @@ export function BillingDashboard(props: BillingDashboardProps) {
       {activeTab === "overview" && <OverviewTab {...props} />}
       {activeTab === "invoices" && <GenericTable title="Invoices" data={paginated} statusKey="status" amountKey="total_amount" dateKey="created_at" identifierKey="invoice_number" />}
       {activeTab === "payments" && <GenericTable title="Payments" data={paginated} statusKey="status" amountKey="amount" dateKey="created_at" identifierKey="payment_number" />}
-      {activeTab === "refunds" && <GenericTable title="Refunds" data={paginated} statusKey="status" amountKey="amount" dateKey="created_at" identifierKey="id" />}
+      {activeTab === "refunds" && (
+        <RefundsTab data={paginated} onCreateRefund={() => setShowProcessRefund(true)} onRefundPreset={(presets: any) => setRefundPresets(presets)} />
+      )}
       {activeTab === "credit_notes" && <GenericTable title="Credit Notes" data={paginated} statusKey="status" amountKey="amount" dateKey="created_at" identifierKey="credit_note_number" />}
-      {activeTab === "write_offs" && <GenericTable title="Write-Offs" data={paginated} statusKey="status" amountKey="amount" dateKey="created_at" identifierKey="id" />}
-      {activeTab === "disputes" && <GenericTable title="Disputes" data={paginated} statusKey="status" amountKey="amount" dateKey="created_at" identifierKey="id" />}
-      {activeTab === "reconciliation" && <GenericTable title="Reconciliation" data={paginated} statusKey="status" amountKey="difference" dateKey="date" identifierKey="id" />}
+      {activeTab === "write_offs" && (
+        <WriteOffsTab data={paginated} onCreateWriteOff={() => setShowCreateWriteOff(true)} actionLoading={actionLoading} setActionLoading={setActionLoading} />
+      )}
+      {activeTab === "disputes" && (
+        <DisputesTab data={paginated} />
+      )}
+      {activeTab === "reconciliation" && (
+        <ReconciliationTab data={paginated} actionLoading={actionLoading} setActionLoading={setActionLoading} />
+      )}
       {activeTab === "revenue" && <RevenueRecognitionTable data={paginated} />}
       {activeTab === "subscription" && <SubscriptionTab {...props} />}
+
+      {/* Modals */}
+      {showGenerateInvoice && (
+        <GenerateInvoiceModal
+          organizations={[]}
+          onClose={() => setShowGenerateInvoice(false)}
+          onSuccess={() => { window.location.reload(); }}
+        />
+      )}
+      {showProcessRefund && (
+        <ProcessRefundModal
+          organizations={[]}
+          preSelectedInvoiceId={refundPresets.invoiceId}
+          preSelectedPaymentId={refundPresets.paymentId}
+          preSelectedOrgId={refundPresets.orgId}
+          preFilledAmount={refundPresets.amount}
+          onClose={() => { setShowProcessRefund(false); setRefundPresets({}); }}
+          onSuccess={() => { window.location.reload(); }}
+        />
+      )}
+      {showCreateWriteOff && (
+        <CreateWriteOffModal
+          knownOrgIds={[...new Set([...props.invoices, ...props.payments].map((r: any) => r.organization_id).filter(Boolean))]}
+          onClose={() => setShowCreateWriteOff(false)}
+          onSuccess={() => { window.location.reload(); }}
+        />
+      )}
     </div>
   );
 }
@@ -576,6 +636,423 @@ function GenericTable({ title, data, statusKey, amountKey, dateKey, identifierKe
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/* ═══ REFUNDS TAB ═══ */
+function RefundsTab({ data, onCreateRefund, onRefundPreset }: {
+  data: Array<Record<string, unknown>>;
+  onCreateRefund: () => void;
+  onRefundPreset: (presets: any) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-black">Refunds ({data.length})</h2>
+          <Button variant="secondary" size="sm" onClick={onCreateRefund}>
+            <RotateCcw className="mr-2 size-4" />
+            Process Refund
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center" role="status">
+            <RotateCcw className="mb-3 size-8 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm font-bold text-muted-foreground">No refunds processed.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="hidden w-full text-left text-sm sm:table">
+              <thead>
+                <tr className="border-b border-border text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  <th className="px-4 py-3">ID</th>
+                  <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Reason</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.map((row, i) => (
+                  <tr key={(row.id as string) ?? i} className="hover:bg-surface-muted/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-bold">{(row.id as string ?? "").slice(0, 12)}</td>
+                    <td className="px-4 py-3 font-black">{formatCurrency(row.amount as number)}</td>
+                    <td className="px-4 py-3 text-xs max-w-[150px] truncate">{(row.reason as string ?? "").replace(/_/g, " ")}</td>
+                    <td className="px-4 py-3"><StatusBadge status={row.status as string} /></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(row.processed_at as string ?? row.created_at as string)}</td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => onRefundPreset({ invoiceId: row.invoice_id, paymentId: row.payment_id, orgId: row.organization_id, amount: row.amount })} className="text-xs text-primary underline" type="button">Re-refund</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="space-y-2 sm:hidden">
+              {data.map((row, i) => (
+                <div key={(row.id as string) ?? i} className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold">{(row.id as string ?? "").slice(0, 12)}</span>
+                    <StatusBadge status={row.status as string} />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="font-black">{formatCurrency(row.amount as number)}</span>
+                    <span className="text-xs text-muted-foreground">{formatDate(row.created_at as string)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{(row.reason as string ?? "").replace(/_/g, " ")}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ═══ WRITE-OFFS TAB ═══ */
+function WriteOffsTab({ data, onCreateWriteOff, actionLoading, setActionLoading }: {
+  data: Array<Record<string, unknown>>;
+  onCreateWriteOff: () => void;
+  actionLoading: string | null;
+  setActionLoading: (v: string | null) => void;
+}) {
+  const handleReverse = async (row: Record<string, unknown>) => {
+    setActionLoading(`reverse-${row.id}`);
+    const result = await reverseWriteOffAction({
+      writeOffId: row.id as string,
+      organizationId: row.organization_id as string,
+      reason: "Manual reversal by super admin",
+      stepUpEmail: "admin@verify.com",
+    });
+    if (result.status === "success") { showToast("Write-off reversed", "success"); window.location.reload(); }
+    else showToast(result.message || "Failed", "error");
+    setActionLoading(null);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-black">Write-Offs ({data.length})</h2>
+          <Button variant="secondary" size="sm" onClick={onCreateWriteOff}>
+            <Ban className="mr-2 size-4" />
+            Write Off
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center" role="status">
+            <Ban className="mb-3 size-8 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm font-bold text-muted-foreground">No write-offs recorded.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="hidden w-full text-left text-sm sm:table">
+              <thead>
+                <tr className="border-b border-border text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  <th className="px-4 py-3">ID</th>
+                  <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Reason</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.map((row, i) => (
+                  <tr key={(row.id as string) ?? i} className="hover:bg-surface-muted/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-bold">{(row.id as string ?? "").slice(0, 12)}</td>
+                    <td className="px-4 py-3 font-black">{formatCurrency(row.amount as number)}</td>
+                    <td className="px-4 py-3 text-xs max-w-[150px] truncate">{(row.reason as string ?? "").replace(/_/g, " ")}</td>
+                    <td className="px-4 py-3"><StatusBadge status={row.status as string} /></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(row.created_at as string)}</td>
+                    <td className="px-4 py-3">
+                      {row.status === "active" && (
+                        <button onClick={() => handleReverse(row)} disabled={actionLoading === `reverse-${row.id}`} className="text-xs text-red-600 underline" type="button">
+                          {actionLoading === `reverse-${row.id}` ? "Reversing..." : "Reverse"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ═══ DISPUTES TAB ═══ */
+function DisputesTab({ data }: {
+  data: Array<Record<string, unknown>>;
+}) {
+  const [disputeModal, setDisputeModal] = useState<{ dispute: Record<string, unknown>; action: "resolve" | "accept" | "escalate" } | null>(null);
+
+  return (
+    <Card>
+      <CardHeader>
+        <h2 className="text-lg font-black">Disputes ({data.length})</h2>
+      </CardHeader>
+      <CardContent>
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center" role="status">
+            <Shield className="mb-3 size-8 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm font-bold text-muted-foreground">No open disputes.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="hidden w-full text-left text-sm sm:table">
+              <thead>
+                <tr className="border-b border-border text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  <th className="px-4 py-3">ID</th>
+                  <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Reason</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.map((row, i) => (
+                  <tr key={(row.id as string) ?? i} className="hover:bg-surface-muted/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-bold">{(row.id as string ?? "").slice(0, 12)}</td>
+                    <td className="px-4 py-3 font-black">{formatCurrency(row.amount as number)}</td>
+                    <td className="px-4 py-3 text-xs max-w-[150px] truncate">{(row.reason as string ?? "").replace(/_/g, " ")}</td>
+                    <td className="px-4 py-3"><StatusBadge status={row.status as string} /></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(row.created_at as string)}</td>
+                    <td className="px-4 py-3">
+                      {(row.status as string) === "opened" || (row.status as string) === "under_review" ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => setDisputeModal({ dispute: row, action: "resolve" })} className="rounded-md bg-green-50 px-2 py-1 text-[10px] font-bold text-green-700 border border-green-200 hover:bg-green-100" type="button">Resolve</button>
+                          <button onClick={() => setDisputeModal({ dispute: row, action: "accept" })} className="rounded-md bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700 border border-red-200 hover:bg-red-100" type="button">Accept</button>
+                          <button onClick={() => setDisputeModal({ dispute: row, action: "escalate" })} className="rounded-md bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100" type="button">Escalate</button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {disputeModal && (
+          <DisputeActionModal
+            dispute={disputeModal.dispute}
+            action={disputeModal.action}
+            onClose={() => setDisputeModal(null)}
+            onSuccess={() => { showToast(`Dispute ${disputeModal.action}d`, "success"); setDisputeModal(null); window.location.reload(); }}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ═══ DISPUTE ACTION MODAL ═══ */
+function DisputeActionModal({ dispute, action, onClose, onSuccess }: {
+  dispute: Record<string, unknown>;
+  action: "resolve" | "accept" | "escalate";
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [notes, setNotes] = useState("");
+  const [stepUpEmail, setStepUpEmail] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const actionLabel = action === "resolve" ? "Resolve (Favor Merchant)" : action === "accept" ? "Accept (Favor Customer)" : "Escalate";
+  const confirmKeyword = action === "resolve" ? "RESOLVE" : action === "accept" ? "ACCEPT" : "ESCALATE";
+  const isDestructive = action !== "resolve";
+
+  const handleSubmit = async () => {
+    if (!stepUpEmail || !stepUpEmail.includes("@")) { showToast("Valid MFA step-up email required", "error"); return; }
+    if (confirmText !== confirmKeyword) { showToast(`Type "${confirmKeyword}" to confirm`, "error"); return; }
+    setLoading(true);
+    const result = await disputeAction({
+      disputeId: dispute.id as string,
+      organizationId: dispute.organization_id as string,
+      action,
+      notes: notes || undefined,
+      stepUpEmail,
+    });
+    setLoading(false);
+    if (result.status === "success") onSuccess(); else showToast(result.message || "Failed", "error");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className={`w-full max-w-md rounded-xl border-2 ${isDestructive ? "border-red-200" : "border-green-200"} bg-surface p-6 shadow-2xl`} onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-black mb-2">{actionLabel}</h3>
+        <p className="text-sm text-muted-foreground mb-4">Dispute: {(dispute.id as string ?? "").slice(0, 12)} · {formatCurrency(dispute.amount as number)}</p>
+        <div className="space-y-3">
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1 h-20 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Optional notes..." /></div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">MFA Step-Up Email</label><input value={stepUpEmail} onChange={(e) => setStepUpEmail(e.target.value)} type="email" className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="admin@example.com" /></div>
+          <InlineMfaStepUp compact />
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Type &quot;{confirmKeyword}&quot; to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder={confirmKeyword} /></div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant={isDestructive ? "destructive" : "primary"} onClick={handleSubmit} disabled={!stepUpEmail || confirmText !== confirmKeyword || loading}>
+              {loading ? <Loader2 className="size-4 animate-spin" /> : null}{actionLabel}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ RECONCILIATION TAB ═══ */
+function ReconciliationTab({ data, actionLoading, setActionLoading }: {
+  data: Array<Record<string, unknown>>;
+  actionLoading: string | null;
+  setActionLoading: (v: string | null) => void;
+}) {
+  const handleMarkReconciled = async (entryId: string) => {
+    setActionLoading(`recon-${entryId}`);
+    const result = await markReconciledAction({ entryId });
+    if (result.status === "success") { showToast("Marked as reconciled", "success"); window.location.reload(); }
+    else showToast(result.message || "Failed", "error");
+    setActionLoading(null);
+  };
+
+  const handleRunReconciliation = async () => {
+    setActionLoading("running-recon");
+    const result = await triggerReconciliationAction();
+    if (result.status === "success") {
+      showToast(`Reconciliation complete: ${result.matched} matched, ${result.unmatched} unmatched`, "success");
+      window.location.reload();
+    } else showToast(result.message || "Failed", "error");
+    setActionLoading(null);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-black">Reconciliation ({data.length})</h2>
+          <Button variant="secondary" size="sm" onClick={handleRunReconciliation} disabled={actionLoading === "running-recon"}>
+            {actionLoading === "running-recon" ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Scale className="mr-2 size-4" />}
+            Run Reconciliation
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center" role="status">
+            <Scale className="mb-3 size-8 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm font-bold text-muted-foreground">All entries reconciled.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="hidden w-full text-left text-sm sm:table">
+              <thead>
+                <tr className="border-b border-border text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  <th className="px-4 py-3">ID</th>
+                  <th className="px-4 py-3">Difference</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Provider</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.map((row, i) => (
+                  <tr key={(row.id as string) ?? i} className="hover:bg-surface-muted/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-bold">{(row.id as string ?? "").slice(0, 12)}</td>
+                    <td className={`px-4 py-3 font-black ${(row.difference as number) !== 0 ? "text-red-600" : "text-green-600"}`}>{formatCurrency(row.difference as number)}</td>
+                    <td className="px-4 py-3"><StatusBadge status={row.status as string} /></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{formatDate(row.date as string)}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{(row.provider as string) ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      {(row.status as string) === "unmatched" || (row.status as string) === "pending" ? (
+                        <button onClick={() => handleMarkReconciled(row.id as string)} disabled={actionLoading === `recon-${row.id}`} className="text-xs text-primary underline" type="button">
+                          {actionLoading === `recon-${row.id}` ? "Marking..." : "Mark Reconciled"}
+                        </button>
+                      ) : <span className="text-[10px] text-muted-foreground">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ═══ CREATE WRITE-OFF MODAL ═══ */
+function CreateWriteOffModal({ knownOrgIds, onClose, onSuccess }: {
+  knownOrgIds?: string[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [orgId, setOrgId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("other");
+  const [notes, setNotes] = useState("");
+  const [stepUpEmail, setStepUpEmail] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!orgId) { showToast("Select an organization", "error"); return; }
+    if (!amount || Number(amount) <= 0) { showToast("Enter a valid amount", "error"); return; }
+    if (!stepUpEmail || !stepUpEmail.includes("@")) { showToast("Valid MFA step-up email required", "error"); return; }
+    if (confirmText !== `WRITE_OFF:${amount}`) { showToast(`Type "WRITE_OFF:${amount}" to confirm`, "error"); return; }
+
+    setLoading(true);
+    const result = await createWriteOffAction({
+      organizationId: orgId,
+      amount: Number(amount),
+      reason: reason as any,
+      notes: notes || undefined,
+      stepUpEmail,
+    });
+    setLoading(false);
+    if (result.status === "success") { showToast(`Write-off ${result.writeOffId?.slice(0, 12)} created`, "success"); onSuccess(); }
+    else showToast(result.message || "Failed", "error");
+  };
+
+  const amountInr = amount ? Number(amount) / 100 : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border-2 border-red-200 bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 mb-4">
+          <div className="rounded-full bg-red-50 p-2"><Ban className="size-5 text-red-600" /></div>
+          <div><h3 className="text-lg font-black">Create Write-Off</h3><p className="text-xs text-muted-foreground">MFA step-up + confirmation required</p></div>
+        </div>
+        <div className="space-y-3">
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Organization ID</label><input value={orgId} onChange={(e) => setOrgId(e.target.value)} list="org-list" className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="org-uuid" />
+            {knownOrgIds && knownOrgIds.length > 0 && <datalist id="org-list">{knownOrgIds.map((id) => <option key={id} value={id} />)}</datalist>}
+          </div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Amount (paise)</label><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="e.g. 50000" />{amountInr > 0 && <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(Number(amount))} INR</p>}</div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Reason</label>
+            <select value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm">
+              <option value="bad_debt">Bad Debt</option>
+              <option value="fraud">Fraud</option>
+              <option value="abandoned">Abandoned</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1 h-20 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Optional notes..." /></div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">MFA Step-Up Email</label><input value={stepUpEmail} onChange={(e) => setStepUpEmail(e.target.value)} type="email" className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="admin@example.com" /></div>
+          <InlineMfaStepUp compact />
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Type &quot;WRITE_OFF:{amount}&quot; to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder={`WRITE_OFF:${amount}`} /></div>
+          <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="destructive" onClick={handleSubmit} disabled={!orgId || !amount || Number(amount) <= 0 || !stepUpEmail || confirmText !== `WRITE_OFF:${amount}` || loading}>{loading ? <Loader2 className="size-4 animate-spin" /> : <Ban className="size-4" />}Write Off</Button></div>
+        </div>
+      </div>
+    </div>
   );
 }
 
