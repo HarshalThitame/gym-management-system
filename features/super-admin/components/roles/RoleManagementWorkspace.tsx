@@ -78,11 +78,11 @@ export function RoleManagementWorkspace({
   const pageSize = data.filters.pageSize;
 
   function setSort(sort: RoleManagementFilters["sort"]) {
-    router.push(buildPageUrl(data.filters, 1, pageSize, sort));
+    router.push(buildPageUrl(data.filters, 1, pageSize, sort), { scroll: false });
   }
 
   function setPage(page: number) {
-    router.push(buildPageUrl(data.filters, page, pageSize, currentSort));
+    router.push(buildPageUrl(data.filters, page, pageSize, currentSort), { scroll: false });
   }
 
   return (
@@ -120,7 +120,7 @@ export function RoleManagementWorkspace({
           <div className="flex flex-wrap items-center gap-3">
             <SearchInput
               value={data.filters.query}
-              onChange={(v) => { const params = new URLSearchParams(searchParams.toString()); params.set("q", v); params.set("page", "1"); router.push(`/super-admin/roles?${params.toString()}`); }}
+              onChange={(v) => { const params = new URLSearchParams(searchParams.toString()); params.set("q", v); params.set("page", "1"); router.push(`/super-admin/roles?${params.toString()}`, { scroll: false }); }}
               placeholder="Search roles by name, display name, or description..."
               className="min-w-0 flex-1"
             />
@@ -132,7 +132,7 @@ export function RoleManagementWorkspace({
                 const params = new URLSearchParams(searchParams.toString());
                 params.set("type", e.target.value);
                 params.set("page", "1");
-                router.push(`/super-admin/roles?${params.toString()}`);
+                router.push(`/super-admin/roles?${params.toString()}`, { scroll: false });
               }}
             >
               <option value="all">All Roles</option>
@@ -333,7 +333,7 @@ function DrawerModal({
           <DeleteRoleForm role={drawer.role} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
         )}
         {drawer.type === "permissions" && (
-          <PermissionsForm role={drawer.role} onClose={onClose} />
+          <PermissionsForm role={drawer.role} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
         )}
         {drawer.type === "assign" && (
           <AssignRoleForm role={drawer.role} onClose={onClose} criticalSuperAdminEmail={criticalSuperAdminEmail} />
@@ -503,7 +503,7 @@ function DeleteRoleForm({ role, onClose, criticalSuperAdminEmail }: { role: Role
   );
 }
 
-function PermissionsForm({ role, onClose }: { role: RoleManagementRecord; onClose: () => void }) {
+function PermissionsForm({ role, onClose, criticalSuperAdminEmail }: { role: RoleManagementRecord; onClose: () => void; criticalSuperAdminEmail: string }) {
   const [state, formAction] = useActionState(updateRolePermissionsAction, initialAuthActionState);
   const [detail, setDetail] = useState<RoleDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -717,6 +717,14 @@ function PermissionsForm({ role, onClose }: { role: RoleManagementRecord; onClos
           <p className="py-4 text-center text-sm font-semibold text-muted-foreground">No resources match &quot;{permSearch}&quot;.</p>
         )}
       </div>
+
+      <FormField label="Step-up email" error={state.fieldErrors?.stepUpEmail}>
+        <Input name="stepUpEmail" placeholder={criticalSuperAdminEmail} required />
+      </FormField>
+
+      <FormField label="Reason (required)" error={state.fieldErrors?.reason}>
+        <Textarea name="reason" placeholder="Why are these permissions changing?" rows={2} required />
+      </FormField>
 
       <FormMessage state={state} />
       <div className="flex gap-3">

@@ -184,8 +184,8 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
 
       <Card className="sticky top-[73px] z-[9]">
         <CardHeader>
-          <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_200px_140px_auto]">
-            <SearchInput value={data.filters.query} onChange={(v) => { const p = new URLSearchParams(window.location.search); p.set("q", v); router.push(`/super-admin/users?${p.toString()}`); }} placeholder="Search name, email, phone..." />
+          <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_200px_140px_auto]" onSubmit={(e) => e.preventDefault()}>
+            <SearchInput value={data.filters.query} onChange={(v) => { const p = new URLSearchParams(window.location.search); p.set("q", v); router.push(`/super-admin/users?${p.toString()}`, { scroll: false }); }} placeholder="Search name, email, phone..." />
             <select className={selectClass} name="role" defaultValue={data.filters.role}>
               <option value="all">All Roles</option>
               {roleNames.map((role) => <option key={role} value={role}>{formatEnterpriseLabel(role)}</option>)}
@@ -201,7 +201,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
               <option value="all">All Organizations</option>
               {data.organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
             </select>
-            <select className={selectClass} value={sort} onChange={(e) => { setSort(e.target.value as SortOption); router.push(`/super-admin/users?sort=${e.target.value}`); }}>
+            <select className={selectClass} value={sort} onChange={(e) => { setSort(e.target.value as SortOption); router.push(`/super-admin/users?sort=${e.target.value}`, { scroll: false }); }}>
               <option value="org_asc">Organization</option>
               <option value="created_desc">Newest First</option>
               <option value="name_asc">Name A-Z</option>
@@ -209,7 +209,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
               <option value="role_asc">Role A-Z</option>
               <option value="last_login_desc">Last Login</option>
             </select>
-            <Button type="submit" variant="primary">Filter</Button>
+            <Button variant="primary">Filter</Button>
           </form>
           <div className="px-5 pb-3">
             <button
@@ -1143,6 +1143,7 @@ function buildMinimalRecord(invite: { id: string; full_name: string; email: stri
     lastLoginAt: null,
     lastLoginSuccess: null,
     lastActivityAt: null,
+    accountNotes: [],
     activeAssignments: 0,
     pendingApprovals: 0
   };

@@ -1,12 +1,37 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ChevronLeft, Shield, FileText, Info } from "lucide-react";
+import { ChevronLeft, FileText, RefreshCw, CheckCircle, XCircle, AlertTriangle, ChevronDown } from "lucide-react";
 import { requireRole } from "@/lib/auth/guards";
+import { Badge } from "@/components/ui/badge";
 import { getComplianceStatus, listComplianceReports } from "@/features/security/services/security-compliance-service";
+import { runAllComplianceChecks } from "@/features/security/services/compliance-checker-service";
+import { rerunComplianceChecks } from "./actions";
+
+function ScoreRing({ score, size = 48 }: { score: number; size?: number }) {
+  const color = score > 90 ? "#16A34A" : score > 70 ? "#D97706" : "#DC2626";
+  const innerSize = size - 8;
+  return (
+    <div
+      className="grid place-items-center rounded-full shrink-0"
+      style={{ width: size, height: size, background: `conic-gradient(${color} ${score}%, #E4E7DD ${score}%)` }}
+    >
+      <div
+        className="grid place-items-center rounded-full bg-card"
+        style={{ width: innerSize, height: innerSize }}
+      >
+        <span className="text-sm font-black">{score}%</span>
+      </div>
+    </div>
+  );
+}
 
 async function ComplianceContent() {
   await requireRole(["super_admin"], "/super-admin");
-  const [status, reports] = await Promise.all([getComplianceStatus(), listComplianceReports()]);
+  const [status, reports, frameworks] = await Promise.all([
+    getComplianceStatus(),
+    listComplianceReports(),
+    runAllComplianceChecks(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -17,36 +42,61 @@ async function ComplianceContent() {
         <div>
           <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Governance</p>
           <h2 className="mt-2 text-2xl font-black md:text-3xl">Compliance & Governance</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground max-w-2xl">Compliance status monitoring, report generation, and reference frameworks. Automated compliance checks are not yet configured for all frameworks.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground max-w-2xl">Real-time compliance monitoring across security frameworks. Automated checks validate RLS coverage, RBAC roles, audit logs, storage policies, and encryption.</p>
         </div>
-      </div>
-
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <div className="flex items-start gap-3">
-          <Info className="mt-0.5 size-5 shrink-0" />
-          <div>
-            <p className="font-bold">Compliance Framework Monitoring Not Fully Configured</p>
-            <p className="mt-1 text-amber-700">The frameworks listed below are reference labels only. Automated compliance checks (RLS coverage, RBAC role coverage, audit log coverage, storage policies) are partially implemented. Compliance scores will appear once end-to-end automated checks are configured.</p>
-          </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <form action={rerunComplianceChecks}>
+            <button type="submit" className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-[10px] font-bold hover:bg-primary/90 transition-colors uppercase tracking-[0.06em]">
+              <RefreshCw className="size-3.5" /> Run All Checks
+            </button>
+          </form>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          { name: "GDPR", desc: `${status.gdprRequests} requests this year`, icon: Shield },
-          { name: "SOC 2", desc: `${status.soc2Reports} reports generated`, icon: Shield },
-          { name: "ISO 27001", desc: "Reference framework", icon: Shield },
-          { name: "HIPAA", desc: "Reference framework", icon: Shield },
-        ].map((fw) => (
-          <div key={fw.name} className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <fw.icon className="size-5 text-muted-foreground" />
-              <p className="text-lg font-black">{fw.name}</p>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{fw.desc}</p>
-            <Badge className="mt-2">Reference framework</Badge>
-          </div>
-        ))}
+        {frameworks.map((fw, i) => {
+          const statusLabel = fw.overallScore > 90 ? "Compliant" : fw.overallScore > 70 ? "At Risk" : "Non-Compliant";
+          const statusVariant = fw.overallScore > 90 ? "success" : fw.overallScore > 70 ? "warning" : "error" as const;
+          return (
+            <details key={fw.framework} className="group reveal-up rounded-xl border border-border bg-card shadow-[0_18px_60px_rgb(17_18_20/0.06)] p-5" style={{"--reveal-delay": `${i * 0.05}s`} as React.CSSProperties}>
+              <summary className="list-none cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <ScoreRing score={fw.overallScore} />
+                    <div>
+                      <div className="text-base font-black">{fw.displayName}</div>
+                      <Badge variant={statusVariant}>{statusLabel}</Badge>
+                    </div>
+                  </div>
+                  <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                </div>
+              </summary>
+              <div className="mt-4 space-y-2 border-t border-border pt-4">
+                {fw.checks.map((check, ci) => {
+                  const icon = check.status === "pass"
+                    ? <CheckCircle className="size-4 shrink-0 text-green-600" />
+                    : check.status === "fail"
+                    ? <XCircle className="size-4 shrink-0 text-red-600" />
+                    : <AlertTriangle className="size-4 shrink-0 text-amber-600" />;
+                  return (
+                    <div key={ci} className="flex items-start gap-3 rounded-md bg-muted/20 px-3 py-2.5 text-sm">
+                      {icon}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-xs">{check.check}</span>
+                          <span className={`text-[10px] font-bold uppercase shrink-0 ${
+                            check.status === "pass" ? "text-green-600" : check.status === "fail" ? "text-red-600" : "text-amber-600"
+                          }`}>{check.status}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-5">{check.details}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          );
+        })}
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
@@ -103,12 +153,18 @@ async function ComplianceContent() {
             </div>
           </div>
           <div className="mt-6 pt-4 border-t border-border">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">Reference Frameworks</p>
-            <p className="mt-1 text-xs text-muted-foreground">The following standards are shown as reference labels only. Automated compliance checks are not yet configured for these frameworks.</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">Frameworks Checked</p>
+            <p className="mt-1 text-xs text-muted-foreground">Automated compliance checks are running across all frameworks.</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {["GDPR", "SOC 2", "ISO 27001", "HIPAA", "PCI DSS"].map((s) => (
-                <span key={s} className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">{s}</span>
-              ))}
+              {frameworks.map((fw) => {
+                const dotColor = fw.overallScore > 90 ? "bg-green-500" : fw.overallScore > 70 ? "bg-amber-500" : "bg-red-500";
+                return (
+                  <span key={fw.framework} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                    <span className={`size-1.5 rounded-full ${dotColor}`} />
+                    {fw.displayName} ({fw.overallScore}%)
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -117,8 +173,6 @@ async function ComplianceContent() {
   );
 }
 
-import { Badge } from "@/components/ui/badge";
-
 export default function CompliancePage() {
-  return <Suspense fallback={<div className="space-y-6"><div className="h-5 w-32 bg-muted rounded animate-pulse" /><div className="h-8 w-48 bg-muted rounded-lg animate-pulse" /><div className="grid grid-cols-4 gap-4"><div className="h-24 bg-muted rounded-xl animate-pulse" /><div className="h-24 bg-muted rounded-xl animate-pulse" /><div className="h-24 bg-muted rounded-xl animate-pulse" /><div className="h-24 bg-muted rounded-xl animate-pulse" /></div></div>}><ComplianceContent /></Suspense>;
+  return <Suspense fallback={<div className="space-y-6"><div className="h-5 w-32 bg-muted rounded animate-pulse" /><div className="h-8 w-48 bg-muted rounded-lg animate-pulse" /><div className="grid grid-cols-4 gap-4"><div className="h-32 bg-muted rounded-xl animate-pulse" /><div className="h-32 bg-muted rounded-xl animate-pulse" /><div className="h-32 bg-muted rounded-xl animate-pulse" /><div className="h-32 bg-muted rounded-xl animate-pulse" /></div></div>}><ComplianceContent /></Suspense>;
 }

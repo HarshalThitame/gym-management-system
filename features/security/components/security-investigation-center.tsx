@@ -1,7 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Shield, AlertTriangle, Globe, Monitor, Fingerprint, Lock, RefreshCw, UserX, Ban, ArrowUpRight } from "lucide-react";
+import { Search, Shield, AlertTriangle, Globe, Monitor, Fingerprint, Lock, RefreshCw, UserX, Ban, ArrowUpRight, ChevronDown, ChevronUp, Clock, Download, FileText, LogIn, Ticket, Key, Circle, Filter } from "lucide-react";
+
+const TIMELINE_TYPE_COLORS: Record<string, string> = {
+  login: "border-green-300 bg-green-50",
+  risk_event: "border-red-300 bg-red-50",
+  support_ticket: "border-blue-300 bg-blue-50",
+  password_change: "border-amber-300 bg-amber-50",
+  session_created: "border-purple-300 bg-purple-50",
+};
+
+const TIMELINE_TYPE_DOTS: Record<string, string> = {
+  login: "bg-green-500",
+  risk_event: "bg-red-500",
+  support_ticket: "bg-blue-500",
+  password_change: "bg-amber-500",
+  session_created: "bg-purple-500",
+};
+
+const TIMELINE_TYPE_ICONS: Record<string, typeof Clock> = {
+  login: LogIn,
+  risk_event: AlertTriangle,
+  support_ticket: Ticket,
+  password_change: Key,
+  session_created: Monitor,
+};
+
+function SeverityDot({ severity }: { severity?: string }) {
+  const color = severity === "critical" ? "bg-red-600" : severity === "high" ? "bg-red-500" : severity === "medium" ? "bg-amber-500" : "bg-green-500";
+  return <span className={`inline-block size-2 rounded-full ${color} shrink-0`} />;
+}
 
 function SeverityBadge({ severity }: { severity: string }) {
   const colors: Record<string, string> = {
@@ -32,6 +61,8 @@ export function SecurityInvestigationCenter({ data }: { data: Record<string, unk
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(data ?? null);
+  const [timelineFilter, setTimelineFilter] = useState<string>("all");
+  const [expandedTimelineEvent, setExpandedTimelineEvent] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (!userId.trim()) return;
@@ -52,12 +83,53 @@ export function SecurityInvestigationCenter({ data }: { data: Record<string, unk
     });
   };
 
+  const handleExportTimeline = () => {
+    const timeline = (result?.timeline ?? []) as Array<Record<string, unknown>>;
+    if (timeline.length === 0) return;
+    const printable = window.open("", "_blank");
+    if (!printable) return;
+    const content = `
+      <html><head><title>Investigation Timeline</title>
+      <style>body{font-family:system-ui,sans-serif;padding:2rem;color:#111;max-width:800px;margin:0 auto}
+      h1{font-size:1.5rem;margin-bottom:.5rem}
+      .meta{color:#666;font-size:.85rem;margin-bottom:2rem}
+      table{width:100%;border-collapse:collapse}
+      th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid #e5e7eb;font-size:.875rem}
+      th{font-weight:600;color:#374151;border-bottom:2px solid #d1d5db}
+      .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+      .dot-login{background:#22c55e}.dot-risk_event{background:#ef4444}.dot-support_ticket{background:#3b82f6}.dot-password_change{background:#f59e0b}.dot-session_created{background:#a855f7}
+      @media print{body{padding:0}}
+      </style></head><body>
+      <h1>Security Investigation Timeline</h1>
+      <p class="meta">${timeline.length} events · Generated ${new Date().toLocaleString()}</p>
+      <table><thead><tr><th>Timestamp</th><th>Type</th><th>Event</th><th>Details</th></tr></thead><tbody>
+      ${timeline.map((e) => `
+        <tr>
+          <td style="white-space:nowrap">${new Date(e.timestamp as string).toLocaleString()}</td>
+          <td><span class="dot dot-${e.type as string}"></span>${(e.type as string).replace(/_/g, " ")}</td>
+          <td>${e.title as string}</td>
+          <td>${e.description as string}</td>
+        </tr>
+      `).join("")}
+      </tbody></table></body></html>
+    `;
+    printable.document.write(content);
+    printable.document.close();
+    printable.print();
+  };
+
   const profile = result?.profile as Record<string, unknown> | null;
   const activeSessions = (result?.activeSessions ?? []) as Array<Record<string, unknown>>;
   const loginHistory = (result?.loginHistory ?? []) as Array<Record<string, unknown>>;
   const riskEvents = (result?.riskEvents ?? []) as Array<Record<string, unknown>>;
   const detectionResults = (result?.detectionResults ?? []) as Array<{ name: string; triggered: boolean; severity: string; detail: string }>;
   const avgRiskScore = (result?.avgRiskScore as number) ?? 0;
+  const timeline = (result?.timeline ?? []) as Array<Record<string, unknown>>;
+  const eventTypes = [...new Set(timeline.map((e) => e.type as string))];
+
+  const filteredTimeline = timelineFilter === "all"
+    ? timeline
+    : timeline.filter((e) => e.type === timelineFilter);
 
   return (
     <div className="space-y-6">
@@ -214,6 +286,92 @@ export function SecurityInvestigationCenter({ data }: { data: Record<string, unk
               </div>
             </div>
           </div>
+
+          {timeline.length > 0 && (
+            <div className="xl:col-span-2 rounded-xl border border-border bg-card shadow-sm">
+              <div className="flex items-center justify-between border-b border-border px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Event Timeline ({timeline.length})</p>
+                  <div className="flex items-center gap-1.5">
+                    <Filter className="size-3 text-muted-foreground" />
+                    <select
+                      value={timelineFilter}
+                      onChange={(e) => setTimelineFilter(e.target.value)}
+                      className="h-7 rounded-md border border-border bg-background px-2 text-[10px] font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="all">All Events</option>
+                      {eventTypes.map((t) => (
+                        <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button onClick={handleExportTimeline}
+                  className="inline-flex items-center gap-1.5 h-7 px-3 rounded-lg border border-border text-[10px] font-bold hover:bg-muted transition-colors uppercase tracking-[0.06em]">
+                  <Download className="size-3" /> Export PDF
+                </button>
+              </div>
+              <div className="max-h-[480px] overflow-y-auto p-5">
+                <div className="relative space-y-0">
+                  {filteredTimeline.slice(0, 50).map((event, i) => {
+                    const eType = event.type as string;
+                    const DotIcon = TIMELINE_TYPE_ICONS[eType] ?? Clock;
+                    const isExpanded = expandedTimelineEvent === event.id;
+                    const meta = event.metadata as Record<string, unknown> ?? {};
+
+                    return (
+                      <div key={event.id as string ?? i} className="relative flex gap-4 pb-4 last:pb-0">
+                        {i < filteredTimeline.length - 1 && (
+                          <div className="absolute left-[17px] top-8 bottom-0 w-px bg-border" />
+                        )}
+                        <div className={`flex size-9 shrink-0 items-center justify-center rounded-full border-2 ${TIMELINE_TYPE_COLORS[eType] ?? "border-gray-200 bg-gray-50"}`}>
+                          <DotIcon className="size-4" />
+                        </div>
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-bold leading-tight">{event.title as string}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{event.description as string}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {(event.severity as string) && <SeverityDot severity={event.severity as string} />}
+                              <span className="text-[10px] text-muted-foreground whitespace-nowrap font-mono">
+                                {event.timestamp ? new Date(String(event.timestamp)).toLocaleString() : ""}
+                              </span>
+                              {Object.keys(meta).length > 0 && (
+                                <button
+                                  onClick={() => setExpandedTimelineEvent(isExpanded ? null : event.id as string)}
+                                  className="p-0.5 rounded hover:bg-muted transition-colors"
+                                >
+                                  {isExpanded ? <ChevronUp className="size-3.5 text-muted-foreground" /> : <ChevronDown className="size-3.5 text-muted-foreground" />}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {isExpanded && Object.keys(meta).length > 0 && (
+                            <div className="mt-2 rounded-md bg-muted/20 p-3 text-xs space-y-1.5">
+                              {Object.entries(meta).map(([k, v]) => (
+                                <div key={k} className="flex items-start gap-2">
+                                  <span className="font-medium text-muted-foreground capitalize min-w-[100px]">{k.replace(/_/g, " ")}:</span>
+                                  <span className="text-foreground font-mono break-all">{String(v ?? "—")}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filteredTimeline.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+                      <Clock className="size-8 text-muted-foreground/30 mb-2" />
+                      <p>No events match the selected filter</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : !loading ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/10 py-20">
