@@ -170,7 +170,7 @@ export function RoleManagementWorkspace({
                   <tr>
                     <td className="px-5 py-12 text-center" colSpan={5}>
                       <p className="font-bold text-muted-foreground">No roles match these filters.</p>
-                      <Button className="mt-3" variant="secondary" onClick={() => router.push("/super-admin/roles")}>Clear Filters</Button>
+                      <Button className="mt-3" variant="secondary" onClick={() => router.push("/super-admin/roles", { scroll: false })}>Clear Filters</Button>
                     </td>
                   </tr>
                 ) : (
