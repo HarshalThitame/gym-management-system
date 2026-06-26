@@ -21,7 +21,8 @@ import type {
   TenantDomainLatestProviderEventRow,
   TenantDomainProviderOperation,
   TenantDomainProviderStatus,
-  TenantDomainRow
+  TenantDomainRow,
+  TenantDomainStatus
 } from "@/types/enterprise";
 
 type CheckResult = {
@@ -205,7 +206,7 @@ export function TenantDomainCenter({
                 ) : null}
                 <Button disabled={pendingCheckId === domain.id || domain.status === "disabled"} onClick={() => void runCheck(domain.id)} size="sm" variant="secondary">
                   {pendingCheckId === domain.id ? <RefreshCw className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
-                  {pendingCheckId === domain.id ? "Checking" : nextDomainActionLabel(status, sslStatus)}
+                  {pendingCheckId === domain.id ? "Checking" : nextDomainActionLabel(normalizeTenantDomainStatus(status), sslStatus)}
                 </Button>
               </div>
             </div>
@@ -250,9 +251,13 @@ function CodeLine({ label, value }: { label: string; value: string }) {
 }
 
 function DomainBadge({ sslStatus, status }: { status: TenantDomainRow["status"]; sslStatus: TenantDomainRow["ssl_status"] }) {
-  const tone = domainStatusTone(status, sslStatus);
+  const tone = domainStatusTone(normalizeTenantDomainStatus(status), sslStatus);
   const variant = tone === "good" ? "success" : tone === "watch" ? "warning" : tone === "risk" ? "error" : "neutral";
   return <Badge variant={variant}>{formatEnterpriseLabel(status)}</Badge>;
+}
+
+function normalizeTenantDomainStatus(status: TenantDomainRow["status"]): TenantDomainStatus {
+  return status === "verified" || status === "failed" || status === "disabled" || status === "pending" ? status : "pending";
 }
 
 function DomainLifecycleActions({ domain, systemDomain }: { domain: TenantDomainRow; systemDomain: boolean }) {

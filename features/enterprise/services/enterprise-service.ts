@@ -118,7 +118,7 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
   const openCompliance = complianceRequests.filter((request) => request.status === "open" || request.status === "in_review");
   const failedBackups = backupJobs.filter((job) => job.status === "failed").length;
   const enabledFlags = featureFlags.filter((flag) => flag.enabled && flag.status === "active").length;
-  const health = healthStatus(healthChecks.slice(0, 16).map((check) => ({ status: check.status })));
+  const health = healthStatus(healthChecks.slice(0, 16).map((check) => ({ status: normalizeHealthStatus(check.status) })));
   const storageRisk = Math.max(...tenantUsagePoints.map((row) => row.storagePercent), 0);
   const revenue = sum(branchLatestMetrics.map((row) => Number(row.revenue_amount ?? 0)));
 
@@ -190,4 +190,8 @@ function kpi(key: string, label: string, value: string, detail: string, status: 
 
 function sum(values: number[]) {
   return values.reduce((total, value) => total + value, 0);
+}
+
+function normalizeHealthStatus(status: string): "healthy" | "degraded" | "down" | "unknown" {
+  return status === "healthy" || status === "degraded" || status === "down" || status === "unknown" ? status : "unknown";
 }

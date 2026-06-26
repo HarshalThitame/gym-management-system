@@ -78,11 +78,9 @@ export function WebhookPanel({ dashboard, hasFeature }: WebhookPanelProps) {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const result = await getWebhookLogs(orgId, selectedWebhookId ?? undefined, {
-        status: logFilters.status,
-        page: logPage,
-        pageSize: 20,
-      });
+      const filters: Parameters<typeof getWebhookLogs>[2] = { page: logPage, pageSize: 20 };
+      if (logFilters.status) filters.status = logFilters.status;
+      const result = await getWebhookLogs(orgId, selectedWebhookId ?? undefined, filters);
       setLogs(result.logs);
       setLogTotal(result.total);
     } catch {
@@ -224,7 +222,7 @@ export function WebhookPanel({ dashboard, hasFeature }: WebhookPanelProps) {
   const statusBadgeVariant = (status: string) => {
     switch (status) {
       case "success": return "success" as const;
-      case "failed": return "danger" as const;
+      case "failed": return "error" as const;
       case "retrying": return "warning" as const;
       default: return "neutral" as const;
     }

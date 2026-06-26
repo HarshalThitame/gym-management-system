@@ -57,7 +57,7 @@ function generatePassword(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
   for (let i = 0; i < 16; i++) {
-    result += chars[array[i] % chars.length];
+    result += chars[(array[i] ?? 0) % chars.length];
   }
   return result;
 }
@@ -128,7 +128,7 @@ export function OrgOwnerCreationWizard({ criticalSuperAdminEmail, onClose }: Pro
     setPassword(generatePassword());
   }, []);
 
-  const canProceedStep0 = email.trim() && password.trim() && fullName.trim().length >= 2;
+  const canProceedStep0 = Boolean(email.trim() && password.trim() && fullName.trim().length >= 2);
   const canProceedStep1 = orgName.trim().length >= 2 && orgSlug.trim().length >= 2;
   const canProceedStep2 = true;
   const canProceedStep3 = confirmation.trim() === "CREATE_ORG_OWNER";

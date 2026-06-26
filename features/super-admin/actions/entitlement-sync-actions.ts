@@ -11,6 +11,12 @@ import {
 const superAdminRoles = ["super_admin"] as const;
 
 type RawRow = Record<string, unknown>;
+type QueryResult = { data: RawRow[] | null; error: { message: string } | null };
+type QueryBuilder = PromiseLike<QueryResult> & {
+  eq(k: string, v: unknown): QueryBuilder;
+  in(k: string, vals: readonly unknown[]): QueryBuilder;
+  order(k: string, o: { ascending: boolean }): QueryBuilder;
+};
 
 function asString(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -21,17 +27,9 @@ async function adminDb() {
   if (!client) throw new Error("Database connection failed.");
   return client as unknown as {
     from(t: string): {
-      select(c: string): {
-        eq(k: string, v: string): Promise<{ data: RawRow[] | null; error: { message: string } | null }>;
-        in(k: string, vals: string[]): {
-          order(k: string, o: { ascending: boolean }): Promise<{ data: RawRow[] | null; error: { message: string } | null }>;
-        };
-      };
-      insert(row: RawRow): Promise<{ data: RawRow[] | null; error: { message: string } | null }>;
-      delete(): {
-        eq(k: string, v: string): Promise<{ error: { message: string } | null }>;
-        not(k: string, v: string, ref: string): Promise<{ error: { message: string } | null }>;
-      };
+      select(c: string): QueryBuilder;
+      insert(row: RawRow): QueryBuilder;
+      delete(): QueryBuilder;
     };
   };
 }

@@ -1,16 +1,42 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import { writeAuditLog } from "@/lib/audit";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
+import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
+import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 
 const superAdminRoles = ["super_admin"] as const;
+const criticalMfaCookie = "super_admin_mfa_verified_at";
 
 function revalidatePaths() {
   revalidatePath("/super-admin/billing");
   revalidatePath("/super-admin/subscriptions");
+}
+
+async function verifyBillingStepUp(stepUpEmail: string): Promise<AuthActionState | null> {
+  const requiredEmail = getCriticalSuperAdminEmail();
+  if (stepUpEmail.trim().toLowerCase() !== requiredEmail) {
+    return { status: "error", message: `Type ${requiredEmail} to pass the step-up identity check.`, fieldErrors: { stepUpEmail: [`Type ${requiredEmail} to confirm.`] } };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const mfaResult = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (mfaResult.data?.currentLevel !== "aal2") {
+    return { status: "error", message: "MFA step-up required. Go to /super-admin/security/mfa first.", fieldErrors: { stepUpEmail: ["Verify MFA first."] } };
+  }
+
+  const cookieStore = await cookies();
+  const verifiedAt = cookieStore.get(criticalMfaCookie)?.value ?? null;
+  if (!isMfaFreshEnough(verifiedAt)) {
+    return { status: "error", message: "MFA session expired. Verify a fresh code.", fieldErrors: { stepUpEmail: ["Re-verify MFA within 10 minutes."] } };
+  }
+
+  return null;
 }
 
 /* ──────────── INVOICE GENERATION ──────────── */
@@ -90,7 +116,8 @@ export async function processRefundAction(input: ProcessRefundInput): Promise<Au
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  if (!input.stepUpEmail || !input.stepUpEmail.includes("@")) return { status: "error", message: "Valid MFA step-up email is required." };
+  const stepUpError = await verifyBillingStepUp(input.stepUpEmail);
+  if (stepUpError) return stepUpError;
 
   try {
     const db = getSupabaseAdminClient() as any;
@@ -162,7 +189,8 @@ export type DisputeActionInput = {
 export async function disputeAction(input: DisputeActionInput): Promise<AuthActionState> {
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
-  if (!input.stepUpEmail || !input.stepUpEmail.includes("@")) return { status: "error", message: "Valid MFA step-up email is required." };
+  const stepUpError = await verifyBillingStepUp(input.stepUpEmail);
+  if (stepUpError) return stepUpError;
 
   try {
     const db = getSupabaseAdminClient() as any;
@@ -206,7 +234,8 @@ export type CreateWriteOffInput = {
 export async function createWriteOffAction(input: CreateWriteOffInput): Promise<AuthActionState & { writeOffId?: string }> {
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
-  if (!input.stepUpEmail || !input.stepUpEmail.includes("@")) return { status: "error", message: "Valid MFA step-up email is required." };
+  const stepUpError = await verifyBillingStepUp(input.stepUpEmail);
+  if (stepUpError) return stepUpError;
 
   try {
     const db = getSupabaseAdminClient() as any;
@@ -244,7 +273,8 @@ export async function createWriteOffAction(input: CreateWriteOffInput): Promise<
 export async function reverseWriteOffAction(input: { writeOffId: string; organizationId: string; reason: string; stepUpEmail: string }): Promise<AuthActionState> {
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
-  if (!input.stepUpEmail || !input.stepUpEmail.includes("@")) return { status: "error", message: "Valid MFA step-up email is required." };
+  const stepUpError = await verifyBillingStepUp(input.stepUpEmail);
+  if (stepUpError) return stepUpError;
 
   try {
     const db = getSupabaseAdminClient() as any;

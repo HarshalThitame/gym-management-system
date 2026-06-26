@@ -48,8 +48,8 @@ type ActionDrawerState =
 
 type UserDetailActionsData = {
   organizations: Array<{ id: string; name: string; slug: string; status?: string }>;
-  allBranches: Array<{ id: string; name: string; branch_code: string; gym_id?: string; organization_id: string }>;
-  allGyms: Array<{ id: string; name: string; slug?: string; organization_id: string }>;
+  allBranches: Array<{ id: string; name: string; branch_code: string | null; gym_id: string | null; organization_id: string | null }>;
+  allGyms: Array<{ id: string; name: string; slug: string | null; organization_id: string | null }>;
 };
 
 export function UserDetailActions({
@@ -310,7 +310,7 @@ function ChangeStatusForm({ record, action, onClose, criticalSuperAdminEmail }: 
     if (state.status === "success") { showToast(state.message ?? "Action completed.", "success"); onClose(); }
   }, [state.status, state.message, onClose]);
 
-  const actionLabels: Record<string, string> = { activate: "Activate", suspend: "Suspend", archive: "Archive" };
+  const actionLabels: Record<"activate" | "suspend" | "archive", string> = { activate: "Activate", suspend: "Suspend", archive: "Archive" };
   const currentStatus = record.user.status;
   const availableActions: Array<"activate" | "suspend" | "archive"> = [];
   if (currentStatus !== "active") availableActions.push("activate");
@@ -336,8 +336,8 @@ function ChangeStatusForm({ record, action, onClose, criticalSuperAdminEmail }: 
 
       <FormField label="New status" error={state.fieldErrors?.action}>
         <select className={selectClass} name="actionSelect" value={selectedAction} onChange={(e) => setSelectedAction(e.target.value as "activate" | "suspend" | "archive")}>
-          {availableActions.map((a) => (
-            <option key={a} value={a}>{formatEnterpriseLabel(actionLabels[a])}</option>
+          {availableActions.map((availableAction) => (
+            <option key={availableAction} value={availableAction}>{formatEnterpriseLabel(actionLabels[availableAction])}</option>
           ))}
         </select>
       </FormField>

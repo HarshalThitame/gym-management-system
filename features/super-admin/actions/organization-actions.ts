@@ -28,7 +28,7 @@ import {
   type OrganizationGovernanceSnapshot
 } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   bulkOrganizationActionSchema,
   organizationLegalHoldActionSchema,
@@ -551,7 +551,7 @@ export async function organizationLifecycleAction(_previousState: AuthActionStat
   const isForceDelete = parsed.data.action === "delete" && parsed.data.forceDelete === "true" && parsed.data.forceConfirm === "I UNDERSTAND THE CONSEQUENCES";
 
   if (isForceDelete) {
-    const forceDeleteRate = checkRateLimit(`force_delete:${context.userId}`, 3, 60_000);
+    const forceDeleteRate = await checkRateLimit(`force_delete:${context.userId}`, 3, 60_000);
     if (!forceDeleteRate.allowed) {
       return { status: "error", message: `Force delete rate limit exceeded. Try again in ${Math.ceil(forceDeleteRate.retryAfterMs / 1000)}s.` };
     }
@@ -897,7 +897,7 @@ export async function bulkOrganizationAction(_previousState: AuthActionState, fo
   }
 
   if (parsed.data.action === "delete") {
-    const bulkDeleteRate = checkRateLimit(`bulk_delete:${context.userId}`, 1, 120_000);
+    const bulkDeleteRate = await checkRateLimit(`bulk_delete:${context.userId}`, 1, 120_000);
     if (!bulkDeleteRate.allowed) {
       return { status: "error", message: `Bulk delete rate limit exceeded. Try again in ${Math.ceil(bulkDeleteRate.retryAfterMs / 1000)}s.` };
     }

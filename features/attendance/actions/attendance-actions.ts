@@ -32,8 +32,7 @@ import {
 
 type AppSupabase = SupabaseClient<Database>;
 type AttendanceAlertSeverity = NonNullable<Database["public"]["Tables"]["attendance_alerts"]["Insert"]["severity"]>;
-type AttendanceAlertType = Database["public"]["Tables"]["attendance_alerts"]["Insert"]["alert_type"];
-type InactivityAlertType = Extract<AttendanceAlertType, "inactive_7_days" | "inactive_15_days" | "inactive_30_days">;
+type InactivityAlertType = "inactive_7_days" | "inactive_15_days" | "inactive_30_days";
 const inactivityAlertTypes: InactivityAlertType[] = ["inactive_7_days", "inactive_15_days", "inactive_30_days"];
 
 export async function manualCheckInAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {

@@ -7,12 +7,6 @@ const nextConfig: NextConfig = {
     ]
   },
   poweredByHeader: false,
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  typescript: {
-    ignoreBuildErrors: true
-  },
   // Code-split heavy chart libraries
   experimental: {
     optimizePackageImports: ["recharts", "lucide-react", "date-fns"]

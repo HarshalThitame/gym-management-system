@@ -14,7 +14,7 @@ import { calculateCommissionsForSession } from "@/features/organization-owner/ac
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database, Json } from "@/types/database";
 import type { AuthContext } from "@/types/auth";
-import type { TrainerRow, TrainerSessionRow } from "@/types/training";
+import { sessionStatuses, type SessionStatus, type TrainerRow, type TrainerSessionRow } from "@/types/training";
 import {
   calculatePackageExpiry,
   minutesBetweenTimes,
@@ -682,6 +682,10 @@ export async function updateTrainerSessionStatusAction(_previousState: AuthActio
     return { status: "error", message: access.message };
   }
 
+  if (!isSessionStatus(session.status)) {
+    return { status: "error", message: "Training session has an invalid status." };
+  }
+
   const transitionError = validateSessionStatusChange(session.status, parsed.data.nextStatus);
   if (transitionError) {
     return { status: "error", message: transitionError };
@@ -1193,7 +1197,7 @@ async function ensureTrainerMemberAccess(
 }
 
 async function generateTrainerCode(supabase: AppSupabase, gymId: string | null) {
-  const { data, error } = await supabase.rpc("generate_trainer_code", { target_gym_id: gymId });
+  const { data, error } = await supabase.rpc("generate_trainer_code", { target_gym_id: gymId ?? "" });
   if (error || !data) {
     return "TRN-0001";
   }
@@ -1201,7 +1205,7 @@ async function generateTrainerCode(supabase: AppSupabase, gymId: string | null) 
 }
 
 async function generateStaffCode(supabase: AppSupabase, gymId: string | null) {
-  const { data, error } = await supabase.rpc("generate_staff_code", { target_gym_id: gymId });
+  const { data, error } = await supabase.rpc("generate_staff_code", { target_gym_id: gymId ?? "" });
   if (error || !data) {
     return "STF-0001";
   }
@@ -1219,7 +1223,7 @@ async function createPtInvoiceAndPayment(
     isPaid: boolean;
   }
 ): Promise<{ ok: true; invoiceId: string | null; paymentId: string | null } | { ok: false; message: string }> {
-  const invoiceNumberResult = await supabase.rpc("generate_invoice_number", { target_gym_id: input.gymId });
+  const invoiceNumberResult = await supabase.rpc("generate_invoice_number", { target_gym_id: input.gymId ?? "" });
   const invoiceNumber = invoiceNumberResult.data ?? `PT-${Date.now()}`;
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
@@ -1258,7 +1262,7 @@ async function createPtInvoiceAndPayment(
     return { ok: true, invoiceId: invoice.id, paymentId: null };
   }
 
-  const paymentNumberResult = await supabase.rpc("generate_payment_number", { target_gym_id: input.gymId });
+  const paymentNumberResult = await supabase.rpc("generate_payment_number", { target_gym_id: input.gymId ?? "" });
   const paymentNumber = paymentNumberResult.data ?? `PAY-${Date.now()}`;
   const { data: payment, error: paymentError } = await supabase
     .from("payments")
@@ -1414,6 +1418,10 @@ async function getOrganizationIdForGym(supabase: AppSupabase, gymId: string | nu
 
 function featureGateMessage(error: unknown) {
   return error instanceof Error ? error.message : "Feature not available on your current plan.";
+}
+
+function isSessionStatus(status: string): status is SessionStatus {
+  return (sessionStatuses as readonly string[]).includes(status);
 }
 
 function validationState(fieldErrors: Record<string, string[] | undefined>): AuthActionState {

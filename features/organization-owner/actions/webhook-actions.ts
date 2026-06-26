@@ -58,6 +58,16 @@ type WebhookLogFilters = {
   pageSize?: number;
 };
 
+type UnsafeSupabase = {
+  // Local shim for webhook tables that are not present in generated Database types yet.
+  // Regenerate types after applying the webhook migrations, then remove this cast.
+  from(table: string): any;
+};
+
+async function createWebhookDb() {
+  return (await createSupabaseServerClient()) as unknown as UnsafeSupabase;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function generateWebhookSecret(): string {
@@ -96,7 +106,7 @@ export async function getWebhooks(
     actionName: "webhooks.list",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
   const { data, error } = await supabase
     .from("webhook_configs")
     .select("*")
@@ -117,7 +127,7 @@ export async function getWebhook(
     actionName: "webhooks.get",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
   const { data, error } = await supabase
     .from("webhook_configs")
     .select("*")
@@ -142,7 +152,7 @@ export async function createWebhook(
   if (!input.name?.trim()) throw new Error("Webhook name is required.");
   if (!isValidHttpsUrl(input.url)) throw new Error("URL must be a valid HTTPS URL.");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
   const secret = input.secret || generateWebhookSecret();
 
   const { data, error } = await supabase
@@ -177,7 +187,7 @@ export async function updateWebhook(
     throw new Error("URL must be a valid HTTPS URL.");
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.name !== undefined) update.name = input.name.trim();
   if (input.url !== undefined) update.url = input.url.trim();
@@ -207,7 +217,7 @@ export async function deleteWebhook(
     actionName: "webhooks.delete",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
   const { error } = await supabase
     .from("webhook_configs")
     .delete()
@@ -230,7 +240,7 @@ export async function getWebhookLogs(
     actionName: "webhooks.logs",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
   const page = Math.max(1, filters?.page ?? 1);
   const pageSize = Math.min(50, Math.max(5, filters?.pageSize ?? 20));
 
@@ -270,7 +280,7 @@ export async function retryWebhookDelivery(
     actionName: "webhooks.retry",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
 
   const { data: log } = await supabase
     .from("webhook_delivery_logs")
@@ -364,7 +374,7 @@ export async function testWebhook(
     actionName: "webhooks.test",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
 
   const { data: config } = await supabase
     .from("webhook_configs")
@@ -442,7 +452,7 @@ export async function triggerWebhooks(
   const hasAccess = await hasFeatureAccess(organizationId, "webhooks");
   if (!hasAccess) return { delivered: 0, failed: 0 };
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createWebhookDb();
 
   // Server-side filtering: only fetch webhooks matching this event type
   const { data: webhooks } = await supabase

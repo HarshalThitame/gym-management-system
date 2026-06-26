@@ -12,7 +12,7 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { entitlementSimpleCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 import type { AuthContext } from "@/types/auth";
 import type { Database, Json } from "@/types/database";
-import type { CommunicationCategory, NotificationTemplateRow, OutboundChannel, SegmentRecipient } from "@/types/communications";
+import { communicationCategories, outboundChannels, type CommunicationCategory, type NotificationTemplateRow, type OutboundChannel, type SegmentRecipient } from "@/types/communications";
 import {
   buildCategoryPreferences,
   extractTemplateVariables,
@@ -399,7 +399,8 @@ export async function dispatchCampaignAction(_previousState: AuthActionState, fo
     return { status: "error", message: "No recipients matched this segment." };
   }
 
-  const channels = getCampaignChannels(campaign.campaign_type);
+  const channels = getCampaignChannels(normalizeCampaignType(campaign.campaign_type));
+  const campaignCategory = normalizeCommunicationCategory(campaign.category);
   const now = new Date().toISOString();
   await supabase.from("campaigns").update({ status: "running", started_at: now }).eq("id", campaign.id);
 
@@ -411,7 +412,7 @@ export async function dispatchCampaignAction(_previousState: AuthActionState, fo
       const result = await dispatchToRecipient(supabase, context, {
         channel,
         campaignId: campaign.id,
-        campaignCategory: campaign.category,
+        campaignCategory,
         sourceType: "campaign",
         sourceId: campaign.id,
         template,
@@ -523,7 +524,8 @@ export async function runAutomationRuleAction(_previousState: AuthActionState, f
   }
 
   const recipients = await resolveSegmentRecipients(rule.gym_id, rule.segment_key);
-  const channels = rule.channel === "multi_channel" ? (["in_app", "email", "whatsapp"] as const) : ([rule.channel] as const);
+  const channels = rule.channel === "multi_channel" ? (["in_app", "email", "whatsapp"] as const) : ([normalizeOutboundChannel(rule.channel)] as const);
+  const campaignCategory = normalizeCommunicationCategory(template.category);
   let queued = 0;
   let optedOut = 0;
   let failed = 0;
@@ -533,7 +535,7 @@ export async function runAutomationRuleAction(_previousState: AuthActionState, f
       const result = await dispatchToRecipient(supabase, context, {
         channel,
         campaignId: null,
-        campaignCategory: template.category,
+        campaignCategory,
         sourceType: "automation",
         sourceId: rule.id,
         template,
@@ -1084,6 +1086,18 @@ function getCampaignChannels(campaignType: "email" | "whatsapp" | "sms" | "multi
     return ["in_app", "email", "whatsapp"];
   }
   return [campaignType];
+}
+
+function normalizeCampaignType(value: string): "email" | "whatsapp" | "sms" | "multi_channel" {
+  return value === "whatsapp" || value === "sms" || value === "multi_channel" ? value : "email";
+}
+
+function normalizeOutboundChannel(value: string): OutboundChannel {
+  return (outboundChannels as readonly string[]).includes(value) ? value as OutboundChannel : "in_app";
+}
+
+function normalizeCommunicationCategory(value: string): CommunicationCategory {
+  return (communicationCategories as readonly string[]).includes(value) ? value as CommunicationCategory : "system";
 }
 
 function recipientVariables(recipient: SegmentRecipient) {

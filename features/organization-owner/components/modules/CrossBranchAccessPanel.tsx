@@ -500,7 +500,7 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
               <Button onClick={handleApplyLogFilters} size="sm" variant="primary">Apply</Button>
               <Button onClick={() => {
                 const data = logs.map((l) => ({
-                  date: new Date(l.created_at).toLocaleDateString(),
+                  date: l.created_at ? new Date(l.created_at).toLocaleDateString() : "",
                   member: members.find((m) => m.id === l.member_id)?.full_name ?? l.member_id,
                   fromGym: gyms.find((g) => g.id === l.from_gym_id)?.name ?? l.from_gym_id ?? "N/A",
                   toGym: gyms.find((g) => g.id === l.to_gym_id)?.name ?? l.to_gym_id,
@@ -536,7 +536,7 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
                   const toGym = gyms.find((g) => g.id === log.to_gym_id);
                   return (
                     <tr key={log.id} className="border-b border-border last:border-0 transition-all hover:bg-surface-muted/50">
-                      <td className="px-4 py-3 font-mono text-xs">{new Date(log.created_at).toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{log.created_at ? new Date(log.created_at).toLocaleString("en-IN") : ""}</td>
                       <td className="px-4 py-3 font-bold">{logMember ? logMember.full_name : log.member_id}</td>
                       <td className="px-4 py-3 text-muted-foreground">{fromGym ? fromGym.name : log.from_gym_id ?? "N/A"}</td>
                       <td className="px-4 py-3 text-muted-foreground">{toGym ? toGym.name : log.to_gym_id}</td>

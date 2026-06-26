@@ -22,6 +22,8 @@ export const deleteRoleSchema = z.object({
 
 export const updateRolePermissionsSchema = z.object({
   roleId: z.string().uuid(),
+  stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
+  reason: z.string().trim().max(500).optional(),
   permissions: z.array(
     z.object({
       resource: z.enum(authResources),

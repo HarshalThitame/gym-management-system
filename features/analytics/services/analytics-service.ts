@@ -579,6 +579,7 @@ function generatedInsight(id: string, gymId: string | null, type: AnalyticsInsig
   return {
     id,
     gym_id: gymId,
+    branch_id: null,
     insight_type: type,
     severity,
     title,
@@ -624,8 +625,8 @@ function average(values: number[]) {
   return Math.round(sum(usable) / usable.length);
 }
 
-function sum(values: number[]) {
-  return values.reduce((total, value) => total + value, 0);
+function sum(values: Array<number | null>) {
+  return values.reduce((total, value) => total + (value ?? 0), 0);
 }
 
 function todayDate() {

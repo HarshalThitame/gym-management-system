@@ -7,7 +7,7 @@ type ReportRow = {
     start_date: string;
     end_date: string;
     payment_status: string;
-    total_amount: number;
+    total_amount: number | null;
   };
   member: {
     member_code: string;

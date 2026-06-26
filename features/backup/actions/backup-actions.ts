@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { writeAuditLog } from "@/lib/audit";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
@@ -68,7 +68,7 @@ export async function startBackupAction(input: unknown): Promise<AuthActionState
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:start:${auth.context.userId}`, 5, 60_000);
+  const rateCheck = await checkRateLimit(`backup:start:${auth.context.userId}`, 5, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   const mfaErr = await verifyMfaStepUp(parsed.data.stepUpEmail);
@@ -121,7 +121,7 @@ export async function deleteBackupAction(input: unknown): Promise<AuthActionStat
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:delete:${auth.context.userId}`, 5, 60_000);
+  const rateCheck = await checkRateLimit(`backup:delete:${auth.context.userId}`, 5, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   const mfaErr = await verifyMfaStepUp(parsed.data.stepUpEmail);
@@ -172,7 +172,7 @@ export async function initiateRecoveryAction(input: unknown): Promise<AuthAction
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:recover:${auth.context.userId}`, 3, 60_000);
+  const rateCheck = await checkRateLimit(`backup:recover:${auth.context.userId}`, 3, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   const mfaErr = await verifyMfaStepUp(parsed.data.stepUpEmail);
@@ -247,7 +247,7 @@ export async function approveRecoveryAction(input: unknown): Promise<AuthActionS
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:approve:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`backup:approve:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   const mfaErr = await verifyMfaStepUp(parsed.data.stepUpEmail);
@@ -310,7 +310,7 @@ export async function saveBackupScheduleAction(input: unknown): Promise<AuthActi
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:schedule:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`backup:schedule:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {
@@ -374,7 +374,7 @@ export async function deleteBackupScheduleAction(input: unknown): Promise<AuthAc
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:schedule:delete:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`backup:schedule:delete:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {
@@ -409,7 +409,7 @@ export async function runBackupVerificationAction(input: unknown): Promise<AuthA
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:verify:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`backup:verify:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {
@@ -450,7 +450,7 @@ export async function generateComplianceReportAction(input: unknown): Promise<Au
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`backup:compliance:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`backup:compliance:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {

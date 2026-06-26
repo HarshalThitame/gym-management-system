@@ -28,6 +28,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   NOT_IMPLEMENTED:    { label: "Not Built",     color: "bg-red-50 text-red-700 border-red-200",            icon: <XCircle className="size-3.5" /> },
   SERVICE_OR_INFRA:   { label: "Service",       color: "bg-gray-50 text-gray-500 border-gray-200",         icon: <Wrench className="size-3.5" /> },
 };
+const DEFAULT_STATUS_CONFIG = {
+  label: "Not Built",
+  color: "bg-red-50 text-red-700 border-red-200",
+  icon: <XCircle className="size-3.5" />,
+};
 
 const SEVERITY_CONFIG: Record<string, { label: string; color: string }> = {
   "P0":  { label: "P0", color: "bg-red-50 text-red-700" },
@@ -35,6 +40,7 @@ const SEVERITY_CONFIG: Record<string, { label: string; color: string }> = {
   "P2":  { label: "P2", color: "bg-yellow-50 text-yellow-700" },
   "N/A": { label: "-",  color: "bg-gray-50 text-gray-400" },
 };
+const DEFAULT_SEVERITY_CONFIG = { label: "-", color: "bg-gray-50 text-gray-400" };
 
 type FilterStatus = "all" | "FULLY_IMPLEMENTED" | "PARTIAL" | "CONFIGURED_ONLY" | "NOT_IMPLEMENTED" | "SERVICE_OR_INFRA";
 type FilterSeverity = "all" | "P0" | "P1" | "P2" | "N/A";
@@ -327,8 +333,8 @@ export function FeatureAuditView({ report }: { report: FeatureAuditReport }) {
             </thead>
             <tbody>
               {filteredFeatures.map((row) => {
-                const statusCfg = STATUS_CONFIG[row.status] ?? STATUS_CONFIG.NOT_IMPLEMENTED;
-                const severityCfg = SEVERITY_CONFIG[row.gapSeverity] ?? SEVERITY_CONFIG["N/A"];
+                const statusCfg = STATUS_CONFIG[row.status] ?? DEFAULT_STATUS_CONFIG;
+                const severityCfg = SEVERITY_CONFIG[row.gapSeverity] ?? DEFAULT_SEVERITY_CONFIG;
                 return (
                   <tr key={row.featureCode} className="border-b hover:bg-muted/30 transition-colors">
                     <td className="p-3 font-mono text-xs">{row.featureCode}</td>

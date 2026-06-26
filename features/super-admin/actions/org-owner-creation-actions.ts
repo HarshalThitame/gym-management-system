@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
@@ -37,7 +37,7 @@ type AuthAdminClient = SupabaseClient<Database> & {
 export async function createOrgOwnerAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/users");
-  const rateCheck = checkRateLimit(`create_org_owner:${context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`create_org_owner:${context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) {
     return { status: "error", message: `Too many creation requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
   }
@@ -161,7 +161,7 @@ export async function createOrgOwnerAction(_previousState: AuthActionState, form
   }).select("id").single();
 
   if (orgError || !org) {
-    await supabase.from("profiles").delete().eq("id", authUserId).catch(() => {});
+    await supabase.from("profiles").delete().eq("id", authUserId);
     await adminClient.auth.admin.deleteUser(authUserId).catch(() => {});
     return { status: "error", message: orgError?.message ?? "Organization creation failed." };
   }

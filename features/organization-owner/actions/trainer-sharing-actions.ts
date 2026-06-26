@@ -51,7 +51,7 @@ export async function getTrainerGymAssignments(
   return (assignments ?? []).map((a) => ({
     gym_id: a.gym_id,
     gym_name: getGymNameFromJoin(a as unknown as Record<string, unknown>),
-    is_primary: a.is_primary,
+    is_primary: a.is_primary ?? false,
   }));
 }
 

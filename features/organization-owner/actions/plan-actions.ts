@@ -5,7 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireOrgFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
+import { requireOrgFeatureAccess, entitlementSimpleCatch } from "@/features/entitlement";
 import { getOrgOwnerContext } from "./action-utils";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 
@@ -38,7 +38,7 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
     revalidatePath("/organization/plan");
     return { status: "success", message: `Auto-renew ${enabled ? "enabled" : "disabled"}.` };
   } catch (e) {
-    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to update auto-renew." };
+    return entitlementSimpleCatch(e, "Failed to update auto-renew.");
   }
 }
 
@@ -117,7 +117,7 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
     revalidatePath("/organization");
     return { status: "success", message: "Subscription cancelled. Auto-renewal is disabled and data will be retained for 30 days." };
   } catch (e) {
-    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to cancel subscription." };
+    return entitlementSimpleCatch(e, "Failed to cancel subscription.");
   }
 }
 
@@ -141,7 +141,7 @@ export async function assignAddonAction(prevState: ActionState, formData: FormDa
     revalidatePath("/organization/plan");
     return { status: "success", message: `Add-on "${addonName}" requested. Our team will activate it shortly.` };
   } catch (e) {
-    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to request add-on." };
+    return entitlementSimpleCatch(e, "Failed to request add-on.");
   }
 }
 
@@ -162,6 +162,6 @@ export async function removeAddonAction(prevState: ActionState, formData: FormDa
     revalidatePath("/organization/plan");
     return { status: "success", message: `Removal request for "${addonName}" submitted.` };
   } catch (e) {
-    return entitlementActionCatch(e) ?? { status: "error", message: e instanceof Error ? e.message : "Failed to request add-on removal." };
+    return entitlementSimpleCatch(e, "Failed to request add-on removal.");
   }
 }

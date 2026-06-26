@@ -50,13 +50,11 @@ export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPan
 
   const fetchLogs = useCallback(async () => {
     try {
-      const result = await getSyncLogs(orgId, {
-        status: logStatusFilter !== "all" ? logStatusFilter : undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        page: logPage,
-        pageSize: 20,
-      });
+      const filters: Parameters<typeof getSyncLogs>[1] = { page: logPage, pageSize: 20 };
+      if (logStatusFilter !== "all") filters.status = logStatusFilter;
+      if (dateFrom) filters.dateFrom = dateFrom;
+      if (dateTo) filters.dateTo = dateTo;
+      const result = await getSyncLogs(orgId, filters);
       setLogs(result.logs);
       setLogTotal(result.total);
     } catch {
@@ -102,7 +100,7 @@ export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPan
   }
 
   const trainerMap = new Map(
-    dashboard.trainers.map((t) => [t.id, t.display_name ?? t.full_name ?? t.id]),
+    dashboard.trainers.map((t) => [t.id, t.display_name ?? t.id]),
   );
 
   return (
@@ -330,7 +328,7 @@ function ConnectionTab({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button onClick={handleSaveConfig} variant="default">
+                <Button onClick={handleSaveConfig} variant="primary">
                   Save Config
                 </Button>
                 <Button onClick={handleSyncAll} variant="secondary" disabled={syncing}>
@@ -461,7 +459,7 @@ function LogsTab({
                       {new Date(log.created_at).toLocaleString("en-IN")}
                     </td>
                     <td className="px-4 py-2.5">
-                      <Badge variant={log.event_type === "sync_error" ? "danger" : "neutral"}>
+                      <Badge variant={log.event_type === "sync_error" ? "error" : "neutral"}>
                         {log.event_type}
                       </Badge>
                     </td>
@@ -471,7 +469,7 @@ function LogsTab({
                     <td className="px-4 py-2.5">
                       <Badge
                         variant={
-                          log.status === "success" ? "success" : log.status === "failed" ? "danger" : "warning"
+                          log.status === "success" ? "success" : log.status === "failed" ? "error" : "warning"
                         }
                       >
                         {log.status}

@@ -516,7 +516,7 @@ function DunningSuspendModal({ invoice, organizations, subscriptions, onClose, o
         <div className="space-y-3">
           <p className="text-xs font-semibold">{orgName} · {formatCurrency(invoice.total_amount ?? invoice.subtotal_amount ?? 0)} overdue</p>
           <div><label className="text-xs font-black uppercase text-muted-foreground">Reason (min 10 chars)</label><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 h-20 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Why is this being suspended?" /></div>
-          <div><label className="text-xs font-black uppercase text-muted-foreground">Type "SUSPEND" to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="SUSPEND" /></div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Type &quot;SUSPEND&quot; to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="SUSPEND" /></div>
           <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="destructive" onClick={handleSubmit} disabled={reason.trim().length < 10 || confirmText !== "SUSPEND" || loading}>{loading ? <Loader2 className="size-4 animate-spin" /> : <PauseCircle className="size-4" />}Suspend</Button></div>
         </div>
       </div>
@@ -551,7 +551,7 @@ function DunningReactivateModal({ invoice, organizations, subscriptions, onClose
         <div className="space-y-3">
           <p className="text-xs font-semibold">{orgName} · Currently suspended</p>
           <div><label className="text-xs font-black uppercase text-muted-foreground">Reason</label><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1 h-20 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="Reason for reactivation..." /></div>
-          <div><label className="text-xs font-black uppercase text-muted-foreground">Type "REACTIVATE" to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="REACTIVATE" /></div>
+          <div><label className="text-xs font-black uppercase text-muted-foreground">Type &quot;REACTIVATE&quot; to confirm</label><input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="REACTIVATE" /></div>
           <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!reason.trim() || confirmText !== "REACTIVATE" || loading}>{loading ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}Reactivate</Button></div>
         </div>
       </div>

@@ -2,8 +2,8 @@
 
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { requireApiRole } from "@/lib/api-middleware/auth";
-import { getOrganizationEntitlements } from "@/features/super-admin/services/entitlement-service";
+import { requireApiRole } from "@/lib/auth/api-guards";
+import { getOrganizationEntitlements } from "@/features/entitlement/entitlement-service";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { FEATURE_KEYS } from "@/features/entitlement/feature-registry";
 
@@ -100,7 +100,7 @@ export async function validateFeatureKeyIntegrity(): Promise<FeatureKeyIntegrity
         .select("code");
 
       const catalogSet = new Set((catalogKeys ?? []).map((k: { code: string }) => k.code));
-      const registrySet = new Set(FEATURE_KEYS);
+      const registrySet: ReadonlySet<string> = new Set(FEATURE_KEYS);
 
       // Keys in database but not in registry
       for (const key of catalogSet) {
@@ -176,7 +176,7 @@ export async function verifyPackageFeaturesForOrg(
     return {
       organizationId,
       packageName: entitlements.packageName ?? "Unknown",
-      packageFeatures: entitlements.packageFeatures ?? [],
+      packageFeatures: entitlements.activeFeatureKeys ?? [],
       activeFeatureKeys: entitlements.activeFeatureKeys ?? [],
       missingFeatures: [],
       extraFeatures: [],

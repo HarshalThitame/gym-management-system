@@ -189,7 +189,7 @@ export function LeadPipelinePanel({ dashboard, hasFeature, onOpenDetail }: Props
                     >
                       <CardContent className="p-3">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className={`size-2 rounded-full shrink-0 ${getScoreColor(lead.lead_score)}`} title={`Score: ${lead.lead_score}`} />
+                          <span className={`size-2 rounded-full shrink-0 ${getScoreColor(lead.lead_score ?? 0)}`} title={`Score: ${lead.lead_score ?? 0}`} />
                           <span className="text-sm font-bold truncate">{lead.name}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">

@@ -1,12 +1,18 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { FEATURE_KEYS, FEATURE_CATEGORIES, MODULE_FEATURE_MAP } from "@/features/entitlement/feature-registry";
+import { FEATURE_CATEGORIES, MODULE_FEATURE_MAP, isFeatureKey } from "@/features/entitlement/feature-registry";
 import type { FeatureKey, FeatureCategoryCode } from "@/features/entitlement/feature-registry";
 import { organizationOwnerModules } from "@/features/organization-owner/lib/organization-owner-modules";
 import type { ImplementationStatus, GapSeverity, FeatureAuditRow, PlanAudit, FeatureAuditReport } from "./feature-audit-types";
 
 type RawRow = Record<string, unknown>;
+type QueryResult = { data: RawRow[] | null; error: { message: string } | null };
+type QueryBuilder = PromiseLike<QueryResult> & {
+  eq(k: string, v: unknown): QueryBuilder;
+  in(k: string, vals: readonly unknown[]): QueryBuilder;
+  order(k: string, o: { ascending: boolean }): QueryBuilder;
+};
 
 function asString(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -334,12 +340,7 @@ export async function buildFeatureAuditReport(): Promise<FeatureAuditReport> {
 
   const db = supabase as unknown as {
     from(t: string): {
-      select(c: string): {
-        eq(k: string, v: unknown): Promise<{ data: RawRow[] | null; error: { message: string } | null }>;
-        in(k: string, vals: unknown[]): {
-          order(k: string, o: { ascending: boolean }): Promise<{ data: RawRow[] | null; error: { message: string } | null }>;
-        };
-      };
+      select(c: string): QueryBuilder;
     };
   };
 
@@ -362,7 +363,6 @@ export async function buildFeatureAuditReport(): Promise<FeatureAuditReport> {
     }
   }
 
-  const featureKeySet = new Set(FEATURE_KEYS);
   const moduleMapReverse: Record<string, string> = {};
   for (const [moduleSlug, featureKey] of Object.entries(MODULE_FEATURE_MAP)) {
     moduleMapReverse[featureKey] = moduleSlug;
@@ -398,7 +398,7 @@ export async function buildFeatureAuditReport(): Promise<FeatureAuditReport> {
 
       const implInfo = getImplementationInfo(featureCode);
 
-      const isInFeatureKeys = featureKeySet.has(featureCode);
+      const isInFeatureKeys = isFeatureKey(featureCode);
       const moduleMapEntry = moduleMapReverse[featureCode] ?? null;
       const sidebarLabel = sidebarModuleLabels[featureCode] ?? null;
 

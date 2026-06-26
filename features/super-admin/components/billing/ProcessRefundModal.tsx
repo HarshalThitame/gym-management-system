@@ -138,7 +138,7 @@ export function ProcessRefundModal({
           <InlineMfaStepUp compact />
 
           <div>
-            <label className="text-xs font-black uppercase text-muted-foreground">Type "REFUND:{amount}" to confirm</label>
+            <label className="text-xs font-black uppercase text-muted-foreground">Type &quot;REFUND:{amount}&quot; to confirm</label>
             <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder={`REFUND:${amount}`} />
           </div>
 

@@ -319,16 +319,18 @@ export async function processReferralOnJoin(
     .maybeSingle();
 
   if (!config || !config.is_active) return;
+  const maxRewardsPerReferrer = config.max_rewards_per_referrer ?? 0;
+  const minMembershipDays = config.min_membership_days ?? 0;
 
   // Enforce max rewards per referrer
-  if (config.max_rewards_per_referrer > 0) {
+  if (maxRewardsPerReferrer > 0) {
     const { count } = await supabase
       .from("referral_rewards")
       .select("id", { count: "exact", head: true })
       .eq("referrer_id", referrer.id)
       .eq("status", "earned");
 
-    if ((count ?? 0) >= config.max_rewards_per_referrer) return;
+    if ((count ?? 0) >= maxRewardsPerReferrer) return;
   }
 
   // Set referred_by on new member
@@ -339,7 +341,7 @@ export async function processReferralOnJoin(
 
   // Set expiry date: min_membership_days * 2 from now (reward expires if not earned)
   const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + (config.min_membership_days * 2));
+  expiryDate.setDate(expiryDate.getDate() + (minMembershipDays * 2));
 
   // Create pending reward
   const { error } = await supabase
@@ -421,7 +423,7 @@ export async function autoEarnReferralRewardsForMember(memberId: string): Promis
       (Date.now() - new Date(oldestMembership.start_date).getTime()) / (86400000)
     );
 
-    if (membershipAge >= config.min_membership_days) {
+    if (membershipAge >= (config.min_membership_days ?? 0)) {
       await markRewardEarned(reward.organization_id, reward.id, oldestMembership.id);
     }
   }

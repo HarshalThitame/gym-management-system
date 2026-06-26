@@ -19,10 +19,12 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
     const result = data?.[0];
 
     if (!error && result) {
+      const resetAt = new Date(result.reset_at).getTime();
       return {
         allowed: result.allowed,
         remaining: result.remaining,
-        resetAt: new Date(result.reset_at).getTime()
+        resetAt,
+        retryAfterMs: Math.max(0, resetAt - Date.now())
       };
     }
   }
@@ -37,13 +39,13 @@ function checkFallbackRateLimit(key: string, limit: number, windowMs: number) {
   if (!current || current.resetAt <= now) {
     const resetAt = now + windowMs;
     fallbackBuckets.set(key, { count: 1, resetAt });
-    return { allowed: true, remaining: limit - 1, resetAt };
+    return { allowed: true, remaining: limit - 1, resetAt, retryAfterMs: 0 };
   }
 
   if (current.count >= limit) {
-    return { allowed: false, remaining: 0, resetAt: current.resetAt };
+    return { allowed: false, remaining: 0, resetAt: current.resetAt, retryAfterMs: Math.max(0, current.resetAt - now) };
   }
 
   current.count += 1;
-  return { allowed: true, remaining: limit - current.count, resetAt: current.resetAt };
+  return { allowed: true, remaining: limit - current.count, resetAt: current.resetAt, retryAfterMs: 0 };
 }

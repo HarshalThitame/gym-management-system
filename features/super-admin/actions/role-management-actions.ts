@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   createRoleSchema,
   updateRoleSchema,
@@ -85,7 +85,7 @@ function revalidatePaths() {
 export async function createRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/roles");
-  const rateCheck = checkRateLimit(`create-role:${context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`create-role:${context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) {
     return { status: "error", message: `Too many requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
   }
@@ -117,7 +117,7 @@ export async function createRoleAction(_previousState: AuthActionState, formData
 export async function updateRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/roles");
-  const rateCheck = checkRateLimit(`update-role:${context.userId}`, 20, 60_000);
+  const rateCheck = await checkRateLimit(`update-role:${context.userId}`, 20, 60_000);
   if (!rateCheck.allowed) {
     return { status: "error", message: `Too many requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
   }
@@ -149,7 +149,7 @@ export async function updateRoleAction(_previousState: AuthActionState, formData
 export async function deleteRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/roles");
-  const rateCheck = checkRateLimit(`delete-role:${context.userId}`, 5, 60_000);
+  const rateCheck = await checkRateLimit(`delete-role:${context.userId}`, 5, 60_000);
   if (!rateCheck.allowed) {
     return { status: "error", message: `Too many requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
   }
@@ -162,6 +162,10 @@ export async function deleteRoleAction(_previousState: AuthActionState, formData
   });
 
   if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
+
+  if (parsed.data.confirmation !== "DELETE") {
+    return fieldError("confirmation", "Type DELETE to confirm.");
+  }
 
   const supabase = await createSupabaseServerClient();
   const criticalAccess = await verifyCriticalSuperAdminAccess(context, supabase, parsed.data.stepUpEmail);
@@ -197,10 +201,18 @@ export async function updateRolePermissionsAction(_previousState: AuthActionStat
   try { resources = JSON.parse(resourcesJson); }
   catch { return fieldError("resources", "Invalid permissions format."); }
 
-  const parsed = updateRolePermissionsSchema.safeParse({ roleId, permissions: resources });
+  const parsed = updateRolePermissionsSchema.safeParse({
+    roleId,
+    permissions: resources,
+    stepUpEmail: formData.get("stepUpEmail"),
+    reason: formData.get("reason") ?? ""
+  });
   if (!parsed.success) return validationState(parsed.error.flatten().fieldErrors);
 
   const supabase = await createSupabaseServerClient();
+  const criticalAccess = await verifyCriticalSuperAdminAccess(context, supabase, parsed.data.stepUpEmail);
+  if (!criticalAccess.ok) return criticalAccess.state;
+
   const { data: targetRole } = await supabase.from("roles").select("is_system").eq("id", parsed.data.roleId).single();
   if ((targetRole as unknown as { is_system: boolean })?.is_system) {
     return { status: "error", message: "System role permissions cannot be modified." };
@@ -213,7 +225,7 @@ export async function updateRolePermissionsAction(_previousState: AuthActionStat
       action: "role.permissions.update",
       entityType: "roles",
       entityId: parsed.data.roleId,
-      metadata: { permissionCount: parsed.data.permissions.length }
+      metadata: { permissionCount: parsed.data.permissions.length, reason: parsed.data.reason ?? "" }
     });
     revalidatePaths();
     return { status: "success", message: "Permissions updated." };
@@ -225,7 +237,7 @@ export async function updateRolePermissionsAction(_previousState: AuthActionStat
 export async function assignUserRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/roles");
-  const rateCheck = checkRateLimit(`assign-role:${context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`assign-role:${context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) {
     return { status: "error", message: `Too many requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
   }
@@ -278,7 +290,7 @@ export async function assignUserRoleAction(_previousState: AuthActionState, form
 export async function unassignUserRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/roles");
-  const rateCheck = checkRateLimit(`unassign-role:${context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`unassign-role:${context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) {
     return { status: "error", message: `Too many requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
   }
@@ -319,7 +331,7 @@ export async function unassignUserRoleAction(_previousState: AuthActionState, fo
 export async function cloneRoleAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(superAdminRoles, "/super-admin/roles");
-  const rateCheck = checkRateLimit(`clone-role:${context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`clone-role:${context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) {
     return { status: "error", message: `Too many requests. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
   }

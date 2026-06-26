@@ -77,12 +77,12 @@ export function LoyaltyPointsPanel({ dashboard, hasFeature }: LoyaltyPointsPanel
       const data = await getPointsSummary(dashboard.organization.id);
       setSummary(data);
       if (data.config) {
-        setPointsPerCheckIn(data.config.points_per_check_in);
-        setPointsPerRenewal(data.config.points_per_renewal_percentage);
-        setPointsPerReferral(data.config.points_per_referral);
-        setRedemptionRate(data.config.points_redemption_rate);
-        setMinPointsToRedeem(data.config.min_points_to_redeem);
-        setMaxRedemptionPct(data.config.max_redemption_percentage);
+        setPointsPerCheckIn(data.config.points_per_check_in ?? 0);
+        setPointsPerRenewal(data.config.points_per_renewal_percentage ?? 0);
+        setPointsPerReferral(data.config.points_per_referral ?? 0);
+        setRedemptionRate(data.config.points_redemption_rate ?? 1);
+        setMinPointsToRedeem(data.config.min_points_to_redeem ?? 0);
+        setMaxRedemptionPct(data.config.max_redemption_percentage ?? 0);
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Failed to load loyalty summary.", "error");

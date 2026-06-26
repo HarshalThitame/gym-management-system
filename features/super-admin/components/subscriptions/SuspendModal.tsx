@@ -86,7 +86,7 @@ export function SuspendModal({ sub, orgId, onClose, onSuccess }: SuspendModalPro
           <InlineMfaStepUp compact />
 
           <div>
-            <label className="text-xs font-black uppercase text-muted-foreground">Type "SUSPEND" to confirm</label>
+            <label className="text-xs font-black uppercase text-muted-foreground">Type &quot;SUSPEND&quot; to confirm</label>
             <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-sm" placeholder="SUSPEND" />
           </div>
 

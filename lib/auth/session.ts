@@ -2,7 +2,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { getPrimaryRole } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
-import type { AuthContext, AuthProfile, RoleName } from "@/types/auth";
+import type { AuthContext, AuthProfile, ProfileStatus, RoleName } from "@/types/auth";
 import { isRoleName } from "@/types/auth";
 
 const anonymousContext: AuthContext = {
@@ -68,8 +68,15 @@ export async function getAuthContext(): Promise<AuthContext> {
   };
 }
 
-function toAuthProfile(profile: AuthProfile): AuthProfile {
-  return profile;
+function toAuthProfile(profile: Omit<AuthProfile, "status"> & { status: string }): AuthProfile {
+  return {
+    ...profile,
+    status: normalizeProfileStatus(profile.status)
+  };
+}
+
+function normalizeProfileStatus(status: string): ProfileStatus {
+  return status === "active" || status === "invited" || status === "suspended" || status === "archived" ? status : "active";
 }
 
 async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, gymId: string | null, branchId: string | null) {

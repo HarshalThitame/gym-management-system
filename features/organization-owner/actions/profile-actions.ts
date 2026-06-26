@@ -34,6 +34,6 @@ export async function saveOrganizationProfileAction(prevState: AuthActionState, 
     revalidateOrgModules(["/organization/profile"]);
     return { ...prevState, status: "success", message: "Organization profile updated." };
   } catch (error) {
-    return entitlementActionCatch(error) ?? { ...prevState, status: "error", message: error instanceof Error ? error.message : "Failed to update profile." };
+    return entitlementActionCatch(prevState, error, "Failed to update profile.");
   }
 }

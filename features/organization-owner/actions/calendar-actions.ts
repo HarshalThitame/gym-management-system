@@ -57,6 +57,16 @@ type SyncLogFilters = {
   pageSize?: number;
 };
 
+type UnsafeSupabase = {
+  // Local shim for newly added calendar tables that are not present in generated Database types yet.
+  // Regenerate types after applying the calendar migrations, then remove this cast.
+  from(table: string): any;
+};
+
+async function createCalendarDb() {
+  return (await createSupabaseServerClient()) as unknown as UnsafeSupabase;
+}
+
 // ─── Integration management ─────────────────────────────────────────────────
 
 export async function getCalendarIntegration(
@@ -68,7 +78,7 @@ export async function getCalendarIntegration(
     actionName: "calendar.get_integration",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
   const { data, error } = await supabase
     .from("calendar_integrations")
     .select("*")
@@ -90,7 +100,7 @@ export async function saveCalendarConfig(
     actionName: "calendar.save_config",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
   const { data: existing } = await supabase
     .from("calendar_integrations")
     .select("id")
@@ -142,7 +152,7 @@ export async function disconnectCalendar(organizationId: string): Promise<void> 
     actionName: "calendar.disconnect",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
   const { data: existing } = await supabase
     .from("calendar_integrations")
     .select("id")
@@ -182,7 +192,7 @@ export async function syncClassSessionToCalendar(
   const hasAccess = await hasFeatureAccess(organizationId, "google_calendar_sync");
   if (!hasAccess) return { synced: false };
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
 
   const [integrationRes, sessionRes] = await Promise.all([
     supabase
@@ -250,7 +260,7 @@ export async function deleteCalendarEvent(
   const hasAccess = await hasFeatureAccess(organizationId, "google_calendar_sync");
   if (!hasAccess) return { deleted: false };
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
 
   const { data: integration } = await supabase
     .from("calendar_integrations")
@@ -300,7 +310,7 @@ export async function syncAllUpcomingClasses(
     actionName: "calendar.sync_all",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
 
   const [integrationRes, sessionsRes] = await Promise.all([
     supabase
@@ -370,7 +380,7 @@ export async function getSyncLogs(
     actionName: "calendar.get_logs",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
   const page = Math.max(1, filters?.page ?? 1);
   const pageSize = Math.min(50, Math.max(5, filters?.pageSize ?? 20));
 
@@ -423,7 +433,7 @@ export async function handleGoogleCallback(
     actionName: "calendar.handle_callback",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
 
   // Stubbed: exchange code for tokens via Google OAuth2 API
   // const tokens = await exchangeCodeForTokens(code);
@@ -486,7 +496,7 @@ export async function getTrainerCalendarConnections(
     actionName: "calendar.get_trainer_connections",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
   const { data, error } = await supabase
     .from("trainer_calendar_connections")
     .select("*")
@@ -506,7 +516,7 @@ export async function connectTrainerCalendar(
     actionName: "calendar.connect_trainer",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
   const { data: existing } = await supabase
     .from("trainer_calendar_connections")
     .select("id")
@@ -554,7 +564,7 @@ export async function disconnectTrainerCalendar(
     actionName: "calendar.disconnect_trainer",
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createCalendarDb();
   await supabase
     .from("trainer_calendar_connections")
     .update({

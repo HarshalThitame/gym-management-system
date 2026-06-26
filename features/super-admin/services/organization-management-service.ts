@@ -1092,13 +1092,13 @@ function buildActivityTimelineByOrganization(
       actorId: event.actor_id,
       actorName: null,
       actorEmail: null,
-      severity: event.severity,
+      severity: auditTimelineSeverity(event.severity),
       entityType: event.entity_type,
       entityId: event.entity_id,
       createdAt: event.created_at,
-      metadata: event.metadata,
-      ipAddress: event.ip_address,
-      userAgent: event.user_agent,
+      metadata: normalizeJson(event.metadata),
+      ipAddress: asNullableString(event.ip_address),
+      userAgent: asNullableString(event.user_agent),
       source: "activity_events"
     });
   }
@@ -1117,9 +1117,9 @@ function buildActivityTimelineByOrganization(
       entityType: log.entity_type,
       entityId: log.entity_id,
       createdAt: log.created_at,
-      metadata: log.metadata,
-      ipAddress: log.ip_address,
-      userAgent: log.user_agent,
+      metadata: normalizeJson(log.metadata),
+      ipAddress: asNullableString(log.ip_address),
+      userAgent: asNullableString(log.user_agent),
       source: "audit_logs"
     });
   }
@@ -1640,6 +1640,23 @@ function pushTimeline(timeline: Map<string, OrganizationAuditTimelineItem[]>, or
   timeline.set(organizationId, existing);
 }
 
+function auditTimelineSeverity(severity: string | null): OrganizationAuditTimelineItem["severity"] {
+  if (severity === "critical") {
+    return "critical";
+  }
+  if (severity === "warning" || severity === "high" || severity === "medium") {
+    return "warning";
+  }
+  if (severity === "notice") {
+    return "notice";
+  }
+  return "info";
+}
+
+function asNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
 function severityFromAction(action: string): OrganizationAuditTimelineItem["severity"] {
   if (/delete|suspend|critical|revoke/i.test(action)) {
     return "critical";
@@ -1648,6 +1665,20 @@ function severityFromAction(action: string): OrganizationAuditTimelineItem["seve
     return "notice";
   }
   return "info";
+}
+
+function normalizeJson(value: unknown): Json {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    Array.isArray(value) ||
+    typeof value === "object"
+  ) {
+    return value as Json;
+  }
+  return null;
 }
 
 function limitPercent(used: number, limit: number | null) {

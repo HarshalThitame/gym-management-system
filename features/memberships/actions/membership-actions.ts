@@ -21,7 +21,7 @@ import {
 } from "@/features/entitlement";
 import { applySplitRules } from "@/features/organization-owner/actions/revenue-split-actions";
 import { autoEarnReferralRewardsForMember } from "@/features/organization-owner/actions/referral-actions";
-import type { MemberDocumentType, MembershipEvent, MembershipPlanRow, MembershipRow, MembershipStatus } from "@/types/membership";
+import { membershipStatuses, type MemberDocumentType, type MembershipEvent, type MembershipPlanRow, type MembershipRow, type MembershipStatus } from "@/types/membership";
 import {
   calculateEndDate,
   classifyPlanChange,
@@ -461,10 +461,11 @@ export async function renewMembershipAction(_previousState: AuthActionState, for
             .select("points")
             .eq("member_id", membership.member_id);
           const currentBalance = (balance.data ?? []).reduce((sum: number, r: { points: number }) => sum + r.points, 0);
+          const maxRedemptionPercentage = loyaltyConfig.max_redemption_percentage ?? 0;
           if (currentBalance >= redeemPoints && redeemPoints >= loyaltyConfig.min_points_to_redeem) {
             loyaltyDiscountPaise = Math.round(redeemPoints * 100 / loyaltyConfig.points_redemption_rate);
             const subtotal = plan.price_amount;
-            const maxRedemptionPaise = Math.floor(subtotal * loyaltyConfig.max_redemption_percentage / 100);
+            const maxRedemptionPaise = Math.floor(subtotal * maxRedemptionPercentage / 100);
             if (loyaltyDiscountPaise > maxRedemptionPaise) {
               loyaltyDiscountPaise = maxRedemptionPaise;
             }
@@ -692,6 +693,10 @@ export async function changeMembershipStatusAction(_previousState: AuthActionSta
 
   if (membership.gym_id !== scope.gymId) {
     return { status: "error", message: "Membership does not belong to this gym." };
+  }
+
+  if (!isMembershipStatus(membership.status)) {
+    return { status: "error", message: "Membership has an invalid status." };
   }
 
   const transitionError = validateStatusTransition(membership.status, parsed.data.nextStatus);
@@ -980,7 +985,7 @@ async function createMembershipRecord(input: {
       reason: input.notes,
       actorId: input.actorId
     }),
-    insertStatusLog(input.supabase, data, data.status, "Membership created", input.actorId),
+    insertStatusLog(input.supabase, data, isMembershipStatus(data.status) ? data.status : "pending", "Membership created", input.actorId),
     input.supabase.from("membership_notification_events").insert({
       gym_id: input.gymId,
       membership_id: data.id,
@@ -1349,7 +1354,7 @@ async function getActiveMemberCountForOrganization(supabase: SupabaseClient<Data
 }
 
 async function generateMemberCode(supabase: SupabaseClient<Database>, gymId: string | null) {
-  const { data, error } = await supabase.rpc("generate_member_code", { target_gym_id: gymId });
+  const { data, error } = await supabase.rpc("generate_member_code", { target_gym_id: gymId ?? "" });
 
   if (error || !data) {
     return `APX-${Date.now().toString().slice(-5)}`;
@@ -1481,6 +1486,10 @@ function readFeatureQuantities(formData: FormData) {
   );
 }
 
+function isMembershipStatus(status: string): status is MembershipStatus {
+  return (membershipStatuses as readonly string[]).includes(status);
+}
+
 function membershipTimestampUpdate(status: MembershipStatus) {
   const now = new Date().toISOString();
 
@@ -1532,7 +1541,7 @@ function normalizeMembershipDiscount(paymentStatus: MembershipRow["payment_statu
 }
 
 async function generateBillingInvoiceNumber(supabase: SupabaseClient<Database>, gymId: string | null) {
-  const { data, error } = await supabase.rpc("generate_invoice_number", { target_gym_id: gymId });
+  const { data, error } = await supabase.rpc("generate_invoice_number", { target_gym_id: gymId ?? "" });
 
   if (error || !data) {
     return generateInvoiceNumber();
@@ -1542,7 +1551,7 @@ async function generateBillingInvoiceNumber(supabase: SupabaseClient<Database>, 
 }
 
 async function generatePaymentNumber(supabase: SupabaseClient<Database>, gymId: string | null) {
-  const { data, error } = await supabase.rpc("generate_payment_number", { target_gym_id: gymId });
+  const { data, error } = await supabase.rpc("generate_payment_number", { target_gym_id: gymId ?? "" });
 
   if (error || !data) {
     return `PAY-${formatISO(new Date(), { representation: "date" }).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`;

@@ -556,6 +556,7 @@ function buildRuleBasedExecutiveInsights(analytics: Awaited<ReturnType<typeof ge
   return [{
     id: "generated-retention",
     gym_id: gymId,
+    branch_id: null,
     insight_type: "retention" as const,
     title: "Retention attention required",
     summary: `${risk} members show churn or inactivity risk based on expiry and attendance patterns.`,

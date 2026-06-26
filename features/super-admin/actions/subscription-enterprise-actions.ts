@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
@@ -110,7 +110,7 @@ export async function upgradePlanAction(input: unknown): Promise<AuthActionState
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`upgrade:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`upgrade:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {
@@ -245,7 +245,7 @@ export async function downgradePlanAction(input: unknown): Promise<AuthActionSta
   const auth = await requireApiRole(superAdminRoles);
   if (!auth.ok) return { status: "error", message: "Super Admin access required." };
 
-  const rateCheck = checkRateLimit(`downgrade:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`downgrade:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {
@@ -391,7 +391,7 @@ export async function cancelSubscriptionAction(input: unknown): Promise<AuthActi
   const mfaError = await verifyMfaStepUp(parsed.data.stepUpEmail);
   if (mfaError) return mfaError;
 
-  const rateCheck = checkRateLimit(`cancel:${auth.context.userId}`, 5, 60_000);
+  const rateCheck = await checkRateLimit(`cancel:${auth.context.userId}`, 5, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {
@@ -744,7 +744,7 @@ export async function overrideSubscriptionPriceAction(input: unknown): Promise<A
   const mfaError = await verifyMfaStepUp(parsed.data.stepUpEmail);
   if (mfaError) return mfaError;
 
-  const rateCheck = checkRateLimit(`override-price:${auth.context.userId}`, 10, 60_000);
+  const rateCheck = await checkRateLimit(`override-price:${auth.context.userId}`, 10, 60_000);
   if (!rateCheck.allowed) return { status: "error", message: `Rate limited. Retry in ${Math.ceil(rateCheck.retryAfterMs / 1000)}s.` };
 
   try {

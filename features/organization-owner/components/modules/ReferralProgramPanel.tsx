@@ -76,9 +76,9 @@ export function ReferralProgramPanel({ dashboard, hasFeature }: ReferralProgramP
       // Populate config form
       if (data.config) {
         setRewardType(data.config.reward_type);
-        setRewardValue(data.config.reward_value);
-        setMinMembershipDays(data.config.min_membership_days);
-        setMaxRewards(data.config.max_rewards_per_referrer);
+        setRewardValue(data.config.reward_value ?? 0);
+        setMinMembershipDays(data.config.min_membership_days ?? 0);
+        setMaxRewards(data.config.max_rewards_per_referrer ?? 0);
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Failed to load referral stats.", "error");
