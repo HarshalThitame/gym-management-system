@@ -207,7 +207,7 @@ async function buildExecutiveAnalyticsDashboard(supabase: SupabaseClient<Databas
   const churnRate = Math.max(0, 100 - retentionRate);
   const leadConversion = percent(leads.filter((lead) => lead.status === "converted").length, leads.length);
   const goalCompletionRate = percent(goals.filter((goal) => goal.status === "completed").length, goals.length);
-  const estimatedLifetimeValue = estimateLifetimeValue(monthRevenue, activeMemberships.length, retentionRate);
+  const estimatedLifetimeValue = estimateLifetimeValue(monthRevenue ?? 0, activeMemberships.length, retentionRate);
   const revenueTrend = buildRevenueTrend(paidPayments, last30, today);
   const membershipTrend = buildMembershipTrend(members, memberships, last30, today);
   const attendanceTrend = attendanceDaily.map((row) => ({ date: row.attendance_date ?? "", visits: row.total_check_ins ?? 0, uniqueMembers: row.unique_members ?? 0 })).slice(-30);
@@ -223,8 +223,8 @@ async function buildExecutiveAnalyticsDashboard(supabase: SupabaseClient<Databas
   ];
   const generatedInsights = buildGeneratedInsights({
     gymId,
-    monthRevenue,
-    previousMonthRevenue,
+    monthRevenue: monthRevenue ?? 0,
+    previousMonthRevenue: previousMonthRevenue ?? 0,
     attendanceToday,
     averageTrainerUtilization,
     averageClassUtilization,
@@ -235,8 +235,8 @@ async function buildExecutiveAnalyticsDashboard(supabase: SupabaseClient<Databas
 
   return {
     kpis: [
-      kpi("today_revenue", "Today's Revenue", "revenue", todayRevenue, 0, formatCurrency(todayRevenue), "Collected today", "Live daily revenue"),
-      kpi("monthly_revenue", "Monthly Revenue", "revenue", monthRevenue, previousMonthRevenue, formatCurrency(monthRevenue), "vs last month", "Paid and partially refunded payments"),
+      kpi("today_revenue", "Today's Revenue", "revenue", todayRevenue ?? 0, 0, formatCurrency(todayRevenue), "Collected today", "Live daily revenue"),
+      kpi("monthly_revenue", "Monthly Revenue", "revenue", monthRevenue ?? 0, previousMonthRevenue ?? 0, formatCurrency(monthRevenue), "vs last month", "Paid and partially refunded payments"),
       kpi("active_members", "Active Members", "membership", activeMemberships.length, expiredMemberships.length, formatCompactNumber(activeMemberships.length), `${expiredMemberships.length} expired`, "Current active memberships"),
       kpi("new_members", "New Members", "membership", newMembersThisMonth, 0, formatCompactNumber(newMembersThisMonth), "this month", "New member records"),
       kpi("renewals", "Renewals", "retention", renewalsThisMonth, 0, formatCompactNumber(renewalsThisMonth), "this month", "Renewal memberships"),
@@ -625,8 +625,10 @@ function average(values: number[]) {
   return Math.round(sum(usable) / usable.length);
 }
 
-function sum(values: Array<number | null>) {
-  return values.reduce((total, value) => total + (value ?? 0), 0);
+function sum(values: Array<number | null>): number {
+  let s = 0;
+  for (const v of values) s += v ?? 0;
+  return s;
 }
 
 function todayDate() {
