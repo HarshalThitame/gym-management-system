@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   ClipboardCopy,
+  Download,
   Loader2,
   Pencil,
   Plus,
@@ -22,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
@@ -92,6 +94,14 @@ export function RoleManagementWorkspace({
             Define custom roles, configure resource-level permissions, and manage role-to-user assignments.
           </p>
         </div>
+        <a
+          href={`/api/super-admin/roles/export?format=csv`}
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-black hover:bg-surface-muted transition-all"
+          target="_blank"
+        >
+          <Download className="size-3.5" />
+          CSV
+        </a>
         <Button onClick={() => setDrawer({ type: "create" })}>
           <Plus className="mr-2 size-4" />
           Create Role
@@ -108,23 +118,12 @@ export function RoleManagementWorkspace({
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative min-w-0 flex-1">
-              <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="h-11 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-base shadow-sm"
-                placeholder="Search roles by name, display name, or description..."
-                aria-label="Search roles"
-                defaultValue={data.filters.query}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const params = new URLSearchParams(searchParams.toString());
-                    params.set("q", (e.target as HTMLInputElement).value);
-                    params.set("page", "1");
-                    router.push(`/super-admin/roles?${params.toString()}`);
-                  }
-                }}
-              />
-            </div>
+            <SearchInput
+              value={data.filters.query}
+              onChange={(v) => { const params = new URLSearchParams(searchParams.toString()); params.set("q", v); params.set("page", "1"); router.push(`/super-admin/roles?${params.toString()}`); }}
+              placeholder="Search roles by name, display name, or description..."
+              className="min-w-0 flex-1"
+            />
             <select
               className={selectClass}
               aria-label="Filter by role type"

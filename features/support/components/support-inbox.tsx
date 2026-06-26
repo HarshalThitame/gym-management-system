@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, Search, RefreshCw, ArrowUpDown, MessageSquare, Clock } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronDown, ChevronUp, Search, RefreshCw, ArrowUpDown, MessageSquare, Clock, Download } from "lucide-react";
 import type { TicketWithRelations } from "@/types/enterprise";
 import { SupportBulkActions } from "./support-bulk-actions";
 import { SupportSavedViews } from "./support-saved-views";
+import { Pagination } from "@/components/ui/pagination";
 import { SupportSlaTimerBadge } from "./support-sla-timer-badge";
 import type { SavedView } from "../services/support-saved-views-service";
 
@@ -55,9 +56,10 @@ export function SupportInbox({
   onDeleteView: (viewId: string) => void;
 }) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
+  const [priorityFilter, setPriorityFilter] = useState(searchParams.get("priority") ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -144,11 +146,11 @@ export function SupportInbox({
             type="text"
             placeholder="Search by ticket #, subject, or customer..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); const p = new URLSearchParams(searchParams.toString()); p.set("q", e.target.value); router.push(`/super-admin/support?${p.toString()}`); }}
             className="w-full h-9 pl-8 pr-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
           />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); const p = new URLSearchParams(searchParams.toString()); p.set("status", e.target.value); router.push(`/super-admin/support?${p.toString()}`); }}
           className="h-9 rounded-lg border border-border bg-background px-2.5 text-xs min-w-[130px] focus:outline-none focus:ring-2 focus:ring-primary/20">
           <option value="">All Statuses</option>
           <option value="open, in_review, in_progress">Active</option>
@@ -160,7 +162,7 @@ export function SupportInbox({
           <option value="closed">Closed</option>
           <option value="reopened">Reopened</option>
         </select>
-        <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}
+        <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); const p = new URLSearchParams(searchParams.toString()); p.set("priority", e.target.value); router.push(`/super-admin/support?${p.toString()}`); }}
           className="h-9 rounded-lg border border-border bg-background px-2.5 text-xs min-w-[110px] focus:outline-none focus:ring-2 focus:ring-primary/20">
           <option value="">All Priorities</option>
           <option value="emergency">Emergency</option>
@@ -172,6 +174,14 @@ export function SupportInbox({
         <button onClick={onRefresh} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border hover:bg-muted transition-colors" title="Refresh">
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
+        <a
+          href={`/api/super-admin/support/export?format=csv`}
+          className="h-9 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-medium hover:bg-muted transition-colors"
+          target="_blank"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export
+        </a>
       </div>
 
       {selected.size > 0 && (
@@ -295,17 +305,13 @@ export function SupportInbox({
       </div>
 
       {total > pageSize && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Showing {Math.min((page - 1) * pageSize + 1, total)}–{Math.min(page * pageSize, total)} of {total}</span>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: Math.ceil(total / pageSize) }, (_, i) => i + 1).slice(0, 7).map((p) => (
-              <button key={p} className={`w-7 h-7 rounded-md text-xs font-medium transition-colors ${p === page ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
-                {p}
-              </button>
-            ))}
-            {Math.ceil(total / pageSize) > 7 && <span className="px-1">...</span>}
-          </div>
-        </div>
+        <Pagination
+          currentPage={page}
+          totalPages={Math.ceil(total / pageSize)}
+          onPageChange={(p) => { const params = new URLSearchParams(searchParams.toString()); params.set("page", String(p)); router.push(`/super-admin/support?${params.toString()}`); }}
+          pageSize={pageSize}
+          totalItems={total}
+        />
       )}
     </div>
   );

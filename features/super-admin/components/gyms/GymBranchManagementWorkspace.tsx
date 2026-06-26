@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { initialAuthActionState, type AuthActionState } from "@/features/auth/actions/action-state";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
@@ -145,10 +146,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
           });
         }}
       >
-        <label className="relative block">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" name="q" onChange={(event) => setQuery(event.target.value)} placeholder="Search gym, branch, code, city, organization..." value={query} />
-        </label>
+        <SearchInput value={query} onChange={(v) => setQuery(v)} placeholder="Search gym, branch, code, city, organization..." />
         <select aria-label="Filter by organization" className={selectClass} name="organizationId" onChange={(event) => setOrganizationId(event.target.value)} value={organizationId}>
           <option value="all">All organizations</option>
           {data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}

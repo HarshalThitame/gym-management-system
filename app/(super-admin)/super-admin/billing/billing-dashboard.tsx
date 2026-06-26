@@ -27,6 +27,8 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SearchInput } from "@/components/ui/search-input";
+import { Pagination } from "@/components/ui/pagination";
 import { formatCurrency } from "@/features/billing/lib/money";
 import { cn } from "@/lib/utils";
 import { showToast, ToastContainer } from "@/components/ui/toast";
@@ -139,10 +141,14 @@ export function BillingDashboard(props: BillingDashboardProps) {
               <RotateCcw className="mr-2 size-4" />
               Process Refund
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => window.print()} aria-label="Export billing data">
-              <Download className="mr-2 size-4" />
-              Export
-            </Button>
+            <a
+              href={`/api/super-admin/billing/export?format=csv&tab=${activeTab}`}
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-muted transition-all"
+              target="_blank"
+            >
+              <Download className="size-4" />
+              CSV
+            </a>
           </div>
         </div>
       </section>
@@ -244,29 +250,22 @@ export function BillingDashboard(props: BillingDashboardProps) {
 
       {/* Search + Pagination Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            placeholder={`Search ${activeTab.replace("_", " ")}...`}
-            className="h-11 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm shadow-sm"
-            aria-label={`Search ${activeTab.replace("_", " ")}`}
-          />
-        </div>
+        <SearchInput
+          value={searchQuery}
+          onChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
+          placeholder={`Search ${activeTab.replace("_", " ")}...`}
+          className="w-full sm:w-72"
+        />
         <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
           <span>{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
           {totalPages > 1 && (
-            <>
-              <span className="text-muted-foreground/50">|</span>
-              <button onClick={() => setCurrentPage(Math.max(1, safePage - 1))} disabled={safePage <= 1} className="disabled:opacity-30 min-h-11 min-w-11 flex items-center justify-center rounded-md hover:bg-surface-muted" aria-label="Previous page">
-                <ChevronLeft className="size-4" />
-              </button>
-              <span>Page {safePage} of {totalPages}</span>
-              <button onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))} disabled={safePage >= totalPages} className="disabled:opacity-30 min-h-11 min-w-11 flex items-center justify-center rounded-md hover:bg-surface-muted" aria-label="Next page">
-                <ChevronRight className="size-4" />
-              </button>
-            </>
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              onPageChange={(p) => setCurrentPage(p)}
+              pageSize={perPage}
+              totalItems={filtered.length}
+            />
           )}
         </div>
       </div>

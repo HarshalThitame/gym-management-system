@@ -5,12 +5,14 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { BarChart3, Package, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Trash2, Calendar, Puzzle, DollarSign, PauseCircle, Gauge, Activity } from "lucide-react";
+import { BarChart3, ChevronDown, Package, X, Loader2, Check, AlertTriangle, RefreshCw, Plus, Eye, ArrowUpDown, Ban, Play, Clock, CreditCard, Receipt, History, Trash2, Calendar, Puzzle, DollarSign, PauseCircle, Gauge, Activity, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
+import { Pagination } from "@/components/ui/pagination";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
 import { PaymentDashboard } from "@/features/super-admin/components/payment-dashboard";
@@ -46,6 +48,14 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ synced: 0, total: 0, failed: 0 });
   const [showTrialSection, setShowTrialSection] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState("all");
+  const [trialOnly, setTrialOnly] = useState(false);
+  const [expiryDateFrom, setExpiryDateFrom] = useState("");
+  const [expiryDateTo, setExpiryDateTo] = useState("");
+  const [createdDateFrom, setCreatedDateFrom] = useState("");
+  const [createdDateTo, setCreatedDateTo] = useState("");
+
 
   const activeSubs = data.subscriptions.filter((s: any) => s.status === "active").length;
   const trialSubs = data.subscriptions.filter((s: any) => s.status === "trial").length;
@@ -98,8 +108,14 @@ export function SubscriptionsClient({ data }: { data: Data }) {
     if (search) { const q = search.toLowerCase(); list = list.filter((o: any) => o.name.toLowerCase().includes(q)); }
     if (filterStatus !== "all") list = list.filter((o: any) => { const s = data.subscriptions.find((x: any) => x.organization_id === o.id); return filterStatus === "unassigned" ? !s : s?.status === filterStatus; });
     if (filterPlan !== "all") list = list.filter((o: any) => { const s = data.subscriptions.find((x: any) => x.organization_id === o.id); const p = s ? data.packages.find((pk: any) => pk.id === s.package_id) : null; return p?.slug === filterPlan; });
+    if (billingPeriod !== "all") list = list.filter((o: any) => { const s = data.subscriptions.find((x: any) => x.organization_id === o.id); return s?.billing_period === billingPeriod; });
+    if (trialOnly) list = list.filter((o: any) => { const s = data.subscriptions.find((x: any) => x.organization_id === o.id); return s?.status === "trial"; });
+    if (expiryDateFrom) list = list.filter((o: any) => { const s = data.subscriptions.find((x: any) => x.organization_id === o.id); return s?.expires_at ? new Date(s.expires_at) >= new Date(expiryDateFrom) : false; });
+    if (expiryDateTo) list = list.filter((o: any) => { const s = data.subscriptions.find((x: any) => x.organization_id === o.id); return s?.expires_at ? new Date(s.expires_at) <= new Date(expiryDateTo) : false; });
+    if (createdDateFrom) list = list.filter((o: any) => new Date(o.created_at) >= new Date(createdDateFrom));
+    if (createdDateTo) list = list.filter((o: any) => new Date(o.created_at) <= new Date(createdDateTo));
     return list;
-  }, [data, search, filterStatus, filterPlan]);
+  }, [data, search, filterStatus, filterPlan, billingPeriod, trialOnly, expiryDateFrom, expiryDateTo, createdDateFrom, createdDateTo]);
 
   const pageCount = Math.ceil(filteredOrgs.length / pageSize);
   const pagedOrgs = filteredOrgs.slice(page * pageSize, (page + 1) * pageSize);
@@ -138,6 +154,14 @@ export function SubscriptionsClient({ data }: { data: Data }) {
             className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-muted transition-all">
             <Clock className="size-4" /> {showTrialSection ? "Hide" : "Show"} Trial Management
           </button>
+          <a
+            href={`/api/super-admin/subscriptions/export?format=csv`}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-muted transition-all"
+            target="_blank"
+          >
+            <Download className="size-4" />
+            CSV
+          </a>
         </div>
       </div>
 
@@ -205,16 +229,75 @@ export function SubscriptionsClient({ data }: { data: Data }) {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div><h2 className="text-lg font-black">Organizations ({filteredOrgs.length})</h2><p className="text-xs text-muted-foreground mt-1">Page {page + 1} of {pageCount || 1}</p></div>
                 <div className="flex flex-wrap gap-2">
-                  <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} placeholder="Search..." className="h-9 w-40 text-xs" />
+                  <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search organizations..." className="w-40" />
                   <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(0); }} className="h-9 rounded-md border border-border bg-surface px-2 text-xs">{["all", "active", "trial", "expired", "suspended", "cancelled", "unassigned"].map(s => <option key={s} value={s}>{s === "all" ? "All Status" : s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select>
                   <select value={filterPlan} onChange={(e) => { setFilterPlan(e.target.value); setPage(0); }} className="h-9 rounded-md border border-border bg-surface px-2 text-xs"><option value="all">All Plans</option>{data.packages.map((p: any) => <option key={p.id} value={p.slug}>{p.name}</option>)}</select>
                   <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }} className="h-9 rounded-md border border-border bg-surface px-2 text-xs">{PAGE_SIZES.map(s => <option key={s} value={s}>{s} / page</option>)}</select>
                 </div>
               </div>
+              <div className="px-5 pb-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronDown className={`size-3.5 transition-transform ${showAdvancedFilters ? "rotate-180" : ""}`} />
+                  {showAdvancedFilters ? "Hide" : "Show"} Advanced Filters
+                </button>
+              </div>
+              {showAdvancedFilters && (
+                <div className="px-5 pb-4 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground mb-1">Expiry from</label>
+                      <input type="date" value={expiryDateFrom} onChange={(e) => setExpiryDateFrom(e.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground mb-1">Expiry to</label>
+                      <input type="date" value={expiryDateTo} onChange={(e) => setExpiryDateTo(e.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground mb-1">Billing period</label>
+                      <select value={billingPeriod} onChange={(e) => setBillingPeriod(e.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs">
+                        <option value="all">All periods</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="half_yearly">Half yearly</option>
+                        <option value="annual">Annual</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end pb-2">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground cursor-pointer">
+                        <input type="checkbox" checked={trialOnly} onChange={(e) => setTrialOnly(e.target.checked)} className="size-4 rounded border-border accent-primary" />
+                        Trial only
+                      </label>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground mb-1">Created from</label>
+                      <input type="date" value={createdDateFrom} onChange={(e) => setCreatedDateFrom(e.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground mb-1">Created to</label>
+                      <input type="date" value={createdDateTo} onChange={(e) => setCreatedDateTo(e.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs" />
+                    </div>
+                    <div />
+                    <div />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs font-black uppercase tracking-[0.12em] text-muted-foreground"><th className="px-3 py-3 w-10"><input type="checkbox" onChange={(e) => { if (e.target.checked) setSelectedIds(pagedOrgs.map((o: any) => o.id)); else setSelectedIds([]); }} checked={selectedIds.length === pagedOrgs.length && pagedOrgs.length > 0} className="rounded" /></th><th className="px-5 py-3">Organization</th><th className="px-5 py-3">Package</th><th className="px-5 py-3">Billing</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Next</th><th className="px-5 py-3">Trial</th><th className="px-5 py-3"></th></tr></thead>
               <tbody>{pagedOrgs.length === 0 ? <tr><td colSpan={8} className="px-5 py-12 text-center text-muted-foreground">No matches</td></tr> : pagedOrgs.map((org: any) => { const orgSub = data.subscriptions.find((s: any) => s.organization_id === org.id); const pkg = orgSub ? data.packages.find((p: any) => p.id === orgSub.package_id) : null; const tEnd = orgSub?.trial_ends_at ? new Date(orgSub.trial_ends_at) : null; const tLeft = tEnd ? Math.max(0, Math.ceil((tEnd.getTime() - Date.now()) / 86400000)) : null; const isSelected = selectedIds.includes(org.id); return (<tr key={org.id} className={cn("border-b border-border transition-colors", isSelected ? "bg-accent/5" : "hover:bg-accent/5")}><td className="px-3 py-3"><input type="checkbox" checked={isSelected} onChange={() => setSelectedIds(prev => prev.includes(org.id) ? prev.filter((id: string) => id !== org.id) : [...prev, org.id])} className="rounded" /></td><td className="px-5 py-3"><button onClick={() => setDrawerOrgData({ org, sub: orgSub, pkg })} className="font-semibold hover:text-primary text-left" type="button">{org.name}</button>{!org.billing_email && orgSub && <span className="ml-1 inline-flex rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 border border-amber-200">No email</span>}</td><td className="px-5 py-3">{pkg ? <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">{pkg.name}</span> : <span className="text-muted-foreground text-xs">—</span>}</td><td className="px-5 py-3 text-xs capitalize">{orgSub?.billing_period ?? "—"}</td><td className="px-5 py-3"><StatusBadge status={orgSub?.status ?? "unassigned"} /></td><td className="px-5 py-3 text-xs text-muted-foreground" suppressHydrationWarning>{orgSub?.next_billing_date ? new Date(orgSub.next_billing_date).toLocaleDateString("en-IN") : orgSub?.expires_at ? new Date(orgSub.expires_at).toLocaleDateString("en-IN") : "—"}</td><td className="px-5 py-3 text-xs">{tLeft !== null ? <span className={cn("font-semibold", tLeft <= 3 ? "text-red-600" : "text-blue-600")}>{tLeft}d</span> : <span className="text-muted-foreground">—</span>}</td><td className="px-5 py-3"><button onClick={() => setDrawerOrgData({ org, sub: orgSub, pkg })} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/10" type="button"><Eye className="size-4" /></button></td></tr>); })}</tbody></table></div>
-            {pageCount > 1 && (<div className="flex items-center justify-between border-t border-border px-5 py-3"><span className="text-xs text-muted-foreground">Page {page + 1} of {pageCount}</span><div className="flex gap-1"><button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 hover:bg-accent/10" type="button">Prev</button>{Array.from({ length: Math.min(pageCount, 5) }).map((_, i) => { const start = Math.max(0, Math.min(page - 2, pageCount - 5)); const p = start + i; if (p >= pageCount) return null; return <button key={p} onClick={() => setPage(p)} className={cn("rounded-md border px-3 py-1.5 text-xs font-semibold", p === page ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-accent/10")} type="button">{p + 1}</button>;})}<button onClick={() => setPage(Math.min(pageCount - 1, page + 1))} disabled={page >= pageCount - 1} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold disabled:opacity-30 hover:bg-accent/10" type="button">Next</button></div></div>)}
+          <Pagination
+            currentPage={page + 1}
+            totalPages={pageCount || 1}
+            onPageChange={(p) => setPage(p - 1)}
+            pageSize={pageSize}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+            totalItems={filteredOrgs.length}
+          />
           {/* Bulk Action Bar */}
           {selectedIds.length > 0 && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 rounded-lg border border-border bg-surface/95 backdrop-blur shadow-2xl px-4 py-3 flex items-center gap-3 animate-slide-in-right">

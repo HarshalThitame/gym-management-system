@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Building2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -31,6 +32,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { HydrationSafeDate } from "@/components/ui/hydration-safe-date";
 import { Input, Textarea } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
@@ -67,6 +69,12 @@ export function OrganizationManagementWorkspace({ criticalSuperAdminEmail, data 
   const [pageSize, setPageSize] = useState(String(data.filters.pageSize));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [drawer, setDrawer] = useState<DrawerState>({ type: "closed" });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [packageFilter, setPackageFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [filterType, setFilterType] = useState("all");
   const selectedVisibleCount = data.records.filter((record) => selectedIds.includes(record.organization.id)).length;
   const allVisibleSelected = data.records.length > 0 && selectedVisibleCount === data.records.length;
 
@@ -80,7 +88,7 @@ export function OrganizationManagementWorkspace({ criticalSuperAdminEmail, data 
       status,
       sort,
       page: String(nextPage),
-      pageSize
+      pageSize,
     }));
   }
 
@@ -140,10 +148,7 @@ export function OrganizationManagementWorkspace({ criticalSuperAdminEmail, data 
               applyFilters(1);
             }}
           >
-            <label className="relative block">
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" onChange={(event) => setQuery(event.target.value)} placeholder="Search by organization, owner, domain, package..." value={query} />
-            </label>
+            <SearchInput value={query} onChange={(v) => setQuery(v)} placeholder="Search by organization, owner, domain, package..." />
             <select aria-label="Filter organizations by status" className={selectClass} onChange={(event) => setStatus(event.target.value)} value={status}>
               <option value="all">All statuses</option>
               {organizationStatuses.map((item) => <option key={item} value={item}>{formatEnterpriseLabel(item)}</option>)}
@@ -156,6 +161,45 @@ export function OrganizationManagementWorkspace({ criticalSuperAdminEmail, data 
             </select>
             <Button type="submit" variant="primary">Apply</Button>
           </form>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showAdvancedFilters ? "Hide" : "Show"} Advanced Filters
+            <ChevronDown className={`size-3.5 transition-transform ${showAdvancedFilters ? "rotate-180" : ""}`} />
+          </button>
+          {showAdvancedFilters && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 py-3">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Created from</label>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Created to</label>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Package</label>
+                <select className={selectClass} value={packageFilter} onChange={(e) => setPackageFilter(e.target.value)}>
+                  <option value="all">All packages</option>
+                  {data.packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Owner</label>
+                <input type="text" value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} placeholder="Search owner..." className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Type</label>
+                <select className={selectClass} value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="trial">Trial</option>
+                </select>
+              </div>
+            </div>
+          )}
           <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <p className="text-sm font-semibold text-muted-foreground">
               Showing {data.pagination.from}-{data.pagination.to} of {formatCompactNumber(data.pagination.total)} organizations.

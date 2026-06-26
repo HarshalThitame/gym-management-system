@@ -22,7 +22,7 @@ async function getData() {
 
   try {
     const [orgsRes, pkgsRes, subsRes, featuresRes, limitsRes, pricingRes, invoicesRes, eventsRes, addonsRes, subAddonsRes, schedRes] = await Promise.all([
-      supabase.from("organizations").select("id, name, billing_email, primary_domain").order("name"),
+      supabase.from("organizations").select("id, name, billing_email, primary_domain, created_at").order("name"),
       supabase.from("packages").select("*").order("sort_order"),
       supabase.from("organization_subscriptions").select("id, organization_id, package_id, status, started_at, expires_at, billing_period, trial_ends_at, price_override, next_billing_date, last_billing_date, cancelled_at, notes, created_at, updated_at, auto_renew"),
       sb.from("package_features").select("package_id, feature_code, value"),

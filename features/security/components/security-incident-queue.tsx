@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Search, User, ChevronDown } from "lucide-react";
+import { AlertTriangle, Search, User, ChevronDown, Download } from "lucide-react";
+import { Pagination } from "@/components/ui/pagination";
 
 const SEVERITY_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
 
@@ -10,12 +11,16 @@ export function SecurityIncidentQueue({ incidents }: { incidents: Array<Record<s
   const [severityFilter, setSeverityFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const perPage = 20;
 
   const filtered = incidents.filter((i) => {
     if (statusFilter && i.status !== statusFilter) return false;
     if (severityFilter && i.severity !== severityFilter) return false;
     return true;
   }).sort((a, b) => (SEVERITY_ORDER[b.severity as string] ?? 0) - (SEVERITY_ORDER[a.severity as string] ?? 0));
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const pagedIncidents = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
 
   const severityColor = (s: string) => {
     const colors: Record<string, string> = { critical: "bg-red-100 text-red-700 border-red-200", high: "bg-orange-100 text-orange-700 border-orange-200", medium: "bg-amber-100 text-amber-700 border-amber-200", low: "bg-blue-100 text-blue-700 border-blue-200" };
@@ -42,15 +47,23 @@ export function SecurityIncidentQueue({ incidents }: { incidents: Array<Record<s
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
+        <a
+          href={`/api/super-admin/security/incidents/export?format=csv`}
+          className="h-9 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-medium hover:bg-muted transition-colors"
+          target="_blank"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export
+        </a>
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-sm divide-y divide-border">
-        {filtered.length === 0 ? (
+        {pagedIncidents.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-muted-foreground">
             <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-30" />
             <p>No incidents match your filters</p>
           </div>
-        ) : filtered.map((inc) => (
+        ) : pagedIncidents.map((inc) => (
           <div key={inc.id as string}>
             <div className="px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === (inc.id as string) ? null : (inc.id as string))}>
               <div className="flex items-center justify-between">
@@ -91,6 +104,16 @@ export function SecurityIncidentQueue({ incidents }: { incidents: Array<Record<s
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          pageSize={perPage}
+          totalItems={filtered.length}
+        />
+      )}
     </div>
   );
 }

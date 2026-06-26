@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { InlineMfaStepUp } from "@/features/super-admin/components/security/InlineMfaStepUp";
@@ -79,6 +80,10 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortOption>(data.filters.sort);
   const [showOrgOwnerWizard, setShowOrgOwnerWizard] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [loginStatus, setLoginStatus] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
     if (drawer.type === "closed") {
@@ -180,15 +185,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
       <Card className="sticky top-[73px] z-[9]">
         <CardHeader>
           <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_200px_140px_auto]">
-            <div className="relative">
-              <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                className="h-11 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-base shadow-sm"
-                name="q"
-                placeholder="Search name, email, phone..."
-                defaultValue={data.filters.query}
-              />
-            </div>
+            <SearchInput value={data.filters.query} onChange={(v) => { const p = new URLSearchParams(window.location.search); p.set("q", v); router.push(`/super-admin/users?${p.toString()}`); }} placeholder="Search name, email, phone..." />
             <select className={selectClass} name="role" defaultValue={data.filters.role}>
               <option value="all">All Roles</option>
               {roleNames.map((role) => <option key={role} value={role}>{formatEnterpriseLabel(role)}</option>)}
@@ -214,6 +211,36 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
             </select>
             <Button type="submit" variant="primary">Filter</Button>
           </form>
+          <div className="px-5 pb-3">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showAdvancedFilters ? "Hide" : "Show"} Advanced Filters
+              <ChevronDown className={`size-3.5 transition-transform ${showAdvancedFilters ? "rotate-180" : ""}`} />
+            </button>
+            {showAdvancedFilters && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Created from</label>
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Created to</label>
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Login status</label>
+                  <select className={selectClass} value={loginStatus} onChange={(e) => setLoginStatus(e.target.value)}>
+                    <option value="all">All</option>
+                    <option value="has_logged_in">Has logged in</option>
+                    <option value="never_logged_in">Never logged in</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
