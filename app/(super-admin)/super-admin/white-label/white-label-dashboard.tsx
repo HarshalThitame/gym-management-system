@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition, useEffect, useRef } from "react";
 import NextImage from "next/image";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { saveTenantConfigAction } from "@/features/super-admin/actions/white-label-actions";
 import {
   ArrowLeftRight, CheckCircle2, Download, EyeOff,
   Globe2,
@@ -85,6 +87,8 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
   const { configs, organizations, domains, stats, module } = props;
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [planFilter, setPlanFilter] = useState("all");
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
   const [editingConfig, setEditingConfig] = useState<Record<string, unknown> | null>(null);
@@ -92,6 +96,13 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [searchQuery]);
 
   const orgMap = useMemo(() => new Map(organizations.map((o) => [o.id as string, o])), [organizations]);
   const domainMap = useMemo(() => {
@@ -106,8 +117,8 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
 
   const filteredConfigs = useMemo(() => {
     let list = configs;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       list = list.filter((c) => {
         const brand = (c.brand_name as string ?? "").toLowerCase();
         const orgId = c.organization_id as string;
@@ -160,13 +171,21 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
   }
 
   function handleSave() {
-    if (!editingConfig) return;
-    const saved = configs.map((c) => (c.id === selectedConfigId ? editingConfig : c))
-      .filter((c): c is Record<string, unknown> => c !== null)
-      .find((c) => c.id === selectedConfigId);
-    if (saved) {
-      setEditingConfig({ ...saved });
-    }
+    if (!editingConfig || !selectedConfigId) return;
+    startTransition(async () => {
+      try {
+        await saveTenantConfigAction(selectedConfigId, editingConfig);
+        const saved = configs.map((c) => (c.id === selectedConfigId ? editingConfig : c))
+          .filter((c): c is Record<string, unknown> => c !== null)
+          .find((c) => c.id === selectedConfigId);
+        if (saved) {
+          setEditingConfig({ ...saved });
+        }
+        showToast("Brand config saved successfully", "success");
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Failed to save brand config", "error");
+      }
+    });
   }
 
   function handleColorChange(key: string, value: string) {
@@ -389,7 +408,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleSave} disabled={!hasChanges}>Save Changes</Button>
+              <Button size="sm" onClick={handleSave} disabled={!hasChanges || isPending}>{isPending ? "Saving..." : "Save Changes"}</Button>
               <Button size="sm" variant="ghost" onClick={handleCloseDetail}>Close</Button>
             </div>
           </div>
@@ -932,11 +951,15 @@ function TestEmailButton({ config, editingConfig }: { config: Record<string, unk
   async function handleSend() {
     setSending(true);
     try {
+      const supabase = createSupabaseBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const to = user?.email ?? "";
+
       const res = await fetch("/api/enterprise/branding/test-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: "admin@example.com",
+          to,
           brandName: editingConfig.brand_name as string ?? config.brand_name as string,
           primaryColor: (editingConfig.brand_colors as Record<string, string>)?.primary ?? "#6366f1",
           accentColor: (editingConfig.brand_colors as Record<string, string>)?.accent ?? "#d7ff3f",
@@ -944,10 +967,17 @@ function TestEmailButton({ config, editingConfig }: { config: Record<string, unk
           fromName: editingConfig.email_from_name as string ?? "Brand",
         }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Request failed" }));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
       await res.json();
       setSent(true);
+      showToast("Test email sent", "success");
       setTimeout(() => setSent(false), 3000);
-    } catch {} finally {
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Failed to send test email", "error");
+    } finally {
       setSending(false);
     }
   }
