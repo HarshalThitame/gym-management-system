@@ -185,7 +185,7 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
       <Card className="sticky top-[73px] z-[9]">
         <CardHeader>
           <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_200px_140px_auto]" onSubmit={(e) => e.preventDefault()}>
-            <SearchInput value={data.filters.query} onChange={(v) => { const p = new URLSearchParams(window.location.search); p.set("q", v); router.push(`/super-admin/users?${p.toString()}`, { scroll: false }); }} placeholder="Search name, email, phone..." />
+            <SearchInput value={data.filters.query} onChange={(v) => { const p = new URLSearchParams(window.location.search); if (v) p.set("q", v); else p.delete("q"); router.push(`/super-admin/users?${p.toString()}`, { scroll: false }); }} placeholder="Search name, email, phone..." />
             <select className={selectClass} name="role" defaultValue={data.filters.role}>
               <option value="all">All Roles</option>
               {roleNames.map((role) => <option key={role} value={role}>{formatEnterpriseLabel(role)}</option>)}
@@ -318,14 +318,14 @@ export function UserManagementWorkspace({ criticalSuperAdminEmail, data, pending
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-semibold text-muted-foreground">Page {data.pagination.page} of {data.pagination.totalPages}</p>
             <div className="flex gap-2">
-              <ButtonLink
-                aria-disabled={data.pagination.page <= 1}
-                href={buildPageUrl(data.filters, data.pagination.page - 1, data.pagination.pageSize, sort)}
-                variant="secondary">Previous</ButtonLink>
-              <ButtonLink
-                aria-disabled={data.pagination.page >= data.pagination.totalPages}
-                href={buildPageUrl(data.filters, data.pagination.page + 1, data.pagination.pageSize, sort)}
-                variant="secondary">Next</ButtonLink>
+              <Button
+                disabled={data.pagination.page <= 1}
+                onClick={() => router.push(buildPageUrl(data.filters, data.pagination.page - 1, data.pagination.pageSize, sort), { scroll: false })}
+                variant="secondary">Previous</Button>
+              <Button
+                disabled={data.pagination.page >= data.pagination.totalPages}
+                onClick={() => router.push(buildPageUrl(data.filters, data.pagination.page + 1, data.pagination.pageSize, sort), { scroll: false })}
+                variant="secondary">Next</Button>
             </div>
           </div>
         </CardContent>

@@ -120,7 +120,7 @@ export function RoleManagementWorkspace({
           <div className="flex flex-wrap items-center gap-3">
             <SearchInput
               value={data.filters.query}
-              onChange={(v) => { const params = new URLSearchParams(searchParams.toString()); params.set("q", v); params.set("page", "1"); router.push(`/super-admin/roles?${params.toString()}`, { scroll: false }); }}
+              onChange={(v) => { const params = new URLSearchParams(searchParams.toString()); if (v) params.set("q", v); else params.delete("q"); params.set("page", "1"); router.push(`/super-admin/roles?${params.toString()}`, { scroll: false }); }}
               placeholder="Search roles by name, display name, or description..."
               className="min-w-0 flex-1"
             />
