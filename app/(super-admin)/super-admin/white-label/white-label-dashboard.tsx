@@ -132,7 +132,7 @@ export default function WhiteLabelDashboard(props: WhiteLabelDashboardProps) {
       list = list.filter((c) => (c.plan_tier as string) === planFilter);
     }
     return list;
-  }, [configs, searchQuery, planFilter, orgMap]);
+  }, [configs, debouncedSearch, planFilter, orgMap]);
 
   const selectedConfig = useMemo(() => {
     if (!selectedConfigId) return null;
