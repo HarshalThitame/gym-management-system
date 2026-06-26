@@ -75,3 +75,30 @@ export async function addInvestigationNote(eventId: string, note: string, actorI
     event_id: eventId, action: "note_added", actor_id: actorId, note,
   });
 }
+
+export async function createSecurityIncident(options: {
+  organizationId?: string;
+  eventType?: string;
+  severity: "low" | "medium" | "high" | "critical";
+  description: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const db = sdb(supabase as unknown);
+
+  const { data, error } = await db.from("security_events").insert({
+    organization_id: options.organizationId ?? null,
+    event_type: options.eventType ?? "monitoring_alert",
+    severity: options.severity,
+    status: "open",
+    description: options.description,
+    metadata: options.metadata ?? {},
+  }).select("*").single();
+
+  if (error || !data) {
+    console.error("[security-incident] Failed to create incident:", error?.message ?? "Unknown error");
+    return null;
+  }
+
+  return data;
+}

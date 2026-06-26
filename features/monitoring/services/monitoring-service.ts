@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { runAllExternalHealthChecks, getRecentIncidents, getUptimePercent } from "./external-health-checks";
+import type { ExternalHealthCheckResult, IncidentReference } from "./external-health-checks";
 
 export type HealthStatus = "healthy" | "degraded" | "down" | "unknown";
 
@@ -92,6 +94,8 @@ export type DataIntegrityIssue = {
 
 export type MonitoringDashboard = {
   platformHealth: HealthCheck[];
+  externalHealth: ExternalHealthCheckResult[];
+  incidentReferences: IncidentReference[];
   usage: UsageOverview;
   subscriptions: SubscriptionMonitoring;
   activity: SystemActivity;
@@ -108,12 +112,27 @@ function getFetchedAt(): string {
 
 export async function getMonitoringDashboard(): Promise<MonitoringDashboard> {
   const supabase = getSupabaseAdminClient();
+  let externalHealth: ExternalHealthCheckResult[] = [];
+
+  try {
+    externalHealth = await runAllExternalHealthChecks();
+    externalHealth = await Promise.all(
+      externalHealth.map(async (h) => ({
+        ...h,
+        uptimePercent: await getUptimePercent(h.service, 24),
+      }))
+    );
+  } catch {
+    // Non-critical - external health checks can fail independently
+  }
 
   if (!supabase) {
     return {
       platformHealth: [
         { component: "database", label: "Database Connection", status: "down", latencyMs: null, lastCheckedAt: null, message: "Supabase client not configured" },
       ],
+      externalHealth,
+      incidentReferences: [],
       usage: {
         totalOrganizations: 0, activeOrganizations: 0, suspendedOrganizations: 0, trialOrganizations: 0,
         totalBranches: 0, activeBranches: 0, totalUsers: 0, totalMembers: 0, totalTrainers: 0,
@@ -253,10 +272,15 @@ export async function getMonitoringDashboard(): Promise<MonitoringDashboard> {
       })),
     };
 
-    const dataIntegrity = await buildDataIntegrityIssues(supabase, organizations, subscriptions);
+    const [dataIntegrity, incidentReferences] = await Promise.all([
+      buildDataIntegrityIssues(supabase, organizations, subscriptions),
+      getRecentIncidents(20),
+    ]);
 
     return {
       platformHealth,
+      externalHealth,
+      incidentReferences,
       usage,
       subscriptions: subscriptionsData,
       activity,
@@ -272,6 +296,8 @@ export async function getMonitoringDashboard(): Promise<MonitoringDashboard> {
       platformHealth: [
         { component: "system", label: "Monitoring System", status: "down", latencyMs: null, lastCheckedAt: null, message: err.message },
       ],
+      externalHealth,
+      incidentReferences: [],
       usage: {
         totalOrganizations: 0, activeOrganizations: 0, suspendedOrganizations: 0, trialOrganizations: 0,
         totalBranches: 0, activeBranches: 0, totalUsers: 0, totalMembers: 0, totalTrainers: 0,
