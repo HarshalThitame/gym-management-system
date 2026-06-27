@@ -143,6 +143,7 @@ export const FEATURE_KEYS = [
   "email_campaigns",
   "whatsapp_business_api",
   "cross_branch_member_access",
+  "custom_email_domain",
   // crm
   "lead_management",
   "trial_management",
@@ -264,6 +265,7 @@ export const MODULE_FEATURE_MAP: Record<string, FeatureKey> = {
   attendance: "attendance_reports",
   classes: "class_booking",
   communications: "whatsapp_integration",
+  "email-settings": "custom_email_domain",
   leads: "lead_management",
   analytics: "advanced_reports",
   branding: "custom_branding",

@@ -105,6 +105,7 @@ export interface OrgFeatureFlags {
   broadcastMessages: boolean;
   emailCampaigns: boolean;
   whatsappBusinessApi: boolean;
+  customEmailDomain: boolean;
 
   // Platform
   memberPortal: boolean;
@@ -137,7 +138,6 @@ export interface OrgFeatureFlags {
   staffManagement: boolean;
   tallyZohoBooksIntegration: boolean;
   restApiAccess: boolean;
-
 
   // Legacy aliases
   classSchedulingEnabled: boolean;

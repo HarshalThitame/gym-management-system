@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrgFeatureAccess } from "@/features/entitlement";
 import { sendEmail } from "@/services/email/resend";
+import { getOrgEmailConfigOrDefault } from "@/services/email/email-config-service";
 import { triggerWebhook } from "@/features/webhooks/trigger";
 import type { LeadRow } from "@/features/organization-owner/services/lead-service";
 import type { Database, Json } from "@/types/database";
@@ -561,6 +562,7 @@ export async function runAutomationRules(
   ]);
 
   const emailMap = new Map((contacts.data ?? []).map((l) => [l.id, { email: l.email!, name: l.name }]));
+  const emailConfig = await getOrgEmailConfigOrDefault(organizationId);
 
   let triggeredCount = 0;
 
@@ -611,6 +613,8 @@ export async function runAutomationRules(
               to: contact.email,
               subject,
               html: body,
+              from: emailConfig.from ?? undefined,
+              replyTo: emailConfig.replyTo ?? undefined,
             });
           } else if (rule.action_type === "change_status") {
             const targetStatus = (config.target_status as string) || "contacted";

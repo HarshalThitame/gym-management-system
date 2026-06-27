@@ -3,12 +3,21 @@ type CommunicationEmailInput = {
   bodyHtml: string;
   ctaLabel?: string;
   ctaUrl?: string;
+  brandName?: string;
+  logoUrl?: string;
+  primaryColor?: string;
 };
 
-export function communicationEmail({ title, bodyHtml, ctaLabel, ctaUrl }: CommunicationEmailInput) {
+export function communicationEmail({ title, bodyHtml, ctaLabel, ctaUrl, brandName, logoUrl, primaryColor }: CommunicationEmailInput) {
+  const safeBrandName = escapeHtml(brandName || "Apex Performance Club");
+  const brandColor = primaryColor || "#111315";
   const action = ctaLabel && ctaUrl
-    ? `<p style="margin:28px 0"><a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:#111315;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 18px;font-weight:700">${escapeHtml(ctaLabel)}</a></p>`
+    ? `<p style="margin:28px 0"><a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 18px;font-weight:700">${escapeHtml(ctaLabel)}</a></p>`
     : "";
+  const logoHtml = logoUrl
+    ? `<p style="margin:0 0 8px"><img src="${escapeHtml(logoUrl)}" alt="${safeBrandName}" style="max-height:40px;max-width:180px;object-fit:contain" /></p>`
+    : "";
+  const brandLabel = logoUrl ? "" : `<p style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#5f646b;font-weight:800">${safeBrandName}</p>`;
 
   return [
     "<!doctype html>",
@@ -18,7 +27,8 @@ export function communicationEmail({ title, bodyHtml, ctaLabel, ctaUrl }: Commun
     "<tr><td align=\"center\">",
     "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:640px;background:#ffffff;border:1px solid #d8ddd2;border-radius:12px;overflow:hidden\">",
     "<tr><td style=\"padding:28px 28px 12px\">",
-    "<p style=\"margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#5f646b;font-weight:800\">Apex Performance Club</p>",
+    logoHtml,
+    brandLabel,
     `<h1 style="margin:0;font-size:28px;line-height:1.15;color:#111315">${escapeHtml(title)}</h1>`,
     "</td></tr>",
     `<tr><td style="padding:12px 28px 4px;font-size:15px;line-height:1.7;color:#30343a">${bodyHtml}</td></tr>`,

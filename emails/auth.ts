@@ -6,14 +6,25 @@ type BrandedEmailInput = {
   body: string;
   ctaLabel?: string;
   ctaUrl?: string;
+  brandName?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  footer?: string;
 };
 
-export function renderBrandedEmail({ title, preview, body, ctaLabel, ctaUrl }: BrandedEmailInput) {
+export function renderBrandedEmail({ title, preview, body, ctaLabel, ctaUrl, brandName, logoUrl, primaryColor, footer }: BrandedEmailInput) {
   const safeTitle = escapeHtml(title);
   const safePreview = escapeHtml(preview);
+  const safeBrandName = escapeHtml(brandName || "Apex Performance Club");
+  const brandColor = primaryColor || "#111214";
   const cta = ctaLabel && ctaUrl
-    ? `<p style="margin:28px 0 0"><a href="${escapeAttribute(ctaUrl)}" style="display:inline-block;background:#111214;color:#ffffff;text-decoration:none;padding:13px 18px;border-radius:6px;font-weight:700">${escapeHtml(ctaLabel)}</a></p>`
+    ? `<p style="margin:28px 0 0"><a href="${escapeAttribute(ctaUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;text-decoration:none;padding:13px 18px;border-radius:6px;font-weight:700">${escapeHtml(ctaLabel)}</a></p>`
     : "";
+  const logoHtml = logoUrl
+    ? `<p style="margin:0 0 18px"><img src="${escapeAttribute(logoUrl)}" alt="${safeBrandName}" style="max-height:48px;max-width:200px;object-fit:contain" /></p>`
+    : "";
+  const brandLabel = logoUrl ? "" : `<p style="margin:0 0 18px;color:#737780;font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">${safeBrandName}</p>`;
+  const safeFooter = footer ? escapeHtml(footer) : `You are receiving this email because an ${safeBrandName} account action was requested.`;
 
   return `<!doctype html>
 <html lang="en">
@@ -26,12 +37,13 @@ export function renderBrandedEmail({ title, preview, body, ctaLabel, ctaUrl }: B
     <div style="display:none;max-height:0;overflow:hidden">${safePreview}</div>
     <main style="max-width:640px;margin:0 auto;padding:32px 18px">
       <section style="background:#ffffff;border:1px solid #d7dbd0;border-radius:8px;padding:32px">
-        <p style="margin:0 0 18px;color:#737780;font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">Apex Performance Club</p>
+        ${logoHtml}
+        ${brandLabel}
         <h1 style="margin:0;font-size:30px;line-height:1.15">${safeTitle}</h1>
         <div style="margin-top:18px;color:#34363a;font-size:16px;line-height:1.7">${body}</div>
         ${cta}
       </section>
-      <p style="margin:18px 4px 0;color:#737780;font-size:12px;line-height:1.6">You are receiving this email because an Apex Performance Club account action was requested.</p>
+      <p style="margin:18px 4px 0;color:#737780;font-size:12px;line-height:1.6">${safeFooter}</p>
     </main>
   </body>
 </html>`;

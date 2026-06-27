@@ -208,6 +208,41 @@ export function BrandingEnterpriseModule({ dashboard, moduleData }: BrandingEnte
             </div>
           </div>
 
+          {/* Email Identity */}
+          <div className="rounded-lg border border-border bg-surface-muted p-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Email Identity</p>
+            <p className="mb-3 text-xs text-muted-foreground">Configure how your organization appears in outgoing emails.</p>
+            <div className="grid gap-5 md:grid-cols-2">
+              <DrawerField label="Email From Name">
+                <input
+                  className={selectClass}
+                  defaultValue={editingConfig ? ((editingConfig.email_branding as Record<string, unknown> | null)?.fromName as string ?? "") : ""}
+                  name="emailFromName"
+                  placeholder="Apex Fitness"
+                  type="text"
+                />
+              </DrawerField>
+              <DrawerField label="Reply-To Email">
+                <input
+                  className={selectClass}
+                  defaultValue={editingConfig ? ((editingConfig.email_branding as Record<string, unknown> | null)?.replyTo as string ?? "") : ""}
+                  name="emailReplyTo"
+                  placeholder="replies@gym.com"
+                  type="email"
+                />
+              </DrawerField>
+              <DrawerField label="Email Logo URL">
+                <input
+                  className={selectClass}
+                  defaultValue={editingConfig ? ((editingConfig.email_branding as Record<string, unknown> | null)?.logoUrl as string ?? "") : ""}
+                  name="emailLogoUrl"
+                  placeholder="https://example.com/email-logo.png"
+                  type="url"
+                />
+              </DrawerField>
+            </div>
+          </div>
+
           {/* Domain + Status */}
           <div className="grid gap-5 md:grid-cols-2">
             <DrawerField label="Custom Domain">

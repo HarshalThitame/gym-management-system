@@ -24,10 +24,11 @@ import { NetworkCampaignPanel } from "@/features/organization-owner/components/m
 import { NPSSurveyPanel } from "@/features/organization-owner/components/modules/NPSSurveyPanel";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
+import { EmailSettingsPanel } from "@/features/organization-owner/components/modules/EmailSettingsPanel";
 
 type CommunicationsEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
 type CampaignRow = Database["public"]["Tables"]["campaigns"]["Row"];
-type CommsTab = "campaigns" | "network" | "nps";
+type CommsTab = "campaigns" | "network" | "nps" | "email-settings";
 
 const CHART_COLORS = ["#0891b2", "#16a34a", "#f59e0b", "#8b5cf6"];
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
@@ -41,6 +42,7 @@ export function CommunicationsEnterpriseModule({ dashboard, moduleData }: Commun
   const [activeTab, setActiveTab] = useState<CommsTab>("campaigns");
   const hasNetworkCampaigns = useHasFeature("network_wide_campaign_manager");
   const hasNpsSurveys = useHasFeature("member_nps_surveys");
+  const hasCustomEmailDomain = useHasFeature("custom_email_domain");
 
   const campaigns = (moduleData?.items ?? dashboard.campaigns) as CampaignRow[];
   const notifications = dashboard.notifications;
@@ -112,7 +114,7 @@ export function CommunicationsEnterpriseModule({ dashboard, moduleData }: Commun
   return (
     <div className="space-y-6">
       {/* ═══ SUB-TABS ═══ */}
-      {hasNetworkCampaigns || hasNpsSurveys ? (
+      {hasNetworkCampaigns || hasNpsSurveys || hasCustomEmailDomain ? (
         <div className="flex gap-1 rounded-lg border border-border bg-surface-muted p-1">
           <button
             onClick={() => setActiveTab("campaigns")}
@@ -157,10 +159,25 @@ export function CommunicationsEnterpriseModule({ dashboard, moduleData }: Commun
               NPS Surveys
             </button>
           ) : null}
+          {hasCustomEmailDomain ? (
+            <button
+              onClick={() => setActiveTab("email-settings")}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all",
+                activeTab === "email-settings"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              type="button"
+            >
+              <Mail className="size-4" />
+              Email Settings
+            </button>
+          ) : null}
         </div>
       ) : null}
 
-      {activeTab === "network" ? <NetworkCampaignPanel dashboard={dashboard} /> : activeTab === "nps" ? <NPSSurveyPanel dashboard={dashboard} /> : (
+      {activeTab === "network" ? <NetworkCampaignPanel dashboard={dashboard} /> : activeTab === "nps" ? <NPSSurveyPanel dashboard={dashboard} /> : activeTab === "email-settings" ? <EmailSettingsPanel dashboard={dashboard} /> : (
         <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

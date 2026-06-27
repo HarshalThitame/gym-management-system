@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrgFeatureAccess } from "@/features/entitlement";
 import { sendEmail } from "@/services/email/resend";
+import { getOrgEmailConfigOrDefault } from "@/services/email/email-config-service";
 import { generateReportPdfInternal, calculateNextScheduledAt, type ReportType } from "@/features/organization-owner/lib/report-schedule-utils";
 
 export type ReportSchedule = {
@@ -165,6 +166,7 @@ export async function sendScheduledReport(
   const sched = schedule as ReportSchedule;
   const { fileName } = await generateReportPdf(organizationId, sched.report_type);
 
+  const emailConfig = await getOrgEmailConfigOrDefault(organizationId);
   const recipients = sched.recipients ?? [];
   await Promise.all(
     recipients.map((recipient) =>
@@ -172,6 +174,8 @@ export async function sendScheduledReport(
         to: recipient,
         subject: `${sched.name} - ${sched.report_type.replace(/_/g, " ")}`,
         html: `<p>Your scheduled report "${sched.name}" is attached as a PDF.</p><p>Report type: ${sched.report_type}</p>`,
+        from: emailConfig.from ?? undefined,
+        replyTo: emailConfig.replyTo ?? undefined,
       })
     )
   );
@@ -216,12 +220,15 @@ export async function processScheduledReports(
 
       await generateReportPdf(organizationId, schedule.report_type);
 
+      const emailConfig = await getOrgEmailConfigOrDefault(organizationId);
       await Promise.all(
         schedule.recipients.map((recipient) =>
           sendEmail({
             to: recipient,
             subject: `${schedule.name} - Scheduled Report`,
             html: `<p>Your scheduled report "${schedule.name}" (${schedule.report_type}) is ready.</p>`,
+            from: emailConfig.from ?? undefined,
+            replyTo: emailConfig.replyTo ?? undefined,
           })
         )
       );

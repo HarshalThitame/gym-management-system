@@ -38,7 +38,7 @@ const SAFE_DEFAULT: OrgFeatureFlags = {
   emailNotifications: false, inAppNotifications: false,
   whatsappIntegration: false, smsIntegration: false,
   birthdayGreetings: false, broadcastMessages: false, emailCampaigns: false,
-  whatsappBusinessApi: false,
+  whatsappBusinessApi: false, customEmailDomain: false,
   memberPortal: false, trainerPortal: false, brandedMobileApp: false, dietWorkoutPlans: false,
   googleCalendarSync: false,
   inAppPushNotifications: false, digitalMembershipCard: false, loyaltyRewardsInApp: false,
@@ -156,6 +156,7 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   dataExportCsvDownload: { type: "feature", code: "data_export_csv_download" },
 
   // Communication
+  customEmailDomain: { type: "feature", code: "custom_email_domain" },
   emailNotifications: { type: "feature", code: "email_notifications" },
   inAppNotifications: { type: "feature", code: "in_app_notifications" },
   whatsappIntegration: { type: "feature", code: "whatsapp_integration" },

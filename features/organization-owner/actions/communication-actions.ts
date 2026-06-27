@@ -7,6 +7,7 @@ import type { Database, Json } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrganizationFeatureAccess, entitlementActionCatch, requireOrgFeatureAccess } from "@/features/entitlement";
 import { sendViaChannel } from "@/features/communications/lib/message-sender";
+import { getOrgEmailConfigOrDefault } from "@/services/email/email-config-service";
 
 type CampaignRow = Database["public"]["Tables"]["campaigns"]["Row"];
 type CampaignDeliveryInsert = Database["public"]["Tables"]["campaign_deliveries"]["Insert"];
@@ -261,6 +262,7 @@ export async function executeNetworkCampaignAction(
   const messageBody = campaign.message_body as Record<string, string> | null;
 
   const { members } = await resolveCampaignRecipientsAction(organizationId, targetGymIds, segmentFilters);
+  const emailConfig = await getOrgEmailConfigOrDefault(organizationId);
 
   if (members.length === 0) {
     await supabase.from("campaigns").update({ status: "completed", updated_at: new Date().toISOString() } as never).eq("id", campaignId);
@@ -306,7 +308,7 @@ export async function executeNetworkCampaignAction(
     const subject = (messageBody?.["email_subject"] ?? "Campaign Update") as string;
     const body = (messageBody?.[channel as string] ?? messageBody?.["body"] ?? "") as string;
 
-    const result = await sendViaChannel(channel, recipient, subject, body);
+    const result = await sendViaChannel(channel, recipient, subject, body, emailConfig.from ?? undefined, emailConfig.replyTo ?? undefined);
     if (result.ok) {
       sentCount++;
       if (deliveryId) {
