@@ -13,8 +13,8 @@ export async function sendCampaignEmail(params: {
     to: params.to,
     subject: params.subject,
     html: params.body,
-    from: params.from,
-    replyTo: params.replyTo,
+    ...(params.from ? { from: params.from } : {}),
+    ...(params.replyTo ? { replyTo: params.replyTo } : {}),
   });
   if (!r.sent) return { ok: false, error: r.reason ?? "Email failed" };
   return { ok: true };
