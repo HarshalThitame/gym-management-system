@@ -4,8 +4,8 @@ type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
-  from?: string;
-  replyTo?: string;
+  from?: string | undefined;
+  replyTo?: string | undefined;
   cc?: string[];
 };
 

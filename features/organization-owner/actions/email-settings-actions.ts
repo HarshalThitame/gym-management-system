@@ -94,8 +94,8 @@ export async function sendTestEmailAction(
       to,
       subject: "Test email from your organization",
       html: `<p>This is a test email from your organization's email configuration.</p><p>If you received this, your email settings are working correctly.</p>`,
-      from,
-      replyTo,
+      ...(from ? { from } : {}),
+      ...(replyTo ? { replyTo } : {}),
     });
 
     if (!result.sent) {
