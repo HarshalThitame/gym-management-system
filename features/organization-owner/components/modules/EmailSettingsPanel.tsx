@@ -66,8 +66,8 @@ export function EmailSettingsPanel({ dashboard }: EmailSettingsPanelProps) {
   }, [addDomainState]);
 
   useEffect(() => {
-    if (verifyState.status === "success" || verifyState.status === "warning") {
-      showToast(verifyState.message!, verifyState.status === "success" ? "success" : "warning");
+    if (verifyState.status === "success") {
+      showToast(verifyState.message!, "success");
     } else if (verifyState.status === "error") {
       showToast(verifyState.message!, "error");
     }
