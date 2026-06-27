@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireOrgFeatureAccess } from "@/features/entitlement";
 
 export type CrossBranchClassRule = {
@@ -43,7 +44,7 @@ export type CrossBranchClassSummary = {
 export async function getCrossBranchClassSummary(organizationId: string): Promise<CrossBranchClassSummary> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
 
   const { data: gyms } = await supabase
     .from("gyms")
@@ -57,29 +58,12 @@ export async function getCrossBranchClassSummary(organizationId: string): Promis
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const bookingsResult = await supabase
-    .from("class_bookings")
-    .select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)")
-    .in("gym_id", gymIds)
-    .in("status", ["booked", "checked_in", "attended"]);
-  const todayBookingsResult = await supabase
-    .from("class_bookings")
-    .select("id", { count: "exact", head: true })
-    .in("gym_id", gymIds)
-    .in("status", ["booked", "checked_in", "attended"])
-    .gte("created_at", `${today}T00:00:00.000Z`)
-    .lte("created_at", `${today}T23:59:59.999Z`);
-  const rulesResult = await supabase
-    .from("cross_branch_class_booking_rules")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("is_active", true);
-  const classesResult = await supabase
-    .from("class_sessions")
-    .select("id", { count: "exact", head: true })
-    .in("gym_id", gymIds)
-    .gte("session_date", today)
-    .eq("status", "scheduled");
+  const [bookingsResult, todayBookingsResult, rulesResult, classesResult] = await Promise.all([
+    supabase.from("class_bookings").select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)").in("gym_id", gymIds).in("status", ["booked", "checked_in", "attended"]),
+    supabase.from("class_bookings").select("id", { count: "exact", head: true }).in("gym_id", gymIds).in("status", ["booked", "checked_in", "attended"]).gte("created_at", `${today}T00:00:00.000Z`).lte("created_at", `${today}T23:59:59.999Z`),
+    supabase.from("cross_branch_class_booking_rules").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("is_active", true),
+    supabase.from("class_sessions").select("id", { count: "exact", head: true }).in("gym_id", gymIds).gte("session_date", today).eq("status", "scheduled"),
+  ]);
 
   const bookings = bookingsResult.data ?? [];
   const memberIds = [...new Set(bookings.map((b) => b.member_id).filter(Boolean))];
@@ -121,7 +105,7 @@ export async function getCrossBranchClassBookings(
 ): Promise<{ bookings: CrossBranchClassBooking[]; total: number }> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
   const page = filters?.page ?? 1;
   const pageSize = filters?.pageSize ?? 20;
   const from = (page - 1) * pageSize;
@@ -205,7 +189,7 @@ export async function getCrossBranchClassRules(
 ): Promise<CrossBranchClassRule[]> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
   const { data, error } = await supabase
     .from("cross_branch_class_booking_rules")
     .select("*")
@@ -222,7 +206,7 @@ export async function createCrossBranchClassRule(
 ): Promise<CrossBranchClassRule> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
   const { data, error } = await supabase
     .from("cross_branch_class_booking_rules")
     .insert({
@@ -248,7 +232,7 @@ export async function updateCrossBranchClassRule(
 ): Promise<CrossBranchClassRule> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
   if (input.name !== undefined) update.name = input.name;
@@ -276,7 +260,7 @@ export async function deleteCrossBranchClassRule(
 ): Promise<void> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
   const { error } = await supabase
     .from("cross_branch_class_booking_rules")
     .delete()
@@ -291,7 +275,7 @@ export async function getAvailableCrossBranchClasses(
 ): Promise<{ gymId: string; gymName: string; availableClasses: number; upcomingSessions: number }[]> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: gyms } = await supabase
