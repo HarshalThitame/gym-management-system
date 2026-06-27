@@ -57,30 +57,34 @@ export async function getCrossBranchClassSummary(organizationId: string): Promis
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const bookingsQuery = supabase
+    .from("class_bookings")
+    .select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)")
+    .in("gym_id", gymIds)
+    .in("status", ["booked", "checked_in", "attended"]);
+  const todayBookingsQuery = supabase
+    .from("class_bookings")
+    .select("id", { count: "exact", head: true })
+    .in("gym_id", gymIds)
+    .in("status", ["booked", "checked_in", "attended"])
+    .gte("created_at", `${today}T00:00:00.000Z`)
+    .lte("created_at", `${today}T23:59:59.999Z`);
+  const rulesQuery = supabase
+    .from("cross_branch_class_booking_rules")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("is_active", true);
+  const classesQuery = supabase
+    .from("class_sessions")
+    .select("id", { count: "exact", head: true })
+    .in("gym_id", gymIds)
+    .gte("session_date", today)
+    .eq("status", "scheduled");
   const [bookingsResult, todayBookingsResult, rulesResult, classesResult] = await Promise.all([
-    supabase
-      .from("class_bookings")
-      .select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)")
-      .in("gym_id", gymIds)
-      .in("status", ["booked", "checked_in", "attended"]),
-    supabase
-      .from("class_bookings")
-      .select("id", { count: "exact", head: true })
-      .in("gym_id", gymIds)
-      .in("status", ["booked", "checked_in", "attended"])
-      .gte("created_at", `${today}T00:00:00.000Z`)
-      .lte("created_at", `${today}T23:59:59.999Z`),
-    supabase
-      .from("cross_branch_class_booking_rules")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("is_active", true),
-    supabase
-      .from("class_sessions")
-      .select("id", { count: "exact", head: true })
-      .in("gym_id", gymIds)
-      .gte("session_date", today)
-      .eq("status", "scheduled"),
+    bookingsQuery,
+    todayBookingsQuery,
+    rulesQuery,
+    classesQuery,
   ]);
 
   const bookings = bookingsResult.data ?? [];
