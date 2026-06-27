@@ -57,34 +57,30 @@ export async function getCrossBranchClassSummary(organizationId: string): Promis
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const bookingsQuery = supabase
-    .from("class_bookings")
-    .select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)")
-    .in("gym_id", gymIds)
-    .in("status", ["booked", "checked_in", "attended"]);
-  const todayBookingsQuery = supabase
-    .from("class_bookings")
-    .select("id", { count: "exact", head: true })
-    .in("gym_id", gymIds)
-    .in("status", ["booked", "checked_in", "attended"])
-    .gte("created_at", `${today}T00:00:00.000Z`)
-    .lte("created_at", `${today}T23:59:59.999Z`);
-  const rulesQuery = supabase
-    .from("cross_branch_class_booking_rules")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .eq("is_active", true);
-  const classesQuery = supabase
-    .from("class_sessions")
-    .select("id", { count: "exact", head: true })
-    .in("gym_id", gymIds)
-    .gte("session_date", today)
-    .eq("status", "scheduled");
   const [bookingsResult, todayBookingsResult, rulesResult, classesResult] = await Promise.all([
-    bookingsQuery,
-    todayBookingsQuery,
-    rulesQuery,
-    classesQuery,
+    supabase
+      .from("class_bookings")
+      .select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)")
+      .in("gym_id", gymIds)
+      .in("status", ["booked", "checked_in", "attended"]) as Promise<{ data: unknown; error: unknown }>,
+    supabase
+      .from("class_bookings")
+      .select("id", { count: "exact", head: true })
+      .in("gym_id", gymIds)
+      .in("status", ["booked", "checked_in", "attended"])
+      .gte("created_at", `${today}T00:00:00.000Z`)
+      .lte("created_at", `${today}T23:59:59.999Z`) as Promise<{ count: number | null; error: unknown }>,
+    supabase
+      .from("cross_branch_class_booking_rules")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("is_active", true) as Promise<{ count: number | null; error: unknown }>,
+    supabase
+      .from("class_sessions")
+      .select("id", { count: "exact", head: true })
+      .in("gym_id", gymIds)
+      .gte("session_date", today)
+      .eq("status", "scheduled") as Promise<{ count: number | null; error: unknown }>,
   ]);
 
   const bookings = bookingsResult.data ?? [];
@@ -168,8 +164,8 @@ export async function getCrossBranchClassBookings(
 
   if (memberIds.length > 0) {
     const [membersResult, profilesResult] = await Promise.all([
-      supabase.from("members").select("id, gym_id, full_name").in("id", memberIds),
-      supabase.from("profiles").select("id, full_name").in("id", memberIds),
+      supabase.from("members").select("id, gym_id, full_name").in("id", memberIds) as Promise<{ data: unknown; error: unknown }>,
+      supabase.from("profiles").select("id, full_name").in("id", memberIds) as Promise<{ data: unknown; error: unknown }>,
     ]);
     for (const m of (membersResult.data ?? [])) {
       if (m.gym_id) memberGymMap.set(m.id, m.gym_id);
