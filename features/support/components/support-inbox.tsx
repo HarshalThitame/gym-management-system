@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronUp, Search, RefreshCw, ArrowUpDown, MessageSquare, Clock, Download } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, RefreshCw, ArrowUpDown, MessageSquare, Clock, Download, UserCheck, AlertTriangle, X } from "lucide-react";
 import type { TicketWithRelations } from "@/types/enterprise";
-import { SupportBulkActions } from "./support-bulk-actions";
 import { SupportSavedViews } from "./support-saved-views";
 import { Pagination } from "@/components/ui/pagination";
 import { SupportSlaTimerBadge } from "./support-sla-timer-badge";
 import type { SavedView } from "../services/support-saved-views-service";
+import type { AgentWithWorkload } from "../services/support-assignment-service";
+import { assignTicketAction, bulkUpdateTicketsAction } from "../actions/support-actions";
+import { computeSlaRemainingMinutes } from "../lib/sla-utils";
 
 const STATUS_BADGE: Record<string, string> = {
   open: "bg-blue-50 text-blue-700 border-blue-200",
@@ -29,8 +31,27 @@ const PRIORITY_BADGE: Record<string, string> = {
   emergency: "bg-red-100 text-red-900",
 };
 
-type SortField = "ticket_number" | "subject" | "customer_name" | "priority" | "status" | "created_at";
+type SortField = "ticket_number" | "subject" | "customer_name" | "priority" | "status" | "created_at" | "sla_urgency";
 type SortDir = "asc" | "desc";
+
+function getSlaMinutes(ticket: TicketWithRelations): number {
+  return ticket.slaPolicy?.resolution_minutes ?? ticket.slaPolicy?.first_response_minutes ?? 240;
+}
+
+function getSlaBorderColor(ticket: TicketWithRelations): string {
+  if (!ticket.sla_policy_id) return "border-l-transparent";
+  const sla = computeSlaRemainingMinutes(ticket.created_at, getSlaMinutes(ticket), ticket.sla_breached);
+  if (sla.status === "breached") return "border-l-red-500";
+  if (sla.status === "warning") return "border-l-amber-500";
+  return "border-l-green-500";
+}
+
+function getSlaUrgencySortKey(ticket: TicketWithRelations): number {
+  if (!ticket.sla_policy_id) return 999999;
+  const sla = computeSlaRemainingMinutes(ticket.created_at, getSlaMinutes(ticket), ticket.sla_breached);
+  if (sla.status === "breached") return -1;
+  return sla.remainingMinutes;
+}
 
 export function SupportInbox({
   tickets,
@@ -43,6 +64,8 @@ export function SupportInbox({
   onSelectView,
   onSaveView,
   onDeleteView,
+  agents,
+  currentUserId,
 }: {
   tickets: TicketWithRelations[];
   total: number;
@@ -54,15 +77,20 @@ export function SupportInbox({
   onSelectView: (view: SavedView) => void;
   onSaveView: (name: string) => void;
   onDeleteView: (viewId: string) => void;
+  agents: AgentWithWorkload[] | undefined;
+  currentUserId: string | undefined;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
   const [priorityFilter, setPriorityFilter] = useState(searchParams.get("priority") ?? "");
+  const [slaBreachedFilter, setSlaBreachedFilter] = useState(searchParams.get("sla_breached") === "true");
+  const [myTicketsOnly, setMyTicketsOnly] = useState(searchParams.get("my_tickets") === "true");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [assigningTicketId, setAssigningTicketId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let result = [...tickets];
@@ -81,14 +109,25 @@ export function SupportInbox({
     if (priorityFilter) {
       result = result.filter((t) => t.priority === priorityFilter);
     }
+    if (slaBreachedFilter) {
+      result = result.filter((t) => t.sla_breached);
+    }
+    if (myTicketsOnly && currentUserId) {
+      result = result.filter((t) => t.assigned_to === currentUserId);
+    }
     result.sort((a, b) => {
+      if (sortField === "sla_urgency") {
+        return sortDir === "asc"
+          ? getSlaUrgencySortKey(a) - getSlaUrgencySortKey(b)
+          : getSlaUrgencySortKey(b) - getSlaUrgencySortKey(a);
+      }
       const aVal = String(a[sortField as keyof TicketWithRelations] ?? "");
       const bVal = String(b[sortField as keyof TicketWithRelations] ?? "");
       const cmp = aVal.localeCompare(bVal);
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
-  }, [tickets, search, statusFilter, priorityFilter, sortField, sortDir]);
+  }, [tickets, search, statusFilter, priorityFilter, slaBreachedFilter, myTicketsOnly, currentUserId, sortField, sortDir]);
 
   const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) {
@@ -117,9 +156,44 @@ export function SupportInbox({
   }, [selected, filtered]);
 
   const handleRowClick = useCallback((id: string, e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest(".checkbox-cell")) return;
+    if ((e.target as HTMLElement).closest(".checkbox-cell, .assignee-cell, .stop-propagation")) return;
     router.push(`/super-admin/support/${id}`);
   }, [router]);
+
+  const updateUrl = useCallback((params: Record<string, string>) => {
+    const p = new URLSearchParams(searchParams.toString());
+    Object.entries(params).forEach(([k, v]) => {
+      if (v) p.set(k, v);
+      else p.delete(k);
+    });
+    router.push(`/super-admin/support?${p.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  const [isPending, startTransition] = useTransition();
+
+  const handleBulkAction = useCallback((action: string, value: string) => {
+    const formData = new FormData();
+    formData.set("ticketIds", JSON.stringify(Array.from(selected)));
+    if (action === "assign") formData.set("assignedTo", value);
+    if (action === "status") formData.set("status", value);
+    if (action === "priority") formData.set("priority", value);
+    startTransition(() => {
+      const fd = formData;
+      bulkUpdateTicketsAction({ status: "idle", message: "" }, fd);
+    });
+    setSelected(new Set());
+  }, [selected]);
+
+  const handleAssignTicket = useCallback((ticketId: string, agentId: string) => {
+    const formData = new FormData();
+    formData.set("ticketId", ticketId);
+    formData.set("assignedTo", agentId);
+    formData.set("assignmentType", "manual");
+    startTransition(() => {
+      assignTicketAction({ status: "idle", message: "" }, formData);
+    });
+    setAssigningTicketId(null);
+  }, [startTransition]);
 
   const SortHeader = ({ field, label, className }: { field: SortField; label: string; className?: string }) => (
     <button onClick={() => toggleSort(field)} className={`flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${className ?? ""}`}>
@@ -130,7 +204,7 @@ export function SupportInbox({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {savedViews && onSelectView && onSaveView && onDeleteView && (
           <SupportSavedViews
             views={savedViews}
@@ -146,11 +220,11 @@ export function SupportInbox({
             type="text"
             placeholder="Search by ticket #, subject, or customer..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); const p = new URLSearchParams(searchParams.toString()); p.set("q", e.target.value); router.push(`/super-admin/support?${p.toString()}`); }}
+            onChange={(e) => { setSearch(e.target.value); updateUrl({ q: e.target.value }); }}
             className="w-full h-9 pl-8 pr-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
           />
         </div>
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); const p = new URLSearchParams(searchParams.toString()); p.set("status", e.target.value); router.push(`/super-admin/support?${p.toString()}`); }}
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); updateUrl({ status: e.target.value }); }}
           className="h-9 rounded-lg border border-border bg-background px-2.5 text-xs min-w-[130px] focus:outline-none focus:ring-2 focus:ring-primary/20">
           <option value="">All Statuses</option>
           <option value="open, in_review, in_progress">Active</option>
@@ -162,7 +236,7 @@ export function SupportInbox({
           <option value="closed">Closed</option>
           <option value="reopened">Reopened</option>
         </select>
-        <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); const p = new URLSearchParams(searchParams.toString()); p.set("priority", e.target.value); router.push(`/super-admin/support?${p.toString()}`); }}
+        <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); updateUrl({ priority: e.target.value }); }}
           className="h-9 rounded-lg border border-border bg-background px-2.5 text-xs min-w-[110px] focus:outline-none focus:ring-2 focus:ring-primary/20">
           <option value="">All Priorities</option>
           <option value="emergency">Emergency</option>
@@ -171,6 +245,26 @@ export function SupportInbox({
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
+        <button
+          onClick={() => { setSlaBreachedFilter(!slaBreachedFilter); updateUrl({ sla_breached: !slaBreachedFilter ? "true" : "" }); }}
+          className={`h-9 px-2.5 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            slaBreachedFilter ? "bg-red-50 border-red-200 text-red-700" : "border-border bg-background hover:bg-muted"
+          }`}
+        >
+          <AlertTriangle className="h-3 w-3" />
+          SLA Breached
+        </button>
+        {currentUserId && (
+          <button
+            onClick={() => { setMyTicketsOnly(!myTicketsOnly); updateUrl({ my_tickets: !myTicketsOnly ? "true" : "" }); }}
+            className={`h-9 px-2.5 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              myTicketsOnly ? "bg-primary/10 border-primary/30 text-primary" : "border-border bg-background hover:bg-muted"
+            }`}
+          >
+            <UserCheck className="h-3 w-3" />
+            My Tickets
+          </button>
+        )}
         <button onClick={onRefresh} className="h-9 w-9 flex items-center justify-center rounded-lg border border-border hover:bg-muted transition-colors" title="Refresh">
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
@@ -185,15 +279,48 @@ export function SupportInbox({
       </div>
 
       {selected.size > 0 && (
-        <SupportBulkActions
-          selectedCount={selected.size}
-          onAssign={() => {}}
-          onSetPriority={() => {}}
-          onSetStatus={() => {}}
-          onEscalate={() => {}}
-          onClose={() => {}}
-          onClear={() => setSelected(new Set())}
-        />
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background/80 backdrop-blur-xl border border-border/50 shadow-lg sticky top-0 z-10">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-xs font-medium">{selected.size} selected</span>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-1">
+              <select
+                onChange={(e) => { if (e.target.value) { handleBulkAction("status", e.target.value); e.target.value = ""; } }}
+                className="h-7 rounded-md border border-border bg-background px-2 text-[10px] font-medium focus:outline-none"
+              >
+                <option value="">Change Status</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+              <select
+                onChange={(e) => { if (e.target.value) { handleBulkAction("priority", e.target.value); e.target.value = ""; } }}
+                className="h-7 rounded-md border border-border bg-background px-2 text-[10px] font-medium focus:outline-none"
+              >
+                <option value="">Change Priority</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+              {agents && agents.length > 0 && (
+                <select
+                  onChange={(e) => { if (e.target.value) { handleBulkAction("assign", e.target.value); e.target.value = ""; } }}
+                  className="h-7 rounded-md border border-border bg-background px-2 text-[10px] font-medium focus:outline-none"
+                >
+                  <option value="">Assign to...</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name} ({a.activeTicketCount} tickets)</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+          <button onClick={() => setSelected(new Set())} className="p-1 hover:text-foreground text-muted-foreground">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
 
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
@@ -212,7 +339,8 @@ export function SupportInbox({
           <div className="w-[90px]"><SortHeader field="priority" label="Priority" /></div>
           <div className="w-[100px]"><SortHeader field="status" label="Status" /></div>
           <div className="w-[120px]"><SortHeader field="created_at" label="Created" /></div>
-          <div className="w-[100px]"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">SLA</span></div>
+          <div className="w-[100px]"><SortHeader field="sla_urgency" label="SLA" /></div>
+          <div className="w-[120px]"><span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assignee</span></div>
         </div>
 
         <div className="divide-y divide-border">
@@ -222,24 +350,30 @@ export function SupportInbox({
                 <MessageSquare className="h-7 w-7 text-muted-foreground/60" />
               </div>
               <p className="text-sm font-medium text-muted-foreground">
-                {search || statusFilter || priorityFilter ? "No tickets match your filters" : "No tickets yet"}
+                {search || statusFilter || priorityFilter || slaBreachedFilter || myTicketsOnly
+                  ? "No tickets match your filters"
+                  : "No tickets yet"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {search || statusFilter || priorityFilter ? "Try adjusting your search or filters" : "Create your first support ticket"}
+                {search || statusFilter || priorityFilter || slaBreachedFilter || myTicketsOnly
+                  ? "Try adjusting your search or filters"
+                  : "Create your first support ticket"}
               </p>
             </div>
           ) : (
             filtered.map((ticket, idx) => {
               const created = new Date(ticket.created_at);
               const isSelected = selected.has(ticket.id);
-              const slaMinutes = ticket.sla_policy_id ? 240 : undefined;
+              const slaMinutes = ticket.sla_policy_id ? getSlaMinutes(ticket) : undefined;
+              const borderColor = getSlaBorderColor(ticket);
+              const assignedAgent = agents?.find((a) => a.id === ticket.assigned_to);
 
               return (
                 <div
                   key={ticket.id}
                   onClick={(e) => handleRowClick(ticket.id, e)}
-                  className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3 px-3 md:px-4 py-3 cursor-pointer transition-all hover:bg-muted/30 ${
-                    isSelected ? "bg-primary/5 border-l-2 border-l-primary" : "border-l-2 border-l-transparent"
+                  className={`flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3 px-3 md:px-4 py-3 cursor-pointer transition-all hover:bg-muted/30 border-l-2 ${borderColor} reveal-up ${
+                    isSelected ? "bg-primary/5" : ""
                   }`}
                   style={{ animationDelay: `${idx * 30}ms` }}
                 >
@@ -289,12 +423,68 @@ export function SupportInbox({
                   </span>
 
                   <div className="w-[100px] shrink-0 hidden md:block">
-                    {slaMinutes && (
+                    {slaMinutes !== undefined && (
                       <SupportSlaTimerBadge
                         createdAt={ticket.created_at}
                         slaMinutes={slaMinutes}
                         slaBreached={ticket.sla_breached}
                       />
+                    )}
+                  </div>
+
+                  <div className="w-[120px] shrink-0 hidden md:flex items-center gap-1 assignee-cell">
+                    {agents && agents.length > 0 ? (
+                      <div className="relative stop-propagation">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setAssigningTicketId(assigningTicketId === ticket.id ? null : ticket.id); }}
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium border transition-all ${
+                            assignedAgent
+                              ? "bg-muted/50 border-border hover:bg-muted"
+                              : "border-dashed border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/50"
+                          }`}
+                        >
+                          {assignedAgent ? (
+                            <>
+                              <UserCheck className="h-3 w-3" />
+                              <span className="truncate max-w-[80px]">{assignedAgent.name}</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="h-3 w-3" />
+                              <span>Unassigned</span>
+                            </>
+                          )}
+                        </button>
+                        {assigningTicketId === ticket.id && (
+                          <div className="absolute top-full left-0 mt-1 z-20 w-52 rounded-lg border border-border bg-card shadow-xl p-1.5" onClick={(e) => e.stopPropagation()}>
+                            <div className="max-h-48 overflow-y-auto space-y-0.5">
+                              <button
+                                onClick={() => handleAssignTicket(ticket.id, "")}
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors hover:bg-muted ${!ticket.assigned_to ? "bg-muted/50" : ""}`}
+                              >
+                                <span className="text-muted-foreground">—</span>
+                                <span>Unassign</span>
+                              </button>
+                              {agents.map((agent) => (
+                                <button
+                                  key={agent.id}
+                                  onClick={() => handleAssignTicket(ticket.id, agent.id)}
+                                  className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-xs transition-colors hover:bg-muted ${
+                                    ticket.assigned_to === agent.id ? "bg-primary/5" : ""
+                                  }`}
+                                >
+                                  <span className="font-medium truncate">{agent.name}</span>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">{agent.activeTicketCount}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">
+                        {assignedAgent?.name ?? <span className="italic">Unassigned</span>}
+                      </span>
                     )}
                   </div>
                 </div>

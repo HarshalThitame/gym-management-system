@@ -14,6 +14,7 @@ const baseMembership: MembershipRow = {
   id: "membership-1",
   gym_id: "gym-1",
   member_id: "member-1",
+  branch_id: null,
   membership_plan_id: "plan-1",
   status: "active",
   start_date: "2026-06-01",
@@ -40,6 +41,7 @@ const baseMembership: MembershipRow = {
 const basePlan: MembershipPlanRow = {
   id: "plan-1",
   gym_id: "gym-1",
+  branch_id: null,
   name: "Monthly",
   slug: "monthly",
   description: "Monthly access plan.",

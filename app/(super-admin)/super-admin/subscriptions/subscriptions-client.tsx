@@ -64,7 +64,7 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   // Normalize MRR by billing period
   const computeMrr = (price: number, period: string) => {
     if (!price) return 0;
-    const divisors: Record<string, number> = { monthly: 1, quarterly: 3, half_yearly: 6, annual: 12, yearly: 12 };
+    const divisors: Record<string, number> = { monthly: 1, annual: 12, yearly: 12 };
     return Math.round(price / (divisors[period] || 1));
   };
 
@@ -261,8 +261,6 @@ export function SubscriptionsClient({ data }: { data: Data }) {
                       <select value={billingPeriod} onChange={(e) => setBillingPeriod(e.target.value)} className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs">
                         <option value="all">All periods</option>
                         <option value="monthly">Monthly</option>
-                        <option value="quarterly">Quarterly</option>
-                        <option value="half_yearly">Half yearly</option>
                         <option value="annual">Annual</option>
                       </select>
                     </div>

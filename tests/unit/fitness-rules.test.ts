@@ -89,6 +89,7 @@ function member(overrides: Partial<MemberRow> = {}): MemberRow {
 	    id: "member-1",
 	    gym_id: "gym-1",
 	    branch_id: null,
+	    organization_id: null,
 	    user_id: "user-1",
     member_code: "APX-001",
     full_name: "Riya Shah",
@@ -119,6 +120,7 @@ function goalRow(overrides: Partial<FitnessGoalRow> = {}): FitnessGoalRow {
   return {
     id: "goal-1",
     gym_id: "gym-1",
+    branch_id: null,
     member_id: "member-1",
     trainer_id: null,
     goal_type: "weight_loss",
@@ -143,6 +145,7 @@ function workout(overrides: Partial<WorkoutSessionRow> = {}): WorkoutSessionRow 
   return {
     id: "workout-1",
     gym_id: "gym-1",
+    branch_id: null,
     member_id: "member-1",
     trainer_id: null,
     workout_program_id: null,
@@ -167,6 +170,7 @@ function measurement(overrides: Partial<BodyMeasurementRow> = {}): BodyMeasureme
   return {
     id: "measurement-1",
     gym_id: "gym-1",
+    branch_id: null,
     member_id: "member-1",
     recorded_on: "2026-06-10",
     weight_kg: null,
@@ -192,6 +196,7 @@ function meal(overrides: Partial<MealEntryRow> = {}): MealEntryRow {
   return {
     id: "meal-1",
     gym_id: "gym-1",
+    branch_id: null,
     member_id: "member-1",
     nutrition_plan_id: null,
     meal_plan_id: null,
@@ -214,6 +219,7 @@ function nutritionPlan(overrides: Partial<NutritionPlanRow> = {}): NutritionPlan
   return {
     id: "nutrition-1",
     gym_id: "gym-1",
+    branch_id: null,
     member_id: "member-1",
     trainer_id: null,
     name: "Maintenance",

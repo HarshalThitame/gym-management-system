@@ -641,8 +641,6 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
                 <select id="pkg-billing-cycle" name="billingPeriod" defaultValue={pkg?.billing_period ?? "monthly"} disabled={savePending} className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm">
                   <option value="monthly">Monthly</option>
                   <option value="annual">Annual</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="half_yearly">Half Yearly</option>
                 </select>
               </div>
             </div>

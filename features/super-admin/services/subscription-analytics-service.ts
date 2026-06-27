@@ -128,8 +128,6 @@ function calculateMrrForPlan(
 
 function normalizeToMonthly(price: number, period: string | null): number {
   switch (period) {
-    case "quarterly": return Math.round(price / 3);
-    case "half_yearly": return Math.round(price / 6);
     case "annual": return Math.round(price / 12);
     default: return price;
   }

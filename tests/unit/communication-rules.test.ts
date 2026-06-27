@@ -79,6 +79,7 @@ function template(): NotificationTemplateRow {
   return {
     id: "template-1",
     gym_id: null,
+    branch_id: null,
     name: "Renewal",
     slug: "renewal",
     category: "membership",
@@ -100,6 +101,7 @@ function preference(overrides: Partial<NotificationPreferenceRow> = {}): Notific
   return {
     id: "preference-1",
     gym_id: null,
+    branch_id: null,
     user_id: "user-1",
     member_id: "member-1",
     trainer_id: null,

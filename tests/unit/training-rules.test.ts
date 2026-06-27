@@ -70,6 +70,7 @@ describe("training CSV reports", () => {
     const row: TrainerSessionRow = {
       id: "session-1",
       gym_id: "gym-1",
+      branch_id: null,
       trainer_id: trainerId,
       member_id: memberId,
       member_pt_package_id: null,

@@ -69,8 +69,6 @@ export type BillingResult = {
 
 const BILLING_PERIOD_MAP: Record<string, number> = {
   monthly: 30,
-  quarterly: 90,
-  half_yearly: 180,
   annual: 365,
 };
 

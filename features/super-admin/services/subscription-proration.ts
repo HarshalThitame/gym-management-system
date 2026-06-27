@@ -1,7 +1,7 @@
 export type ProrationInput = {
   currentPrice: number;
   newPrice: number;
-  billingPeriod: "monthly" | "quarterly" | "half_yearly" | "annual";
+  billingPeriod: "monthly" | "annual";
   daysRemainingInPeriod: number;
 };
 
@@ -15,8 +15,6 @@ export type ProrationResult = {
 export function getDaysInPeriod(period: ProrationInput["billingPeriod"]): number {
   switch (period) {
     case "monthly": return 30;
-    case "quarterly": return 90;
-    case "half_yearly": return 182;
     case "annual": return 365;
   }
 }

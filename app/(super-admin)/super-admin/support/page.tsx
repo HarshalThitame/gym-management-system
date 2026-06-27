@@ -6,6 +6,7 @@ import { db } from "@/features/support/services/support-db";
 import { listTickets } from "@/features/support/services/support-ticket-service";
 import { getSupportDashboard } from "@/features/support/services/support-analytics-service";
 import { listSlaPolicies, getSlaDashboard } from "@/features/support/services/support-sla-service";
+import { getAvailableAgents } from "@/features/support/services/support-assignment-service";
 import type { SavedView } from "@/features/support/services/support-saved-views-service";
 import type { SupportDashboard } from "@/types/enterprise";
 import { SupportPageClient } from "./support-page-client";
@@ -16,11 +17,12 @@ async function safeData<T>(promise: Promise<T>, fallback: T): Promise<T> {
 
 async function SupportContent() {
   const ctx = await requireRole(["super_admin"], "/super-admin");
-  const [ticketResult, dashboard, slaPolicies, slaStats] = await Promise.all([
+  const [ticketResult, dashboard, slaPolicies, slaStats, agents] = await Promise.all([
     safeData(listTickets({ page: 1, pageSize: 50 }), { tickets: [], total: 0, page: 1, pageSize: 50 }),
     safeData(getSupportDashboard(), {} as SupportDashboard),
     safeData(listSlaPolicies(), []),
     safeData(getSlaDashboard(), { totalTickets: 0, breachedCount: 0, atRiskCount: 0, slaCompliancePercent: 0 }),
+    safeData(getAvailableAgents(), []),
   ]);
 
   const supabase = await createSupabaseServerClient();
@@ -49,7 +51,7 @@ async function SupportContent() {
         </div>
       </div>
 
-      <SupportPageClient ticketResult={ticketResult} dashboard={dashboard} slaPolicies={slaPolicies} slaStats={slaStats} views={views ?? []} />
+      <SupportPageClient ticketResult={ticketResult} dashboard={dashboard} slaPolicies={slaPolicies} slaStats={slaStats} views={views ?? []} agents={agents} currentUserId={ctx.userId ?? undefined} />
     </div>
   );
 }

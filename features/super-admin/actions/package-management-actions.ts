@@ -23,7 +23,7 @@ const packageSchema = z.object({
   trialDays: z.coerce.number().int().min(0).default(0),
   sortOrder: z.coerce.number().int().min(0).default(0),
   price: z.coerce.number().int().min(0).default(0),
-  billingPeriod: z.enum(["monthly", "quarterly", "half_yearly", "annual"]).default("monthly"),
+  billingPeriod: z.enum(["monthly", "annual"]).default("monthly"),
   isActive: z.coerce.boolean().default(true),
   recommended: z.coerce.boolean().default(false),
   priceMonthly: z.coerce.number().int().min(0).default(0),

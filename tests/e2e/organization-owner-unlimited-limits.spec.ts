@@ -141,7 +141,7 @@ test.describe("Organization Owner — Unlimited Limits", () => {
       const matches = text.match(/\d+/g);
       if (matches && matches.length >= 2) {
         const used = parseInt(matches[0], 10);
-        const total = parseInt(matches[1], 10);
+        const total = parseInt(matches[1] ?? "0", 10);
         if (!isNaN(used) && !isNaN(total)) {
           expect(used).toBeGreaterThanOrEqual(0);
           expect(total).toBeGreaterThanOrEqual(0);

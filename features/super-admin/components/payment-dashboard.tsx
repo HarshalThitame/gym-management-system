@@ -24,7 +24,7 @@ const PAGE_SIZES = [25, 50, 100];
 /* ─── Normalize MRR ─── */
 function computeMrr(price: number, period: string): number {
   if (!price) return 0;
-  const divisors: Record<string, number> = { monthly: 1, quarterly: 3, half_yearly: 6, annual: 12, yearly: 12 };
+  const divisors: Record<string, number> = { monthly: 1, annual: 12, yearly: 12 };
   return Math.round(price / (divisors[period] || 1));
 }
 

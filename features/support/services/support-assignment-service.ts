@@ -25,10 +25,15 @@ export async function getAvailableAgents(organizationId?: string) {
 
   const agentsWithLoad: AgentWithWorkload[] = [];
   for (const agent of agents ?? []) {
+    const { count } = await sdb
+      .from("support_tickets")
+      .select("*", { count: "exact", head: true })
+      .eq("assigned_to", agent.id)
+      .in("status", ["open", "in_review", "in_progress", "waiting_on_customer", "waiting_on_third_party"]);
     agentsWithLoad.push({
       id: agent.id,
       name: agent.full_name ?? "Unknown",
-      activeTicketCount: 0,
+      activeTicketCount: count ?? 0,
       skills: [],
     });
   }

@@ -27,7 +27,25 @@ const baseOrganization: OrganizationRow = {
   settings: {},
   created_by: null,
   created_at: "2026-06-12T00:00:00.000Z",
-  updated_at: "2026-06-12T00:00:00.000Z"
+  updated_at: "2026-06-12T00:00:00.000Z",
+  activated_at: null,
+  archived_at: null,
+  billing_address_line1: null,
+  billing_address_line2: null,
+  billing_city: null,
+  billing_country: "IN",
+  billing_state: null,
+  billing_zip: null,
+  business_type: null,
+  cancellation_reason: null,
+  cancelled_at: null,
+  gst_registered_name: null,
+  gstin: null,
+  paused_at: null,
+  suspended_at: null,
+  suspension_reason: null,
+  tags: null,
+  verified_at: null
 };
 
 describe("super admin organization governance rules", () => {

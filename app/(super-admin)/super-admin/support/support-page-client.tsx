@@ -7,6 +7,7 @@ import { SupportAnalytics } from "@/features/support/components/support-analytic
 import { SupportSlaDashboard } from "@/features/support/components/support-sla-dashboard";
 import type { TicketWithRelations, SupportDashboard, SupportSlaPolicyRow } from "@/types/enterprise";
 import type { SavedView } from "@/features/support/services/support-saved-views-service";
+import type { AgentWithWorkload } from "@/features/support/services/support-assignment-service";
 
 export function SupportPageClient({
   ticketResult,
@@ -14,12 +15,16 @@ export function SupportPageClient({
   slaPolicies,
   slaStats,
   views: initialViews,
+  agents,
+  currentUserId,
 }: {
   ticketResult: { tickets: TicketWithRelations[]; total: number; page: number; pageSize: number };
   dashboard: SupportDashboard;
   slaPolicies: SupportSlaPolicyRow[];
   slaStats: { totalTickets: number; breachedCount: number; atRiskCount: number; slaCompliancePercent: number };
   views: SavedView[];
+  agents: AgentWithWorkload[] | undefined;
+  currentUserId: string | undefined;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"inbox" | "analytics" | "sla">("inbox");
@@ -82,6 +87,8 @@ export function SupportPageClient({
           onSelectView={(v) => setActiveViewId(v.id)}
           onSaveView={handleSaveView}
           onDeleteView={handleDeleteView}
+          agents={agents}
+          currentUserId={currentUserId}
         />
       )}
 

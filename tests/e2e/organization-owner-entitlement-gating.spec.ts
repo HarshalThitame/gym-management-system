@@ -163,11 +163,9 @@ test.describe("Organization Owner — Entitlement Gating", () => {
     await page.goto("/organization/equipment", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(5000);
 
-    const path = new URL(page.url()).pathname;
-    const isRedirected = path !== "/organization/equipment" ||
-      path === "/organization/locked-feature" ||
-      path === "/unauthorized" ||
-      path === "/organization";
+    const currentPath = new URL(page.url()).pathname;
+    const isRedirected = currentPath !== "/organization/equipment" ||
+      ["/organization/locked-feature", "/unauthorized", "/organization"].includes(currentPath);
 
     const body = await page.innerText("body").catch(() => "");
     const hasLockedMessage = body.toLowerCase().includes("feature not in your plan") ||

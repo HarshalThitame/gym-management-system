@@ -148,7 +148,7 @@ export async function upgradePlanAction(input: unknown): Promise<AuthActionState
     const currentPrice = priceOverride ?? (currentPkg.price as number) ?? 0;
     const newPrice = (newPkg.price as number) ?? 0;
     const billingPeriod = (sub.billing_period as string) || (currentPkg.billing_period as string) || "monthly";
-    const period = billingPeriod as "monthly" | "quarterly" | "half_yearly" | "annual";
+    const period = billingPeriod as "monthly" | "annual";
 
     const nextBillingDate = sub.next_billing_date as string | null;
     const billingAnchor = sub.billing_anchor as string | null;
@@ -285,7 +285,7 @@ export async function downgradePlanAction(input: unknown): Promise<AuthActionSta
     const currentPrice = priceOverride ?? (currentPkg.price as number) ?? 0;
     const newPrice = (newPkg.price as number) ?? 0;
     const billingPeriod = (sub.billing_period as string) || (currentPkg.billing_period as string) || "monthly";
-    const period = billingPeriod as "monthly" | "quarterly" | "half_yearly" | "annual";
+    const period = billingPeriod as "monthly" | "annual";
 
     const nextBillingDate = sub.next_billing_date as string | null;
     const now = new Date();

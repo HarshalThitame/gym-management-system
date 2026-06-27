@@ -4,6 +4,7 @@ import type { Json } from "@/types/database";
 import { requireRole } from "@/lib/auth/guards";
 import { writeAuditLog } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createTicket, updateTicket, assignTicket, addNote as addNoteService,
 } from "../services/support-ticket-service";
@@ -208,6 +209,51 @@ export async function createEscalationRuleAction(_prevState: AuthActionState, fo
     return successState("Escalation rule created.");
   } catch (e) {
     return errorState(e instanceof Error ? e.message : "Failed to create escalation rule.");
+  }
+}
+
+export async function bulkUpdateTicketsAction(
+  _prevState: AuthActionState,
+  formData: FormData
+): Promise<AuthActionState> {
+  void _prevState;
+  try {
+    const ctx = await requireRole(adminRoles, "/super-admin");
+    const rawIds = formData.get("ticketIds");
+    const ticketIds = typeof rawIds === "string" ? JSON.parse(rawIds) as string[] : [];
+    if (ticketIds.length === 0) return errorState("No tickets selected.");
+
+    const payload: Record<string, unknown> = {};
+    const status = formData.get("status");
+    const priority = formData.get("priority");
+    const assignedTo = formData.get("assignedTo");
+    const tag = formData.get("tag");
+
+    if (status) payload.status = status;
+    if (priority) payload.priority = priority;
+    if (assignedTo) payload.assigned_to = assignedTo;
+    if (tag) payload.tag = tag;
+
+    const supabase = await createSupabaseServerClient();
+
+    const { error } = await (supabase
+      .from("support_tickets")
+      .update(payload as never)
+      .in("id", ticketIds) as unknown as { error: Error | null });
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      actorId: ctx.userId,
+      action: "support.ticket.bulk_update",
+      entityType: "support_ticket",
+      entityId: ticketIds.join(","),
+    });
+
+    revalidatePath("/super-admin/support");
+    return successState(`${ticketIds.length} tickets updated.`);
+  } catch (e) {
+    return errorState(e instanceof Error ? e.message : "Failed to bulk update tickets.");
   }
 }
 

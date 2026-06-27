@@ -1,6 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { db } from "./support-db";
-import type { SupportKnowledgeBaseArticleRow } from "@/types/enterprise";
+import type { SupportKnowledgeBaseArticleRow, SupportTicketCategoryRow } from "@/types/enterprise";
+
+export type KbArticleWithCategory = SupportKnowledgeBaseArticleRow & {
+  category?: SupportTicketCategoryRow | null;
+};
 
 export type KbListOptions = {
   organizationId?: string;
@@ -20,7 +24,7 @@ export async function listKbArticles(options: KbListOptions = {}) {
   const pageSize = Math.min(options.pageSize ?? 25, 100);
   const offset = (page - 1) * pageSize;
 
-  let q = sdb.from("support_knowledge_base_articles").select("*", { count: "exact" });
+  let q = sdb.from("support_knowledge_base_articles").select("*, category:support_ticket_categories(*)", { count: "exact" });
   if (options.organizationId) q = q.eq("organization_id", options.organizationId);
   if (options.articleType) q = q.eq("article_type", options.articleType);
   if (options.status) q = q.eq("status", options.status);
@@ -34,7 +38,7 @@ export async function listKbArticles(options: KbListOptions = {}) {
 
   const { data, error, count } = await q.order("created_at", { ascending: false }).range(offset, offset + pageSize - 1);
   if (error) throw new Error(error.message);
-  return { articles: data as unknown as SupportKnowledgeBaseArticleRow[], total: count ?? 0, page, pageSize };
+  return { articles: (data as unknown as KbArticleWithCategory[]), total: count ?? 0, page, pageSize };
 }
 
 export async function getKbArticle(slug: string) {

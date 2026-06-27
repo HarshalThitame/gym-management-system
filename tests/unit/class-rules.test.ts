@@ -17,6 +17,7 @@ const activeMembership: MembershipRow = {
   id: "membership-1",
   gym_id: "gym-1",
   member_id: "member-1",
+  branch_id: null,
   membership_plan_id: "plan-1",
   status: "active",
   start_date: "2026-06-01",
@@ -100,6 +101,7 @@ function buildClassRow(overrides: Partial<ClassRow> = {}): ClassRow {
   return {
     id: "class-1",
     gym_id: "gym-1",
+    branch_id: null,
     category_id: "category-1",
     name: "Signature Strength",
     slug: "signature-strength",
@@ -132,6 +134,7 @@ function buildSessionRow(overrides: Partial<ClassSessionRow> = {}): ClassSession
   return {
     id: "session-1",
     gym_id: "gym-1",
+    branch_id: null,
     class_id: "class-1",
     schedule_id: null,
     primary_trainer_id: "trainer-1",
@@ -161,6 +164,7 @@ function buildScheduleRow(overrides: Partial<ClassScheduleRow> = {}): ClassSched
   return {
     id: "schedule-1",
     gym_id: "gym-1",
+    branch_id: null,
     class_id: "class-1",
     recurrence: "weekly",
     start_date: "2026-06-01",
@@ -184,6 +188,7 @@ function buildBookingRow(): ClassBookingRow {
   return {
     id: "booking-1",
     gym_id: "gym-1",
+    branch_id: null,
     session_id: "session-1",
     class_id: "class-1",
     member_id: "member-1",
