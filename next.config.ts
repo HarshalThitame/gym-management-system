@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Code-split heavy chart libraries
   experimental: {
-    optimizePackageImports: ["recharts", "lucide-react", "date-fns"]
+    optimizePackageImports: ["recharts", "lucide-react", "date-fns"],
   },
   async headers() {
     return [

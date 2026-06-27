@@ -195,10 +195,7 @@ begin
 
   insert into public.package_pricing (package_id, billing_period, price, currency) values
     (v_pkg_id, 'monthly', 299900, 'INR'),
-    (v_pkg_id, 'quarterly', 849900, 'INR'),
-    (v_pkg_id, 'half_yearly', 1599900, 'INR'),
-    (v_pkg_id, 'annual', 2999900, 'INR')
-  on conflict (package_id, billing_period) do update set price = excluded.price;
+    (v_pkg_id, 'annual', 2999900, 'INR');
 
 end $$;
 

@@ -197,7 +197,5 @@ BEGIN
 
   INSERT INTO package_pricing (package_id, billing_period, price, currency) VALUES
     (v_pkg_id, 'monthly', 749900, 'INR'),
-    (v_pkg_id, 'quarterly', 2129900, 'INR'),
-    (v_pkg_id, 'half_yearly', 4049900, 'INR'),
     (v_pkg_id, 'annual', 7499900, 'INR');
 END $$;

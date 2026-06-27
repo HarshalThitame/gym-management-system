@@ -73,7 +73,7 @@ BEGIN
 
   UPDATE packages SET
     name = 'Enterprise',
-    description = 'Enterprise plan is for large gym chains and franchise networks that need unlimited branches, unlimited members, white-label mobile app, franchise rollup reporting, advanced CRM, custom roles, API access, accounting integrations, dedicated infrastructure, SSO, SLA support, and premium enterprise controls.',
+    description = 'Enterprise plan is for large gym chains and multi-branch networks that need unlimited branches, unlimited members, advanced CRM, custom roles, API access, accounting integrations, and premium enterprise controls.',
     is_active = true,
     trial_days = 30,
     color = '#7c3aed',
@@ -81,7 +81,7 @@ BEGIN
     sort_order = 3,
     price = NULL,
     billing_period = 'monthly',
-    metadata = '{"target_customer": "Franchise networks, large gym chains, premium fitness brands, and enterprise organizations.", "price_label": "Contact Sales", "price_type": "custom", "short_description": "Unlimited everything. White-label mobile app, franchise rollup, SLA, dedicated support."}'::jsonb
+    metadata = '{"target_customer": "Large gym chains, multi-branch networks, premium fitness brands, and enterprise organizations.", "price_label": "Contact Sales", "price_type": "custom", "short_description": "Unlimited everything. Advanced CRM, custom roles, API access, priority support."}'::jsonb
   WHERE id = v_pkg;
 
   -- Update Enterprise package features (all true for enterprise)
@@ -225,7 +225,5 @@ BEGIN
 
   INSERT INTO package_pricing (package_id, billing_period, price, currency) VALUES
     (v_pkg, 'monthly', 999900, 'INR'),
-    (v_pkg, 'quarterly', 2849900, 'INR'),
-    (v_pkg, 'half_yearly', 5399900, 'INR'),
     (v_pkg, 'annual', 9999900, 'INR');
 END $$;
