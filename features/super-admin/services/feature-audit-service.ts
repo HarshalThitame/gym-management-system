@@ -48,7 +48,6 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   branch_attendance:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   biometric_attendance:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   fingerprint_attendance:    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  face_recognition_attendance: { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   rfid_attendance:           { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   nfc_attendance:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   geo_fencing_attendance:    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
@@ -67,10 +66,7 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   payment_failure_handling:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P0" },
   partial_payment_dues:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   razorpay_payu_integration:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P0" },
-  multi_currency_billing:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  franchise_fee_management:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   multi_gstin_support:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  pos_merchandise_supplements:     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   branch_revenue_split:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
 
   // Communication — core module is implemented; sub-features partial
@@ -96,7 +92,6 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   member_nps_surveys:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
 
   // Enterprise — some are fully implemented, others are service/infra
-  franchise_management:               { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   multi_branch_management:            { hasSidebar: true,  sidebarModule: "branches", hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   api_access:                         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
   webhooks:                           { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
@@ -110,15 +105,7 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   multi_branch_staff_assignment:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   hr_document_storage:                { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   custom_roles_granular_permissions:  { hasSidebar: true,  sidebarModule: "custom-roles", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
-  sso_saml_login:                     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  dedicated_cloud_infrastructure:     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  dedicated_onboarding_manager:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  response_sla:                       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  named_account_manager:              { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  automated_backups_90_day_retention: { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  uptime_sla_99_9:                    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  staff_training_sessions:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  custom_feature_requests:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
+
 
   // Membership — core is fully implemented; sub-features partial
   member_management:            { hasSidebar: true,  sidebarModule: "members",     hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
@@ -138,7 +125,6 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   branded_mobile_app:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   diet_workout_plans:           { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   google_calendar_sync:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  white_label_mobile_app:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   in_app_push_notifications:     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   digital_membership_card:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   loyalty_rewards_in_app:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
@@ -151,11 +137,9 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   class_occupancy_report:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   lead_conversion_report:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   branch_revenue_comparison:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  franchise_rollup_reports:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   scheduled_report_delivery:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   equipment_inventory_maintenance:   { hasSidebar: true,  sidebarModule: "equipment",  hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   data_export_csv_download:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  franchise_rollup_dashboard:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   custom_dashboards_kpis:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
 
   // Trainer — core module is fully implemented; sub-features are partial
@@ -209,7 +193,6 @@ function findCategoryForFeature(featureCode: string): string {
     branch_attendance: "Attendance",
     biometric_attendance: "Attendance",
     fingerprint_attendance: "Attendance",
-    face_recognition_attendance: "Attendance",
     rfid_attendance: "Attendance",
     nfc_attendance: "Attendance",
     geo_fencing_attendance: "Attendance",
@@ -227,10 +210,7 @@ function findCategoryForFeature(featureCode: string): string {
     payment_failure_handling: "Billing & Payments",
     partial_payment_dues: "Billing & Payments",
     razorpay_payu_integration: "Billing & Payments",
-    multi_currency_billing: "Billing & Payments",
-    franchise_fee_management: "Billing & Payments",
     multi_gstin_support: "Billing & Payments",
-    pos_merchandise_supplements: "Billing & Payments",
     branch_revenue_split: "Billing & Payments",
     // communication
     email_notifications: "Communication",
@@ -253,7 +233,6 @@ function findCategoryForFeature(featureCode: string): string {
     network_wide_campaign_manager: "CRM & Sales",
     member_nps_surveys: "CRM & Sales",
     // enterprise
-    franchise_management: "Enterprise",
     multi_branch_management: "Enterprise",
     api_access: "Enterprise",
     webhooks: "Enterprise",
@@ -267,15 +246,7 @@ function findCategoryForFeature(featureCode: string): string {
     multi_branch_staff_assignment: "Enterprise",
     hr_document_storage: "Enterprise",
     custom_roles_granular_permissions: "Enterprise",
-    sso_saml_login: "Enterprise",
-    dedicated_cloud_infrastructure: "Enterprise",
-    dedicated_onboarding_manager: "Enterprise",
-    response_sla: "Enterprise",
-    named_account_manager: "Enterprise",
-    automated_backups_90_day_retention: "Enterprise",
-    uptime_sla_99_9: "Enterprise",
-    staff_training_sessions: "Enterprise",
-    custom_feature_requests: "Enterprise",
+
     // membership
     member_management: "Membership Management",
     membership_renewals: "Membership Management",
@@ -293,7 +264,6 @@ function findCategoryForFeature(featureCode: string): string {
     branded_mobile_app: "Platform",
     diet_workout_plans: "Platform",
     google_calendar_sync: "Platform",
-    white_label_mobile_app: "Platform",
     in_app_push_notifications: "Platform",
     digital_membership_card: "Platform",
     loyalty_rewards_in_app: "Platform",
@@ -305,11 +275,9 @@ function findCategoryForFeature(featureCode: string): string {
     class_occupancy_report: "Reports & Analytics",
     lead_conversion_report: "Reports & Analytics",
     branch_revenue_comparison: "Reports & Analytics",
-    franchise_rollup_reports: "Reports & Analytics",
     scheduled_report_delivery: "Reports & Analytics",
     equipment_inventory_maintenance: "Reports & Analytics",
     data_export_csv_download: "Reports & Analytics",
-    franchise_rollup_dashboard: "Reports & Analytics",
     custom_dashboards_kpis: "Reports & Analytics",
     // trainer
     trainer_management: "Trainer Management",

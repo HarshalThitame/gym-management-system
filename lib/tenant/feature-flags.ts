@@ -18,7 +18,6 @@ export interface OrgFeatureFlags {
   branchAttendance: boolean;
   biometricAttendanceEnabled: boolean;
   fingerprintAttendance: boolean;
-  faceRecognitionAttendance: boolean;
   rfidAttendanceEnabled: boolean;
   nfcAttendance: boolean;
   geoFencingAttendance: boolean;
@@ -80,10 +79,7 @@ export interface OrgFeatureFlags {
   paymentFailureHandling: boolean;
   partialPaymentDues: boolean;
   razorpayPayuIntegration: boolean;
-  multiCurrencyBilling: boolean;
-  franchiseFeeManagement: boolean;
   multiGstinSupport: boolean;
-  posMerchandiseSupplements: boolean;
   branchRevenueSplit: boolean;
 
   // Reports
@@ -95,8 +91,7 @@ export interface OrgFeatureFlags {
   classOccupancyReport: boolean;
   leadConversionReport: boolean;
   branchRevenueComparison: boolean;
-  franchiseRollupReports: boolean;
-  franchiseRollupDashboard: boolean;
+
   scheduledReportDelivery: boolean;
   equipmentInventoryMaintenance: boolean;
   dataExportCsvDownload: boolean;
@@ -116,7 +111,6 @@ export interface OrgFeatureFlags {
   trainerPortal: boolean;
   brandedMobileApp: boolean;
   dietWorkoutPlans: boolean;
-  whiteLabelMobileApp: boolean;
   googleCalendarSync: boolean;
   inAppPushNotifications: boolean;
   digitalMembershipCard: boolean;
@@ -135,7 +129,6 @@ export interface OrgFeatureFlags {
 
   // Enterprise
   multiBranchManagement: boolean;
-  franchiseManagement: boolean;
   apiAccessEnabled: boolean;
   webhooks: boolean;
   auditLogs: boolean;
@@ -144,15 +137,7 @@ export interface OrgFeatureFlags {
   staffManagement: boolean;
   tallyZohoBooksIntegration: boolean;
   restApiAccess: boolean;
-  ssoSamlLogin: boolean;
-  dedicatedCloudInfrastructure: boolean;
-  dedicatedOnboardingManager: boolean;
-  responseSla: boolean;
-  namedAccountManager: boolean;
-  automatedBackups90DayRetention: boolean;
-  uptimeSla99_9: boolean;
-  staffTrainingSessions: boolean;
-  customFeatureRequests: boolean;
+
 
   // Legacy aliases
   classSchedulingEnabled: boolean;

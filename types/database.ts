@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       access_devices: {
@@ -6085,6 +6060,193 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mobile_trainer_dashboard"
             referencedColumns: ["gym_id"]
+          },
+        ]
+      }
+      calendar_integrations: {
+        Row: {
+          access_token: string | null
+          calendar_id: string | null
+          connected_by: string | null
+          created_at: string | null
+          id: string
+          last_synced_at: string | null
+          organization_id: string
+          provider: string
+          refresh_token: string | null
+          sync_classes: boolean | null
+          sync_enabled: boolean | null
+          sync_pt_sessions: boolean | null
+          token_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_id?: string | null
+          connected_by?: string | null
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          organization_id: string
+          provider?: string
+          refresh_token?: string | null
+          sync_classes?: boolean | null
+          sync_enabled?: boolean | null
+          sync_pt_sessions?: boolean | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          calendar_id?: string | null
+          connected_by?: string | null
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          organization_id?: string
+          provider?: string
+          refresh_token?: string | null
+          sync_classes?: boolean | null
+          sync_enabled?: boolean | null
+          sync_pt_sessions?: boolean | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_integrations_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_sync_logs: {
+        Row: {
+          class_session_id: string | null
+          created_at: string | null
+          error_message: string | null
+          event_type: string
+          external_event_id: string | null
+          id: string
+          integration_id: string | null
+          organization_id: string
+          status: string
+        }
+        Insert: {
+          class_session_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_type: string
+          external_event_id?: string | null
+          id?: string
+          integration_id?: string | null
+          organization_id: string
+          status?: string
+        }
+        Update: {
+          class_session_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string
+          external_event_id?: string | null
+          id?: string
+          integration_id?: string | null
+          organization_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_logs_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_session_utilization"
+            referencedColumns: ["session_id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_class_session_id_fkey"
+            columns: ["class_session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -23138,6 +23300,126 @@ export type Database = {
           },
         ]
       }
+      monitoring_alert_configs: {
+        Row: {
+          alert_rules: Json
+          created_at: string
+          created_by: string | null
+          email_recipients: string
+          id: string
+          is_active: boolean
+          pagerduty_integration_key: string
+          pagerduty_severity_mapping: Json
+          slack_webhook_url: string
+          threshold_error_rate_pct: number
+          threshold_latency_warning_ms: number
+          threshold_uptime_warning_pct: number
+          updated_at: string
+        }
+        Insert: {
+          alert_rules?: Json
+          created_at?: string
+          created_by?: string | null
+          email_recipients?: string
+          id?: string
+          is_active?: boolean
+          pagerduty_integration_key?: string
+          pagerduty_severity_mapping?: Json
+          slack_webhook_url?: string
+          threshold_error_rate_pct?: number
+          threshold_latency_warning_ms?: number
+          threshold_uptime_warning_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          alert_rules?: Json
+          created_at?: string
+          created_by?: string | null
+          email_recipients?: string
+          id?: string
+          is_active?: boolean
+          pagerduty_integration_key?: string
+          pagerduty_severity_mapping?: Json
+          slack_webhook_url?: string
+          threshold_error_rate_pct?: number
+          threshold_latency_warning_ms?: number
+          threshold_uptime_warning_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      monitoring_alert_history: {
+        Row: {
+          acknowledged: boolean
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          channel: string
+          component: string
+          created_at: string
+          id: string
+          message: string | null
+          service: string
+          severity: string
+          title: string
+        }
+        Insert: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          channel: string
+          component: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          service: string
+          severity: string
+          title: string
+        }
+        Update: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          channel?: string
+          component?: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          service?: string
+          severity?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      monitoring_external_health_checks: {
+        Row: {
+          checked_at: string
+          error_message: string | null
+          id: string
+          latency_ms: number
+          metadata: Json
+          service: string
+          status: string
+        }
+        Insert: {
+          checked_at?: string
+          error_message?: string | null
+          id?: string
+          latency_ms?: number
+          metadata?: Json
+          service: string
+          status: string
+        }
+        Update: {
+          checked_at?: string
+          error_message?: string | null
+          id?: string
+          latency_ms?: number
+          metadata?: Json
+          service?: string
+          status?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           branch_id: string | null
@@ -35541,6 +35823,105 @@ export type Database = {
           },
         ]
       }
+      trainer_calendar_connections: {
+        Row: {
+          access_token: string | null
+          calendar_id: string | null
+          created_at: string | null
+          id: string
+          organization_id: string
+          provider: string
+          refresh_token: string | null
+          sync_enabled: boolean | null
+          token_expires_at: string | null
+          trainer_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          provider?: string
+          refresh_token?: string | null
+          sync_enabled?: boolean | null
+          token_expires_at?: string | null
+          trainer_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          provider?: string
+          refresh_token?: string | null
+          sync_enabled?: boolean | null
+          token_expires_at?: string | null
+          trainer_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trainer_calendar_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trainer_calendar_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trainer_calendar_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trainer_calendar_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trainer_calendar_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trainer_calendar_connections_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["trainer_id"]
+          },
+          {
+            foreignKeyName: "trainer_calendar_connections_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_performance_summary"
+            referencedColumns: ["trainer_id"]
+          },
+          {
+            foreignKeyName: "trainer_calendar_connections_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "trainers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trainer_certifications: {
         Row: {
           alert_at: string | null
@@ -37731,6 +38112,169 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      webhook_configs: {
+        Row: {
+          created_at: string | null
+          events: string[]
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          name: string
+          organization_id: string
+          secret: string | null
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          events?: string[]
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name: string
+          organization_id: string
+          secret?: string | null
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          events?: string[]
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name?: string
+          organization_id?: string
+          secret?: string | null
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_configs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_delivery_logs: {
+        Row: {
+          attempt_count: number | null
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          event_type: string
+          id: string
+          organization_id: string
+          payload: Json | null
+          response_body: string | null
+          response_status: number | null
+          status: string
+          webhook_id: string
+        }
+        Insert: {
+          attempt_count?: number | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          organization_id: string
+          payload?: Json | null
+          response_body?: string | null
+          response_status?: number | null
+          status?: string
+          webhook_id: string
+        }
+        Update: {
+          attempt_count?: number | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          organization_id?: string
+          payload?: Json | null
+          response_body?: string | null
+          response_status?: number | null
+          status?: string
+          webhook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_delivery_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_delivery_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_delivery_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_delivery_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhook_delivery_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_delivery_logs_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_configs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_logs: {
         Row: {
@@ -40012,7 +40556,6 @@ export type Database = {
           custom_domain_enabled: boolean | null
           expires_at: string | null
           features: Json | null
-          franchise_management_enabled: boolean | null
           is_active: boolean | null
           limits: Json | null
           max_branches: number | null
@@ -40038,7 +40581,6 @@ export type Database = {
           custom_domain_enabled?: never
           expires_at?: string | null
           features?: Json | null
-          franchise_management_enabled?: never
           is_active?: boolean | null
           limits?: Json | null
           max_branches?: never
@@ -40064,7 +40606,6 @@ export type Database = {
           custom_domain_enabled?: never
           expires_at?: string | null
           features?: Json | null
-          franchise_management_enabled?: never
           is_active?: boolean | null
           limits?: Json | null
           max_branches?: never
@@ -40196,9 +40737,7 @@ export type Database = {
           description: string | null
           dynamic_qr_attendance_enabled: boolean | null
           email_notifications_enabled: boolean | null
-          face_recognition_attendance_enabled: boolean | null
           fingerprint_attendance_enabled: boolean | null
-          franchise_management_enabled: boolean | null
           geo_fencing_attendance_enabled: boolean | null
           goal_tracking_enabled: boolean | null
           icon: string | null
@@ -40265,9 +40804,7 @@ export type Database = {
           description?: string | null
           dynamic_qr_attendance_enabled?: never
           email_notifications_enabled?: never
-          face_recognition_attendance_enabled?: never
           fingerprint_attendance_enabled?: never
-          franchise_management_enabled?: never
           geo_fencing_attendance_enabled?: never
           goal_tracking_enabled?: never
           icon?: string | null
@@ -40334,9 +40871,7 @@ export type Database = {
           description?: string | null
           dynamic_qr_attendance_enabled?: never
           email_notifications_enabled?: never
-          face_recognition_attendance_enabled?: never
           fingerprint_attendance_enabled?: never
-          franchise_management_enabled?: never
           geo_fencing_attendance_enabled?: never
           goal_tracking_enabled?: never
           icon?: string | null
@@ -41416,9 +41951,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

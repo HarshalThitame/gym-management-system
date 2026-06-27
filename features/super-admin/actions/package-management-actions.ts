@@ -51,7 +51,7 @@ const packageSchema = z.object({
 // (package_features_feature_code_fkey). The single source of truth for the
 // valid key set is features/entitlement/feature-registry.ts (FEATURE_KEYS).
 // TODO(Phase 3): add missing keys (e.g. custom_branding, trial_management,
-// nfc_attendance, fingerprint_attendance, face_recognition_attendance,
+// nfc_attendance, fingerprint_attendance,
 // geo_fencing_attendance, attendance_api, dynamic_qr_attendance) so the
 // editor can control every registered feature.
 const FEATURE_FIELD_MAP: Record<string, string> = {
@@ -101,19 +101,14 @@ const FEATURE_FIELD_MAP: Record<string, string> = {
   class_occupancy_report: "classOccupancyReport",
   lead_conversion_report: "leadConversionReport",
   branch_revenue_comparison: "branchRevenueComparison",
-  franchise_rollup_reports: "franchiseRollupReports",
   whatsapp_business_api: "whatsappBusinessApi",
   google_calendar_sync: "googleCalendarSync",
-  white_label_mobile_app: "whiteLabelMobileApp",
   tally_zoho_books_integration: "tallyZohoBooksIntegration",
   rest_api_access: "restApiAccess",
   cross_branch_member_access: "crossBranchMemberAccess",
   custom_member_fields: "customMemberFields",
   member_data_import_export: "memberDataImportExport",
-  multi_currency_billing: "multiCurrencyBilling",
-  franchise_fee_management: "franchiseFeeManagement",
   multi_gstin_support: "multiGstinSupport",
-  pos_merchandise_supplements: "posMerchandiseSupplements",
   branch_revenue_split: "branchRevenueSplit",
   network_wide_class_calendar: "networkWideClassCalendar",
   trainer_sharing_across_branches: "trainerSharingAcrossBranches",
@@ -125,7 +120,6 @@ const FEATURE_FIELD_MAP: Record<string, string> = {
   loyalty_points_system: "loyaltyPointsSystem",
   network_wide_campaign_manager: "networkWideCampaignManager",
   member_nps_surveys: "memberNpsSurveys",
-  franchise_rollup_dashboard: "franchiseRollupDashboard",
   custom_dashboards_kpis: "customDashboardsKpis",
   scheduled_report_delivery: "scheduledReportDelivery",
   equipment_inventory_maintenance: "equipmentInventoryMaintenance",
@@ -133,15 +127,7 @@ const FEATURE_FIELD_MAP: Record<string, string> = {
   in_app_push_notifications: "inAppPushNotifications",
   digital_membership_card: "digitalMembershipCard",
   loyalty_rewards_in_app: "loyaltyRewardsInApp",
-  sso_saml_login: "ssoSamlLogin",
-  dedicated_cloud_infrastructure: "dedicatedCloudInfrastructure",
-  dedicated_onboarding_manager: "dedicatedOnboardingManager",
-  response_sla: "responseSla",
-  named_account_manager: "namedAccountManager",
-  automated_backups_90_day_retention: "automatedBackups90DayRetention",
-  uptime_sla_99_9: "uptimeSla99_9",
-  staff_training_sessions: "staffTrainingSessions",
-  custom_feature_requests: "customFeatureRequests",
+
 };
 
 export async function savePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {

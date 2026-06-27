@@ -7,8 +7,9 @@ What this phase is about:
   Currently payments are tracked per organization but there's no per-branch revenue
   attribution or split configuration. The feature key is registered but has zero
   implementation. This phase builds revenue split rules, per-branch revenue reports,
-  and integrates into the existing Revenue module. Note: franchise_fee_management was
-  removed in Phase 1.1, so this phase focuses only on branch revenue splitting.
+  and integrates into the existing Revenue module. (franchise_fee_management was
+  removed in Phase 1.1; all phantom features are now cleaned from the codebase,
+  so this phase focuses only on branch revenue splitting.)
 
 Reference: docs/ENTERPRISE_PRODUCTION_PLAN.md Phase 2 Session 10.
 

@@ -14,7 +14,7 @@ Complete redesign of the package management system from hardcoded column-based f
 - No centralized entitlement engine
 
 ### After (Enterprise-Grade)
-- **Feature Catalog**: Central registry of all 51 platform features
+- **Feature Catalog**: Central registry of all 49 platform features (2 phantom features removed per Phase 1.1)
 - **Package Features**: Key-value entitlements per package (no schema changes for new features)
 - **Package Limits**: Key-value limits per package (flexible, scalable)
 - **Package Pricing**: Multi-period pricing (monthly, annual, etc.)
@@ -29,7 +29,7 @@ Complete redesign of the package management system from hardcoded column-based f
 | Table | Purpose | Rows |
 |-------|---------|------|
 | `feature_categories` | Feature groupings (11 categories) | 11 |
-| `feature_catalog` | Master registry of all features | 51 |
+| `feature_catalog` | Master registry of all features | 49 |
 | `package_features` | Feature entitlements per package | ~150 |
 | `package_limits` | Limit values per package | ~21 |
 | `package_pricing` | Multi-period pricing | ~6 |
@@ -45,12 +45,12 @@ Complete redesign of the package management system from hardcoded column-based f
 |---------|----------------|---------------|----------|--------|
 | **Starter** | ₹1,499 | ₹14,999 | 16 enabled | 1 gym, 1 branch, 500 members, 10 trainers, 5 staff |
 | **Growth** | ₹3,999 | ₹39,999 | 33 enabled | 5 gyms, 10 branches, 5K members, 100 trainers, 50 staff |
-| **Enterprise** | ₹9,999 | ₹99,999 | 52 enabled | All unlimited |
+| **Enterprise** | ₹9,999 | ₹99,999 | 50 enabled (2 phantom removed) | All unlimited |
 
-## Feature Catalog (51 Features)
+## Feature Catalog (49 Features)
 
-### Attendance (14)
-`manual_attendance`, `qr_attendance`, `dynamic_qr_attendance`, `trainer_attendance`, `staff_attendance`, `branch_attendance`, `biometric_attendance`, `fingerprint_attendance`, `face_recognition_attendance`, `rfid_attendance`, `nfc_attendance`, `geo_fencing_attendance`, `attendance_api`, `attendance_reports`
+### Attendance (13)
+`manual_attendance`, `qr_attendance`, `dynamic_qr_attendance`, `trainer_attendance`, `staff_attendance`, `branch_attendance`, `biometric_attendance`, `fingerprint_attendance`, `rfid_attendance`, `nfc_attendance`, `geo_fencing_attendance`, `attendance_api`, `attendance_reports`
 
 ### Membership (5)
 `member_management`, `membership_renewals`, `expiry_tracking`, `goal_tracking`, `progress_photos`
@@ -79,8 +79,8 @@ Complete redesign of the package management system from hardcoded column-based f
 ### White Label (3)
 `white_label`, `custom_domain`, `custom_branding`
 
-### Enterprise (7)
-`multi_branch_management`, `franchise_management`, `api_access`, `webhooks`, `audit_logs`, `advanced_rbac`, `priority_support`
+### Enterprise (6)
+`multi_branch_management`, `api_access`, `webhooks`, `audit_logs`, `advanced_rbac`, `priority_support`
 
 ## TypeScript Files Created/Updated
 
@@ -88,7 +88,7 @@ Complete redesign of the package management system from hardcoded column-based f
 - `features/super-admin/services/entitlement-service.ts` — Centralized entitlement engine
 
 ### Updated
-- `lib/tenant/feature-flags.ts` — 51 features + 7 limits mapped to catalog codes
+- `lib/tenant/feature-flags.ts` — 49 features + 7 limits mapped to catalog codes
 - `lib/tenant/feature-resolver.ts` — Dynamic resolution from package_features/package_limits
 - `lib/tenant/plan-context.ts` — Resolves from new tables with package slug/id
 - `features/super-admin/services/subscription-service.ts` — Updated PackageRow type
