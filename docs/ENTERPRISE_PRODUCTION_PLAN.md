@@ -1,9 +1,37 @@
 # Enterprise Production-Ready Buildout Plan
 
-> **Last updated:** 2026-06-19
+> **Last updated:** 2026-06-27
 > **Target:** All paid features in Growth/Enterprise packages have real modules/pages/APIs
 > **Scope:** Organization Owner panel only
-> **Timeline:** 13 weeks (3+ months)
+> **Status:** Sessions 1-20 **COMPLETE** · Sessions 21-23 remaining (polish, testing, hardening)
+
+## Completion Summary
+
+| Phase | Sessions | Status |
+|-------|----------|--------|
+| Phase 1.1 — Remove Phantom Features | Session 1 | ✅ Complete |
+| Phase 1.2 — Leads Dashboard | Session 2 | ✅ Complete |
+| Phase 1.3 — Custom Member Fields + Import/Export | Session 3 | ✅ Complete |
+| Phase 1.4 — Dedicated Report Pages | Session 4 | ✅ Complete |
+| Phase 1.5 — Trainer Commissions + Payroll | Session 5 | ✅ Complete (service files extracted) |
+| Phase 2.1 — Staff Attendance & Leave | Session 6 | ✅ Complete (service files extracted) |
+| Phase 2.2 — Multi-Branch Staff + HR Docs | Session 7 | ✅ Complete |
+| Phase 2.3 — Custom Roles & Permissions | Session 8 | ✅ Complete |
+| Phase 2.4 — Corporate / Bulk Memberships | Session 9 | ✅ Complete |
+| Phase 2.5 — Revenue Split | Session 10 | ✅ Complete |
+| Phase 2.6 — Cross-Branch Member Access | Session 11 | ✅ Complete |
+| Phase 3.1 — Cross-Branch Class Booking | Session 12 | ✅ Complete |
+| Phase 3.2 — Network Calendar + Trainer Sharing | Session 13 | ✅ Complete |
+| Phase 3.3 — Lead Pipeline & Re-engagement | Session 14 | ✅ Complete |
+| Phase 3.4 — Referral Program | Session 15 | ✅ Complete |
+| Phase 3.5 — Loyalty Points System | Session 16 | ✅ Complete |
+| Phase 3.6 — Campaign Manager | Session 17 | ✅ Complete |
+| Phase 3.7 — NPS Surveys | Session 18 | ✅ Complete |
+| Phase 3.8 — Custom Dashboards + Reports + Equipment | Session 19 | ✅ Complete (CustomizableDashboard wired in workspace) |
+| Phase 3.9 — Google Calendar Sync + Webhooks | Session 20 | ✅ Complete |
+| Phase 4.1 — Package Sync & Entitlement Cleanup | Session 21 | ⏳ Pending |
+| Phase 4.2 — E2E Testing | Session 22 | ⏳ Pending |
+| Phase 4.3 — Final Validation & Hardening | Session 23 | ⏳ Pending |
 
 ---
 

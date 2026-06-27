@@ -1,29 +1,11 @@
 "use server";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrgFeatureAccess } from "@/features/entitlement";
+import { getMonthlyPayroll as getPayroll } from "../services/payroll-service";
+import type { PayrollRecord, PayrollResult } from "../services/payroll-service";
 
-export type PayrollRecord = {
-  trainerId: string;
-  trainerName: string;
-  baseSalary: number;
-  totalCommissions: number;
-  deductions: number;
-  netPayable: number;
-  commissionCount: number;
-};
-
-export type PayrollResult = {
-  records: PayrollRecord[];
-  month: string;
-  year: string;
-  summary: {
-    totalPayroll: number;
-    totalTrainers: number;
-    avgPerTrainer: number;
-  };
-};
+export type { PayrollRecord, PayrollResult };
 
 export async function getMonthlyPayroll(
   organizationId: string,
@@ -31,71 +13,7 @@ export async function getMonthlyPayroll(
   year: string
 ): Promise<PayrollResult> {
   await requireOrgFeatureAccess(organizationId, "payroll_export");
-
-  const supabase = await createSupabaseServerClient();
-  const paddedMonth = month.padStart(2, "0");
-  const startDate = `${year}-${paddedMonth}-01`;
-  const endDate = `${year}-${paddedMonth}-31`;
-
-  const { data: gyms } = await supabase
-    .from("gyms")
-    .select("id")
-    .eq("organization_id", organizationId);
-
-  const gymIds = (gyms ?? []).map((g: { id: string }) => g.id);
-  if (gymIds.length === 0) {
-    return { records: [], month, year, summary: { totalPayroll: 0, totalTrainers: 0, avgPerTrainer: 0 } };
-  }
-
-  const { data: commissions } = await supabase
-    .from("trainer_commissions")
-    .select("trainer_id, amount, status")
-    .eq("organization_id", organizationId)
-    .gte("calculated_at", startDate)
-    .lte("calculated_at", endDate)
-    .eq("status", "paid");
-
-  const { data: trainers } = await supabase
-    .from("trainers")
-    .select("id, display_name, base_salary")
-    .in("gym_id", gymIds);
-
-  const commissionByTrainer = new Map<string, { total: number; count: number }>();
-  for (const c of commissions ?? []) {
-    const existing = commissionByTrainer.get(c.trainer_id) ?? { total: 0, count: 0 };
-    existing.total += c.amount;
-    existing.count += 1;
-    commissionByTrainer.set(c.trainer_id, existing);
-  }
-
-  const records: PayrollRecord[] = (trainers ?? []).map((t) => {
-    const comm = commissionByTrainer.get(t.id) ?? { total: 0, count: 0 };
-    return {
-      trainerId: t.id,
-      trainerName: t.display_name,
-      baseSalary: t.base_salary ?? 0,
-      totalCommissions: comm.total,
-      deductions: 0,
-      netPayable: (t.base_salary ?? 0) + comm.total,
-      commissionCount: comm.count,
-    };
-  });
-
-  records.sort((a, b) => b.netPayable - a.netPayable);
-
-  const totalPayroll = records.reduce((s, r) => s + r.netPayable, 0);
-  const totalTrainers = records.filter((r) => r.netPayable > 0).length;
-
-  return {
-    records,
-    month,
-    year,
-    summary: {
-      totalPayroll,
-      totalTrainers,
-      avgPerTrainer: totalTrainers > 0 ? Math.round(totalPayroll / totalTrainers) : 0,
-    },
-  };
+  return getPayroll(organizationId, month, year);
 }
 
 export async function exportPayrollCSV(
@@ -105,7 +23,7 @@ export async function exportPayrollCSV(
 ): Promise<string> {
   await requireOrgFeatureAccess(organizationId, "payroll_export");
 
-  const result = await getMonthlyPayroll(organizationId, month, year);
+  const result = await getPayroll(organizationId, month, year);
 
   const header = "Trainer Name,Base Salary (₹),Commissions (₹),Deductions (₹),Net Payable (₹),Commission Count";
   const rows = result.records.map((r) =>
@@ -140,7 +58,7 @@ export async function exportPayrollPDF(
 ): Promise<Uint8Array> {
   await requireOrgFeatureAccess(organizationId, "payroll_export");
 
-  const result = await getMonthlyPayroll(organizationId, month, year);
+  const result = await getPayroll(organizationId, month, year);
 
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595, 842]);
@@ -173,7 +91,7 @@ export async function exportPayrollPDF(
   for (const record of result.records) {
     if (y < 100) {
       y = 780;
-      const newPage = pdf.addPage([595, 842]);
+      pdf.addPage([595, 842]);
       page.drawRectangle({ x: 48, y: y - 6, width: 499, height: 22, color: rgb(0.94, 0.95, 0.92) });
     }
     page.drawText(record.trainerName.slice(0, 28), { x: 56, y, size: 9, font: regular, color: dark });

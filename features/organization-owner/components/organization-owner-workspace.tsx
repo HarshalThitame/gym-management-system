@@ -9,6 +9,7 @@ import { AuditTrailViewer } from "@/features/organization-owner/components/audit
 import { LanguageSwitcher } from "@/features/organization-owner/components/language-switcher";
 import { ThemePreview } from "@/features/organization-owner/components/modules/ThemePreview";
 import { EnterpriseDashboard } from "@/features/organization-owner/components/enterprise-dashboard";
+import { CustomizableDashboard } from "@/features/organization-owner/components/customizable-dashboard";
 import { AnalyticsIntelligence } from "@/features/organization-owner/components/analytics/advanced-analytics";
 import { BranchesModule } from "@/features/organization-owner/components/modules/GymsModule";
 import { StaffModule } from "@/features/organization-owner/components/modules/StaffModule";
@@ -67,6 +68,21 @@ export function OrganizationOwnerWorkspace({ dashboard, module, moduleData, modu
 }
 
 function OrganizationOwnerDashboardView({ dashboard, planContext }: { dashboard: OrganizationOwnerDashboard; planContext?: OrgPlanContext | null | undefined }) {
+  const hasCustomDashboards = planContext?.features?.customDashboardsKpis ?? false;
+
+  if (hasCustomDashboards) {
+    return (
+      <div className="space-y-6">
+        <EnterpriseDashboard dashboard={dashboard} planContext={planContext} />
+        <div className="rounded-lg border border-border bg-surface p-5">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Customizable Dashboard</p>
+          <p className="mt-1 text-sm text-muted-foreground">Drag, reorder, and toggle widgets to build your perfect dashboard layout. Changes are saved to your account.</p>
+        </div>
+        <CustomizableDashboard dashboard={dashboard} />
+      </div>
+    );
+  }
+
   return <EnterpriseDashboard dashboard={dashboard} planContext={planContext} />;
 }
 

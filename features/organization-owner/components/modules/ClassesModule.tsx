@@ -19,6 +19,7 @@ import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { NetworkClassCalendar } from "@/features/organization-owner/components/modules/NetworkClassCalendar";
+import { CrossBranchClassBookingPanel } from "@/features/organization-owner/components/modules/CrossBranchClassBookingPanel";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
@@ -29,7 +30,7 @@ const CHART_COLORS = ["#16a34a", "#0891b2", "#f59e0b", "#dc2626"];
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
 export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterpriseModuleProps) {
-  const [activeTab, setActiveTab] = useState<"sessions" | "calendar">("sessions");
+  const [activeTab, setActiveTab] = useState<"sessions" | "calendar" | "cross-branch">("sessions");
   const { filters, navigate, currentPage } = useModuleFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailSession, setDetailSession] = useState<ClassSessionRow | null>(null);
@@ -45,8 +46,11 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
     if (hasNetworkCalendar) {
       t.push({ key: "calendar", label: "Network Calendar", icon: <Calendar className="size-4" /> });
     }
+    if (hasCrossBranchFeature) {
+      t.push({ key: "cross-branch", label: "Cross-Branch", icon: <GitBranch className="size-4" /> });
+    }
     return t;
-  }, [hasNetworkCalendar]);
+  }, [hasNetworkCalendar, hasCrossBranchFeature]);
 
   const sessions = (moduleData?.items ?? dashboard.classSessions) as ClassSessionRow[];
   const crossBranchCounts = moduleData?.crossBranchCounts ?? {};
@@ -143,6 +147,9 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
 
       {/* ═══ NETWORK CALENDAR TAB ═══ */}
       {activeTab === "calendar" ? <NetworkClassCalendar dashboard={dashboard} /> : null}
+
+      {/* ═══ CROSS-BRANCH BOOKING TAB ═══ */}
+      {activeTab === "cross-branch" ? <CrossBranchClassBookingPanel dashboard={dashboard} /> : null}
 
       {/* ═══ SESSIONS TAB (DEFAULT) ═══ */}
       {activeTab !== "sessions" ? null : (
