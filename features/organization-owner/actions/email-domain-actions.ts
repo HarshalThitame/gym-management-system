@@ -153,7 +153,7 @@ export async function verifyEmailSendingDomainAction(
     revalidateOrgModules(["/organization/communications"]);
     return {
       ...prevState,
-      status: newStatus === "verified" ? "success" : "warning",
+      status: newStatus === "verified" ? "success" : "error",
       message: newStatus === "verified"
         ? "Domain verified! You can now send emails from this domain."
         : "Domain not yet verified. Check DNS records and try again.",
