@@ -44,7 +44,7 @@ export async function sendViaChannel(
 ): Promise<SendResult> {
   switch (channel) {
     case "email":
-      return sendCampaignEmail({ to: recipient, subject, body, from: emailFrom, replyTo: emailReplyTo });
+      return sendCampaignEmail({ to: recipient, subject, body, ...(emailFrom ? { from: emailFrom } : {}), ...(emailReplyTo ? { replyTo: emailReplyTo } : {}) });
     case "sms":
       return sendCampaignSms({ to: recipient, message: body });
     case "whatsapp":
