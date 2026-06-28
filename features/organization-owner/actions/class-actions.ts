@@ -2,6 +2,7 @@
 
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
@@ -35,6 +36,9 @@ export async function saveClassSessionAction(prevState: AuthActionState, formDat
     const { data: classDef } = await supabase.from("classes").select("id").eq("id", classId).eq("gym_id", gymId).maybeSingle();
     if (!classDef) return { ...prevState, status: "error", message: "Class not found for this gym." };
 
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) return { ...prevState, status: "error", message: "Server configuration error." };
+
     const capacity = Number(formData.get("capacity")) || 30;
     const trainerId = (formData.get("trainerId") as string) || null;
     const location = (formData.get("location") as string) || null;
@@ -45,12 +49,12 @@ export async function saveClassSessionAction(prevState: AuthActionState, formDat
 
     if (sessionId) {
       const update: Record<string, unknown> = { session_date: sessionDate, starts_at: startsAt, ends_at: endsAt, capacity, primary_trainer_id: trainerId, location, notes, status, updated_at: new Date().toISOString() };
-      const { error } = await supabase.from("class_sessions").update(update as never).eq("id", sessionId);
+      const { error } = await adminClient.from("class_sessions").update(update as never).eq("id", sessionId);
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_class_session", entityType: "class_session", entityId: sessionId });
     } else {
       const insert: Record<string, unknown> = { gym_id: gymId, class_id: classId, session_date: sessionDate, starts_at: startsAt, ends_at: endsAt, capacity, primary_trainer_id: trainerId, location, notes, status };
-      const { data, error } = await supabase.from("class_sessions").insert(insert as never).select("id").single();
+      const { data, error } = await adminClient.from("class_sessions").insert(insert as never).select("id").single();
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.create_class_session", entityType: "class_session", entityId: data.id });
       targetSessionId = data.id;
@@ -76,8 +80,9 @@ export async function cancelClassSessionAction(prevState: AuthActionState, formD
     const sessionId = formData.get("sessionId") as string;
     if (!sessionId) return { ...prevState, status: "error", message: "Session ID is required." };
 
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("class_sessions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() } as never).eq("id", sessionId);
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) return { ...prevState, status: "error", message: "Server configuration error." };
+    const { error } = await adminClient.from("class_sessions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() } as never).eq("id", sessionId);
     if (error) throw new Error(error.message);
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.cancel_class_session", entityType: "class_session", entityId: sessionId });
     revalidateOrgModules(["/organization/classes"]);
