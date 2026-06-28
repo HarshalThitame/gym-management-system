@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ClassSchema } from "@/features/classes/schemas/classes";
 import { slugifyClassName } from "@/features/classes/lib/business-rules";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
@@ -45,8 +46,12 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
     }
 
     const supabase = await createSupabaseServerClient();
-    const gymId = formData.get("gymId") as string;
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) {
+      return { ...prevState, status: "error", message: "Server configuration error." };
+    }
 
+    const gymId = formData.get("gymId") as string;
     if (!gymId) {
       return { ...prevState, status: "error", message: "Gym is required." };
     }
@@ -60,7 +65,7 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
     const now = new Date().toISOString();
 
     if (parsed.data.classId) {
-      const { error } = await supabase
+      const { error } = await adminClient
         .from("classes")
         .update({
           name: parsed.data.name,
@@ -89,7 +94,7 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
       if (error) throw new Error(error.message);
 
       if (parsed.data.primaryTrainerId) {
-        await supabase.from("class_trainers").upsert({
+        await adminClient.from("class_trainers").upsert({
           gym_id: gymId,
           class_id: parsed.data.classId,
           trainer_id: parsed.data.primaryTrainerId,
@@ -101,7 +106,7 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
 
       await auditOrgAction(ctx.userId, "class_def.updated", "class", parsed.data.classId, { name: parsed.data.name, status: parsed.data.status });
     } else {
-      const { data: newClass, error } = await supabase
+      const { data: newClass, error } = await adminClient
         .from("classes")
         .insert({
           gym_id: gymId,
@@ -134,7 +139,7 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
       if (error) throw new Error(error.message);
 
       if (parsed.data.primaryTrainerId) {
-        await supabase.from("class_trainers").upsert({
+        await adminClient.from("class_trainers").upsert({
           gym_id: gymId,
           class_id: newClass.id,
           trainer_id: parsed.data.primaryTrainerId,
