@@ -48,6 +48,9 @@ export function useKeyboardShortcuts() {
 
     // g+<key> navigation
     if (e.key === "g" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) return;
+      e.preventDefault();
       const handle = (e2: KeyboardEvent) => {
         window.removeEventListener("keydown", handle);
         const combo = `g+${e2.key}`;
