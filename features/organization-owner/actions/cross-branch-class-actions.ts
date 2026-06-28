@@ -211,7 +211,7 @@ export async function createCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
-  const { data, error } = await adminClient
+  const { data, error } = await (adminClient
     .from("cross_branch_class_booking_rules")
     .insert({
       organization_id: organizationId,
@@ -221,11 +221,11 @@ export async function createCrossBranchClassRule(
       is_allowed: input.isAllowed ?? true,
       priority: input.priority ?? 0,
       is_active: true,
-    })
+    } as never)
     .select("*")
-    .single();
+    .single() as Promise<{ data: CrossBranchClassRule; error: unknown }>);
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(String(error));
   return data;
 }
 
@@ -247,15 +247,15 @@ export async function updateCrossBranchClassRule(
   if (input.isActive !== undefined) update.is_active = input.isActive;
   if (input.priority !== undefined) update.priority = input.priority;
 
-  const { data, error } = await adminClient
+  const { data, error } = await (adminClient
     .from("cross_branch_class_booking_rules")
-    .update(update)
+    .update(update as never)
     .eq("id", ruleId)
     .eq("organization_id", organizationId)
     .select("*")
-    .single();
+    .single() as Promise<{ data: CrossBranchClassRule; error: unknown }>);
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(String(error));
   return data;
 }
 
@@ -267,13 +267,13 @@ export async function deleteCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
-  const { error } = await adminClient
+  const { error } = await (adminClient
     .from("cross_branch_class_booking_rules")
     .delete()
     .eq("id", ruleId)
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId) as Promise<{ error: unknown }>);
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(String(error));
 }
 
 export async function getAvailableCrossBranchClasses(
