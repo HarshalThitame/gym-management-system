@@ -23,6 +23,7 @@ import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { NetworkClassCalendar } from "@/features/organization-owner/components/modules/NetworkClassCalendar";
 import { CrossBranchClassBookingPanel } from "@/features/organization-owner/components/modules/CrossBranchClassBookingPanel";
 import { ClassCreatedDialog } from "@/features/organization-owner/components/modules/ClassCreatedDialog";
+import { SessionCreatedDialog } from "@/features/organization-owner/components/modules/SessionCreatedDialog";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
@@ -44,6 +45,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
   const [editingClass, setEditingClass] = useState<ClassDefRow | null>(null);
   const [defState, defFormAction] = useActionState(saveOrgClassDefinitionAction, initialAuthActionState);
   const [successClass, setSuccessClass] = useState<{ id: string; name: string; status: string; classType: string; difficulty: string; durationMinutes: number; defaultCapacity: number; gymName: string } | null>(null);
+  const [successSession, setSuccessSession] = useState<{ id: string; sessionDate: string; startsAt: string; endsAt: string; className: string; gymName: string; trainerName: string; location: string; capacity: number } | null>(null);
 
   useEffect(() => {
     const classData = (defState as Record<string, unknown>).classData as Record<string, string | number> | undefined;
@@ -61,6 +63,24 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
       setDefDrawerOpen(false);
     }
   }, [defState, dashboard]);
+
+  useEffect(() => {
+    const sessionData = (state as Record<string, unknown>).sessionData as Record<string, string | number> | undefined;
+    if (state.status === "success" && sessionData) {
+      setSuccessSession({
+        id: sessionData.id as string,
+        sessionDate: sessionData.sessionDate as string,
+        startsAt: sessionData.startsAt as string,
+        endsAt: sessionData.endsAt as string,
+        className: dashboard.classes.find((c) => c.id === sessionData.classId)?.name ?? (sessionData.classId as string),
+        gymName: dashboard.gyms.find((g) => g.id === sessionData.gymId)?.name ?? (sessionData.gymId as string),
+        trainerName: sessionData.trainerId ? (dashboard.trainers.find((t) => t.id === sessionData.trainerId)?.display_name ?? "") : "",
+        location: sessionData.location as string,
+        capacity: sessionData.capacity as number,
+      });
+      setDrawerOpen(false);
+    }
+  }, [state, dashboard]);
 
   const hasCrossBranchFeature = useHasFeature("cross_branch_class_booking");
   const hasNetworkCalendar = useHasFeature("network_wide_class_calendar");
@@ -450,6 +470,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
       )}
 
       <ClassCreatedDialog open={!!successClass} data={successClass} onClose={() => setSuccessClass(null)} />
+      <SessionCreatedDialog open={!!successSession} data={successSession} onClose={() => setSuccessSession(null)} />
     </div>
   );
 }

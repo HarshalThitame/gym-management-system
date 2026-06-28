@@ -12,7 +12,21 @@ import { syncClassSessionToCalendar, deleteCalendarEvent } from "./calendar-acti
 type SessionInsert = Database["public"]["Tables"]["class_sessions"]["Insert"];
 type SessionUpdate = Database["public"]["Tables"]["class_sessions"]["Update"];
 
-export async function saveClassSessionAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+export type SessionActionResult = AuthActionState & {
+  sessionData?: {
+    id: string;
+    sessionDate: string;
+    startsAt: string;
+    endsAt: string;
+    classId: string;
+    gymId: string;
+    trainerId: string;
+    location: string;
+    capacity: number;
+  };
+};
+
+export async function saveClassSessionAction(prevState: AuthActionState, formData: FormData): Promise<SessionActionResult> {
   try {
     const ctx = await getOrgOwnerContext("/organization/classes");
     await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "class_booking", actionName: "class.save" });
@@ -67,9 +81,24 @@ export async function saveClassSessionAction(prevState: AuthActionState, formDat
       syncClassSessionToCalendar(ctx.organizationId, targetSessionId).catch(() => {});
     }
 
-    return { ...prevState, status: "success", message: "Class session saved." };
+    return {
+      ...prevState,
+      status: "success",
+      message: "Class session saved.",
+      sessionData: {
+        id: targetSessionId,
+        sessionDate,
+        startsAt,
+        endsAt,
+        classId,
+        gymId,
+        trainerId: trainerId ?? "",
+        location: location ?? "",
+        capacity
+      }
+    };
   } catch (e) {
-    return entitlementActionCatch(prevState, e, "Failed to save class session.");
+    return entitlementActionCatch(prevState, e, "Failed to save class session.") as SessionActionResult;
   }
 }
 
