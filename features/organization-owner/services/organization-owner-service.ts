@@ -27,6 +27,7 @@ type MembershipRow = Database["public"]["Tables"]["memberships"]["Row"];
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 type TrainerRow = Database["public"]["Tables"]["trainers"]["Row"];
 type AttendanceLogRow = Database["public"]["Tables"]["attendance_logs"]["Row"];
+type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 type ClassSessionRow = Database["public"]["Tables"]["class_sessions"]["Row"];
 type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type CampaignRow = Database["public"]["Tables"]["campaigns"]["Row"];
@@ -54,6 +55,7 @@ export type OrganizationOwnerDashboard = {
   payments: PaymentRow[];
   trainers: TrainerRow[];
   attendanceLogs: AttendanceLogRow[];
+  classes: ClassRow[];
   classSessions: ClassSessionRow[];
   notifications: NotificationRow[];
   campaigns: CampaignRow[];
@@ -199,6 +201,7 @@ async function loadGymScopedData(supabase: SupabaseClient<Database>, gymIds: str
       payments: [] as PaymentRow[],
       trainers: [] as TrainerRow[],
       attendanceLogs: [] as AttendanceLogRow[],
+      classes: [] as ClassRow[],
       classSessions: [] as ClassSessionRow[],
       notifications: [] as NotificationRow[],
       campaigns: [] as CampaignRow[]
@@ -211,6 +214,7 @@ async function loadGymScopedData(supabase: SupabaseClient<Database>, gymIds: str
     membershipsResult,
     paymentsResult,
     trainersResult,
+    classesResult,
     attendanceLogsResult,
     classSessionsResult,
     notificationsResult,
@@ -221,6 +225,7 @@ async function loadGymScopedData(supabase: SupabaseClient<Database>, gymIds: str
     supabase.from("memberships").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(300),
     supabase.from("payments").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(300),
     supabase.from("trainers").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(200),
+    supabase.from("classes").select("*").in("gym_id", gymIds).order("name", { ascending: true }).limit(500),
     supabase.from("attendance_logs").select("*").in("gym_id", gymIds).order("occurred_at", { ascending: false }).limit(300),
     supabase.from("class_sessions").select("*").in("gym_id", gymIds).order("starts_at", { ascending: false }).limit(300),
     supabase.from("notifications").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(200),
@@ -233,6 +238,7 @@ async function loadGymScopedData(supabase: SupabaseClient<Database>, gymIds: str
     membershipsResult,
     paymentsResult,
     trainersResult,
+    classesResult,
     attendanceLogsResult,
     classSessionsResult,
     notificationsResult,
@@ -249,6 +255,7 @@ async function loadGymScopedData(supabase: SupabaseClient<Database>, gymIds: str
     memberships: membershipsResult.data ?? [],
     payments: paymentsResult.data ?? [],
     trainers: trainersResult.data ?? [],
+    classes: classesResult.data ?? [],
     attendanceLogs: attendanceLogsResult.data ?? [],
     classSessions: classSessionsResult.data ?? [],
     notifications: notificationsResult.data ?? [],

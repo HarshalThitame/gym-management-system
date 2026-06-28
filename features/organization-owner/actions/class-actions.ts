@@ -29,6 +29,12 @@ export async function saveClassSessionAction(prevState: AuthActionState, formDat
     const { data: gym } = await supabase.from("gyms").select("organization_id").eq("id", gymId).single();
     if (!gym || gym.organization_id !== ctx.organizationId) return { ...prevState, status: "error", message: "Gym not in your organization." };
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(classId)) return { ...prevState, status: "error", message: "Invalid class ID format." };
+
+    const { data: classDef } = await supabase.from("classes").select("id").eq("id", classId).eq("gym_id", gymId).maybeSingle();
+    if (!classDef) return { ...prevState, status: "error", message: "Class not found for this gym." };
+
     const capacity = Number(formData.get("capacity")) || 30;
     const trainerId = (formData.get("trainerId") as string) || null;
     const location = (formData.get("location") as string) || null;

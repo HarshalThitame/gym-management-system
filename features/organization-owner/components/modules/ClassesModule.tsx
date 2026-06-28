@@ -54,6 +54,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
 
   const sessions = (moduleData?.items ?? dashboard.classSessions) as ClassSessionRow[];
   const crossBranchCounts = moduleData?.crossBranchCounts ?? {};
+  const [selectedGymId, setSelectedGymId] = useState(editingSession?.gym_id ?? "");
 
   const openCreate = useCallback(() => { setEditingSession(null); setDrawerOpen(true); }, []);
   const openEdit = useCallback((s: ClassSessionRow) => { setEditingSession(s); setDrawerOpen(true); }, []);
@@ -224,12 +225,17 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
           {editingSession ? <input name="sessionId" type="hidden" value={editingSession.id} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
             <DrawerField label="Branch" required>
-              <select className={selectClass} defaultValue={editingSession?.gym_id ?? ""} name="gymId" required>
+              <select className={selectClass} defaultValue={editingSession?.gym_id ?? ""} name="gymId" required onChange={(e) => setSelectedGymId(e.target.value)}>
                 <option value="">Select gym</option>{dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </DrawerField>
-            <DrawerField label="Class ID" required>
-              <input className={selectClass} defaultValue={editingSession?.class_id ?? ""} name="classId" required type="text" placeholder="e.g. YOGA-101" />
+            <DrawerField label="Class" required>
+              <select className={selectClass} defaultValue={editingSession?.class_id ?? ""} name="classId" required>
+                <option value="">Select class</option>
+                {dashboard.classes.filter((c) => c.gym_id === selectedGymId || !selectedGymId).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </DrawerField>
             <DrawerField label="Session Date" required>
               <input className={selectClass} defaultValue={editingSession?.session_date ?? ""} name="sessionDate" required type="date" />
@@ -282,7 +288,7 @@ function ClassDetailPanel({ session, dashboard, crossBranchCount, hasCrossBranch
               <h2 className="text-xl font-black">{session.session_date}</h2>
               <EnterpriseStatusBadge status={session.status} />
             </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">{session.starts_at?.slice(0, 5)} - {session.ends_at?.slice(0, 5)} · Class ID: {session.class_id}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{session.starts_at?.slice(0, 5)} - {session.ends_at?.slice(0, 5)} · {dashboard.classes.find((c) => c.id === session.class_id)?.name ?? session.class_id}</p>
           </div>
           <button className="flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground" onClick={onClose} type="button" aria-label="Close"><CalendarDays className="size-5" /></button>
         </div>
@@ -295,7 +301,7 @@ function ClassDetailPanel({ session, dashboard, crossBranchCount, hasCrossBranch
               <div><p className="text-xs text-muted-foreground">Start</p><p className="text-sm font-bold">{session.starts_at?.slice(0, 5) ?? "—"}</p></div>
               <div><p className="text-xs text-muted-foreground">End</p><p className="text-sm font-bold">{session.ends_at?.slice(0, 5) ?? "—"}</p></div>
               <div><p className="text-xs text-muted-foreground">Location</p><p className="text-sm font-bold">{session.location ?? "—"}</p></div>
-              <div><p className="text-xs text-muted-foreground">Class ID</p><p className="text-sm font-bold">{session.class_id}</p></div>
+              <div><p className="text-xs text-muted-foreground">Class</p><p className="text-sm font-bold">{dashboard.classes.find((c) => c.id === session.class_id)?.name ?? session.class_id}</p></div>
             </CardContent>
           </Card>
           <Card>
