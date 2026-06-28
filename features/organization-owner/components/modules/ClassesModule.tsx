@@ -181,7 +181,6 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {dashboard.classes.map((c) => {
-                const trainer = c.primary_trainer_id ? dashboard.trainers.find((t) => t.id === c.primary_trainer_id) : null;
                 const gym = c.gym_id ? dashboard.gyms.find((g) => g.id === c.gym_id) : null;
                 return (
                   <div className="rounded-lg border border-border bg-surface p-4" key={c.id}>
@@ -203,12 +202,12 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
                         <p className="font-bold">{c.duration_minutes}m</p>
                       </div>
                       <div className="rounded-md border border-border bg-background p-2">
-                        <p className="font-black text-muted-foreground">Trainer</p>
-                        <p className="font-bold">{trainer?.display_name ?? "—"}</p>
-                      </div>
-                      <div className="rounded-md border border-border bg-background p-2">
                         <p className="font-black text-muted-foreground">Gym</p>
                         <p className="font-bold">{gym?.name ?? "—"}</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="font-black text-muted-foreground">Created By</p>
+                        <p className="font-bold">{c.created_by ?? "—"}</p>
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end gap-2">
