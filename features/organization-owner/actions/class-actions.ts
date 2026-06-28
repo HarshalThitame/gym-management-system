@@ -86,7 +86,7 @@ export async function saveClassSessionAction(prevState: AuthActionState, formDat
       status: "success",
       message: "Class session saved.",
       sessionData: {
-        id: targetSessionId,
+        id: targetSessionId as string,
         sessionDate,
         startsAt,
         endsAt,
