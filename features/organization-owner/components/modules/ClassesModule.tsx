@@ -210,6 +210,9 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
         onExportCSV={() => exportToCSV(sessions.map((s) => ({ date: s.session_date, start: s.starts_at, end: s.ends_at, status: s.status, booked: s.booked_count, capacity: s.capacity, waitlist: s.waitlist_count, location: s.location, gym_id: s.gym_id, trainer_id: s.primary_trainer_id })), "all-classes")}
         headerAction={<Button onClick={openCreate} size="sm" variant="primary"><Plus className="size-4" /> Schedule Class</Button>}
         headerTitle="Class Sessions" items={items}
+        emptyTitle="No class sessions yet"
+        emptyDescription="Schedule your first class session to get started."
+        emptyAction={{ label: "Schedule Class", onClick: openCreate }}
         totalItems={totalItems} totalPages={Math.ceil(totalItems / (filters.pageSize ?? 12))}
         currentPage={currentPage} onPageChange={(p) => navigate({ page: p })} pageSize={filters.pageSize ?? 12}
       />
