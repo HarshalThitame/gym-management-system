@@ -1,6 +1,9 @@
 "use server";
 
+"use server";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireOrgFeatureAccess } from "@/features/entitlement";
 
@@ -206,8 +209,9 @@ export async function createCrossBranchClassRule(
 ): Promise<CrossBranchClassRule> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
-  const { data, error } = await supabase
+  const adminClient = getSupabaseAdminClient();
+  if (!adminClient) throw new Error("Server configuration error.");
+  const { data, error } = await adminClient
     .from("cross_branch_class_booking_rules")
     .insert({
       organization_id: organizationId,
@@ -232,7 +236,8 @@ export async function updateCrossBranchClassRule(
 ): Promise<CrossBranchClassRule> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
+  const adminClient = getSupabaseAdminClient();
+  if (!adminClient) throw new Error("Server configuration error.");
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
   if (input.name !== undefined) update.name = input.name;
@@ -242,7 +247,7 @@ export async function updateCrossBranchClassRule(
   if (input.isActive !== undefined) update.is_active = input.isActive;
   if (input.priority !== undefined) update.priority = input.priority;
 
-  const { data, error } = await supabase
+  const { data, error } = await adminClient
     .from("cross_branch_class_booking_rules")
     .update(update)
     .eq("id", ruleId)
@@ -260,8 +265,9 @@ export async function deleteCrossBranchClassRule(
 ): Promise<void> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_class_booking");
 
-  const supabase: SupabaseClient = await createSupabaseServerClient() as unknown as SupabaseClient;
-  const { error } = await supabase
+  const adminClient = getSupabaseAdminClient();
+  if (!adminClient) throw new Error("Server configuration error.");
+  const { error } = await adminClient
     .from("cross_branch_class_booking_rules")
     .delete()
     .eq("id", ruleId)
