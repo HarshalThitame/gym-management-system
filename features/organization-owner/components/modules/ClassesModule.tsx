@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useActionState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, useEffect, useActionState, type ReactNode } from "react";
 import { CalendarDays, Download, Dumbbell, Edit3, Eye, Plus, UsersRound, XCircle, GitBranch, Calendar } from "lucide-react";
 import { LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Line } from "recharts";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
@@ -22,6 +22,7 @@ import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterpris
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { NetworkClassCalendar } from "@/features/organization-owner/components/modules/NetworkClassCalendar";
 import { CrossBranchClassBookingPanel } from "@/features/organization-owner/components/modules/CrossBranchClassBookingPanel";
+import { ClassCreatedDialog } from "@/features/organization-owner/components/modules/ClassCreatedDialog";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
@@ -42,6 +43,25 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
   const [defDrawerOpen, setDefDrawerOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassDefRow | null>(null);
   const [defState, defFormAction] = useActionState(saveOrgClassDefinitionAction, initialAuthActionState);
+  const [successClass, setSuccessClass] = useState<{ id: string; name: string; status: string; classType: string; difficulty: string; durationMinutes: number; defaultCapacity: number; gymName: string } | null>(null);
+
+  useEffect(() => {
+    const classData = (defState as Record<string, unknown>).classData as Record<string, string | number> | undefined;
+    if (defState.status === "success" && classData) {
+      setSuccessClass({
+        id: classData.id as string,
+        name: classData.name as string,
+        status: classData.status as string,
+        classType: classData.classType as string,
+        difficulty: classData.difficulty as string,
+        durationMinutes: classData.durationMinutes as number,
+        defaultCapacity: classData.defaultCapacity as number,
+        gymName: dashboard.gyms.find((g) => g.id === classData.gymId)?.name ?? (classData.gymId as string),
+      });
+      setDefDrawerOpen(false);
+    }
+  }, [defState, dashboard]);
+
   const hasCrossBranchFeature = useHasFeature("cross_branch_class_booking");
   const hasNetworkCalendar = useHasFeature("network_wide_class_calendar");
 
@@ -428,6 +448,8 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
       {detailSession ? <ClassDetailPanel session={detailSession} dashboard={dashboard} crossBranchCount={crossBranchCounts[detailSession.id] ?? 0} hasCrossBranchFeature={hasCrossBranchFeature} onClose={() => setDetailSession(null)} /> : null}
         </>
       )}
+
+      <ClassCreatedDialog open={!!successClass} data={successClass} onClose={() => setSuccessClass(null)} />
     </div>
   );
 }

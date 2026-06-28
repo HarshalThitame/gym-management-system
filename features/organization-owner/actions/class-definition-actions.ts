@@ -63,6 +63,7 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
 
     const slug = slugifyClassName(parsed.data.name);
     const now = new Date().toISOString();
+    let savedClassId = parsed.data.classId || "";
 
     if (parsed.data.classId) {
       const { error } = await adminClient
@@ -137,11 +138,12 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
         .single();
 
       if (error) throw new Error(error.message);
+      savedClassId = newClass.id;
 
       if (parsed.data.primaryTrainerId) {
         await adminClient.from("class_trainers").upsert({
           gym_id: gymId,
-          class_id: newClass.id,
+          class_id: savedClassId,
           trainer_id: parsed.data.primaryTrainerId,
           role: "primary",
           status: "active",
@@ -149,11 +151,24 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
         }, { onConflict: "class_id,trainer_id,role" });
       }
 
-      await auditOrgAction(ctx.userId, "class_def.created", "class", newClass.id, { name: parsed.data.name, status: parsed.data.status });
+      await auditOrgAction(ctx.userId, "class_def.created", "class", savedClassId, { name: parsed.data.name, status: parsed.data.status });
     }
 
     revalidateOrgModules(["/organization/classes"]);
-    return { status: "success", message: parsed.data.classId ? "Class updated." : "Class created." };
+    return {
+      status: "success",
+      message: parsed.data.classId ? "Class updated." : "Class created.",
+      classData: {
+        id: savedClassId,
+        name: parsed.data.name,
+        status: parsed.data.status,
+        classType: parsed.data.classType,
+        difficulty: parsed.data.difficulty,
+        durationMinutes: parsed.data.durationMinutes,
+        defaultCapacity: parsed.data.defaultCapacity,
+        gymId
+      }
+    };
   } catch (e) {
     return entitlementActionCatch(prevState, e, "Failed to save class definition.");
   }
