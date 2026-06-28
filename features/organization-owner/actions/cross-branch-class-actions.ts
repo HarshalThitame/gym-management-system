@@ -211,7 +211,8 @@ export async function createCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
-  const { data, error } = await (adminClient
+  const client = adminClient as never;
+  const { data, error } = await client
     .from("cross_branch_class_booking_rules")
     .insert({
       organization_id: organizationId,
@@ -221,9 +222,9 @@ export async function createCrossBranchClassRule(
       is_allowed: input.isAllowed ?? true,
       priority: input.priority ?? 0,
       is_active: true,
-    } as never)
+    })
     .select("*")
-    .single() as Promise<{ data: CrossBranchClassRule; error: unknown }>);
+    .single() as { data: CrossBranchClassRule; error: unknown };
 
   if (error) throw new Error(String(error));
   return data;
@@ -238,6 +239,7 @@ export async function updateCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
+  const client = adminClient as never;
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
   if (input.name !== undefined) update.name = input.name;
@@ -247,13 +249,13 @@ export async function updateCrossBranchClassRule(
   if (input.isActive !== undefined) update.is_active = input.isActive;
   if (input.priority !== undefined) update.priority = input.priority;
 
-  const { data, error } = await (adminClient
+  const { data, error } = await client
     .from("cross_branch_class_booking_rules")
-    .update(update as never)
+    .update(update)
     .eq("id", ruleId)
     .eq("organization_id", organizationId)
     .select("*")
-    .single() as Promise<{ data: CrossBranchClassRule; error: unknown }>);
+    .single() as { data: CrossBranchClassRule; error: unknown };
 
   if (error) throw new Error(String(error));
   return data;
@@ -267,11 +269,12 @@ export async function deleteCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
-  const { error } = await (adminClient
+  const client = adminClient as never;
+  const { error } = await client
     .from("cross_branch_class_booking_rules")
     .delete()
     .eq("id", ruleId)
-    .eq("organization_id", organizationId) as Promise<{ error: unknown }>);
+    .eq("organization_id", organizationId) as { error: unknown };
 
   if (error) throw new Error(String(error));
 }
