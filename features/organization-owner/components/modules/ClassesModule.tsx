@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useActionState, type ReactNode } from "react";
-import { CalendarDays, Download, Edit3, Eye, Plus, UsersRound, XCircle, GitBranch, Calendar } from "lucide-react";
+import { CalendarDays, Download, Dumbbell, Edit3, Eye, Plus, UsersRound, XCircle, GitBranch, Calendar } from "lucide-react";
 import { LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Line } from "recharts";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
@@ -12,10 +12,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { saveClassSessionAction, cancelClassSessionAction } from "@/features/organization-owner/actions/class-actions";
+import { saveOrgClassDefinitionAction } from "@/features/organization-owner/actions/class-definition-actions";
 import { Button } from "@/components/ui/button";
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
+import { formatClassLabel } from "@/features/classes/lib/business-rules";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { NetworkClassCalendar } from "@/features/organization-owner/components/modules/NetworkClassCalendar";
@@ -25,17 +27,21 @@ import type { Database } from "@/types/database";
 
 type ClassesEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[]; crossBranchCounts?: Record<string, number> } | undefined };
 type ClassSessionRow = Database["public"]["Tables"]["class_sessions"]["Row"];
+type ClassDefRow = Database["public"]["Tables"]["classes"]["Row"];
 
 const CHART_COLORS = ["#16a34a", "#0891b2", "#f59e0b", "#dc2626"];
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
 export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterpriseModuleProps) {
-  const [activeTab, setActiveTab] = useState<"sessions" | "calendar" | "cross-branch">("sessions");
+  const [activeTab, setActiveTab] = useState<"sessions" | "calendar" | "cross-branch" | "definitions">("sessions");
   const { filters, navigate, currentPage } = useModuleFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailSession, setDetailSession] = useState<ClassSessionRow | null>(null);
   const [editingSession, setEditingSession] = useState<ClassSessionRow | null>(null);
   const [state, formAction] = useActionState(saveClassSessionAction, initialAuthActionState);
+  const [defDrawerOpen, setDefDrawerOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<ClassDefRow | null>(null);
+  const [defState, defFormAction] = useActionState(saveOrgClassDefinitionAction, initialAuthActionState);
   const hasCrossBranchFeature = useHasFeature("cross_branch_class_booking");
   const hasNetworkCalendar = useHasFeature("network_wide_class_calendar");
 
@@ -49,6 +55,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
     if (hasCrossBranchFeature) {
       t.push({ key: "cross-branch", label: "Cross-Branch", icon: <GitBranch className="size-4" /> });
     }
+    t.push({ key: "definitions", label: "Definitions", icon: <Dumbbell className="size-4" /> });
     return t;
   }, [hasNetworkCalendar, hasCrossBranchFeature]);
 
@@ -151,6 +158,158 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
 
       {/* ═══ CROSS-BRANCH BOOKING TAB ═══ */}
       {activeTab === "cross-branch" ? <CrossBranchClassBookingPanel dashboard={dashboard} /> : null}
+
+      {/* ═══ DEFINITIONS TAB ═══ */}
+      {activeTab !== "definitions" ? null : (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black">Class Definitions</h3>
+            <Button onClick={() => { setEditingClass(null); setDefDrawerOpen(true); }} size="sm" variant="primary">
+              <Plus className="size-4" /> Create Class
+            </Button>
+          </div>
+
+          {dashboard.classes.length === 0 ? (
+            <div className="rounded-lg border border-border bg-surface-muted p-12 text-center">
+              <Dumbbell className="mx-auto size-10 text-muted-foreground" />
+              <p className="mt-4 text-lg font-black">No classes defined yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">Create your first class so you can schedule sessions.</p>
+              <Button className="mt-4" onClick={() => { setEditingClass(null); setDefDrawerOpen(true); }} variant="primary">
+                <Plus className="size-4" /> Create Class
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {dashboard.classes.map((c) => {
+                const trainer = c.primary_trainer_id ? dashboard.trainers.find((t) => t.id === c.primary_trainer_id) : null;
+                const gym = c.gym_id ? dashboard.gyms.find((g) => g.id === c.gym_id) : null;
+                return (
+                  <div className="rounded-lg border border-border bg-surface p-4" key={c.id}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-black">{c.name}</h4>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{formatClassLabel(c.class_type)} · {formatClassLabel(c.difficulty)}</p>
+                      </div>
+                      <EnterpriseStatusBadge status={c.status} />
+                    </div>
+                    <p className="mt-2 text-sm leading-5 text-muted-foreground line-clamp-2">{c.description}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="font-black text-muted-foreground">Capacity</p>
+                        <p className="font-bold">{c.default_capacity}</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="font-black text-muted-foreground">Duration</p>
+                        <p className="font-bold">{c.duration_minutes}m</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="font-black text-muted-foreground">Trainer</p>
+                        <p className="font-bold">{trainer?.display_name ?? "—"}</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-background p-2">
+                        <p className="font-black text-muted-foreground">Gym</p>
+                        <p className="font-bold">{gym?.name ?? "—"}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <Button onClick={() => { setEditingClass(c); setDefDrawerOpen(true); }} size="sm" variant="secondary">
+                        <Edit3 className="size-3.5" /> Edit
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ═══ CLASS DEFINITION CREATE/EDIT DRAWER ═══ */}
+          <OrgOwnerDrawer description={editingClass ? "Edit class definition" : "Create a new class definition"} onClose={() => { setDefDrawerOpen(false); setEditingClass(null); }} open={defDrawerOpen} title={editingClass ? "Edit Class" : "Create Class"} size="lg">
+            <form action={defFormAction} className="space-y-5">
+              <DrawerFormMessage status={defState.status} message={defState.message} />
+              {editingClass ? <input name="classId" type="hidden" value={editingClass.id} /> : null}
+              <div className="grid gap-5 md:grid-cols-2">
+                <DrawerField label="Class Name" required>
+                  <input className={selectClass} defaultValue={editingClass?.name ?? ""} name="name" required type="text" placeholder="e.g. Signature Strength Club" />
+                </DrawerField>
+                <DrawerField label="Branch" required>
+                  <select className={selectClass} defaultValue={editingClass?.gym_id ?? ""} name="gymId" required>
+                    <option value="">Select gym</option>
+                    {dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </DrawerField>
+              </div>
+              <DrawerField label="Description">
+                <textarea className={selectClass + " min-h-[80px]"} defaultValue={editingClass?.description ?? ""} name="description" placeholder="Describe this class" />
+              </DrawerField>
+              <div className="grid gap-5 md:grid-cols-3">
+                <DrawerField label="Class Type">
+                  <select className={selectClass} defaultValue={editingClass?.class_type ?? "group_class"} name="classType">
+                    <option value="group_class">Group class</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="special_event">Special event</option>
+                    <option value="challenge">Challenge</option>
+                    <option value="camp">Camp</option>
+                    <option value="group_pt">Group PT</option>
+                  </select>
+                </DrawerField>
+                <DrawerField label="Difficulty">
+                  <select className={selectClass} defaultValue={editingClass?.difficulty ?? "all_levels"} name="difficulty">
+                    <option value="all_levels">All levels</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </DrawerField>
+                <DrawerField label="Status">
+                  <select className={selectClass} defaultValue={editingClass?.status ?? "draft"} name="status">
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="archived">Archived</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </DrawerField>
+              </div>
+              <div className="grid gap-5 md:grid-cols-4">
+                <DrawerField label="Duration (min)">
+                  <input className={selectClass} defaultValue={editingClass?.duration_minutes ?? 60} min={15} max={240} name="durationMinutes" type="number" />
+                </DrawerField>
+                <DrawerField label="Capacity">
+                  <input className={selectClass} defaultValue={editingClass?.default_capacity ?? 24} min={1} name="defaultCapacity" type="number" />
+                </DrawerField>
+                <DrawerField label="Price ($)">
+                  <input className={selectClass} defaultValue={(editingClass?.price_amount ?? 0) / 100} min={0} name="priceAmount" type="number" />
+                </DrawerField>
+                <DrawerField label="Booking Window (days)">
+                  <input className={selectClass} defaultValue={editingClass?.booking_window_days ?? 14} min={0} name="bookingWindowDays" type="number" />
+                </DrawerField>
+              </div>
+              <div className="grid gap-5 md:grid-cols-3">
+                <DrawerField label="Trainer">
+                  <select className={selectClass} defaultValue="" name="primaryTrainerId">
+                    <option value="">No trainer</option>
+                    {dashboard.trainers.filter((t) => t.status === "active").map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}
+                  </select>
+                </DrawerField>
+                <DrawerField label="Location">
+                  <input className={selectClass} defaultValue={editingClass?.location ?? ""} name="location" type="text" placeholder="Studio A" />
+                </DrawerField>
+                <DrawerField label="Membership Access">
+                  <select className={selectClass} defaultValue={editingClass?.membership_access ?? "active_members"} name="membershipAccess">
+                    <option value="active_members">Active members</option>
+                    <option value="premium_only">Premium only</option>
+                    <option value="staff_approval">Staff approval</option>
+                    <option value="public_event">Public event</option>
+                  </select>
+                </DrawerField>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-border pt-6">
+                <button className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={() => { setDefDrawerOpen(false); setEditingClass(null); }} type="button">Cancel</button>
+                <DrawerSubmitButton>{editingClass ? "Update" : "Create"}</DrawerSubmitButton>
+              </div>
+            </form>
+          </OrgOwnerDrawer>
+        </div>
+      )}
 
       {/* ═══ SESSIONS TAB (DEFAULT) ═══ */}
       {activeTab !== "sessions" ? null : (
