@@ -1,5 +1,3 @@
-"use server";
-
 import { triggerWebhooks } from "@/features/organization-owner/actions/webhook-actions";
 
 export const WEBHOOK_EVENTS = {
