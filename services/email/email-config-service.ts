@@ -60,11 +60,21 @@ export async function getOrgEmailConfigOrDefault(
   organizationId: string
 ): Promise<Required<Pick<OrgEmailConfig, "from" | "replyTo">> & OrgEmailConfig> {
   const config = await getOrgEmailConfig(organizationId);
+  const platformDomain = process.env.PLATFORM_EMAIL_DOMAIN;
   const globalFrom = process.env.RESEND_FROM_EMAIL;
+
+  // Priority: org verified domain > platform domain > RESEND_FROM_EMAIL env var
+  let from = config.from;
+  if (!from && platformDomain) {
+    from = `noreply@${platformDomain}`;
+  }
+  if (!from && globalFrom) {
+    from = globalFrom;
+  }
 
   return {
     ...config,
-    from: config.from || globalFrom || null,
+    from: from || null,
     replyTo: config.replyTo || null,
   };
 }

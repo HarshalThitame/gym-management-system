@@ -6,6 +6,7 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { entitlementActionCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
 import { sendEmail } from "@/services/email/resend";
+import { getOrgEmailConfigOrDefault } from "@/services/email/email-config-service";
 
 export async function saveEmailSettingsAction(
   prevState: AuthActionState,
@@ -85,10 +86,15 @@ export async function sendTestEmailAction(
     });
 
     const to = formData.get("to") as string;
-    const from = (formData.get("from") as string) || undefined;
+    let from = (formData.get("from") as string) || undefined;
     const replyTo = (formData.get("replyTo") as string) || undefined;
 
     if (!to) return { ...prevState, status: "error", message: "Recipient email is required." };
+
+    if (!from) {
+      const emailConfig = await getOrgEmailConfigOrDefault(ctx.organizationId);
+      from = emailConfig.from ?? undefined;
+    }
 
     const result = await sendEmail({
       to,
