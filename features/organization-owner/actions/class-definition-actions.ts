@@ -8,7 +8,20 @@ import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { getOrgOwnerContext, auditOrgAction, revalidateOrgModules } from "./action-utils";
 import { requireOrganizationFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
-export async function saveOrgClassDefinitionAction(prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+type ClassDefActionResult = AuthActionState & {
+  classData?: {
+    id: string;
+    name: string;
+    status: string;
+    classType: string;
+    difficulty: string;
+    durationMinutes: number;
+    defaultCapacity: number;
+    gymId: string;
+  };
+};
+
+export async function saveOrgClassDefinitionAction(prevState: AuthActionState, formData: FormData): Promise<ClassDefActionResult> {
   try {
     const ctx = await getOrgOwnerContext("/organization/classes");
     await requireOrganizationFeatureAccess({ organizationId: ctx.organizationId, featureKey: "class_booking", actionName: "org.class-definition.save" });
@@ -170,6 +183,6 @@ export async function saveOrgClassDefinitionAction(prevState: AuthActionState, f
       }
     };
   } catch (e) {
-    return entitlementActionCatch(prevState, e, "Failed to save class definition.");
+    return entitlementActionCatch(prevState, e, "Failed to save class definition.") as ClassDefActionResult;
   }
 }
