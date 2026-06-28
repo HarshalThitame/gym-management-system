@@ -147,7 +147,7 @@ export async function validateFeatureKeyIntegrity(): Promise<IntegrityResult> {
     emailNotifications: "email_notifications", inAppNotifications: "in_app_notifications",
     whatsappIntegration: "whatsapp_integration", smsIntegration: "sms_integration",
     birthdayGreetings: "birthday_greetings", broadcastMessages: "broadcast_messages",
-    emailCampaigns: "email_campaigns", whatsappBusinessApi: "whatsapp_business_api",
+    emailCampaigns: "email_campaigns", customEmailDomain: "custom_email_domain", whatsappBusinessApi: "whatsapp_business_api",
     memberPortal: "member_portal", trainerPortal: "trainer_portal",
     brandedMobileApp: "branded_mobile_app", dietWorkoutPlans: "diet_workout_plans",
     googleCalendarSync: "google_calendar_sync",

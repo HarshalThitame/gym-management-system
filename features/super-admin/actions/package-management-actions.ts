@@ -44,6 +44,7 @@ const packageSchema = z.object({
   rfidAttendance: z.coerce.boolean().default(false),
   notificationsEnabled: z.coerce.boolean().default(false),
   whiteLabelEnabled: z.coerce.boolean().default(false),
+  customEmailDomain: z.coerce.boolean().default(false),
 });
 
 // Feature toggles from the editor. Keys are canonical feature keys (snake_case)
@@ -127,6 +128,7 @@ const FEATURE_FIELD_MAP: Record<string, string> = {
   in_app_push_notifications: "inAppPushNotifications",
   digital_membership_card: "digitalMembershipCard",
   loyalty_rewards_in_app: "loyaltyRewardsInApp",
+  custom_email_domain: "customEmailDomain",
 
 };
 
