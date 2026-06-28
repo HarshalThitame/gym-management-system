@@ -211,7 +211,7 @@ export async function createCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
-  const client = adminClient as never;
+  const client = adminClient as any;
   const { data, error } = await client
     .from("cross_branch_class_booking_rules")
     .insert({
@@ -239,7 +239,7 @@ export async function updateCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
-  const client = adminClient as never;
+  const client = adminClient as any;
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
   if (input.name !== undefined) update.name = input.name;
@@ -269,7 +269,7 @@ export async function deleteCrossBranchClassRule(
 
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) throw new Error("Server configuration error.");
-  const client = adminClient as never;
+  const client = adminClient as any;
   const { error } = await client
     .from("cross_branch_class_booking_rules")
     .delete()
