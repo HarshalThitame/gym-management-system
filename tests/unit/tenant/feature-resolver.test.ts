@@ -71,6 +71,7 @@ const safeDefaultFlags: OrgFeatureFlags = {
 
   classSchedulingEnabled: false, communicationsEnabled: false,
   trainerAssignmentEnabled: false, razorpayEnabled: false,
+  customEmailDomain: false,
 };
 const standardPackage = {
   max_members: 500,
