@@ -44,9 +44,9 @@ export type CrossGymClassSummary = {
 export async function getCrossGymClassSummary(organizationId: string): Promise<CrossGymClassSummary> {
   await getOrgOwnerContext("/organization/classes");
 
-  const supabase = await createSupabaseServerClient();
+  const db = await createSupabaseServerClient() as any;
 
-  const { data: gyms } = await supabase
+  const { data: gyms } = await db
     .from("gyms")
     .select("id, name")
     .eq("organization_id", organizationId);
@@ -59,10 +59,10 @@ export async function getCrossGymClassSummary(organizationId: string): Promise<C
   const today = new Date().toISOString().slice(0, 10);
 
   const [bookingsResult, todayBookingsResult, rulesResult, classesResult] = await Promise.all([
-    supabase.from("class_bookings").select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)").in("gym_id", gymIds).in("status", ["booked", "checked_in", "attended"]),
-    supabase.from("class_bookings").select("id", { count: "exact", head: true }).in("gym_id", gymIds).in("status", ["booked", "checked_in", "attended"]).gte("created_at", `${today}T00:00:00.000Z`).lte("created_at", `${today}T23:59:59.999Z`),
-    supabase.from("cross_branch_class_booking_rules").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("is_active", true),
-    supabase.from("class_sessions").select("id", { count: "exact", head: true }).in("gym_id", gymIds).gte("session_date", today).eq("status", "scheduled"),
+    db.from("class_bookings").select("id, session_id, member_id, gym_id, created_at, class_sessions!inner(gym_id, session_date, class_id)").in("gym_id", gymIds).in("status", ["booked", "checked_in", "attended"]),
+    db.from("class_bookings").select("id", { count: "exact", head: true }).in("gym_id", gymIds).in("status", ["booked", "checked_in", "attended"]).gte("created_at", `${today}T00:00:00.000Z`).lte("created_at", `${today}T23:59:59.999Z`),
+    db.from("cross_branch_class_booking_rules").select("id", { count: "exact", head: true }).eq("organization_id", organizationId).eq("is_active", true),
+    db.from("class_sessions").select("id", { count: "exact", head: true }).in("gym_id", gymIds).gte("session_date", today).eq("status", "scheduled"),
   ]);
 
   const bookings = bookingsResult.data ?? [];
@@ -76,7 +76,7 @@ export async function getCrossGymClassSummary(organizationId: string): Promise<C
       .from("members")
       .select("id, gym_id")
       .in("id", memberIds);
-    const memberGymMap = new Map((members ?? []).map((m) => [m.id, m.gym_id]));
+    const memberGymMap = new Map((members ?? []).map((m: any) => [m.id, m.gym_id]));
 
     for (const b of bookings) {
       const memberGymId = memberGymMap.get(b.member_id);
@@ -105,17 +105,17 @@ export async function getCrossGymClassBookings(
 ): Promise<{ bookings: CrossGymClassBooking[]; total: number }> {
   await getOrgOwnerContext("/organization/classes");
 
-  const supabase = await createSupabaseServerClient();
+  const db = await createSupabaseServerClient() as any;
   const page = filters?.page ?? 1;
   const pageSize = filters?.pageSize ?? 20;
   const from = (page - 1) * pageSize;
 
-  const { data: gyms } = await supabase
+  const { data: gyms } = await db
     .from("gyms")
     .select("id, name")
     .eq("organization_id", organizationId);
-  const gymsMap = new Map((gyms ?? []).map((g) => [g.id, g.name]));
-  const gymIds = (gyms ?? []).map((g) => g.id);
+  const gymsMap = new Map((gyms ?? []).map((g: any) => [g.id, g.name]));
+  const gymIds = (gyms ?? []).map((g: any) => g.id);
 
   if (gymIds.length === 0) {
     return { bookings: [], total: 0 };
@@ -123,7 +123,7 @@ export async function getCrossGymClassBookings(
 
   const targetGymIds = filters?.gymId && filters.gymId !== "all" ? [filters.gymId] : gymIds;
 
-  let query = supabase
+  let query = db
     .from("class_bookings")
     .select("id, session_id, member_id, gym_id, status, created_at, class_sessions!inner(gym_id, session_date, class_id)", { count: "exact" })
     .in("gym_id", targetGymIds)
@@ -139,14 +139,14 @@ export async function getCrossGymClassBookings(
   if (error) throw new Error(error.message);
 
   const bookingRows = bookings ?? [];
-  const memberIds = [...new Set(bookingRows.map((b) => b.member_id).filter(Boolean))];
+  const memberIds = [...new Set(bookingRows.map((b: any) => b.member_id).filter(Boolean))];
 
   const memberGymMap = new Map<string, string>();
   const memberNameMap = new Map<string, string>();
 
   if (memberIds.length > 0) {
-    const membersResult = await supabase.from("members").select("id, gym_id, full_name").in("id", memberIds);
-    const profilesResult = await supabase.from("profiles").select("id, full_name").in("id", memberIds);
+    const membersResult = await db.from("members").select("id, gym_id, full_name").in("id", memberIds);
+    const profilesResult = await db.from("profiles").select("id, full_name").in("id", memberIds);
     for (const m of (membersResult.data ?? [])) {
       if (m.gym_id) memberGymMap.set(m.id, m.gym_id);
       if (m.full_name) memberNameMap.set(m.id, m.full_name);
@@ -189,8 +189,8 @@ export async function getCrossGymClassRules(
 ): Promise<CrossGymClassRule[]> {
   await getOrgOwnerContext("/organization/classes");
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const db = await createSupabaseServerClient() as any;
+  const { data, error } = await db
     .from("cross_branch_class_booking_rules")
     .select("*")
     .eq("organization_id", organizationId)
@@ -281,10 +281,10 @@ export async function getAvailableCrossGymClasses(
 ): Promise<{ gymId: string; gymName: string; availableClasses: number; upcomingSessions: number }[]> {
   await getOrgOwnerContext("/organization/classes");
 
-  const supabase = await createSupabaseServerClient();
+  const db = await createSupabaseServerClient() as any;
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: gyms } = await supabase
+  const { data: gyms } = await db
     .from("gyms")
     .select("id, name")
     .eq("organization_id", organizationId)
@@ -294,14 +294,14 @@ export async function getAvailableCrossGymClasses(
   const result: { gymId: string; gymName: string; availableClasses: number; upcomingSessions: number }[] = [];
 
   for (const gym of gymList) {
-    const { count: sessionsCount } = await supabase
+    const { count: sessionsCount } = await db
       .from("class_sessions")
       .select("id", { count: "exact", head: true })
       .eq("gym_id", gym.id)
       .gte("session_date", today)
       .eq("status", "scheduled");
 
-    const { count: distinctClasses } = await supabase
+    const { count: distinctClasses } = await db
       .from("class_sessions")
       .select("class_id", { count: "exact", head: true })
       .eq("gym_id", gym.id)
