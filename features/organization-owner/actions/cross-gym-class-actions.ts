@@ -114,7 +114,7 @@ export async function getCrossGymClassBookings(
     .from("gyms")
     .select("id, name")
     .eq("organization_id", organizationId);
-  const gymsMap = new Map((gyms ?? []).map((g: any) => [g.id, g.name]));
+  const gymsMap = new Map<string, string>((gyms ?? []).map((g: any) => [g.id as string, g.name as string]));
   const gymIds = (gyms ?? []).map((g: any) => g.id);
 
   if (gymIds.length === 0) {
@@ -164,15 +164,17 @@ export async function getCrossGymClassBookings(
     const sessionGymId = sessionData?.gym_id;
 
     if (memberGymId && sessionGymId && memberGymId !== sessionGymId) {
+      const mgId: string = memberGymId;
+      const sgId: string = sessionGymId;
       results.push({
         id: b.id as string,
         session_id: b.session_id as string,
         member_id: b.member_id as string,
         member_name: memberNameMap.get(b.member_id as string) ?? "Unknown",
-        from_gym_id: memberGymId,
-        from_gym_name: gymsMap.get(memberGymId) ?? "Unknown",
-        to_gym_id: sessionGymId,
-        to_gym_name: gymsMap.get(sessionGymId) ?? "Unknown",
+        from_gym_id: mgId,
+        from_gym_name: gymsMap.get(mgId) ?? "Unknown",
+        to_gym_id: sgId,
+        to_gym_name: gymsMap.get(sgId) ?? "Unknown",
         class_id: sessionData?.class_id ?? "",
         session_date: sessionData?.session_date ?? "",
         status: b.status as string,
