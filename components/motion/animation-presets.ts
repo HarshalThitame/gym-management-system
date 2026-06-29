@@ -91,11 +91,10 @@ export function createCountUpVariants(
   from: number,
   to: number,
   duration: number = 2
-): Variants {
+) {
   return {
     initial: { count: from },
-    animate: { count: to },
-    transition: { duration, ease: "easeOut" },
+    animate: { count: to, transition: { duration, ease: "easeOut" as const } },
   };
 }
 
