@@ -166,7 +166,6 @@ export const AnimatedLineChart = React.forwardRef<
               animationDuration={animationDuration}
               animationEasing="ease-in-out"
               isAnimationActive={true}
-              transition={{ duration: 0.2 }}
             />
           </LineChart>
         </ResponsiveContainer>
