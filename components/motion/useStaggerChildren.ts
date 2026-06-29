@@ -305,7 +305,7 @@ export function useDebounceAnimation(
   callback: () => void,
   { delay = 300 }: UseDebounceAnimationOptions = {}
 ) {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const debouncedCallback = () => {
     if (timeoutRef.current) {
