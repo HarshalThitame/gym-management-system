@@ -61,15 +61,15 @@ const modalVariants = {
     scale: 1,
     opacity: 1,
     y: 0,
-    transition: { duration: 0.3, ease: "easeOut" },
+    transition: { duration: 0.3, ease: "easeOut" as const },
   },
   exit: {
     scale: 0.8,
     opacity: 0,
     y: 20,
-    transition: { duration: 0.2, ease: "easeIn" },
+    transition: { duration: 0.2, ease: "easeIn" as const },
   },
-};
+} as const;
 
 const sectionVariants = {
   initial: { opacity: 0, y: 10 },
