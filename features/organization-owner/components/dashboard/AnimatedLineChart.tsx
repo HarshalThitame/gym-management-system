@@ -39,11 +39,9 @@ interface AnimatedLineChartProps {
 /**
  * Custom Tooltip Component with smooth fade-in
  */
-const DefaultTooltip: React.FC<TooltipProps<number, string>> = ({
-  active,
-  payload,
-  label,
-}) => {
+const DefaultTooltip: React.FC<TooltipProps<number, string>> = (props) => {
+  const { active, label } = props;
+  const payload = (props as any).payload as { name: string; value: number }[] | undefined;
   if (!active || !payload || payload.length === 0) return null;
 
   return (
