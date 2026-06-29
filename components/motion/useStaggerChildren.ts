@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useMotionValue, useTransform } from "framer-motion";
+import { animate, useMotionValue, useTransform } from "framer-motion";
 
 /**
  * Result type for useStaggerChildren hook
@@ -81,16 +81,13 @@ export function useCountUp({
   });
 
   useEffect(() => {
-    const controls = count.get();
-    const animation = count.animate(to, {
+    const controls = animate(count, to, {
       duration,
       ease: "easeOut",
     });
 
     return () => {
-      if (animation && typeof animation.stop === "function") {
-        animation.stop();
-      }
+      controls.stop();
     };
   }, [count, to, duration]);
 
@@ -132,7 +129,7 @@ export function useAnimatedValue({
    * Animate the value to a new target
    */
   const animateTo = (target: number) => {
-    return motionValue.animate(target, {
+    return animate(motionValue, target, {
       duration,
       ease: "easeOut",
     });
@@ -238,14 +235,12 @@ export function usePulse({
   const pulseValue = useMotionValue(1);
 
   useEffect(() => {
-    const animate = async () => {
-      while (true) {
-        await pulseValue.animate(scale, { duration: duration / 2 });
-        await pulseValue.animate(1, { duration: duration / 2 });
-      }
-    };
-
-    animate();
+    const controls = animate(pulseValue, [1, scale, 1], {
+      duration,
+      ease: "easeInOut",
+      repeat: Infinity,
+    });
+    return () => controls.stop();
   }, [pulseValue, scale, duration]);
 
   return pulseValue;
@@ -275,12 +270,12 @@ export function useHoverAnimation({
 
   const handleHoverStart = () => {
     setIsHovered(true);
-    scaleValue.animate(scale, { duration });
+    animate(scaleValue, scale, { duration });
   };
 
   const handleHoverEnd = () => {
     setIsHovered(false);
-    scaleValue.animate(1, { duration });
+    animate(scaleValue, 1, { duration });
   };
 
   return {
