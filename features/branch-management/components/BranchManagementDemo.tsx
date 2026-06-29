@@ -84,7 +84,7 @@ const SAMPLE_BRANCHES = [
  * Showcases all branch management components with cinematic design
  */
 export function BranchManagementDemo() {
-  const [selectedBranch, setSelectedBranch] = useState<typeof SAMPLE_BRANCHES[number] | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<any>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const statistics = [
