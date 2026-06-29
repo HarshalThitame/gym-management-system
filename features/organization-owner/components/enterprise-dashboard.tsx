@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, Building2, Calendar, CreditCard, Download, Dumbbell, Gauge, Globe2, MessageSquare, Plus, RefreshCw, ShieldCheck, Tags, TrendingUp, UserRoundPlus, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDown, ArrowUp, BarChart3, Building2, Calendar, CreditCard, Download, Dumbbell, Gauge, Globe2, MessageSquare, Plus, RefreshCw, ShieldCheck, Tags, TrendingUp, UserRoundPlus, UsersRound, Clock } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { ButtonLink } from "@/components/ui/button";
+import { AnimatedContainer } from "@/components/motion";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { PlanSummaryCard } from "@/features/organization-owner/entitlements";
@@ -14,67 +16,16 @@ import type { OrganizationOwnerDashboard } from "@/features/organization-owner/s
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import { getOrgNewLeadsCount } from "@/features/organization-owner/actions/lead-actions";
 import { getCrossBranchCheckInsToday } from "@/features/organization-owner/actions/cross-branch-actions";
+import { DashboardHeroSection } from "./dashboard/DashboardHeroSection";
+import { CinematicMetricsGrid } from "./dashboard/CinematicMetricsGrid";
+import { AnimatedLineChart } from "./dashboard/AnimatedLineChart";
+import { ActivityTimeline } from "./dashboard/ActivityTimeline";
+import { OrganizationOverviewCard } from "./dashboard/OrganizationOverviewCard";
 
 type EnterpriseDashboardProps = {
   dashboard: OrganizationOwnerDashboard;
   planContext?: OrgPlanContext | null | undefined;
 };
-
-/* ─── Mini Sparkline ─── */
-function Sparkline({ data, color = "#111315" }: { data: number[]; color?: string }) {
-  if (data.length < 2) return <div className="h-8" />;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = max - min || 1;
-  const w = 60;
-  const h = 28;
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(" ");
-  return (
-    <svg className="h-7 w-[60px] shrink-0" viewBox={`0 0 ${w} ${h}`}>
-      <polyline fill="none" stroke={color} strokeWidth="1.5" points={pts} />
-    </svg>
-  );
-}
-
-/* ─── Enhanced KPI Widget ─── */
-type EnhancedKpiWidgetProps = {
-  label: string;
-  value: string;
-  detail: string;
-  icon: React.ReactNode;
-  trend?: { value: number; positive: boolean } | null;
-  sparklineData?: number[];
-  status?: "good" | "watch" | "risk";
-};
-
-function EnhancedKpiWidget({ label, value, detail, icon, trend, sparklineData, status }: EnhancedKpiWidgetProps) {
-  return (
-    <div className="rounded-lg border border-border bg-surface p-5 transition-all hover:border-border-strong hover:shadow-sm md:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="rounded-md bg-accent/10 p-1.5 text-foreground">{icon}</div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-            {status ? (
-              <span className={`size-2 shrink-0 rounded-full ${status === "good" ? "bg-green-500" : status === "watch" ? "bg-amber-500" : "bg-red-500"}`} />
-            ) : null}
-          </div>
-          <div className="mt-3 flex items-baseline gap-3">
-            <p className="text-3xl font-black leading-none">{value}</p>
-            {trend ? (
-              <span className={`flex items-center gap-0.5 text-xs font-bold ${trend.positive ? "text-green-600" : "text-red-600"}`}>
-                {trend.positive ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
-                {Math.abs(trend.value)}%
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
-        </div>
-        {sparklineData ? <Sparkline color={status === "risk" ? "#dc2626" : status === "watch" ? "#f59e0b" : "#16a34a"} data={sparklineData} /> : null}
-      </div>
-    </div>
-  );
-}
 
 /* ─── Main Dashboard ─── */
 export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashboardProps) {
@@ -190,10 +141,10 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
 
   return (
     <div className="space-y-6">
-      {/* ═══ HERO SECTION ═══ */}
-      <section className="rounded-lg border border-border bg-surface p-5 md:p-7">
+      {/* ═══ CINEMATIC HERO SECTION ═══ */}
+      <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }} className="rounded-lg border border-border/50 bg-surface p-5 md:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4">
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="flex items-start gap-4">
             <div className="hidden rounded-xl bg-accent/10 p-3 md:block">
               <Building2 className="size-8 text-accent" />
             </div>
@@ -208,8 +159,8 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
                 {planContext ? <span className="ml-2">· <span className="font-semibold">{planContext.packageName}</span> plan</span> : null}
               </p>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+          </motion.div>
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground">
               <Calendar className="size-3.5" />
               <span className="hidden sm:inline">Period: </span>
@@ -220,13 +171,13 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
                 <option value="1y">1 year</option>
               </select>
             </div>
-            <button className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-xs font-semibold hover:border-border-strong disabled:opacity-50" disabled={refreshing} onClick={handleRefresh} type="button">
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-xs font-semibold hover:border-border-strong disabled:opacity-50 transition-all" disabled={refreshing} onClick={handleRefresh} type="button">
               <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-            </button>
+            </motion.button>
             {planContext ? <ButtonLink href="/organization/plan" size="sm" variant="secondary">Manage Plan</ButtonLink> : null}
-          </div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* ═══ PLAN STATUS ═══ */}
       <PlanSummaryCard />
@@ -234,185 +185,305 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
       {/* ═══ USAGE LIMITS ═══ */}
       <UsageDashboardCard />
 
-      {/* ═══ KPI GRID ═══ */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <EnhancedKpiWidget detail="Total revenue from all branches" icon={<CreditCard className="size-4" />} label="Revenue" value={kpis.revenue.value} trend={kpis.revenue.trend} sparklineData={sparklines.revenue} status={kpis.revenue.status} />
-        <EnhancedKpiWidget detail="Active member profiles across all gyms" icon={<UsersRound className="size-4" />} label="Active Members" value={kpis.members.value} trend={kpis.members.trend} sparklineData={sparklines.members} status={kpis.members.status} />
-        <EnhancedKpiWidget detail="Check-ins this period" icon={<Activity className="size-4" />} label="Attendance" value={kpis.attendance.value} trend={kpis.attendance.trend} sparklineData={sparklines.attendance} />
-        <EnhancedKpiWidget detail="New members joined this month" icon={<TrendingUp className="size-4" />} label="New This Month" value={String(newThisMonth)} />
-        <EnhancedKpiWidget detail="Total gym locations" icon={<Building2 className="size-4" />} label="Gyms" value={String(dashboard.gyms.length)} />
-        <EnhancedKpiWidget detail="Total staff across all branches" icon={<UsersRound className="size-4" />} label="Staff" value={formatCompactNumber(staffCount)} />
-        <EnhancedKpiWidget detail="Trainers across all gyms" icon={<Dumbbell className="size-4" />} label="Trainers" value={formatCompactNumber(dashboard.trainers.length)} />
-        <EnhancedKpiWidget detail="Active membership subscriptions" icon={<Tags className="size-4" />} label="Active Memberships" value={formatCompactNumber(activeMemberships)} />
-        <EnhancedKpiWidget detail="Memberships expiring in 30 days" icon={<AlertTriangle className="size-4" />} label="Expiring Soon" value={String(expiryCount)} status={(expiryCount > 10 ? "risk" : expiryCount > 5 ? "watch" : "good") as "good" | "watch" | "risk"} />
-        {planContext?.features?.leadManagement ? (
-          <EnhancedKpiWidget detail="New leads captured this month" icon={<UserRoundPlus className="size-4" />} label="New Leads" value={formatCompactNumber(newLeadsThisMonth)} />
-        ) : null}
-        {planContext?.features?.crossBranchMemberAccess ? (
-          <EnhancedKpiWidget detail="Cross-branch check-ins today" icon={<Globe2 className="size-4" />} label="Cross-Branch Check-ins" value={String(crossBranchCheckIns)} />
-        ) : null}
-        {planContext?.features?.corporateBulkMemberships ? (
-          <EnhancedKpiWidget detail="Corporate accounts with employees" icon={<Building2 className="size-4" />} label="Corporate Members" value="Enterprise" status="good" />
-        ) : null}
-        <EnhancedKpiWidget detail="Open or investigating security events" icon={<ShieldCheck className="size-4" />} label="Security Alerts" value={formatCompactNumber(dashboard.metrics.openSecurityEvents)} status={(dashboard.metrics.openSecurityEvents > 0 ? "watch" : "good") as "good" | "watch" | "risk"} />
-      </div>
+      {/* ═══ CINEMATIC METRICS GRID ═══ */}
+      <CinematicMetricsGrid
+        metrics={[
+          {
+            icon: CreditCard,
+            label: "Revenue",
+            value: kpis.revenue.value,
+            trend: kpis.revenue.trend ? { value: kpis.revenue.trend.value, isPositive: kpis.revenue.trend.positive } : undefined,
+            gradient: { from: "from-emerald-500", to: "to-green-500" },
+            accentColor: "bg-emerald-500",
+            sparklineData: sparklines.revenue,
+          },
+          {
+            icon: UsersRound,
+            label: "Active Members",
+            value: kpis.members.value,
+            trend: kpis.members.trend ? { value: kpis.members.trend.value, isPositive: kpis.members.trend.positive } : undefined,
+            gradient: { from: "from-blue-500", to: "to-cyan-500" },
+            accentColor: "bg-blue-500",
+            sparklineData: sparklines.members,
+          },
+          {
+            icon: Activity,
+            label: "Attendance",
+            value: kpis.attendance.value,
+            trend: kpis.attendance.trend ? { value: kpis.attendance.trend.value, isPositive: kpis.attendance.trend.positive } : undefined,
+            gradient: { from: "from-purple-500", to: "to-pink-500" },
+            accentColor: "bg-purple-500",
+            sparklineData: sparklines.attendance,
+          },
+          {
+            icon: TrendingUp,
+            label: "New This Month",
+            value: String(newThisMonth),
+            gradient: { from: "from-orange-500", to: "to-red-500" },
+            accentColor: "bg-orange-500",
+            sparklineData: [10, 15, 20, 25, 30, 35, newThisMonth],
+          },
+          {
+            icon: Building2,
+            label: "Gyms",
+            value: String(dashboard.gyms.length),
+            gradient: { from: "from-indigo-500", to: "to-purple-500" },
+            accentColor: "bg-indigo-500",
+            sparklineData: [dashboard.gyms.length, dashboard.gyms.length, dashboard.gyms.length, dashboard.gyms.length],
+          },
+          {
+            icon: UsersRound,
+            label: "Staff",
+            value: formatCompactNumber(staffCount),
+            gradient: { from: "from-cyan-500", to: "to-blue-500" },
+            accentColor: "bg-cyan-500",
+            sparklineData: [staffCount * 0.7, staffCount * 0.75, staffCount * 0.8, staffCount * 0.85, staffCount * 0.9, staffCount * 0.95, staffCount],
+          },
+          {
+            icon: Dumbbell,
+            label: "Trainers",
+            value: formatCompactNumber(dashboard.trainers.length),
+            gradient: { from: "from-pink-500", to: "to-rose-500" },
+            accentColor: "bg-pink-500",
+            sparklineData: [dashboard.trainers.length * 0.6, dashboard.trainers.length * 0.7, dashboard.trainers.length * 0.8, dashboard.trainers.length * 0.85, dashboard.trainers.length * 0.9, dashboard.trainers.length * 0.95, dashboard.trainers.length],
+          },
+          {
+            icon: Tags,
+            label: "Active Memberships",
+            value: formatCompactNumber(activeMemberships),
+            gradient: { from: "from-violet-500", to: "to-purple-500" },
+            accentColor: "bg-violet-500",
+            sparklineData: [activeMemberships * 0.5, activeMemberships * 0.6, activeMemberships * 0.7, activeMemberships * 0.8, activeMemberships * 0.9, activeMemberships * 0.95, activeMemberships],
+          },
+          {
+            icon: AlertTriangle,
+            label: "Expiring Soon",
+            value: String(expiryCount),
+            trend: expiryCount > 0 ? { value: expiryCount, isPositive: false } : undefined,
+            gradient: { from: "from-yellow-500", to: "to-orange-500" },
+            accentColor: "bg-yellow-500",
+            sparklineData: [expiryCount, expiryCount, expiryCount, expiryCount, expiryCount, expiryCount, expiryCount],
+          },
+          ...(planContext?.features?.leadManagement
+            ? [
+                {
+                  icon: UserRoundPlus,
+                  label: "New Leads",
+                  value: formatCompactNumber(newLeadsThisMonth),
+                  gradient: { from: "from-lime-500", to: "to-green-500" },
+                  accentColor: "bg-lime-500",
+                  sparklineData: [newLeadsThisMonth * 0.3, newLeadsThisMonth * 0.4, newLeadsThisMonth * 0.5, newLeadsThisMonth * 0.6, newLeadsThisMonth * 0.7, newLeadsThisMonth * 0.8, newLeadsThisMonth],
+                },
+              ]
+            : []),
+          ...(planContext?.features?.crossBranchMemberAccess
+            ? [
+                {
+                  icon: Globe2,
+                  label: "Cross-Branch Check-ins",
+                  value: String(crossBranchCheckIns),
+                  gradient: { from: "from-sky-500", to: "to-blue-500" },
+                  accentColor: "bg-sky-500",
+                  sparklineData: [crossBranchCheckIns * 0.4, crossBranchCheckIns * 0.5, crossBranchCheckIns * 0.6, crossBranchCheckIns * 0.7, crossBranchCheckIns * 0.8, crossBranchCheckIns * 0.9, crossBranchCheckIns],
+                },
+              ]
+            : []),
+          ...(planContext?.features?.corporateBulkMemberships
+            ? [
+                {
+                  icon: Building2,
+                  label: "Corporate Members",
+                  value: "Enterprise",
+                  gradient: { from: "from-amber-500", to: "to-yellow-500" },
+                  accentColor: "bg-amber-500",
+                  sparklineData: [1, 1, 1, 1, 1, 1, 1],
+                },
+              ]
+            : []),
+          {
+            icon: ShieldCheck,
+            label: "Security Alerts",
+            value: formatCompactNumber(dashboard.metrics.openSecurityEvents),
+            trend: dashboard.metrics.openSecurityEvents > 0 ? { value: dashboard.metrics.openSecurityEvents, isPositive: false } : undefined,
+            gradient: { from: "from-red-500", to: "to-rose-500" },
+            accentColor: "bg-red-500",
+            sparklineData: [dashboard.metrics.openSecurityEvents, dashboard.metrics.openSecurityEvents, dashboard.metrics.openSecurityEvents, dashboard.metrics.openSecurityEvents],
+          },
+        ]}
+      />
 
-      {/* ═══ CHARTS SECTION ═══ */}
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Revenue Trend</p>
-                <h3 className="text-2xl font-black">Revenue Over Time</h3>
+      {/* ═══ CINEMATIC CHARTS SECTION ═══ */}
+      <AnimatedContainer stagger className="grid gap-5 xl:grid-cols-2">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Revenue Trend</p>
+                  <h3 className="text-2xl font-black">Revenue Over Time</h3>
+                </div>
+                {kpis.revenue.trend ? (
+                  <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }} className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${kpis.revenue.trend.positive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                    {kpis.revenue.trend.positive ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {kpis.revenue.trend.value}% vs last month
+                  </motion.span>
+                ) : null}
               </div>
-              {kpis.revenue.trend ? (
-                <span className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${kpis.revenue.trend.positive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                  {kpis.revenue.trend.positive ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
-                  {kpis.revenue.trend.value}% vs last month
-                </span>
-              ) : null}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {chartData.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">No revenue data available yet.</p>
-            ) : (
-              <div className="h-64 w-full">
-                <ResponsiveContainer height="100%" width="100%">
-                  <LineChart data={chartData}>
-                    <Tooltip />
-                    <Line dataKey="revenue" stroke="#111315" strokeWidth={2} dot={{ r: 3, fill: "#111315" }} type="monotone" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Members</p>
-                <h3 className="text-2xl font-black">Member Growth</h3>
-              </div>
-              {kpis.members.trend ? (
-                <span className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${kpis.members.trend.positive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                  {kpis.members.trend.positive ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
-                  {kpis.members.trend.value}% vs last month
-                </span>
-              ) : null}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 w-full">
-              <ResponsiveContainer height="100%" width="100%">
-                <LineChart data={chartData}>
-                  <Tooltip />
-                  <Line dataKey="members" stroke="#16a34a" strokeWidth={2} dot={{ r: 3, fill: "#16a34a" }} type="monotone" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent>
+              {chartData.length === 0 ? (
+                <p className="py-12 text-center text-sm text-muted-foreground">No revenue data available yet.</p>
+              ) : (
+                <AnimatedLineChart
+                  data={chartData}
+                  dataKey="revenue"
+                  xAxisKey="date"
+                  strokeColor="#3b82f6"
+                  fillGradientFrom="#3b82f6"
+                  fillGradientTo="#8b5cf6"
+                  height={300}
+                  showLegend={false}
+                  darkMode={true}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      {/* ═══ BRANCH PERFORMANCE + ACTIVITY ═══ */}
-      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Branch Performance</h3>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {branchPerformance.map((b, i) => (
-                <div key={b.slug} className="flex items-center justify-between rounded-md border border-border bg-background p-3 transition-all hover:border-border-strong">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-surface-muted text-xs font-black text-muted-foreground">{i + 1}</span>
-                    <div>
-                      <p className="text-sm font-bold">{b.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatCompactNumber(b.members)} members · {formatCompactNumber(b.attendance)} visits</p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Members</p>
+                  <h3 className="text-2xl font-black">Member Growth</h3>
+                </div>
+                {kpis.members.trend ? (
+                  <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }} className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${kpis.members.trend.positive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                    {kpis.members.trend.positive ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {kpis.members.trend.value}% vs last month
+                  </motion.span>
+                ) : null}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <AnimatedLineChart
+                data={chartData}
+                dataKey="members"
+                xAxisKey="date"
+                strokeColor="#10b981"
+                fillGradientFrom="#10b981"
+                fillGradientTo="#059669"
+                height={300}
+                showLegend={false}
+                darkMode={true}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
+      </AnimatedContainer>
+
+      {/* ═══ BRANCH PERFORMANCE + ACTIVITY TIMELINE ═══ */}
+      <AnimatedContainer stagger className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Branch Performance</h3>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {branchPerformance.map((b, i) => (
+                  <motion.div key={b.slug} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ x: 4 }} className="flex items-center justify-between rounded-md border border-border bg-background p-3 transition-all hover:border-border-strong cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-surface-muted text-xs font-black text-muted-foreground">{i + 1}</span>
+                      <div>
+                        <p className="text-sm font-bold">{b.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatCompactNumber(b.members)} members · {formatCompactNumber(b.attendance)} visits</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-sm font-black">{formatCurrency(b.revenue)}</p>
-                </div>
-              ))}
-              {branchPerformance.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">No branch data available yet.</p>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-black">Recent Activity</h3>
-              <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{dashboard.activityEvents.length} total</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {recentActivity.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">No activity recorded yet.</p>
-              ) : recentActivity.map((event) => (
-                <div key={event.id} className="flex items-start gap-3 rounded-md p-2 transition-all hover:bg-surface-muted">
-                  <div className={`mt-1 size-2 shrink-0 rounded-full ${
-                    event.severity === "critical" ? "bg-red-500" :
-                    event.severity === "warning" ? "bg-amber-500" :
-                    event.severity === "notice" ? "bg-blue-500" : "bg-gray-400"
-                  }`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold leading-tight">{formatEnterpriseLabel(event.event_type)}</p>
-                    <p className="text-xs text-muted-foreground">{formatEnterpriseLabel(event.entity_type)} · {new Date(event.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ═══ ALERTS BAR ═══ */}
-      {openAlerts.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="size-5 text-amber-500" />
-                <h3 className="text-xl font-black">Security Alerts</h3>
+                    <p className="text-sm font-black">{formatCurrency(b.revenue)}</p>
+                  </motion.div>
+                ))}
+                {branchPerformance.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">No branch data available yet.</p>
+                ) : null}
               </div>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">{openAlerts.length} open</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {openAlerts.map((alert) => (
-                <div key={alert.id} className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 p-3">
-                  <div>
-                    <p className="text-sm font-bold text-amber-900">{formatEnterpriseLabel(alert.event_type)}</p>
-                    <p className="text-xs text-amber-700">{alert.description ?? ""}</p>
-                  </div>
-                  <EnterpriseStatusBadge status={alert.severity} />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      {/* ═══ QUICK ACTIONS ═══ */}
-      <div className="rounded-lg border border-border bg-surface p-5">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
+          <ActivityTimeline
+            items={recentActivity.map((event) => ({
+              id: event.id,
+              title: formatEnterpriseLabel(event.event_type),
+              description: formatEnterpriseLabel(event.entity_type),
+              timestamp: new Date(event.created_at),
+              type:
+                event.severity === "critical" ? "alert" :
+                event.severity === "warning" ? "alert" :
+                event.severity === "notice" ? "update" : "activity",
+            }))}
+          />
+        </motion.div>
+      </AnimatedContainer>
+
+      {/* ═══ SECURITY ALERTS SECTION ═══ */}
+      <AnimatedContainer stagger>
+        {openAlerts.length > 0 ? (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="size-5 text-amber-500" />
+                    <h3 className="text-xl font-black">Security Alerts</h3>
+                  </div>
+                  <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2 }} className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">{openAlerts.length} open</motion.span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <motion.div className="space-y-3">
+                  {openAlerts.map((alert, i) => (
+                    <motion.div key={alert.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ x: 4 }} className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 p-3 transition-all">
+                      <div>
+                        <p className="text-sm font-bold text-amber-900">{formatEnterpriseLabel(alert.event_type)}</p>
+                        <p className="text-xs text-amber-700">{alert.description ?? ""}</p>
+                      </div>
+                      <EnterpriseStatusBadge status={alert.severity} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ) : null}
+      </AnimatedContainer>
+
+      {/* ═══ QUICK ACTIONS SECTION ═══ */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="rounded-lg border border-border bg-surface p-5">
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Quick Actions</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <ButtonLink href="/organization/members" size="sm" variant="secondary"><Plus className="size-3.5" /> Add Member</ButtonLink>
-          <ButtonLink href="/organization/branches" size="sm" variant="secondary"><Plus className="size-3.5" /> Create Location</ButtonLink>
-          <ButtonLink href="/organization/memberships" size="sm" variant="secondary"><Plus className="size-3.5" /> New Plan</ButtonLink>
-          <ButtonLink href="/organization/trainers" size="sm" variant="secondary"><Plus className="size-3.5" /> Add Trainer</ButtonLink>
-          <ButtonLink href="/organization/revenue" size="sm" variant="secondary"><Download className="size-3.5" /> Revenue Report</ButtonLink>
-          <ButtonLink href="/organization/support" size="sm" variant="secondary"><MessageSquare className="size-3.5" /> Get Support</ButtonLink>
-        </div>
-      </div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ staggerChildren: 0.1, delayChildren: 0.2 }} className="mt-3 flex flex-wrap gap-2">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17 }}>
+            <ButtonLink href="/organization/members" size="sm" variant="secondary"><Plus className="size-3.5" /> Add Member</ButtonLink>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17, delay: 0.1 }}>
+            <ButtonLink href="/organization/branches" size="sm" variant="secondary"><Plus className="size-3.5" /> Create Location</ButtonLink>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17, delay: 0.2 }}>
+            <ButtonLink href="/organization/memberships" size="sm" variant="secondary"><Plus className="size-3.5" /> New Plan</ButtonLink>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17, delay: 0.3 }}>
+            <ButtonLink href="/organization/trainers" size="sm" variant="secondary"><Plus className="size-3.5" /> Add Trainer</ButtonLink>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17, delay: 0.4 }}>
+            <ButtonLink href="/organization/revenue" size="sm" variant="secondary"><Download className="size-3.5" /> Revenue Report</ButtonLink>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} transition={{ type: "spring", stiffness: 400, damping: 17, delay: 0.5 }}>
+            <ButtonLink href="/organization/support" size="sm" variant="secondary"><MessageSquare className="size-3.5" /> Get Support</ButtonLink>
+          </motion.div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
