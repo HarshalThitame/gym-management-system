@@ -5,21 +5,22 @@
 [dir="rtl"] .space-x-reverse > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
 
 @theme {
-  --color-background: #f8f7f2;
-  --color-foreground: #111214;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f0f1ec;
-  --color-surface-strong: #e4e7dd;
-  --color-border: #d7dbd0;
-  --color-border-strong: #b9c0b1;
-  --color-muted: #737780;
-  --color-muted-foreground: #5f646d;
-  --color-primary: #111214;
-  --color-primary-foreground: #ffffff;
+  /* Dark-only Cinematic Theme */
+  --color-background: #0a0e27;
+  --color-foreground: #f0f4f8;
+  --color-surface: #111214;
+  --color-surface-muted: #191b1f;
+  --color-surface-strong: #24272d;
+  --color-border: #30343b;
+  --color-border-light: #4a5268;
+  --color-muted: #aeb4be;
+  --color-muted-foreground: #8b92a1;
+  --color-primary: #0a0e27;
+  --color-primary-foreground: #f0f4f8;
   --color-accent: #c8f24a;
-  --color-accent-foreground: #111214;
+  --color-accent-foreground: #0a0e27;
   --color-secondary: #22d3ee;
-  --color-secondary-foreground: #062f39;
+  --color-secondary-foreground: #0a0e27;
   --color-destructive: #d92d20;
   --color-destructive-foreground: #ffffff;
   --color-success: #16a34a;
@@ -28,37 +29,88 @@
   --color-ink: #111214;
   --color-porcelain: #f8f7f2;
   --color-steel: #737780;
+  
+  /* Cinematic Background Variations */
+  --color-bg-primary: #0a0e27;
+  --color-bg-secondary: #1a1f3a;
+  --color-bg-tertiary: #252d48;
+  
+  /* Gradient Presets */
+  --gradient-blue-purple: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gradient-pink: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+  --gradient-accent: linear-gradient(135deg, #c8f24a 0%, #22d3ee 100%);
+  --gradient-neon: linear-gradient(90deg, #00d4ff 0%, #7f3ff2 50%, #ff006e 100%);
+  
+  /* Glow Effects */
+  --glow-blue: 0 0 20px rgba(59, 130, 246, 0.5);
+  --glow-purple: 0 0 20px rgba(139, 92, 246, 0.5);
+  --glow-pink: 0 0 20px rgba(236, 72, 153, 0.5);
+  --glow-cyan: 0 0 20px rgba(34, 211, 238, 0.5);
+  --glow-lime: 0 0 20px rgba(200, 242, 74, 0.5);
+  
+  /* Shadow Presets */
+  --shadow-glow-sm: 0 0 8px rgba(59, 130, 246, 0.3);
+  --shadow-glow-md: 0 0 16px rgba(139, 92, 246, 0.4);
+  --shadow-glow-lg: 0 8px 32px rgba(139, 92, 246, 0.2);
+  --shadow-premium: 0 24px 80px rgb(17 18 20 / 0.14);
+  
   --font-sans: var(--font-geist-sans), Inter, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
-  --shadow-premium: 0 24px 80px rgb(17 18 20 / 0.14);
 }
 
 :root {
-  color-scheme: light;
-  --background: #f8f7f2;
-  --foreground: #111214;
-  --surface: #ffffff;
-  --surface-muted: #f0f1ec;
-  --surface-strong: #e4e7dd;
-  --border: #d7dbd0;
-  --muted: #737780;
-  --ring: #22d3ee;
-}
-
-.dark {
   color-scheme: dark;
-  --background: #070809;
-  --foreground: #f8f7f2;
+  --background: #0a0e27;
+  --foreground: #f0f4f8;
   --surface: #111214;
   --surface-muted: #191b1f;
   --surface-strong: #24272d;
   --border: #30343b;
+  --border-light: #4a5268;
   --muted: #aeb4be;
   --ring: #c8f24a;
+  
+  /* Cinematic Background Variations */
+  --bg-primary: #0a0e27;
+  --bg-secondary: #1a1f3a;
+  --bg-tertiary: #252d48;
+  
+  /* Gradient Presets */
+  --gradient-blue-purple: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gradient-pink: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+  --gradient-accent: linear-gradient(135deg, #c8f24a 0%, #22d3ee 100%);
+  --gradient-neon: linear-gradient(90deg, #00d4ff 0%, #7f3ff2 50%, #ff006e 100%);
+  
+  /* Glow Effects */
+  --glow-blue: 0 0 20px rgba(59, 130, 246, 0.5);
+  --glow-purple: 0 0 20px rgba(139, 92, 246, 0.5);
+  --glow-pink: 0 0 20px rgba(236, 72, 153, 0.5);
+  --glow-cyan: 0 0 20px rgba(34, 211, 238, 0.5);
+  --glow-lime: 0 0 20px rgba(200, 242, 74, 0.5);
+  
+  /* Shadow Presets */
+  --shadow-glow-sm: 0 0 8px rgba(59, 130, 246, 0.3);
+  --shadow-glow-md: 0 0 16px rgba(139, 92, 246, 0.4);
+  --shadow-glow-lg: 0 8px 32px rgba(139, 92, 246, 0.2);
 }
+
+
+/* 
+ * LEGACY LIGHT MODE COLORS (ARCHIVED FOR REFERENCE)
+ * These colors are no longer used - app is dark-only cinematic theme
+ * 
+ * Light mode palette (deprecated):
+ * --background: #f8f7f2 (light beige)
+ * --foreground: #111214 (dark gray)
+ * --surface: #ffffff (white)
+ * --surface-muted: #f0f1ec (light gray)
+ * --surface-strong: #e4e7dd (medium gray)
+ * --border: #d7dbd0 (light border)
+ * --muted: #737780 (muted gray)
+ */
 
 * {
   box-sizing: border-box;
