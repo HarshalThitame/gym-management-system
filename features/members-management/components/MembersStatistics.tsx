@@ -59,22 +59,22 @@ export function MembersStatistics({
 }: MembersStatisticsProps) {
   // Count-up animations
   const totalCountUp = useCountUp({
-    start: 0,
-    end: data.totalMembers,
+    from: 0,
+    to: data.totalMembers,
     duration: 2,
     decimals: 0,
   });
 
   const activeCountUp = useCountUp({
-    start: 0,
-    end: data.activeMembers,
+    from: 0,
+    to: data.activeMembers,
     duration: 2,
     decimals: 0,
   });
 
   const inactiveCountUp = useCountUp({
-    start: 0,
-    end: data.inactiveMembers,
+    from: 0,
+    to: data.inactiveMembers,
     duration: 2,
     decimals: 0,
   });
