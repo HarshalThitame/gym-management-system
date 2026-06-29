@@ -16,11 +16,7 @@ import type { OrganizationOwnerDashboard } from "@/features/organization-owner/s
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import { getOrgNewLeadsCount } from "@/features/organization-owner/actions/lead-actions";
 import { getCrossBranchCheckInsToday } from "@/features/organization-owner/actions/cross-branch-actions";
-import { DashboardHeroSection } from "./dashboard/DashboardHeroSection";
-import { CinematicMetricsGrid } from "./dashboard/CinematicMetricsGrid";
-import { AnimatedLineChart } from "./dashboard/AnimatedLineChart";
-import { ActivityTimeline } from "./dashboard/ActivityTimeline";
-import { OrganizationOverviewCard } from "./dashboard/OrganizationOverviewCard";
+import { DashboardHeroSection, CinematicMetricsGrid, AnimatedLineChart, ActivityTimeline, OrganizationOverviewCard } from "./dashboard";
 
 type EnterpriseDashboardProps = {
   dashboard: OrganizationOwnerDashboard;
