@@ -144,7 +144,7 @@ export const AnimatedLineChart = React.forwardRef<
               style={{ fontSize: "12px" }}
             />
 
-            <Tooltip content={customTooltip || <DefaultTooltip />} />
+            <Tooltip content={customTooltip || (DefaultTooltip as any)} />
 
             {showLegend && (
               <Legend
