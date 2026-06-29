@@ -26,22 +26,17 @@ export interface CinematicStatCardProps {
  * Features: icon with gradient background, metric label, value, trend indicator,
  * gradient accent bar, and sparkline chart
  */
-export const CinematicStatCard = React.forwardRef<
-  HTMLDivElement,
-  CinematicStatCardProps
->(
-  (
-    {
-      icon: Icon,
-      label,
-      value,
-      trend,
-      gradient = { from: "from-blue-500", to: "to-purple-500" },
-      accentColor = "bg-purple-500",
-      sparklineData = [20, 40, 30, 50, 45, 60, 55],
-    },
-    ref
-  ) => {
+export const CinematicStatCard: React.FC<CinematicStatCardProps> = (
+  {
+    icon: Icon,
+    label,
+    value,
+    trend,
+    gradient = { from: "from-blue-500", to: "to-purple-500" },
+    accentColor = "bg-purple-500",
+    sparklineData = [20, 40, 30, 50, 45, 60, 55],
+  }
+) => {
     const trendIsPositive = trend?.isPositive ?? true;
     const trendColor = trendIsPositive ? "text-green-400" : "text-red-400";
     const trendBg = trendIsPositive ? "bg-green-500/10" : "bg-red-500/10";
@@ -62,7 +57,7 @@ export const CinematicStatCard = React.forwardRef<
     const pathData = `M ${points.join(" L ")}`;
 
     return (
-      <CinematicCard ref={ref} variant="default" className="p-6 group">
+      <CinematicCard variant="default" className="p-6 group">
         <div className="space-y-4">
           {/* Icon with gradient background */}
           <div
@@ -157,4 +152,4 @@ export const CinematicStatCard = React.forwardRef<
   }
 );
 
-CinematicStatCard.displayName = "CinematicStatCard";
+
