@@ -4,7 +4,7 @@ import React, { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { useCountUp } from "@/components/motion";
 
-interface AnimatedCounterCardProps {
+export interface AnimatedCounterCardProps {
   value: number;
   label: string;
   icon?: ReactNode;
