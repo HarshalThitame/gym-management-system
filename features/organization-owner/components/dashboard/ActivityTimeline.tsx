@@ -128,7 +128,7 @@ function TimelineItem({
   index: number;
 }): React.ReactNode {
   const type = item.type || "activity";
-  const colors = TypeColorMap[type] ?? TypeColorMap.activity;
+  const colors = TypeColorMap[type]!;
   const icon = TypeIconMap[type];
 
   return (
