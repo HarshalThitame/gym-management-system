@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useState, useActionState, useRef } from "react";
-import { Building2, ChevronDown, ChevronRight, Download, Edit3, Eye, MapPin, Plus, ShieldAlert, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { useCallback, useState, useActionState, useRef, useEffect, type ReactNode } from "react";
+import { Building2, Download, Edit3, Eye, MapPin, Plus, ShieldAlert, ShieldCheck, Trash2, UserRound, X, Search, CheckCircle2 } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
 import { OrgOwnerDrawer, DrawerField, DrawerSubmitButton, DrawerFormMessage } from "@/features/organization-owner/components/org-owner-drawer";
 import { GymDetailPanel } from "@/features/organization-owner/components/gym-detail-panel";
 import { StatCard } from "@/components/ui/stat-card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { saveGymAction, setGymStatusAction } from "@/features/organization-owner/actions/gym-actions";
 import { saveBranchAction, setBranchStatusAction } from "@/features/organization-owner/actions/branch-actions";
@@ -19,6 +20,8 @@ import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatCurrency } from "@/features/enterprise/lib/business-rules";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { CrossBranchAccessPanel } from "@/features/organization-owner/components/modules/CrossBranchAccessPanel";
+import { GymCreatedDialog } from "@/features/organization-owner/components/modules/GymCreatedDialog";
+import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import type { GymRow } from "@/types/enterprise";
 import type { Database } from "@/types/database";
 
@@ -29,6 +32,7 @@ type BranchesModuleProps = {
 };
 
 type BranchRow = Database["public"]["Tables"]["branches"]["Row"];
+type StatKey = "all" | "active" | "suspended" | "branches" | null;
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
@@ -46,6 +50,22 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const [state, formAction] = useActionState(saveGymAction, initialAuthActionState);
   const [branchState, branchFormAction] = useActionState(saveBranchAction, initialAuthActionState);
   const formRef = useRef<HTMLFormElement>(null);
+  const [statPanel, setStatPanel] = useState<StatKey>(null);
+  const [successGym, setSuccessGym] = useState<{ id: string; name: string; slug: string; timezone: string; currency: string; status: string } | null>(null);
+
+  useEffect(() => {
+    const gymData = (state as Record<string, unknown>).gymData as Record<string, string> | undefined;
+    if (state.status === "success" && gymData && gymData.id) {
+      setSuccessGym({
+        id: gymData.id,
+        name: gymData.name,
+        slug: gymData.slug,
+        timezone: gymData.timezone,
+        currency: gymData.currency,
+        status: gymData.status,
+      });
+    }
+  }, [state]);
 
   const initialItems = ((moduleData?.items ?? dashboard.gyms) as GymRow[]);
   const { items: gyms, addOptimistic, updateOptimistic, removeOptimistic } = useOptimisticList<GymRow>(initialItems);
@@ -210,10 +230,18 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
         <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="Total locations across your organization" icon={<Building2 className="size-5" />} label="Total Locations" value={String(gyms.length)} />
-        <StatCard detail="Active locations" icon={<Building2 className="size-5" />} label="Active" value={String(activeGyms)} />
-        <StatCard detail="Suspended locations" icon={<Building2 className="size-5" />} label="Suspended" value={String(suspendedGyms)} />
-        <StatCard detail="Total branches across all locations" icon={<Building2 className="size-5" />} label="Branches" value={`${activeLocations}/${totalLocations} active`} />
+        <button type="button" onClick={() => setStatPanel("all")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both]">
+          <StatCard detail="Total locations across your organization" icon={<Building2 className="size-5" />} label="Total Locations" value={String(gyms.length)} />
+        </button>
+        <button type="button" onClick={() => setStatPanel("active")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both_0.05s]">
+          <StatCard detail="Active locations" icon={<Building2 className="size-5" />} label="Active" value={String(activeGyms)} />
+        </button>
+        <button type="button" onClick={() => setStatPanel("suspended")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both_0.1s]">
+          <StatCard detail="Suspended locations" icon={<Building2 className="size-5" />} label="Suspended" value={String(suspendedGyms)} />
+        </button>
+        <button type="button" onClick={() => setStatPanel("branches")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both_0.15s]">
+          <StatCard detail="Total branches across all locations" icon={<Building2 className="size-5" />} label="Branches" value={`${activeLocations}/${totalLocations} active`} />
+        </button>
       </section>
 
       {/* ═══ FILTERS + DATA LIST ═══ */}
@@ -330,6 +358,24 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
 
       {/* ═══ GYM DETAIL PANEL ═══ */}
       {detailGym ? <GymDetailPanel gym={detailGym} dashboard={dashboard} onClose={() => setDetailGym(null)} /> : null}
+
+      {/* ═══ STAT DETAIL PANEL ═══ */}
+      {statPanel ? (
+        <LocationStatDetailPanel
+          statKey={statPanel}
+          gyms={gyms}
+          activeGyms={activeGyms}
+          suspendedGyms={suspendedGyms}
+          activeLocations={activeLocations}
+          totalLocations={totalLocations}
+          branches={branches}
+          dashboard={dashboard}
+          onClose={() => setStatPanel(null)}
+          onViewDetail={(gym) => { setStatPanel(null); setDetailGym(gym); }}
+        />
+      ) : null}
+
+      <GymCreatedDialog open={!!successGym} data={successGym} onClose={() => setSuccessGym(null)} />
         </>
       )}
     </div>
@@ -341,19 +387,21 @@ function GymBranchList({ gymId, branches, onAddBranch, onEditBranch, onSetStatus
   gymId: string; branches: BranchRow[]; onAddBranch: (gymId: string) => void; onEditBranch: (branch: BranchRow) => void; onSetStatus: (branchId: string, status: string) => void;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 animate-[fade-in-up_0.3s_ease-out_both]">
       <div className="flex items-center justify-between">
         <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{branches.length} Branch{branches.length !== 1 ? "es" : ""}</p>
-        <button className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-semibold hover:border-border-strong" onClick={() => onAddBranch(gymId)} type="button"><Plus className="size-3" /> Add Branch</button>
+        <button className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-semibold hover:border-border-strong hover:bg-surface-muted transition-all" onClick={() => onAddBranch(gymId)} type="button"><Plus className="size-3" /> Add Branch</button>
       </div>
       {branches.length === 0 ? (
         <p className="text-xs text-muted-foreground">No branches yet. Click &quot;Add Branch&quot; to create one.</p>
       ) : (
         <div className="space-y-2">
-          {branches.map((branch) => (
-            <div key={branch.id} className="flex items-center justify-between rounded-md border border-border bg-background p-3 transition-all hover:border-border-strong">
+          {branches.map((branch, idx) => (
+            <div key={branch.id} className="flex items-center justify-between rounded-md border border-border bg-background p-3 transition-all hover:border-border-strong hover:bg-surface-muted/50 animate-[fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: `${idx * 0.05}s` }}>
               <div className="flex items-start gap-3">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <div className="mt-0.5 flex size-8 items-center justify-center rounded-md bg-accent/10 text-accent">
+                  <MapPin className="size-4" />
+                </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold">{branch.name}</p>
@@ -367,22 +415,198 @@ function GymBranchList({ gymId, branches, onAddBranch, onEditBranch, onSetStatus
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  branch.status === "active" ? "bg-green-100 text-green-700" :
-                  branch.status === "suspended" ? "bg-red-100 text-red-700" :
-                  "bg-amber-100 text-amber-700"
-                }`}>{branch.status}</span>
-                <button className="rounded-md p-1 text-muted-foreground hover:bg-surface-muted hover:text-foreground" onClick={() => onEditBranch(branch)} type="button" aria-label="Edit branch"><Edit3 className="size-3.5" /></button>
+                <EnterpriseStatusBadge status={branch.status} />
+                <button className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-muted hover:text-foreground transition-all" onClick={() => onEditBranch(branch)} type="button" aria-label="Edit branch"><Edit3 className="size-3.5" /></button>
                 {branch.status === "active" ? (
-                  <button className="rounded-md p-1 text-red-500 hover:bg-red-50" onClick={() => onSetStatus(branch.id, "suspended")} type="button" aria-label="Suspend branch"><ShieldAlert className="size-3.5" /></button>
+                  <button className="rounded-md p-1.5 text-red-500 hover:bg-red-50 transition-all" onClick={() => onSetStatus(branch.id, "suspended")} type="button" aria-label="Suspend branch"><ShieldAlert className="size-3.5" /></button>
                 ) : (
-                  <button className="rounded-md p-1 text-green-600 hover:bg-green-50" onClick={() => onSetStatus(branch.id, "active")} type="button" aria-label="Activate branch"><ShieldCheck className="size-3.5" /></button>
+                  <button className="rounded-md p-1.5 text-green-600 hover:bg-green-50 transition-all" onClick={() => onSetStatus(branch.id, "active")} type="button" aria-label="Activate branch"><ShieldCheck className="size-3.5" /></button>
                 )}
               </div>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   LOCATION STAT DETAIL PANEL
+   ════════════════════════════════════════════ */
+function LocationStatDetailPanel({
+  statKey, gyms, activeGyms, suspendedGyms, activeLocations, totalLocations, branches, dashboard, onClose, onViewDetail,
+}: {
+  statKey: StatKey; gyms: GymRow[]; activeGyms: number; suspendedGyms: number;
+  activeLocations: number; totalLocations: number; branches: BranchRow[];
+  dashboard: OrganizationOwnerDashboard; onClose: () => void;
+  onViewDetail: (gym: GymRow) => void;
+}) {
+  const [search, setSearch] = useState("");
+
+  const titleByKey: Record<string, string> = {
+    all: "All Locations",
+    active: "Active Locations",
+    suspended: "Suspended Locations",
+    branches: "Branch Overview",
+  };
+
+  const iconByKey: Record<string, ReactNode> = {
+    all: <Building2 className="size-5" />,
+    active: <CheckCircle2 className="size-5" />,
+    suspended: <ShieldAlert className="size-5" />,
+    branches: <MapPin className="size-5" />,
+  };
+
+  const list =
+    statKey === "all" ? gyms :
+    statKey === "active" ? gyms.filter((g) => g.status === "active") :
+    statKey === "suspended" ? gyms.filter((g) => g.status === "suspended") :
+    [];
+
+  const filtered = list.filter((g) =>
+    g.name.toLowerCase().includes(search.toLowerCase()) ||
+    g.slug.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (!statKey) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm animate-[fade-in_0.2s_ease-out_both]" onClick={onClose}>
+      <div className="flex h-full w-full max-w-2xl flex-col bg-surface shadow-2xl animate-[slide-in-right_0.3s_cubic-bezier(0.2,0,0,1)_both]" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={titleByKey[statKey]}>
+        <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+              {iconByKey[statKey]}
+            </div>
+            <div>
+              <h2 className="text-xl font-black">{titleByKey[statKey]}</h2>
+              <p className="text-sm text-muted-foreground">
+                {statKey === "branches"
+                  ? `${branches.length} branches across ${gyms.length} locations`
+                  : `${filtered.length} location${filtered.length !== 1 ? "s" : ""}`
+                }
+              </p>
+            </div>
+          </div>
+          <button className="flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground transition-all" onClick={onClose} type="button" aria-label="Close">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          {/* ── BRANCH OVERVIEW VIEW ── */}
+          {statKey === "branches" ? (
+            <div className="space-y-6">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-border bg-background p-4 text-center">
+                  <p className="text-2xl font-black text-accent">{totalLocations}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Total locations</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-4 text-center">
+                  <p className="text-2xl font-black text-green-600">{activeLocations}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Active branches</p>
+                </div>
+                <div className="rounded-lg border border-border bg-background p-4 text-center">
+                  <p className="text-2xl font-black text-amber-600">{branches.length - activeLocations}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Inactive branches</p>
+                </div>
+              </div>
+
+              {branches.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border bg-surface-muted p-12 text-center">
+                  <MapPin className="mx-auto size-10 text-muted-foreground" />
+                  <p className="mt-3 text-lg font-black">No branches</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Add branches to your locations to see them here.</p>
+                </div>
+              ) : (
+                <Card>
+                  <CardHeader><h3 className="font-black">All Branches</h3></CardHeader>
+                  <CardContent className="space-y-2">
+                    {branches.map((b) => {
+                      const parentGym = gyms.find((g) => g.id === b.gym_id);
+                      return (
+                        <div key={b.id} className="flex items-center justify-between rounded-lg border border-border bg-background p-3 transition-all hover:border-border-strong">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <MapPin className="size-4 shrink-0 text-accent" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold truncate">{b.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{b.branch_code} · {parentGym?.name ?? "—"}</p>
+                            </div>
+                          </div>
+                          <EnterpriseStatusBadge status={b.status} />
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            /* ── LOCATION LIST VIEW ── */
+            <>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
+                  placeholder="Search locations..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {filtered.map((g) => {
+                  const gymBranches = branches.filter((b) => b.gym_id === g.id);
+                  const gymMembers = dashboard.members.filter((m) => m.gym_id === g.id);
+                  const gymRevenue = dashboard.payments
+                    .filter((p) => p.status === "paid" && p.gym_id === g.id)
+                    .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+
+                  return (
+                    <div key={g.id} className="group rounded-lg border border-border bg-background p-4 transition-all hover:border-accent/30 hover:shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex size-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                            <Building2 className="size-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold truncate">{g.name}</p>
+                            <p className="text-xs text-muted-foreground">{g.slug}</p>
+                          </div>
+                        </div>
+                        <EnterpriseStatusBadge status={g.status} />
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-md bg-surface-muted p-2 text-center">
+                          <p className="font-black text-muted-foreground">Branches</p>
+                          <p className="font-bold">{gymBranches.length}</p>
+                        </div>
+                        <div className="rounded-md bg-surface-muted p-2 text-center">
+                          <p className="font-black text-muted-foreground">Members</p>
+                          <p className="font-bold">{gymMembers.length}</p>
+                        </div>
+                        <div className="rounded-md bg-surface-muted p-2 text-center">
+                          <p className="font-black text-muted-foreground">Revenue</p>
+                          <p className="font-bold">{formatCompactNumber(Math.round(gymRevenue))}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <button onClick={() => onViewDetail(g)} className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-bold transition-all hover:bg-surface-muted" type="button">View Details</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <div className="col-span-2 rounded-lg border border-dashed border-border bg-surface-muted p-12 text-center">
+                    <Search className="mx-auto size-8 text-muted-foreground" />
+                    <p className="mt-2 text-sm text-muted-foreground">No locations match your search.</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
