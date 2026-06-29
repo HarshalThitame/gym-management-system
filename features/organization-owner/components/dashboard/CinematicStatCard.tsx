@@ -149,7 +149,6 @@ export const CinematicStatCard: React.FC<CinematicStatCardProps> = (
         </div>
       </CinematicCard>
     );
-  }
-);
+  };
 
 
