@@ -76,11 +76,11 @@ export async function getCrossGymClassSummary(organizationId: string): Promise<C
       .from("members")
       .select("id, gym_id")
       .in("id", memberIds);
-    const memberGymMap = new Map((members ?? []).map((m: any) => [m.id, m.gym_id]));
+    const memberGymMap = new Map<string, string>((members ?? []).map((m: any) => [m.id as string, m.gym_id as string]));
 
-    for (const b of bookings) {
-      const memberGymId = memberGymMap.get(b.member_id);
-      const sessionGymId = (b.class_sessions as unknown as { gym_id: string }).gym_id;
+    for (const b of bookings as Array<Record<string, unknown>>) {
+      const memberGymId = memberGymMap.get(b.member_id as string);
+      const sessionGymId = ((b.class_sessions as unknown as Record<string, unknown>)?.gym_id as string | undefined);
       if (memberGymId && sessionGymId && memberGymId !== sessionGymId) {
         crossGymCount++;
         if (memberGymId) fromGymSet.add(memberGymId);
@@ -147,36 +147,36 @@ export async function getCrossGymClassBookings(
   if (memberIds.length > 0) {
     const membersResult = await db.from("members").select("id, gym_id, full_name").in("id", memberIds);
     const profilesResult = await db.from("profiles").select("id, full_name").in("id", memberIds);
-    for (const m of (membersResult.data ?? [])) {
-      if (m.gym_id) memberGymMap.set(m.id, m.gym_id);
-      if (m.full_name) memberNameMap.set(m.id, m.full_name);
+    for (const m of (membersResult.data ?? []) as Array<Record<string, unknown>>) {
+      if (m.gym_id) memberGymMap.set(m.id as string, m.gym_id as string);
+      if (m.full_name) memberNameMap.set(m.id as string, m.full_name as string);
     }
-    for (const p of (profilesResult.data ?? [])) {
-      if (!memberNameMap.has(p.id) && p.full_name) memberNameMap.set(p.id, p.full_name);
+    for (const p of (profilesResult.data ?? []) as Array<Record<string, unknown>>) {
+      if (!memberNameMap.has(p.id as string) && p.full_name) memberNameMap.set(p.id as string, p.full_name as string);
     }
   }
 
   const results: CrossGymClassBooking[] = [];
 
-  for (const b of bookingRows) {
-    const memberGymId = memberGymMap.get(b.member_id);
+  for (const b of bookingRows as Array<Record<string, unknown>>) {
+    const memberGymId = memberGymMap.get(b.member_id as string);
     const sessionData = b.class_sessions as unknown as { gym_id: string; session_date: string; class_id: string };
     const sessionGymId = sessionData?.gym_id;
 
     if (memberGymId && sessionGymId && memberGymId !== sessionGymId) {
       results.push({
-        id: b.id,
-        session_id: b.session_id,
-        member_id: b.member_id,
-        member_name: memberNameMap.get(b.member_id) ?? "Unknown",
+        id: b.id as string,
+        session_id: b.session_id as string,
+        member_id: b.member_id as string,
+        member_name: memberNameMap.get(b.member_id as string) ?? "Unknown",
         from_gym_id: memberGymId,
         from_gym_name: gymsMap.get(memberGymId) ?? "Unknown",
         to_gym_id: sessionGymId,
         to_gym_name: gymsMap.get(sessionGymId) ?? "Unknown",
         class_id: sessionData?.class_id ?? "",
         session_date: sessionData?.session_date ?? "",
-        status: b.status,
-        created_at: b.created_at,
+        status: b.status as string,
+        created_at: b.created_at as string,
       });
     }
   }
