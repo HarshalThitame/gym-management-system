@@ -7,7 +7,7 @@ import { useMotionValue, useTransform } from "framer-motion";
  * Result type for useStaggerChildren hook
  */
 export interface UseStaggerChildrenResult {
-  ref: React.RefObject<HTMLDivElement>;
+  ref: React.RefObject<HTMLDivElement | null>;
   isVisible: boolean;
 }
 
