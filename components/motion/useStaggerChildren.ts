@@ -24,9 +24,9 @@ export function useStaggerChildren(): UseStaggerChildrenResult {
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (!entry) return;
         if (entry.isIntersecting) {
           setIsVisible(true);
-          // Optional: unobserve after animation triggers
           observer.unobserve(entry.target);
         }
       },
@@ -186,6 +186,7 @@ export function useScrollAnimation({
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (!entry) return;
         if (entry.isIntersecting) {
           setIsInView(true);
           if (once) {
