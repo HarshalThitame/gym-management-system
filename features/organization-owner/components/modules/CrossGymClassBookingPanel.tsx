@@ -10,17 +10,17 @@ import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { OrgOwnerDrawer, DrawerField, DrawerSubmitButton, DrawerFormMessage } from "@/features/organization-owner/components/org-owner-drawer";
 import {
-  getCrossBranchClassSummary,
-  getCrossBranchClassBookings,
-  getCrossBranchClassRules,
-  createCrossBranchClassRule,
-  updateCrossBranchClassRule,
-  deleteCrossBranchClassRule,
-  getAvailableCrossBranchClasses,
-  type CrossBranchClassSummary,
-  type CrossBranchClassBooking,
-  type CrossBranchClassRule,
-} from "@/features/organization-owner/actions/cross-branch-class-actions";
+  getCrossGymClassSummary,
+  getCrossGymClassBookings,
+  getCrossGymClassRules,
+  createCrossGymClassRule,
+  updateCrossGymClassRule,
+  deleteCrossGymClassRule,
+  getAvailableCrossGymClasses,
+  type CrossGymClassSummary,
+  type CrossGymClassBooking,
+  type CrossGymClassRule,
+} from "@/features/organization-owner/actions/cross-gym-class-actions";
 
 type Props = {
   dashboard: OrganizationOwnerDashboard;
@@ -28,19 +28,19 @@ type Props = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function CrossBranchClassBookingPanel({ dashboard }: Props) {
+export function CrossGymClassBookingPanel({ dashboard }: Props) {
   const hasFeature = useHasFeature("cross_branch_class_booking");
 
   const [activeTab, setActiveTab] = useState<"overview" | "rules" | "bookings">("overview");
-  const [summary, setSummary] = useState<CrossBranchClassSummary | null>(null);
-  const [rules, setRules] = useState<CrossBranchClassRule[]>([]);
-  const [bookings, setBookings] = useState<CrossBranchClassBooking[]>([]);
+  const [summary, setSummary] = useState<CrossGymClassSummary | null>(null);
+  const [rules, setRules] = useState<CrossGymClassRule[]>([]);
+  const [bookings, setBookings] = useState<CrossGymClassBooking[]>([]);
   const [availableGyms, setAvailableGyms] = useState<{ gymId: string; gymName: string; availableClasses: number; upcomingSessions: number }[]>([]);
   const [bookingsTotal, setBookingsTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<CrossBranchClassRule | null>(null);
+  const [editingRule, setEditingRule] = useState<CrossGymClassRule | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [ruleName, setRuleName] = useState("");
@@ -52,9 +52,9 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
     if (!hasFeature) return;
     try {
       const [s, r, a] = await Promise.all([
-        getCrossBranchClassSummary(dashboard.organization.id),
-        getCrossBranchClassRules(dashboard.organization.id),
-        getAvailableCrossBranchClasses(dashboard.organization.id),
+        getCrossGymClassSummary(dashboard.organization.id),
+        getCrossGymClassRules(dashboard.organization.id),
+        getAvailableCrossGymClasses(dashboard.organization.id),
       ]);
       setSummary(s);
       setRules(r);
@@ -68,7 +68,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
   const refreshBookings = useCallback(async () => {
     if (!hasFeature) return;
     try {
-      const result = await getCrossBranchClassBookings(dashboard.organization.id, { page: 1, pageSize: 50 });
+      const result = await getCrossGymClassBookings(dashboard.organization.id, { page: 1, pageSize: 50 });
       setBookings(result.bookings);
       setBookingsTotal(result.total);
     } catch {
@@ -91,7 +91,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
     setDrawerOpen(true);
   }, []);
 
-  const openEdit = useCallback((rule: CrossBranchClassRule) => {
+  const openEdit = useCallback((rule: CrossGymClassRule) => {
     setEditingRule(rule);
     setFormError(null);
     setRuleName(rule.name);
@@ -127,10 +127,10 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
 
     try {
       if (editingRule) {
-        await updateCrossBranchClassRule(dashboard.organization.id, editingRule.id, data);
+        await updateCrossGymClassRule(dashboard.organization.id, editingRule.id, data);
         showToast("Rule updated", "success");
       } else {
-        await createCrossBranchClassRule(dashboard.organization.id, data);
+        await createCrossGymClassRule(dashboard.organization.id, data);
         showToast("Rule created", "success");
       }
       closeDrawer();
@@ -144,7 +144,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
   const handleDelete = useCallback(async (ruleId: string, name: string) => {
     if (!window.confirm(`Delete rule "${name}"?`)) return;
     try {
-      await deleteCrossBranchClassRule(dashboard.organization.id, ruleId);
+      await deleteCrossGymClassRule(dashboard.organization.id, ruleId);
       showToast("Rule deleted", "success");
       refreshSummary();
     } catch (err) {
@@ -152,9 +152,9 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
     }
   }, [dashboard.organization.id, refreshSummary]);
 
-  const handleToggleActive = useCallback(async (rule: CrossBranchClassRule) => {
+  const handleToggleActive = useCallback(async (rule: CrossGymClassRule) => {
     try {
-      await updateCrossBranchClassRule(dashboard.organization.id, rule.id, { isActive: !rule.is_active });
+      await updateCrossGymClassRule(dashboard.organization.id, rule.id, { isActive: !rule.is_active });
       refreshSummary();
       showToast(rule.is_active ? "Rule disabled" : "Rule enabled", "success");
     } catch (err) {
@@ -177,8 +177,8 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
     return (
       <div className="rounded-lg border border-border bg-surface p-8 text-center">
         <ShieldAlert className="mx-auto size-10 text-muted-foreground" />
-        <p className="mt-3 text-sm font-bold">Cross-Branch Class Booking</p>
-        <p className="mt-1 text-xs text-muted-foreground">This feature requires an Enterprise plan. Upgrade to enable cross-branch class booking.</p>
+        <p className="mt-3 text-sm font-bold">Cross-Gym Class Booking</p>
+        <p className="mt-1 text-xs text-muted-foreground">This feature requires an Enterprise plan. Upgrade to enable cross-gym class booking.</p>
       </div>
     );
   }
@@ -207,15 +207,15 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
       {activeTab === "overview" ? (
         <>
           <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard detail="Cross-branch bookings across all gyms" icon={<BookOpen className="size-5" />} label="Total Bookings" value={String(summary?.totalBookings ?? 0)} />
-            <StatCard detail="Cross-branch bookings today" icon={<CalendarDays className="size-5" />} label="Today" value={String(summary?.todayBookings ?? 0)} />
-            <StatCard detail="Active cross-branch booking rules" icon={<Layers className="size-5" />} label="Active Rules" value={String(summary?.activeRules ?? 0)} />
+            <StatCard detail="Cross-gym bookings across all gyms" icon={<BookOpen className="size-5" />} label="Total Bookings" value={String(summary?.totalBookings ?? 0)} />
+            <StatCard detail="Cross-gym bookings today" icon={<CalendarDays className="size-5" />} label="Today" value={String(summary?.todayBookings ?? 0)} />
+            <StatCard detail="Active cross-gym booking rules" icon={<Layers className="size-5" />} label="Active Rules" value={String(summary?.activeRules ?? 0)} />
             <StatCard detail="Upcoming class sessions available" icon={<BarChart3 className="size-5" />} label="Available Sessions" value={String(summary?.classesAvailable ?? 0)} />
           </section>
 
           <section className="rounded-lg border border-border bg-surface p-5">
             <h3 className="text-lg font-black">Gym Booking Availability</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Upcoming class sessions available per gym for cross-branch booking</p>
+            <p className="mt-1 text-sm text-muted-foreground">Upcoming class sessions available per gym for cross-gym booking</p>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
@@ -269,7 +269,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
                 {loading ? (
                   <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>Loading...</td></tr>
                 ) : rules.length === 0 ? (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>No cross-branch booking rules configured. Click Add Rule to create one.</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>No cross-gym booking rules configured. Click Add Rule to create one.</td></tr>
                 ) : rules.map((rule) => {
                   const fromGym = rule.from_gym_id ? gyms.find((g) => g.id === rule.from_gym_id) : null;
                   const toGym = gyms.find((g) => g.id === rule.to_gym_id);
@@ -309,12 +309,12 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
             </table>
           </div>
 
-          <OrgOwnerDrawer description={editingRule ? `Editing ${editingRule.name}` : "Create a cross-branch class booking rule"} onClose={closeDrawer} open={drawerOpen} title={editingRule ? "Edit Rule" : "Add Rule"} size="lg">
+          <OrgOwnerDrawer description={editingRule ? `Editing ${editingRule.name}` : "Create a cross-gym class booking rule"} onClose={closeDrawer} open={drawerOpen} title={editingRule ? "Edit Rule" : "Add Rule"} size="lg">
             <form onSubmit={handleSubmit} className="space-y-5">
               <DrawerFormMessage status={formError ? "error" : "idle"} message={formError} />
               <div className="grid gap-5 md:grid-cols-2">
                 <DrawerField label="Rule Name" required>
-                  <input className={selectClass} defaultValue={editingRule?.name ?? ""} onChange={(e) => setRuleName(e.target.value)} placeholder="e.g. Allow cross-branch booking from Central" required type="text" />
+                  <input className={selectClass} defaultValue={editingRule?.name ?? ""} onChange={(e) => setRuleName(e.target.value)} placeholder="e.g. Allow cross-gym booking from Central" required type="text" />
                 </DrawerField>
                 <DrawerField label="Priority">
                   <input className={selectClass} defaultValue={editingRule?.priority ?? 0} min={0} name="priority" type="number" />
@@ -371,7 +371,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
       {activeTab === "bookings" ? (
         <>
           <section className="grid gap-4 md:grid-cols-3">
-            <StatCard detail="Total cross-branch class bookings" icon={<BookOpen className="size-5" />} label="Total Bookings" value={String(bookingsTotal)} />
+            <StatCard detail="Total cross-gym class bookings" icon={<BookOpen className="size-5" />} label="Total Bookings" value={String(bookingsTotal)} />
             {summary ? (
               <StatCard detail="Unique source gyms" icon={<Globe2 className="size-5" />} label="From Gyms" value={String(summary.fromGyms.length)} />
             ) : null}
@@ -381,7 +381,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
           </section>
 
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{bookings.length} of {bookingsTotal} cross-branch bookings</p>
+            <p className="text-sm text-muted-foreground">{bookings.length} of {bookingsTotal} cross-gym bookings</p>
             <Button size="sm" variant="secondary" onClick={() => {
               const data = bookings.map((b) => ({
                 member: b.member_name,
@@ -392,7 +392,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
                 status: b.status,
                 bookedAt: new Date(b.created_at).toLocaleDateString("en-IN"),
               }));
-              exportToCSV(data, "cross-branch-bookings");
+              exportToCSV(data, "cross-gym-bookings");
             }}>
               <BarChart3 className="size-3.5" /> Export CSV
             </Button>
@@ -412,7 +412,7 @@ export function CrossBranchClassBookingPanel({ dashboard }: Props) {
               </thead>
               <tbody>
                 {bookings.length === 0 ? (
-                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>No cross-branch class bookings yet.</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>No cross-gym class bookings yet.</td></tr>
                 ) : bookings.map((b) => (
                   <tr key={b.id} className="border-b border-border last:border-0 transition-all hover:bg-surface-muted/50">
                     <td className="px-4 py-3 font-bold">{b.member_name}</td>
