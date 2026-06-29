@@ -223,7 +223,7 @@ export const AnimatedButton = React.forwardRef<
       whileTap={hoverable ? { scale: 0.95 } : undefined}
       transition={{ duration: 0.2 }}
       className={`transition-all duration-300 ${className}`}
-      {...props}
+      {...(props as any)}
     >
       {children}
     </motion.button>
