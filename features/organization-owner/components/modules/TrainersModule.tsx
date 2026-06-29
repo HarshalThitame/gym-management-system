@@ -5,7 +5,7 @@ import {
   Banknote, Download, Dumbbell, Edit3, Eye, FileText, Percent, Plus, UserRound,
   UsersRound, GitBranch, Phone, Mail, Clock, Award, MapPin, X,
   CalendarDays, BarChart3, ShieldAlert, CheckCircle2, UserPlus, Briefcase,
-  ChevronRight, Search, AlertTriangle, useHasFeature as _uHF,
+  ChevronRight, Search, AlertTriangle,
 } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
