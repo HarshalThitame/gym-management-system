@@ -15,7 +15,7 @@ import {
 import { motion } from "framer-motion";
 
 interface DataPoint {
-  [key: string]: string | number;
+  [key: string]: string | number | undefined;
   name?: string;
 }
 
