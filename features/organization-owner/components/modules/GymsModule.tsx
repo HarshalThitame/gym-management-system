@@ -57,12 +57,12 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
     const gymData = (state as Record<string, unknown>).gymData as Record<string, string> | undefined;
     if (state.status === "success" && gymData && gymData.id) {
       setSuccessGym({
-        id: gymData.id,
-        name: gymData.name,
-        slug: gymData.slug,
-        timezone: gymData.timezone,
-        currency: gymData.currency,
-        status: gymData.status,
+        id: gymData.id!,
+        name: gymData.name!,
+        slug: gymData.slug!,
+        timezone: gymData.timezone!,
+        currency: gymData.currency!,
+        status: gymData.status!,
       });
     }
   }, [state]);
