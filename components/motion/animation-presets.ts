@@ -45,7 +45,7 @@ export const hoverLift: TargetAndTransition = {
 export const hoverLiftTransition = {
   duration: 0.3,
   ease: "easeOut",
-};
+} as const;
 
 /**
  * Slide drawer animation - for sidebar/drawer components
@@ -66,7 +66,7 @@ export const gradientBorderGlow: TargetAndTransition = {
 export const gradientBorderGlowTransition = {
   duration: 0.3,
   ease: "easeOut",
-};
+} as const;
 
 /**
  * Pulse effect - continuous scaling animation
@@ -123,7 +123,7 @@ export const scaleHover: TargetAndTransition = {
 export const scaleHoverTransition = {
   duration: 0.2,
   ease: "easeOut",
-};
+} as const;
 
 /**
  * Slide in from left
