@@ -2,6 +2,7 @@
 
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
@@ -24,6 +25,9 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
     const { data: gym } = await supabase.from("gyms").select("organization_id").eq("id", gymId).single();
     if (!gym || gym.organization_id !== ctx.organizationId) return { ...prevState, status: "error", message: "Gym not in your organization." };
 
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) return { ...prevState, status: "error", message: "Server configuration error." };
+
     const employeeCode = `TRN-${Date.now().toString(36).toUpperCase()}`;
     const email = (formData.get("email") as string) || null;
     const phone = (formData.get("phone") as string) || null;
@@ -33,7 +37,7 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
 
     if (trainerId) {
       const update: Record<string, unknown> = { display_name: displayName, email, phone, years_experience: yearsExperience, employment_type: employmentType, status, updated_at: new Date().toISOString() };
-      const { error } = await supabase.from("trainers").update(update as never).eq("id", trainerId).eq("gym_id", gymId);
+      const { error } = await adminClient.from("trainers").update(update as never).eq("id", trainerId).eq("gym_id", gymId);
       if (error) throw new Error(error.message);
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_trainer", entityType: "trainer", entityId: trainerId });
     } else {
@@ -46,7 +50,7 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
       if (!limitCheck.ok) return { ...prevState, status: "error", message: limitCheck.error };
 
       const insert: Record<string, unknown> = { gym_id: gymId, employee_code: employeeCode, display_name: displayName, email, phone, years_experience: yearsExperience, employment_type: employmentType, status };
-      const { data, error } = await supabase.from("trainers").insert(insert as never).select("id").single();
+      const { data, error } = await adminClient.from("trainers").insert(insert as never).select("id").single();
       if (error) throw new Error(error.message);
       trainerId = data.id;
       await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.create_trainer", entityType: "trainer", entityId: data.id });
@@ -69,7 +73,7 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
         // Remove unchecked assignments (except primary)
         for (const assign of (existingAssignments ?? [])) {
           if (assign.gym_id !== gymId && !additionalIds.includes(assign.gym_id)) {
-            await supabase
+            await adminClient
               .from("trainer_gym_assignments")
               .delete()
               .eq("trainer_id", trainerId)
@@ -83,7 +87,7 @@ export async function saveTrainerAction(prevState: AuthActionState, formData: Fo
           if (!existingGymIds.has(addGymId)) {
             const { data: addGym } = await supabase.from("gyms").select("organization_id").eq("id", addGymId).single();
             if (addGym && addGym.organization_id === ctx.organizationId) {
-              await supabase.from("trainer_gym_assignments").insert({
+              await adminClient.from("trainer_gym_assignments").insert({
                 trainer_id: trainerId,
                 gym_id: addGymId,
                 organization_id: ctx.organizationId,
@@ -110,8 +114,10 @@ export async function assignMemberToTrainerAction(prevState: AuthActionState, fo
     const trainerId = formData.get("trainerId") as string;
     if (!memberId || !trainerId) return { ...prevState, status: "error", message: "Member ID and Trainer ID are required." };
 
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("members").update({ assigned_trainer_id: trainerId, updated_at: new Date().toISOString() }).eq("id", memberId);
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) return { ...prevState, status: "error", message: "Server configuration error." };
+
+    const { error } = await adminClient.from("members").update({ assigned_trainer_id: trainerId, updated_at: new Date().toISOString() }).eq("id", memberId);
     if (error) throw new Error(error.message);
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.assign_member_to_trainer", entityType: "member", entityId: memberId, metadata: { trainerId } as never });
     revalidateOrgModules(["/organization/trainers", "/organization/members"]);
