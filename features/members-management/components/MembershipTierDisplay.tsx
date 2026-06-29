@@ -100,7 +100,7 @@ export function MembershipTierDisplay({
 }: MembershipTierDisplayProps) {
   const currentTier = tiers.find((t) => t.id === currentTierId);
   const displayTiers = showCurrentOnly
-    ? [currentTier || tiers[0]]
+    ? [currentTier || tiers[0]!]
     : tiers;
 
   return (

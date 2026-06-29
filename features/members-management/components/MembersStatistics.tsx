@@ -51,7 +51,7 @@ const TIER_COLORS = {
   platinum: "#8b5cf6",
 };
 
-const COLORS = ["#10b981", "#64748b"];
+const COLORS = ["#10b981", "#64748b"] as const;
 
 export function MembersStatistics({
   data,

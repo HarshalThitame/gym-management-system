@@ -53,7 +53,7 @@ export function BranchDetailsDrawer({
         ? {
             ...prev,
             [name]: name.includes("Count") || name === "revenue" ? Number(value) : value,
-          }
+          } as typeof prev
         : null
     );
   };
