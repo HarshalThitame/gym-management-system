@@ -16,3 +16,8 @@ export { GradientChartContainer } from "./GradientChartContainer";
 
 export { default as DashboardHeroSection } from "./DashboardHeroSection";
 export type { DashboardHeroSectionProps } from "./DashboardHeroSection";
+
+export { ActivityTimeline } from "./ActivityTimeline";
+export type { ActivityTimelineProps } from "./ActivityTimeline";
+
+export { OrganizationOverviewCard } from "./OrganizationOverviewCard";
