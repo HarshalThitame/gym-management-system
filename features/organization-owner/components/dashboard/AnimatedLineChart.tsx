@@ -19,7 +19,7 @@ interface DataPoint {
   name?: string;
 }
 
-interface AnimatedLineChartProps {
+export interface AnimatedLineChartProps {
   data: DataPoint[];
   dataKey: string;
   xAxisKey?: string;
