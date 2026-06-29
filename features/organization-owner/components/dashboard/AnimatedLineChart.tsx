@@ -54,7 +54,7 @@ const DefaultTooltip: React.FC<TooltipProps<number, string>> = (props) => {
       <p className="text-sm font-medium text-white/90 mb-1">
         {String(label)}
       </p>
-      {payload.map((entry: { name: string; value: number }, index) => (
+      {payload.map((entry: { name: string; value: number }, index: number) => (
         <p key={index} className="text-sm font-semibold text-blue-400">
           {entry.name}: {entry.value}
         </p>
