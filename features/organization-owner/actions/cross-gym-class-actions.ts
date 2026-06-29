@@ -50,7 +50,7 @@ export async function getCrossGymClassSummary(organizationId: string): Promise<C
     .from("gyms")
     .select("id, name")
     .eq("organization_id", organizationId);
-  const gymIds = (gyms ?? []).map((g) => g.id);
+  const gymIds = ((gyms ?? []) as { id: string }[]).map((g) => g.id);
 
   if (gymIds.length === 0) {
     return { totalBookings: 0, todayBookings: 0, activeRules: 0, classesAvailable: 0, fromGyms: [], toGyms: [] };
@@ -66,13 +66,13 @@ export async function getCrossGymClassSummary(organizationId: string): Promise<C
   ]);
 
   const bookings = bookingsResult.data ?? [];
-  const memberIds = [...new Set(bookings.map((b) => b.member_id).filter(Boolean))];
+  const memberIds = [...new Set(bookings.map((b: any) => b.member_id).filter(Boolean))];
   let crossGymCount = 0;
   const fromGymSet = new Set<string>();
   const toGymSet = new Set<string>();
 
   if (memberIds.length > 0 && bookings.length > 0) {
-    const { data: members } = await supabase
+    const { data: members } = await db
       .from("members")
       .select("id, gym_id")
       .in("id", memberIds);
