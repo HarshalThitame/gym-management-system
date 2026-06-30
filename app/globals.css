@@ -5,54 +5,54 @@
 [dir="rtl"] .space-x-reverse > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
 
 @theme {
-  /* Dark-only Cinematic Theme */
-  --color-background: #0a0e27;
-  --color-foreground: #f0f4f8;
-  --color-surface: #111214;
-  --color-surface-muted: #191b1f;
-  --color-surface-strong: #24272d;
-  --color-border: #30343b;
-  --color-border-light: #4a5268;
-  --color-muted: #aeb4be;
+  /* Light Cinematic Theme */
+  --color-background: #f8f7f2;
+  --color-foreground: #111214;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f0f1ec;
+  --color-surface-strong: #e4e7dd;
+  --color-border: #d7dbd0;
+  --color-border-light: #c5c9be;
+  --color-muted: #737780;
   --color-muted-foreground: #8b92a1;
-  --color-primary: #0a0e27;
-  --color-primary-foreground: #f0f4f8;
-  --color-accent: #c8f24a;
-  --color-accent-foreground: #0a0e27;
-  --color-secondary: #22d3ee;
-  --color-secondary-foreground: #0a0e27;
-  --color-destructive: #d92d20;
+  --color-primary: #1a1a2e;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #6366f1;
+  --color-accent-foreground: #ffffff;
+  --color-secondary: #06b6d4;
+  --color-secondary-foreground: #ffffff;
+  --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
   --color-success: #16a34a;
   --color-warning: #d97706;
-  --color-obsidian: #070809;
-  --color-ink: #111214;
+  --color-obsidian: #111214;
+  --color-ink: #1a1a2e;
   --color-porcelain: #f8f7f2;
   --color-steel: #737780;
   
   /* Cinematic Background Variations */
-  --color-bg-primary: #0a0e27;
-  --color-bg-secondary: #1a1f3a;
-  --color-bg-tertiary: #252d48;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f3f4f6;
+  --color-bg-tertiary: #e5e7eb;
   
   /* Gradient Presets */
-  --gradient-blue-purple: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gradient-blue-purple: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   --gradient-pink: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
-  --gradient-accent: linear-gradient(135deg, #c8f24a 0%, #22d3ee 100%);
-  --gradient-neon: linear-gradient(90deg, #00d4ff 0%, #7f3ff2 50%, #ff006e 100%);
+  --gradient-accent: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+  --gradient-neon: linear-gradient(90deg, #06b6d4 0%, #6366f1 50%, #f43f5e 100%);
   
   /* Glow Effects */
-  --glow-blue: 0 0 20px rgba(59, 130, 246, 0.5);
-  --glow-purple: 0 0 20px rgba(139, 92, 246, 0.5);
-  --glow-pink: 0 0 20px rgba(236, 72, 153, 0.5);
-  --glow-cyan: 0 0 20px rgba(34, 211, 238, 0.5);
-  --glow-lime: 0 0 20px rgba(200, 242, 74, 0.5);
+  --glow-blue: 0 0 20px rgba(99, 102, 241, 0.3);
+  --glow-purple: 0 0 20px rgba(139, 92, 246, 0.3);
+  --glow-pink: 0 0 20px rgba(236, 72, 153, 0.3);
+  --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.3);
+  --glow-lime: 0 0 20px rgba(99, 102, 241, 0.3);
   
   /* Shadow Presets */
-  --shadow-glow-sm: 0 0 8px rgba(59, 130, 246, 0.3);
-  --shadow-glow-md: 0 0 16px rgba(139, 92, 246, 0.4);
-  --shadow-glow-lg: 0 8px 32px rgba(139, 92, 246, 0.2);
-  --shadow-premium: 0 24px 80px rgb(17 18 20 / 0.14);
+  --shadow-glow-sm: 0 0 8px rgba(99, 102, 241, 0.2);
+  --shadow-glow-md: 0 0 16px rgba(139, 92, 246, 0.25);
+  --shadow-glow-lg: 0 8px 32px rgba(99, 102, 241, 0.15);
+  --shadow-premium: 0 24px 80px rgb(0 0 0 / 0.08);
   
   --font-sans: var(--font-geist-sans), Inter, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -62,40 +62,54 @@
 }
 
 :root {
-  color-scheme: dark;
-  --background: #0a0e27;
-  --foreground: #f0f4f8;
-  --surface: #111214;
-  --surface-muted: #191b1f;
-  --surface-strong: #24272d;
-  --border: #30343b;
-  --border-light: #4a5268;
-  --muted: #aeb4be;
-  --ring: #c8f24a;
+  color-scheme: light;
+  --background: #f8f7f2;
+  --foreground: #111214;
+  --surface: #ffffff;
+  --surface-muted: #f0f1ec;
+  --surface-strong: #e4e7dd;
+  --border: #d7dbd0;
+  --border-light: #c5c9be;
+  --muted: #737780;
+  --ring: #6366f1;
   
   /* Cinematic Background Variations */
-  --bg-primary: #0a0e27;
-  --bg-secondary: #1a1f3a;
-  --bg-tertiary: #252d48;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --bg-tertiary: #e5e7eb;
   
   /* Gradient Presets */
-  --gradient-blue-purple: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gradient-blue-purple: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   --gradient-pink: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
-  --gradient-accent: linear-gradient(135deg, #c8f24a 0%, #22d3ee 100%);
-  --gradient-neon: linear-gradient(90deg, #00d4ff 0%, #7f3ff2 50%, #ff006e 100%);
+  --gradient-accent: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+  --gradient-neon: linear-gradient(90deg, #06b6d4 0%, #6366f1 50%, #f43f5e 100%);
   
   /* Glow Effects */
-  --glow-blue: 0 0 20px rgba(59, 130, 246, 0.5);
-  --glow-purple: 0 0 20px rgba(139, 92, 246, 0.5);
-  --glow-pink: 0 0 20px rgba(236, 72, 153, 0.5);
-  --glow-cyan: 0 0 20px rgba(34, 211, 238, 0.5);
-  --glow-lime: 0 0 20px rgba(200, 242, 74, 0.5);
+  --glow-blue: 0 0 20px rgba(99, 102, 241, 0.3);
+  --glow-purple: 0 0 20px rgba(139, 92, 246, 0.3);
+  --glow-pink: 0 0 20px rgba(236, 72, 153, 0.3);
+  --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.3);
+  --glow-lime: 0 0 20px rgba(99, 102, 241, 0.3);
   
   /* Shadow Presets */
-  --shadow-glow-sm: 0 0 8px rgba(59, 130, 246, 0.3);
-  --shadow-glow-md: 0 0 16px rgba(139, 92, 246, 0.4);
-  --shadow-glow-lg: 0 8px 32px rgba(139, 92, 246, 0.2);
+  --shadow-glow-sm: 0 0 8px rgba(99, 102, 241, 0.2);
+  --shadow-glow-md: 0 0 16px rgba(139, 92, 246, 0.25);
+  --shadow-glow-lg: 0 8px 32px rgba(99, 102, 241, 0.15);
 }
+
+/* 
+ * LEGACY DARK MODE COLORS (ARCHIVED FOR REFERENCE)
+ * These colors are no longer used - app is light cinematic theme
+ * 
+ * Dark mode palette (deprecated):
+ * --background: #0a0e27 (dark navy)
+ * --foreground: #f0f4f8 (light text)
+ * --surface: #111214 (dark gray)
+ * --surface-muted: #191b1f
+ * --surface-strong: #24272d
+ * --border: #30343b
+ * --muted: #aeb4be
+ */
 
 
 /* 
@@ -134,8 +148,8 @@ body {
 }
 
 ::selection {
-  background: #c8f24a;
-  color: #111214;
+  background: #6366f1;
+  color: #ffffff;
 }
 
 a {
@@ -216,8 +230,8 @@ input[type="radio"] {
 
 .surface-grid {
   background-image:
-    linear-gradient(rgb(17 18 20 / 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(17 18 20 / 0.06) 1px, transparent 1px);
+    linear-gradient(rgb(0 0 0 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(0 0 0 / 0.04) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 

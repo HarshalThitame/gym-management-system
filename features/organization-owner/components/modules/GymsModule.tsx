@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useActionState, useRef, useEffect, type ReactNode } from "react";
 import { Building2, Download, Edit3, Eye, MapPin, Plus, ShieldAlert, ShieldCheck, Trash2, UserRound, X, Search, CheckCircle2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
@@ -205,24 +206,33 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   return (
     <div className="space-y-6">
       {/* ═══ SUB-TABS ═══ */}
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1">
-        <button
+      <motion.div
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className="flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1"
+      >
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all ${moduleTab === "locations" ? "bg-surface shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           onClick={() => setModuleTab("locations")}
           type="button"
         >
           <Building2 className="size-4" /> Locations
-        </button>
+        </motion.button>
         {hasCrossBranchFeature ? (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all ${moduleTab === "cross-branch" ? "bg-surface shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setModuleTab("cross-branch")}
             type="button"
           >
             <ShieldCheck className="size-4" /> Cross-Branch Access
-          </button>
+          </motion.button>
         ) : null}
-      </div>
+      </motion.div>
 
       {moduleTab === "cross-branch" ? (
         <CrossBranchAccessPanel dashboard={dashboard} />
@@ -230,18 +240,42 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
         <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <button type="button" onClick={() => setStatPanel("all")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both]">
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          whileHover={{ scale: 1.03, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          type="button" onClick={() => setStatPanel("all")} className="text-left transition-all">
           <StatCard detail="Total locations across your organization" icon={<Building2 className="size-5" />} label="Total Locations" value={String(gyms.length)} />
-        </button>
-        <button type="button" onClick={() => setStatPanel("active")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both_0.05s]">
+        </motion.button>
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05, ease: "easeOut" }}
+          whileHover={{ scale: 1.03, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          type="button" onClick={() => setStatPanel("active")} className="text-left transition-all">
           <StatCard detail="Active locations" icon={<Building2 className="size-5" />} label="Active" value={String(activeGyms)} />
-        </button>
-        <button type="button" onClick={() => setStatPanel("suspended")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both_0.1s]">
+        </motion.button>
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
+          whileHover={{ scale: 1.03, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          type="button" onClick={() => setStatPanel("suspended")} className="text-left transition-all">
           <StatCard detail="Suspended locations" icon={<Building2 className="size-5" />} label="Suspended" value={String(suspendedGyms)} />
-        </button>
-        <button type="button" onClick={() => setStatPanel("branches")} className="text-left transition-all hover:opacity-80 animate-[fade-in-up_0.4s_ease-out_both_0.15s]">
+        </motion.button>
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
+          whileHover={{ scale: 1.03, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          type="button" onClick={() => setStatPanel("branches")} className="text-left transition-all">
           <StatCard detail="Total branches across all locations" icon={<Building2 className="size-5" />} label="Branches" value={`${activeLocations}/${totalLocations} active`} />
-        </button>
+        </motion.button>
       </section>
 
       {/* ═══ FILTERS + DATA LIST ═══ */}
@@ -360,20 +394,30 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
       {detailGym ? <GymDetailPanel gym={detailGym} dashboard={dashboard} onClose={() => setDetailGym(null)} /> : null}
 
       {/* ═══ STAT DETAIL PANEL ═══ */}
-      {statPanel ? (
-        <LocationStatDetailPanel
-          statKey={statPanel}
-          gyms={gyms}
-          activeGyms={activeGyms}
-          suspendedGyms={suspendedGyms}
-          activeLocations={activeLocations}
-          totalLocations={totalLocations}
-          branches={branches}
-          dashboard={dashboard}
-          onClose={() => setStatPanel(null)}
-          onViewDetail={(gym) => { setStatPanel(null); setDetailGym(gym); }}
-        />
-      ) : null}
+      <AnimatePresence>
+        {statPanel ? (
+          <motion.div
+            key="stat-panel"
+            initial={{ opacity: 0, x: 60 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 60 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
+            <LocationStatDetailPanel
+              statKey={statPanel}
+              gyms={gyms}
+              activeGyms={activeGyms}
+              suspendedGyms={suspendedGyms}
+              activeLocations={activeLocations}
+              totalLocations={totalLocations}
+              branches={branches}
+              dashboard={dashboard}
+              onClose={() => setStatPanel(null)}
+              onViewDetail={(gym) => { setStatPanel(null); setDetailGym(gym); }}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <GymCreatedDialog open={!!successGym} data={successGym} onClose={() => setSuccessGym(null)} />
         </>
@@ -387,17 +431,29 @@ function GymBranchList({ gymId, branches, onAddBranch, onEditBranch, onSetStatus
   gymId: string; branches: BranchRow[]; onAddBranch: (gymId: string) => void; onEditBranch: (branch: BranchRow) => void; onSetStatus: (branchId: string, status: string) => void;
 }) {
   return (
-    <div className="space-y-3 animate-[fade-in-up_0.3s_ease-out_both]">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="space-y-3"
+    >
       <div className="flex items-center justify-between">
         <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{branches.length} Branch{branches.length !== 1 ? "es" : ""}</p>
         <button className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-semibold hover:border-border-strong hover:bg-surface-muted transition-all" onClick={() => onAddBranch(gymId)} type="button"><Plus className="size-3" /> Add Branch</button>
       </div>
       {branches.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No branches yet. Click &quot;Add Branch&quot; to create one.</p>
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-muted-foreground">No branches yet. Click &quot;Add Branch&quot; to create one.</motion.p>
       ) : (
         <div className="space-y-2">
           {branches.map((branch, idx) => (
-            <div key={branch.id} className="flex items-center justify-between rounded-md border border-border bg-background p-3 transition-all hover:border-border-strong hover:bg-surface-muted/50 animate-[fade-in-up_0.3s_ease-out_both]" style={{ animationDelay: `${idx * 0.05}s` }}>
+            <motion.div
+              key={branch.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: idx * 0.05, ease: "easeOut" }}
+              whileHover={{ scale: 1.01, borderColor: "var(--border-strong)" }}
+              className="flex items-center justify-between rounded-md border border-border bg-background p-3 transition-all hover:bg-surface-muted/50"
+            >
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex size-8 items-center justify-center rounded-md bg-accent/10 text-accent">
                   <MapPin className="size-4" />
@@ -423,11 +479,11 @@ function GymBranchList({ gymId, branches, onAddBranch, onEditBranch, onSetStatus
                   <button className="rounded-md p-1.5 text-green-600 hover:bg-green-50 transition-all" onClick={() => onSetStatus(branch.id, "active")} type="button" aria-label="Activate branch"><ShieldCheck className="size-3.5" /></button>
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
