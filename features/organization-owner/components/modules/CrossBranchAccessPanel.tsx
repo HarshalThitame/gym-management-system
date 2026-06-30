@@ -10,6 +10,7 @@ import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { RuleActionSuccessDialog } from "@/features/organization-owner/components/modules/RuleActionSuccessDialog";
+import { DeleteConfirmDialog } from "@/features/organization-owner/components/modules/DeleteConfirmDialog";
 import {
   getAccessRules,
   createAccessRule,
@@ -46,6 +47,8 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
   const [selectedToBranchId, setSelectedToBranchId] = useState("");
   const [selectedAccess, setSelectedAccess] = useState<"allow" | "deny">("allow");
   const [successRule, setSuccessRule] = useState<{ rule: AccessRule; action: "created" | "updated" | "deleted" } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const [logFilters, setLogFilters] = useState<AccessLogsFilter>({ page: 1, pageSize: 50 });
@@ -173,17 +176,24 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
   }, [editingRule, dashboard.organization.id, closeDrawer, refreshRules, ruleType, selectedMemberId, selectedFromBranchId, selectedToBranchId, selectedAccess, setSuccessRule]);
 
   const handleDelete = useCallback(async (ruleId: string, ruleName: string) => {
-    if (!window.confirm(`Delete rule "${ruleName}"?`)) return;
-    const rule = rules.find((r) => r.id === ruleId);
-    if (!rule) { showToast("Rule not found", "error"); return; }
+    setPendingDelete({ id: ruleId, name: ruleName });
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const rule = rules.find((r) => r.id === pendingDelete.id);
+    if (!rule) { showToast("Rule not found", "error"); setPendingDelete(null); setDeleting(false); return; }
     try {
-      await deleteAccessRule(dashboard.organization.id, ruleId);
+      await deleteAccessRule(dashboard.organization.id, pendingDelete.id);
+      setPendingDelete(null);
       setSuccessRule({ rule, action: "deleted" });
       refreshRules();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to delete rule", "error");
     }
-  }, [dashboard.organization.id, refreshRules, rules, setSuccessRule]);
+    setDeleting(false);
+  }, [dashboard.organization.id, pendingDelete, refreshRules, rules]);
 
   const handleToggleActive = useCallback(async (rule: AccessRule) => {
     try {
@@ -574,6 +584,13 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
         </>
       )}
 
+      <DeleteConfirmDialog
+        loading={deleting}
+        onCancel={() => { setPendingDelete(null); }}
+        onConfirm={confirmDelete}
+        open={pendingDelete !== null}
+        ruleName={pendingDelete?.name ?? ""}
+      />
       <RuleActionSuccessDialog
         action={successRule?.action ?? "created"}
         branches={allBranches}
