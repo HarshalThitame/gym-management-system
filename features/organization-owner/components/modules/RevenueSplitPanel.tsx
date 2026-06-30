@@ -7,6 +7,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recha
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
+import { showToast } from "@/components/ui/toast";
 import { formatCurrency, formatCompactNumber } from "@/features/enterprise/lib/business-rules";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
