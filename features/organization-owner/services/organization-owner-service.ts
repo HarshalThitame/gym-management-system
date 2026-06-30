@@ -105,7 +105,7 @@ export async function getOrganizationOwnerDashboard(context: ScopedOrganizationO
     supabase.from("gyms").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
     supabase.from("branches").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(200),
     supabase.from("branch_settings").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(200),
-    supabase.from("branch_users").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(500),
+    supabase.from("branch_users").select("*").eq("organization_id", organizationId).in("role_name", ["gym_admin", "reception_staff", "trainer"]).order("updated_at", { ascending: false }).limit(500),
     supabase.from("branch_metrics").select("*").eq("organization_id", organizationId).order("metric_date", { ascending: false }).limit(1000),
     supabase.from("tenant_configs").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(50),
     supabase.from("tenant_domains").select("*").eq("organization_id", organizationId).order("is_primary", { ascending: false }).order("updated_at", { ascending: false }).limit(100),

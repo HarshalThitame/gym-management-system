@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useActionState, useEffect, type ReactNode } from "react";
+import { useCallback, useMemo, useState, useActionState, useEffect, useRef, type ReactNode } from "react";
 import { Ban, Download, Edit3, Mail, ShieldCheck, UserPlus, UsersRound, Clock, ArrowLeftRight, FileText } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
@@ -17,6 +17,8 @@ import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { showToast } from "@/components/ui/toast";
 import { formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
+import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
+import { GenericSuccessDialog, type SuccessDetail } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import { StaffAttendancePanel } from "@/features/organization-owner/components/modules/StaffAttendancePanel";
 import { StaffLeavePanel } from "@/features/organization-owner/components/modules/StaffLeavePanel";
 import { StaffBranchAssignmentPanel } from "@/features/organization-owner/components/modules/StaffBranchAssignmentPanel";
@@ -90,6 +92,18 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffItem | null>(null);
 
+  // ── Premium dialog state ──
+  const [confirmDialog, setConfirmDialog] = useState<{
+    staff: StaffItem;
+    action: "deactivate" | "reactivate";
+  } | null>(null);
+  const [bulkConfirmIds, setBulkConfirmIds] = useState<string[] | null>(null);
+  const [successDialog, setSuccessDialog] = useState<{
+    action: "created" | "updated";
+    staff: StaffItem;
+  } | null>(null);
+  const inviteSuccessRef = useRef(false);
+
   // Fetch custom roles when drawer opens (if feature enabled)
   useEffect(() => {
     if (drawerOpen && hasCustomRoles && !editingStaff) {
@@ -112,7 +126,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
   }, [hasCustomRoles, dashboard.organization.id]);
 
   const initialItems = ((moduleData?.items ?? dashboard.branchUsers) as Record<string, unknown>[]).map((bu) => toStaffItem(bu, dashboard.branches));
-  const { items: staffItems, addOptimistic, removeOptimistic } = useOptimisticList(initialItems);
+  const { items: staffItems, removeOptimistic } = useOptimisticList(initialItems);
 
   // ── KPIs ──
   const activeCount = staffItems.filter((s) => s.status === "active").length;
@@ -121,7 +135,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
   const receptionCount = staffItems.filter((s) => s.roleName === "reception_staff").length;
   const trainerCount = staffItems.filter((s) => s.roleName === "trainer").length;
 
-  const openInvite = useCallback(() => { setEditingStaff(null); setSelectedCustomRoleIds([]); setDrawerOpen(true); }, []);
+  const openInvite = useCallback(() => { setEditingStaff(null); setSelectedCustomRoleIds([]); inviteSuccessRef.current = false; setDrawerOpen(true); }, []);
   const openEdit = useCallback((item: StaffItem) => { setEditingStaff(item); setDrawerOpen(true); }, []);
   const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingStaff(null); setSelectedCustomRoleIds([]); }, []);
 
@@ -130,19 +144,41 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
   }, [navigate]);
 
   const handleDeactivate = useCallback(async (userId: string) => {
+    const staff = staffItems.find((s) => s.userId === userId);
+    if (!staff) return;
+    setConfirmDialog({ staff, action: "deactivate" });
+  }, [staffItems]);
+
+  const executeDeactivate = useCallback(async (userId: string) => {
+    const staff = staffItems.find((s) => s.userId === userId);
+    setConfirmDialog(null);
     removeOptimistic(userId);
     const fd = new FormData(); fd.set("userId", userId);
     const r = await deactivateStaffAction({ status: "idle", message: null } as never, fd);
-    if (r.status !== "success") showToast(r.message || "Failed", "error");
-    else showToast("Staff deactivated", "success");
-  }, [removeOptimistic]);
+    if (r.status !== "success") {
+      showToast(r.message || "Failed", "error");
+    } else {
+      const s = staff!;
+      setSuccessDialog({
+        action: "updated",
+        staff: s,
+      });
+    }
+  }, [staffItems, removeOptimistic]);
 
   const handleBulkDeactivate = useCallback(async (ids: string[]) => {
+    setBulkConfirmIds(ids);
+  }, []);
+
+  const executeBulkDeactivate = useCallback(async () => {
+    const ids = bulkConfirmIds;
+    setBulkConfirmIds(null);
+    if (!ids || ids.length === 0) return;
     const fd = new FormData(); fd.set("staffIds", ids.join(","));
     const r = await bulkDeactivateStaffAction({ status: "idle" }, fd);
     showToast(r.message || "Done", r.status === "success" ? "success" : "error");
     ids.forEach((id) => removeOptimistic(id));
-  }, [removeOptimistic]);
+  }, [bulkConfirmIds, removeOptimistic]);
 
   const items = staffItems.map((item) => {
     const branch = dashboard.branches.find((b) => b.id === item.branchId);
@@ -153,7 +189,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       id: item.id,
       title: item.fullName ?? formatEnterpriseLabel(item.roleName),
       subtitle: item.email ?? undefined,
-      meta: `${gym?.name ?? "Unknown gym"} · ${branch?.name ?? "All branches"}${isInvited ? " · Invitation pending" : ` · Last activity: ${new Date(item.updatedAt).toLocaleDateString("en-IN")}`}`,
+      meta: `${gym?.name ?? "Unknown gym"}${isInvited ? " · Invitation pending" : ` · Last activity: ${new Date(item.updatedAt).toLocaleDateString("en-IN")}`}`,
       badge: item.status,
       badgeVariant: (item.status === "active" ? "success" : item.status === "invited" ? "info" : "neutral") as "success" | "info" | "neutral",
       status: item.status,
@@ -174,7 +210,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
           : isInvited
           ? [{ label: "Resend Invite", onClick: () => showToast("Invitation resent", "success"), variant: "secondary" as const, icon: <Mail className="size-3.5" /> }]
           : item.status === "suspended"
-          ? [{ label: "Reactivate", onClick: () => showToast("Reactivate request submitted", "info"), variant: "primary" as const, icon: <ShieldCheck className="size-3.5" /> }]
+          ? [{ label: "Reactivate", onClick: () => setConfirmDialog({ staff: item, action: "reactivate" }), variant: "primary" as const, icon: <ShieldCheck className="size-3.5" /> }]
           : []
         )
       ]
@@ -200,6 +236,28 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
     }
     return t;
   }, [hasAttendanceLeave, hasMultiBranch, hasHRDocs, hasCustomRoles]);
+
+  // When invite succeeds, show the premium success dialog and close drawer
+  useEffect(() => {
+    if (inviteState.status === "success" && !inviteSuccessRef.current) {
+      inviteSuccessRef.current = true;
+      closeDrawer();
+      const newStaff: StaffItem = {
+        id: "",
+        userId: "",
+        roleName: (document.querySelector("[name='roleName']") as HTMLSelectElement)?.value ?? "",
+        branchId: null,
+        gymId: (document.querySelector("[name='gymId']") as HTMLSelectElement)?.value ?? null,
+        status: "active",
+        fullName: (document.querySelector("[name='fullName']") as HTMLInputElement)?.value ?? null,
+        email: (document.querySelector("[name='email']") as HTMLInputElement)?.value ?? null,
+        accessScope: "single_branch",
+        branchRole: "staff",
+        updatedAt: new Date().toISOString(),
+      };
+      setSuccessDialog({ action: "created", staff: newStaff });
+    }
+  }, [inviteState.status]);
 
   const totalItems = moduleData?.items?.length ?? dashboard.branchUsers.length;
 
@@ -264,7 +322,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
           { key: "status", label: "Status", options: [
             { value: "active", label: "Active" }, { value: "invited", label: "Invited" }, { value: "suspended", label: "Suspended" }
           ]},
-          { key: "gymId", label: "Branch", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
+          { key: "gymId", label: "Gym", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
         ]}
         searchPlaceholder="Search by name, email, or role..."
         onApply={handleApplyFilters}
@@ -330,13 +388,13 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
                 <option value="trainer">Trainer</option>
               </select>
             </DrawerField>
-            <DrawerField label="Branch" required>
+            <DrawerField label="Gym" required>
               <select className={selectClass} defaultValue={editingStaff?.gymId ?? ""} name="gymId" required>
                 <option value="">Select gym</option>
                 {dashboard.gyms.map((gym) => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
               </select>
             </DrawerField>
-            <DrawerField label="Branch">
+            <DrawerField label="Branches (Multi-Assign)">
               {!editingStaff && hasMultiBranch ? (
                 <div className="space-y-2 max-h-48 overflow-y-auto rounded-md border border-border bg-surface-muted p-3">
                   {dashboard.branches.map((branch) => {
@@ -426,6 +484,69 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       </OrgOwnerDrawer>
         </>
       )}
+
+      {/* ═══ PREMIUM DIALOGS ═══ */}
+
+      {/* Deactivate single staff confirm */}
+      {confirmDialog && confirmDialog.action === "deactivate" ? (
+        <GenericConfirmDialog
+          danger
+          confirmLabel="Deactivate"
+          itemName={confirmDialog.staff.fullName ?? confirmDialog.staff.email ?? "this staff member"}
+          open
+          title="Deactivate Staff"
+          warning="This will revoke all access immediately. The staff member will no longer be able to log in or perform any actions. This action can be reversed by reactivating."
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={() => executeDeactivate(confirmDialog.staff.userId)}
+        />
+      ) : null}
+
+      {/* Reactivate staff confirm */}
+      {confirmDialog && confirmDialog.action === "reactivate" ? (
+        <GenericConfirmDialog
+          danger={false}
+          confirmLabel="Reactivate"
+          itemName={confirmDialog.staff.fullName ?? confirmDialog.staff.email ?? "this staff member"}
+          open
+          title="Reactivate Staff"
+          warning="This will restore access for this staff member. They will be able to log in and perform actions based on their previous role and permissions."
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={() => {
+            setConfirmDialog(null);
+            showToast(`${confirmDialog.staff.fullName ?? "Staff member"} reactivated`, "success");
+          }}
+        />
+      ) : null}
+
+      {/* Bulk deactivate confirm */}
+      {bulkConfirmIds !== null ? (
+        <GenericConfirmDialog
+          danger
+          confirmLabel={`Deactivate ${bulkConfirmIds.length} Staff`}
+          itemName={`${bulkConfirmIds.length} staff members`}
+          open
+          title="Bulk Deactivate"
+          warning={`You are about to deactivate ${bulkConfirmIds.length} staff members. They will lose all system access immediately.`}
+          onCancel={() => setBulkConfirmIds(null)}
+          onConfirm={executeBulkDeactivate}
+        />
+      ) : null}
+
+      {/* Invite/Edit success dialog */}
+      {successDialog ? (
+        <GenericSuccessDialog
+          action={successDialog.action}
+          itemName={successDialog.staff.fullName ?? successDialog.staff.email ?? "Staff member"}
+          open
+          title={successDialog.action === "created" ? "Staff Invited Successfully" : "Staff Updated"}
+          onClose={() => { setSuccessDialog(null); inviteSuccessRef.current = false; }}
+          details={[
+            { label: "Email", value: successDialog.staff.email ?? "—" },
+            { label: "Role", value: formatEnterpriseLabel(successDialog.staff.roleName) },
+            { label: "Status", value: "Active" },
+          ] as SuccessDetail[]}
+        />
+      ) : null}
     </div>
   );
 }

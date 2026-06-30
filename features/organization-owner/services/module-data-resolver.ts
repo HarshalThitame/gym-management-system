@@ -46,7 +46,7 @@ export async function resolveModuleData(
     }
 
     case "staff": {
-      const q = supabase.from("branch_users").select("id, user_id, role_name, branch_id, status, updated_at, profiles!inner(full_name, email)", { count: "exact" }).eq("organization_id", orgId);
+      const q = supabase.from("branch_users").select("id, user_id, role_name, branch_id, status, updated_at, profiles!inner(full_name, email)", { count: "exact" }).eq("organization_id", orgId).in("role_name", ["gym_admin", "reception_staff", "trainer"]);
       if (params.role && params.role !== "all") q.eq("role_name", params.role as never);
       if (params.status && params.status !== "all") q.eq("status", params.status as never);
       const { data, count } = await q.order("updated_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
