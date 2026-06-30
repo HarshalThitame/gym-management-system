@@ -219,7 +219,7 @@ export function getRoleRedirect(roles: readonly RoleName[]) {
   const primaryRole = getPrimaryRole(roles);
 
   if (!primaryRole) {
-    return "/auth/no-role";
+    return "/unauthorized";
   }
 
   if (primaryRole === "super_admin") {

@@ -38,7 +38,7 @@ export default async function UnauthorizedPage({ searchParams }: UnauthorizedPag
           </p>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
-          <form action={signOutAction}>
+          <form action={signOutAction} id="sign-out-form-mobile">
             <SignOutButton />
           </form>
           <ButtonLink className="w-full" href="/" variant="secondary">
