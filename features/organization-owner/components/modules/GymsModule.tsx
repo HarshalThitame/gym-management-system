@@ -528,8 +528,24 @@ function LocationStatDetailPanel({
   if (!statKey) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm animate-[fade-in_0.2s_ease-out_both]" onClick={onClose}>
-      <div className="flex h-full w-full max-w-2xl flex-col bg-surface shadow-2xl animate-[slide-in-right_0.3s_cubic-bezier(0.2,0,0,1)_both]" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={titleByKey[statKey]}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ x: "100%" }}
+        animate={{ x: 0 }}
+        exit={{ x: "100%" }}
+        transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+        className="flex h-full w-full max-w-2xl flex-col bg-surface shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label={titleByKey[statKey]}
+      >
         <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
@@ -662,7 +678,7 @@ function LocationStatDetailPanel({
             </>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
