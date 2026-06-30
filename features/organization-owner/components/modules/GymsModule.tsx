@@ -48,6 +48,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const [successGym, setSuccessGym] = useState<{ id: string; name: string; slug: string; timezone: string; currency: string; status: string } | null>(null);
   const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
   const [pendingDeleteGymId, setPendingDeleteGymId] = useState<string | null>(null);
+  const [pendingSuspendGymId, setPendingSuspendGymId] = useState<string | null>(null);
 
   useEffect(() => {
     const gymData = (state as Record<string, unknown>).gymData as Record<string, string> | undefined;
@@ -159,7 +160,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
         ];
         if (gym.status === "active") {
           return [...base,
-            { label: "Suspend", onClick: () => handleSetStatus(gym.id, "suspended"), variant: "destructive" as const, icon: <ShieldAlert className="size-3.5" /> },
+            { label: "Suspend", onClick: () => setPendingSuspendGymId(gym.id), variant: "destructive" as const, icon: <ShieldAlert className="size-3.5" /> },
             { label: "Delete", onClick: () => setPendingDeleteGymId(gym.id), variant: "destructive" as const, icon: <Trash2 className="size-3.5" /> },
           ];
         }
@@ -341,6 +342,16 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
         title="Delete Gym?"
         itemName={gyms.find(g => g.id === pendingDeleteGymId)?.name ?? ""}
         warning="This will archive the gym and its data. This action can be reversed."
+      />
+      <GenericConfirmDialog
+        open={!!pendingSuspendGymId}
+        onConfirm={() => { if (pendingSuspendGymId) { handleSetStatus(pendingSuspendGymId, "suspended"); setPendingSuspendGymId(null); } }}
+        onCancel={() => setPendingSuspendGymId(null)}
+        title="Suspend Gym?"
+        itemName={gyms.find(g => g.id === pendingSuspendGymId)?.name ?? ""}
+        warning="Members will not be able to check in at this gym. Existing memberships, staff, and data will be preserved. You can reactivate the gym at any time."
+        confirmLabel="Suspend"
+        danger={false}
       />
         </>
       )}
