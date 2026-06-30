@@ -1023,6 +1023,8 @@ async function tryCrossBranchAccess(
   contextGymId: string
 ): Promise<AuthActionState | null> {
   try {
+    const adminDb = getSupabaseAdminClient();
+
     const { evaluateCrossBranchAccess } = await import(
       "@/features/organization-owner/actions/cross-branch-actions"
     );
@@ -1036,29 +1038,33 @@ async function tryCrossBranchAccess(
     );
 
     if (access.allowed) {
-      await supabase.from("cross_branch_access_logs").insert({
+      if (adminDb) {
+        await adminDb.from("cross_branch_access_logs").insert({
+          organization_id: organizationId,
+          member_id: input.memberId,
+          from_gym_id: validation.member!.gym_id,
+          to_gym_id: contextGymId,
+          rule_id: access.ruleId ?? null,
+          rule_name: access.ruleName ?? null,
+          decision: "allowed",
+          reason: "Cross-branch access allowed"
+        });
+      }
+      return null;
+    }
+
+    if (adminDb) {
+      await adminDb.from("cross_branch_access_logs").insert({
         organization_id: organizationId,
         member_id: input.memberId,
         from_gym_id: validation.member!.gym_id,
         to_gym_id: contextGymId,
         rule_id: access.ruleId ?? null,
         rule_name: access.ruleName ?? null,
-        decision: "allowed",
-        reason: "Cross-branch access allowed"
+        decision: "denied",
+        reason: access.reason ?? "No cross-branch access rule"
       });
-      return null;
     }
-
-    await supabase.from("cross_branch_access_logs").insert({
-      organization_id: organizationId,
-      member_id: input.memberId,
-      from_gym_id: validation.member!.gym_id,
-      to_gym_id: contextGymId,
-      rule_id: access.ruleId ?? null,
-      rule_name: access.ruleName ?? null,
-      decision: "denied",
-      reason: access.reason ?? "No cross-branch access rule"
-    });
 
     await recordDeniedAccess(supabase, input.context, {
       ...validation,

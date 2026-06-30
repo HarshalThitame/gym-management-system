@@ -51,12 +51,14 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
   const [deleting, setDeleting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [logFilters, setLogFilters] = useState<AccessLogsFilter>({ page: 1, pageSize: 50 });
   const [logPage, setLogPage] = useState(1);
   const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(new Set());
 
   const [logMemberId, setLogMemberId] = useState("");
   const [logGymId, setLogGymId] = useState("");
+  const [logDecision, setLogDecision] = useState("");
+  const [logDateFrom, setLogDateFrom] = useState("");
+  const [logDateTo, setLogDateTo] = useState("");
 
   const refreshRules = useCallback(async () => {
     if (!hasFeature) return;
@@ -70,14 +72,17 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
   const refreshLogs = useCallback(async () => {
     if (!hasFeature) return;
     try {
-      const filters: AccessLogsFilter = { ...logFilters, page: logPage };
+      const filters: AccessLogsFilter = { page: logPage, pageSize: 50 };
       if (logMemberId) filters.memberId = logMemberId;
       if (logGymId) filters.gymId = logGymId;
+      if (logDecision) filters.decision = logDecision;
+      if (logDateFrom) filters.dateFrom = logDateFrom;
+      if (logDateTo) filters.dateTo = logDateTo;
       const result = await getAccessLogs(dashboard.organization.id, filters);
       setLogs(result.logs);
       setLogsTotal(result.total);
     } catch { /* silently ignore */ }
-  }, [dashboard.organization.id, hasFeature, logFilters, logPage, logMemberId, logGymId]);
+  }, [dashboard.organization.id, hasFeature, logPage, logMemberId, logGymId, logDecision, logDateFrom, logDateTo]);
 
   const refreshCheckIns = useCallback(async () => {
     try {
@@ -229,8 +234,7 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
 
   const handleApplyLogFilters = useCallback(() => {
     setLogPage(1);
-    refreshLogs();
-  }, [refreshLogs]);
+  }, []);
 
   if (!hasFeature) {
     return (
@@ -497,7 +501,7 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
             </div>
             <div className="flex-1 min-w-[160px]">
               <label className="mb-1 block text-xs font-bold text-muted-foreground">Decision</label>
-              <select className={selectClass} onChange={(e) => setLogFilters((f) => ({ ...f, decision: e.target.value || undefined } as AccessLogsFilter))} value={logFilters.decision ?? ""}>
+              <select className={selectClass} onChange={(e) => setLogDecision(e.target.value)} value={logDecision}>
                 <option value="">All</option>
                 <option value="allowed">Allowed</option>
                 <option value="denied">Denied</option>
@@ -505,11 +509,11 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
             </div>
             <div className="flex-1 min-w-[160px]">
               <label className="mb-1 block text-xs font-bold text-muted-foreground">Date From</label>
-              <input className={selectClass} onChange={(e) => setLogFilters((f) => ({ ...f, dateFrom: e.target.value || undefined } as AccessLogsFilter))} type="date" value={logFilters.dateFrom ?? ""} />
+              <input className={selectClass} onChange={(e) => setLogDateFrom(e.target.value)} type="date" value={logDateFrom} />
             </div>
             <div className="flex-1 min-w-[160px]">
               <label className="mb-1 block text-xs font-bold text-muted-foreground">Date To</label>
-              <input className={selectClass} onChange={(e) => setLogFilters((f) => ({ ...f, dateTo: e.target.value || undefined } as AccessLogsFilter))} type="date" value={logFilters.dateTo ?? ""} />
+              <input className={selectClass} onChange={(e) => setLogDateTo(e.target.value)} type="date" value={logDateTo} />
             </div>
             <div className="flex items-end gap-2">
               <Button onClick={handleApplyLogFilters} size="sm" variant="primary">Apply</Button>
@@ -572,12 +576,12 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
           </div>
 
           {/* ═══ PAGINATION ═══ */}
-          {logsTotal > (logFilters.pageSize ?? 50) ? (
+          {logsTotal > 50 ? (
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Showing {(logPage - 1) * (logFilters.pageSize ?? 50) + 1}-{Math.min(logPage * (logFilters.pageSize ?? 50), logsTotal)} of {logsTotal}</p>
+              <p className="text-xs text-muted-foreground">Showing {(logPage - 1) * 50 + 1}-{Math.min(logPage * 50, logsTotal)} of {logsTotal}</p>
               <div className="flex items-center gap-2">
                 <Button disabled={logPage <= 1} onClick={() => setLogPage((p) => p - 1)} size="sm" variant="secondary">Previous</Button>
-                <Button disabled={logPage * (logFilters.pageSize ?? 50) >= logsTotal} onClick={() => setLogPage((p) => p + 1)} size="sm" variant="secondary">Next</Button>
+                <Button disabled={logPage * 50 >= logsTotal} onClick={() => setLogPage((p) => p + 1)} size="sm" variant="secondary">Next</Button>
               </div>
             </div>
           ) : null}

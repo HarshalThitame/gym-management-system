@@ -23,6 +23,7 @@ COMMENT ON CONSTRAINT cross_branch_rules_scope ON cross_branch_access_rules IS '
 CREATE INDEX idx_cross_branch_rules_org ON cross_branch_access_rules(organization_id);
 CREATE INDEX idx_cross_branch_rules_member ON cross_branch_access_rules(member_id);
 CREATE INDEX idx_cross_branch_rules_branches ON cross_branch_access_rules(from_branch_id, to_branch_id);
+CREATE INDEX idx_cross_branch_rules_eval ON cross_branch_access_rules(organization_id, is_active, priority DESC, created_at DESC);
 
 ALTER TABLE cross_branch_access_rules ENABLE ROW LEVEL SECURITY;
 
@@ -77,4 +78,4 @@ CREATE POLICY "Super admins view cross-branch logs"
 CREATE POLICY "System inserts cross-branch logs"
   ON cross_branch_access_logs
   FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (public.is_super_admin() OR public.is_organization_owner(organization_id));

@@ -67,6 +67,10 @@ export async function createAccessRule(
 ): Promise<AccessRule> {
   await requireOrgFeatureAccess(organizationId, "cross_branch_member_access");
 
+  if (!input.name?.trim()) {
+    throw new Error("Rule name is required");
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("cross_branch_access_rules")
@@ -162,7 +166,10 @@ export async function evaluateCrossBranchAccess(
       return { allowed: false, reason: "Feature not enabled" };
     }
 
-    const supabase = await createSupabaseServerClient();
+    const supabase = getSupabaseAdminClient();
+    if (!supabase) {
+      return { allowed: false, reason: "Server configuration error" };
+    }
 
     const [rulesResult, branchResult] = await Promise.all([
       supabase
@@ -172,7 +179,7 @@ export async function evaluateCrossBranchAccess(
         .eq("is_active", true)
         .order("priority", { ascending: false })
         .order("created_at", { ascending: false }),
-      supabase
+      adminSupabase
         .from("branches")
         .select("id")
         .eq("gym_id", toGymId)
@@ -264,6 +271,12 @@ export async function getAccessLogs(
 export async function getCrossBranchCheckInsToday(
   organizationId: string
 ): Promise<number> {
+  try {
+    await requireOrgFeatureAccess(organizationId, "cross_branch_member_access");
+  } catch {
+    return 0;
+  }
+
   try {
     const supabase = await createSupabaseServerClient();
     const today = new Date().toISOString().slice(0, 10);
