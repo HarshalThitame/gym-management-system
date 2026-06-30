@@ -135,8 +135,8 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
     setSaving(true);
     setFormError(null);
 
-    const toBranchId = editingRule ? selectedToBranchId : (e.currentTarget.elements.namedItem("toBranchId") as HTMLSelectElement)?.value;
-    const name = editingRule ? (e.currentTarget.querySelector('[name="name"]') as HTMLInputElement)?.value : (e.currentTarget.elements.namedItem("name") as HTMLInputElement)?.value;
+    const name = (e.currentTarget.elements.namedItem("name") as HTMLInputElement)?.value;
+    const toBranchId = selectedToBranchId;
 
     if (!name || !toBranchId) {
       setFormError("Rule name and target branch are required.");
