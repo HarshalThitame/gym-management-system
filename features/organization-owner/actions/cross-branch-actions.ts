@@ -179,7 +179,7 @@ export async function evaluateCrossBranchAccess(
         .eq("is_active", true)
         .order("priority", { ascending: false })
         .order("created_at", { ascending: false }),
-      adminSupabase
+      supabase
         .from("branches")
         .select("id")
         .eq("gym_id", toGymId)
