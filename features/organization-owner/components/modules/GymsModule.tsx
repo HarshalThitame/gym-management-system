@@ -149,7 +149,6 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
       badgeVariant: (gym.status === "active" ? "success" : gym.status === "suspended" ? "warning" : "neutral") as "success" | "warning" | "neutral",
       status: gym.status,
       sections: [
-        { label: "Capacity", value: gym.capacity ? `${formatCompactNumber(gym.capacity)} max` : "Not set" },
         { label: "Revenue", value: formatCurrency(gymRevenue) },
         { label: "Members", value: `${gymMembers.length} total · ${gymMembers.filter((m) => m.status === "active").length} active` },
       ],
@@ -453,11 +452,7 @@ function LocationStatDetailPanel({
                     </div>
                     <EnterpriseStatusBadge status={g.status} />
                   </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-md bg-surface-muted p-2 text-center">
-                      <p className="font-black text-muted-foreground">Capacity</p>
-                      <p className="font-bold">{g.capacity ? formatCompactNumber(g.capacity) : "—"}</p>
-                    </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-md bg-surface-muted p-2 text-center">
                       <p className="font-black text-muted-foreground">Members</p>
                       <p className="font-bold">{gymMembers.length}</p>
