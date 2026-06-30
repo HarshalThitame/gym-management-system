@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { showToast } from "@/components/ui/toast";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import { cn } from "@/lib/utils";
 import { formatCompactNumber } from "@/features/enterprise/lib/business-rules";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
@@ -46,6 +47,7 @@ export function NPSSurveyPanel({
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [surveyNpsMap, setSurveyNpsMap] = useState<Record<string, number | null>>({});
   const [drawerTriggerType, setDrawerTriggerType] = useState<string>("manual");
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
 
   const refreshSurveys = useCallback(async () => {
     setLoading(true);
@@ -100,11 +102,11 @@ export function NPSSurveyPanel({
 
     if (editingSurvey) {
       const result = await updateSurvey(organizationId, editingSurvey.id, data);
-      if (result) showToast("Survey updated", "success");
+      if (result) setSuccessAction({ action: "updated", title: "Survey Updated!", itemName: editingSurvey.name });
       else showToast("Failed to update survey", "error");
     } else {
       const result = await createSurvey(organizationId, data);
-      if (result) showToast("Survey created", "success");
+      if (result) setSuccessAction({ action: "created", title: "Survey Created!", itemName: data.name });
       else showToast("Failed to create survey", "error");
     }
     setSaving(false);
@@ -114,7 +116,7 @@ export function NPSSurveyPanel({
 
   const handleDelete = async (id: string) => {
     const result = await deleteSurvey(organizationId, id);
-    if (result.success) showToast("Survey deleted", "success");
+    if (result.success) setSuccessAction({ action: "deleted", title: "Survey Deleted!", itemName: surveys.find((s) => s.id === id)?.name ?? "Survey" });
     else showToast("Failed to delete survey", "error");
     refreshSurveys();
   };
@@ -535,6 +537,13 @@ export function NPSSurveyPanel({
           ) : null}
         </>
       )}
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </div>
   );
 }

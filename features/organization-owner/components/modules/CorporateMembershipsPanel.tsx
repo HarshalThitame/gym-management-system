@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useActionState } from "react";
+import { useCallback, useEffect, useMemo, useState, useActionState, useRef } from "react";
 import { AlertTriangle, ArrowLeft, Banknote, Building2, CheckCircle2, Edit3, Plus, Search, Trash2, Unlink, UserRoundPlus, UsersRound, XCircle } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { StatCard } from "@/components/ui/stat-card";
@@ -20,6 +20,8 @@ import {
   unlinkCorporateEmployeeAction,
   type CorporateAccountWithEmployees,
 } from "@/features/organization-owner/actions/corporate-actions";
+import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import type { Database } from "@/types/database";
 
 type CorporateRow = CorporateAccountWithEmployees;
@@ -68,6 +70,9 @@ export function CorporateMembershipsPanel({ dashboard, hasFeature }: CorporateMe
   const [bulkPlanId, setBulkPlanId] = useState("");
   const [bulkErrors, setBulkErrors] = useState<{ index: number; message: string }[]>([]);
   const [bulkState, bulkFormAction] = useActionState(bulkAddCorporateEmployeesAction, initialAuthActionState);
+  const [pendingDelete, setPendingDelete] = useState<{ accountId: string; name: string } | null>(null);
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
+  const lastSavedCompanyName = useRef("");
 
   // ── Preview: parse and validate bulk input locally ──
   const previewEntries = useMemo((): PreviewEntry[] => {
@@ -156,21 +161,28 @@ export function CorporateMembershipsPanel({ dashboard, hasFeature }: CorporateMe
   const closeBulkDrawer = useCallback(() => { setBulkDrawerOpen(false); setBulkInput(""); setBulkGymId(""); setBulkPlanId(""); setBulkErrors([]); }, []);
   const backToList = useCallback(() => { setView("list"); setSelectedAccount(null); setEmployees([]); }, []);
 
-  const handleDelete = useCallback(async (accountId: string) => {
-    if (!confirm("Delete this corporate account? Employees will be unlinked but not deleted.")) return;
+  const handleDelete = useCallback((accountId: string, name: string) => {
+    setPendingDelete({ accountId, name });
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
     const fd = new FormData();
-    fd.set("accountId", accountId);
+    fd.set("accountId", pendingDelete.accountId);
     try {
       const result = await deleteCorporateAccountAction(initialAuthActionState, fd);
-      showToast(result.message || "Deleted.", result.status === "success" ? "success" : "error");
       if (result.status === "success") {
+        setSuccessAction({ action: "deleted", title: "Company Deleted!", itemName: pendingDelete.name });
         loadAccounts();
         if (view === "detail") backToList();
+      } else {
+        showToast(result.message || "Failed to delete.", "error");
       }
     } catch {
       showToast("Failed to delete.", "error");
     }
-  }, [loadAccounts, view, backToList]);
+    setPendingDelete(null);
+  }, [pendingDelete, loadAccounts, view, backToList, setSuccessAction]);
 
   const handleUnlink = useCallback(async (memberId: string) => {
     const fd = new FormData();
@@ -188,14 +200,14 @@ export function CorporateMembershipsPanel({ dashboard, hasFeature }: CorporateMe
 
   // ── Watch form action results ──
   useEffect(() => {
-    if (createState.status === "success") { closeDrawer(); loadAccounts(); showToast(createState.message || "Created.", "success"); }
+    if (createState.status === "success") { closeDrawer(); loadAccounts(); setSuccessAction({ action: "created", title: "Company Created!", itemName: lastSavedCompanyName.current || "Corporate Account" }); }
     if (createState.status === "error" && createState.message) showToast(createState.message, "error");
-  }, [createState, closeDrawer, loadAccounts]);
+  }, [createState, closeDrawer, loadAccounts, setSuccessAction]);
 
   useEffect(() => {
-    if (updateState.status === "success") { closeDrawer(); loadAccounts(); showToast(updateState.message || "Updated.", "success"); }
+    if (updateState.status === "success") { closeDrawer(); loadAccounts(); setSuccessAction({ action: "updated", title: "Company Updated!", itemName: lastSavedCompanyName.current || "Corporate Account" }); }
     if (updateState.status === "error" && updateState.message) showToast(updateState.message, "error");
-  }, [updateState, closeDrawer, loadAccounts]);
+  }, [updateState, closeDrawer, loadAccounts, setSuccessAction]);
 
   useEffect(() => {
     if (bulkState.status === "success" || bulkState.status === "error") {
@@ -320,7 +332,7 @@ export function CorporateMembershipsPanel({ dashboard, hasFeature }: CorporateMe
                         <button className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-muted hover:text-foreground" onClick={() => openEdit(acct)} title="Edit" type="button">
                           <Edit3 className="size-3.5" />
                         </button>
-                        <button className="rounded-md p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => handleDelete(acct.id)} title="Delete" type="button">
+                        <button className="rounded-md p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => handleDelete(acct.id, acct.company_name)} title="Delete" type="button">
                           <Trash2 className="size-3.5" />
                         </button>
                       </div>
@@ -340,7 +352,10 @@ export function CorporateMembershipsPanel({ dashboard, hasFeature }: CorporateMe
           title={editingAccount ? "Edit Company" : "Add Company"}
           size="lg"
         >
-          <form action={editingAccount ? updateFormAction : createFormAction} className="space-y-5">
+          <form action={editingAccount ? updateFormAction : createFormAction} className="space-y-5" onSubmit={() => {
+            const input = document.querySelector<HTMLInputElement>('input[name="companyName"]');
+            if (input) lastSavedCompanyName.current = input.value;
+          }}>
             <DrawerFormMessage status={editingAccount ? updateState.status : createState.status} message={editingAccount ? updateState.message : createState.message} />
             {editingAccount ? <input name="accountId" type="hidden" value={editingAccount.id} /> : null}
             <div className="grid gap-5 md:grid-cols-2">
@@ -375,6 +390,21 @@ export function CorporateMembershipsPanel({ dashboard, hasFeature }: CorporateMe
             </div>
           </form>
         </OrgOwnerDrawer>
+        <GenericConfirmDialog
+          open={!!pendingDelete}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setPendingDelete(null)}
+          title="Delete Corporate Account?"
+          itemName={pendingDelete?.name ?? ""}
+          warning="Employees will be unlinked but not deleted."
+        />
+        <GenericSuccessDialog
+          action={successAction?.action ?? "created"}
+          itemName={successAction?.itemName ?? ""}
+          onClose={() => setSuccessAction(null)}
+          open={successAction !== null}
+          title={successAction?.title ?? ""}
+        />
       </div>
     );
   }

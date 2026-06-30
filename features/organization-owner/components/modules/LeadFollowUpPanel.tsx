@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { showToast } from "@/components/ui/toast";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import {
   getLeadTasks,
   getOverdueTasks,
@@ -54,6 +55,7 @@ export function LeadFollowUpPanel({ dashboard, hasFeature, onOpenLead }: Props) 
   });
   const [submitting, setSubmitting] = useState(false);
   const [leads, setLeads] = useState<{ id: string; name: string }[]>([]);
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
 
   const orgId = dashboard.organization.id;
   const staffList = dashboard.branchUsers.filter(
@@ -145,7 +147,7 @@ export function LeadFollowUpPanel({ dashboard, hasFeature, onOpenLead }: Props) 
         if (formData.description) updateData.description = formData.description;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await updateLeadTask(orgId, editingTask.id, updateData as any);
-        showToast("Task updated", "success");
+        setSuccessAction({ action: "updated", title: "Task Updated!", itemName: formData.title });
       } else {
         const payload: Record<string, unknown> = {
           leadId: formData.leadId,
@@ -156,7 +158,7 @@ export function LeadFollowUpPanel({ dashboard, hasFeature, onOpenLead }: Props) 
         if (formData.assignedTo) payload.assignedTo = formData.assignedTo;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await createLeadTask(orgId, payload as any);
-        showToast("Task created", "success");
+        setSuccessAction({ action: "created", title: "Task Created!", itemName: formData.title });
       }
       setShowForm(false);
       setEditingTask(null);
@@ -167,7 +169,7 @@ export function LeadFollowUpPanel({ dashboard, hasFeature, onOpenLead }: Props) 
     } finally {
       setSubmitting(false);
     }
-  }, [orgId, formData, editingTask, fetchTasks]);
+  }, [orgId, formData, editingTask, fetchTasks, setSuccessAction]);
 
   const handleComplete = useCallback(async (taskId: string) => {
     try {
@@ -195,13 +197,14 @@ export function LeadFollowUpPanel({ dashboard, hasFeature, onOpenLead }: Props) 
 
   const handleDelete = useCallback(async (taskId: string) => {
     try {
+      const taskName = tasks.find((t) => t.id === taskId)?.title ?? "Task";
       await deleteLeadTask(orgId, taskId);
+      setSuccessAction({ action: "deleted", title: "Task Deleted!", itemName: taskName });
       fetchTasks();
-      showToast("Task deleted", "success");
     } catch {
       showToast("Failed to delete task", "error");
     }
-  }, [orgId, fetchTasks]);
+  }, [orgId, fetchTasks, tasks, setSuccessAction]);
 
   if (!hasFeature) {
     return (
@@ -400,6 +403,13 @@ export function LeadFollowUpPanel({ dashboard, hasFeature, onOpenLead }: Props) 
           ) : null}
         </div>
       )}
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </div>
   );
 }

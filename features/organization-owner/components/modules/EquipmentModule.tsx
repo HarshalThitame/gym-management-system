@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OrgOwnerDrawer, DrawerField } from "@/features/organization-owner/components/org-owner-drawer";
 import { showToast } from "@/components/ui/toast";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import { formatEnterpriseLabel, formatCurrency } from "@/features/enterprise/lib/business-rules";
 import type {
   EquipmentRow,
@@ -109,6 +110,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     serviceOverdue: Partial<EquipmentRow>[];
     amcExpiring: Partial<EquipmentRow>[];
   }>({ warrantyExpiring: [], serviceOverdue: [], amcExpiring: [] });
+
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
 
   // Filters
   const [filterBranch, setFilterBranch] = useState("all");
@@ -230,7 +233,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
       };
       if (editingId) saveInput.equipmentId = editingId;
       await saveEquipment(dashboard.organization.id, saveInput);
-      showToast(editingId ? "Equipment updated" : "Equipment created", "success");
+      setSuccessAction({ action: editingId ? "updated" : "created", title: editingId ? "Equipment Updated!" : "Equipment Created!", itemName: formName.trim() });
       resetForm();
       setDrawerOpen(false);
       await loadEquipment();
@@ -242,7 +245,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
   const handleDelete = async (equipmentId: string) => {
     try {
       await deleteEquipment(dashboard.organization.id, equipmentId);
-      showToast("Equipment deleted", "success");
+      setSuccessAction({ action: "deleted", title: "Equipment Deleted!", itemName: equipment.find((e) => e.id === equipmentId)?.name ?? "Equipment" });
       await loadEquipment();
       if (selectedEq?.id === equipmentId) setSelectedEq(null);
     } catch (e) {
@@ -750,6 +753,13 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
           </div>
         </div>
       </OrgOwnerDrawer>
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </div>
   );
 }

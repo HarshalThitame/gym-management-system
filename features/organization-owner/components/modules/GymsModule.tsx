@@ -21,6 +21,8 @@ import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatCurrency } from "@/features/enterprise/lib/business-rules";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { CrossBranchAccessPanel } from "@/features/organization-owner/components/modules/CrossBranchAccessPanel";
+import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import { GymCreatedDialog } from "@/features/organization-owner/components/modules/GymCreatedDialog";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import type { GymRow } from "@/types/enterprise";
@@ -53,6 +55,8 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [statPanel, setStatPanel] = useState<StatKey>(null);
   const [successGym, setSuccessGym] = useState<{ id: string; name: string; slug: string; timezone: string; currency: string; status: string } | null>(null);
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
+  const [pendingDeleteGymId, setPendingDeleteGymId] = useState<string | null>(null);
 
   useEffect(() => {
     const gymData = (state as Record<string, unknown>).gymData as Record<string, string> | undefined;
@@ -107,17 +111,23 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
       status: (formData.get("status") as "active" | "suspended" | "archived") || "active",
       organization_id: dashboard.organization.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
     };
+    const isEdit = !!editingGym;
     addOptimistic(optimisticGym);
     setSavingStatus("saving");
-    closeDrawer();
-    showToast("Saving gym...", "info");
 
     const fd = new FormData(form);
     const result = await saveGymAction({ status: "idle", message: null } as never, fd);
-    if (result.status === "success") { removeOptimistic(tempId); showToast("Gym saved", "success"); }
-    else { removeOptimistic(tempId); showToast(result.message || "Failed", "error"); }
+    if (result.status === "success") {
+      removeOptimistic(tempId);
+      if (isEdit) {
+        setSuccessAction({ action: "updated", title: "Location Updated!", itemName: name });
+      }
+    } else {
+      removeOptimistic(tempId);
+      showToast(result.message || "Failed", "error");
+    }
     setSavingStatus("idle");
-  }, [addOptimistic, removeOptimistic, closeDrawer, dashboard.organization.id]);
+  }, [addOptimistic, removeOptimistic, closeDrawer, dashboard.organization.id, editingGym]);
 
   const handleSetStatus = useCallback(async (gymId: string, status: "active" | "suspended" | "archived") => {
     updateOptimistic(gymId, { status });
@@ -126,8 +136,15 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
     if (result.status !== "success") {
       updateOptimistic(gymId, { status: dashboard.gyms.find((g) => g.id === gymId)?.status ?? "active" });
       showToast(result.message || "Failed", "error");
-    } else showToast(`Gym ${status}`, "success");
-  }, [updateOptimistic, dashboard.gyms]);
+    } else {
+      if (status === "archived") {
+        const name = gyms.find((g) => g.id === gymId)?.name ?? "";
+        setSuccessAction({ action: "deleted", title: "Location Deleted!", itemName: name });
+      } else {
+        showToast(`Gym ${status}`, "success");
+      }
+    }
+  }, [updateOptimistic, dashboard.gyms, gyms]);
 
   const handleApplyFilters = useCallback((f: Record<string, string>) => {
     navigate({ q: f.q, status: f.status });
@@ -189,7 +206,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
         if (gym.status === "active") {
           return [...base,
             { label: "Suspend", onClick: () => handleSetStatus(gym.id, "suspended"), variant: "destructive" as const, icon: <ShieldAlert className="size-3.5" /> },
-            { label: "Delete", onClick: () => { if (window.confirm("Delete this gym?")) handleSetStatus(gym.id, "archived"); }, variant: "destructive" as const, icon: <Trash2 className="size-3.5" /> },
+            { label: "Delete", onClick: () => setPendingDeleteGymId(gym.id), variant: "destructive" as const, icon: <Trash2 className="size-3.5" /> },
           ];
         }
         if (gym.status === "suspended") {
@@ -420,6 +437,21 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
       </AnimatePresence>
 
       <GymCreatedDialog open={!!successGym} data={successGym} onClose={() => setSuccessGym(null)} />
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
+      <GenericConfirmDialog
+        open={!!pendingDeleteGymId}
+        onConfirm={() => { if (pendingDeleteGymId) { handleSetStatus(pendingDeleteGymId, "archived"); setPendingDeleteGymId(null); } }}
+        onCancel={() => setPendingDeleteGymId(null)}
+        title="Delete Gym?"
+        itemName={gyms.find(g => g.id === pendingDeleteGymId)?.name ?? ""}
+        warning="This will archive the gym and its data. This action can be reversed."
+      />
         </>
       )}
     </div>

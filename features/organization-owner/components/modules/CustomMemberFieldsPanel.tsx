@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit3, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast } from "@/components/ui/toast";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import type { CustomField } from "@/features/organization-owner/actions/member-field-actions";
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
@@ -27,6 +28,7 @@ export function CustomMemberFieldsPanel({ organizationId, hasFeature }: CustomMe
   const [saving, setSaving] = useState(false);
   const [modal, setModal] = useState<FieldModalData>(initialModal);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
 
   const [formName, setFormName] = useState("");
   const [formType, setFormType] = useState("text");
@@ -95,14 +97,14 @@ export function CustomMemberFieldsPanel({ organizationId, hasFeature }: CustomMe
           showToast(result.message, "error");
           return;
         }
-        showToast("Field updated.", "success");
+        setSuccessAction({ action: "updated", title: "Field Updated!", itemName: modal.editing.field_name });
       } else {
         const result = await createCustomField(organizationId, editData as { field_name: string; field_type: string; options?: string[] | null; required?: boolean; sort_order?: number });
         if (result.status === "error") {
           showToast(result.message, "error");
           return;
         }
-        showToast("Field created.", "success");
+        setSuccessAction({ action: "created", title: "Field Created!", itemName: formName.trim() });
       }
       closeModal();
       loadFields();
@@ -121,7 +123,7 @@ export function CustomMemberFieldsPanel({ organizationId, hasFeature }: CustomMe
         showToast(result.message, "error");
         return;
       }
-      showToast("Field deleted.", "success");
+      setSuccessAction({ action: "deleted", title: "Field Deleted!", itemName: fields.find((f) => f.id === fieldId)?.field_name ?? "Field" });
       setDeleteConfirm(null);
       loadFields();
     } catch (e) {
@@ -247,6 +249,13 @@ export function CustomMemberFieldsPanel({ organizationId, hasFeature }: CustomMe
           </div>
         </div>
       ) : null}
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </Card>
   );
 }

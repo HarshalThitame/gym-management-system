@@ -23,6 +23,8 @@ import {
   type SplitLog,
   type BranchRevenueReport,
 } from "@/features/organization-owner/actions/revenue-split-actions";
+import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 
 type Props = { dashboard: OrganizationOwnerDashboard };
 
@@ -77,6 +79,9 @@ function SplitRulesTab({ dashboard }: { dashboard: OrganizationOwnerDashboard })
   const [loading, setLoading] = useState(true);
   const [editRule, setEditRule] = useState<SplitRule | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ ruleId: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
 
   const loadRules = useCallback(async () => {
     try {
@@ -86,6 +91,21 @@ function SplitRulesTab({ dashboard }: { dashboard: OrganizationOwnerDashboard })
     } catch { /* handled */ }
     finally { setLoading(false); }
   }, [dashboard.organization.id]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteSplitRule(dashboard.organization.id, pendingDelete.ruleId);
+      setSuccessAction({ action: "deleted", title: "Split Rule Deleted!", itemName: pendingDelete.name });
+      loadRules();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to delete split rule", "error");
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
+    }
+  }, [pendingDelete, dashboard.organization.id, loadRules, setSuccessAction]);
 
   useEffect(() => { loadRules(); }, [loadRules]);
 
@@ -159,11 +179,7 @@ function SplitRulesTab({ dashboard }: { dashboard: OrganizationOwnerDashboard })
                         </button>
                         <button
                           className="rounded p-1 hover:bg-surface-muted"
-                          onClick={async () => {
-                            if (!confirm("Delete this split rule?")) return;
-                            await deleteSplitRule(dashboard.organization.id, rule.id);
-                            loadRules();
-                          }}
+                          onClick={() => setPendingDelete({ ruleId: rule.id, name: rule.name })}
                           title="Delete" type="button"
                         >
                           <Trash2 className="size-3.5 text-destructive" />
@@ -183,9 +199,29 @@ function SplitRulesTab({ dashboard }: { dashboard: OrganizationOwnerDashboard })
           dashboard={dashboard}
           rule={editRule}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); loadRules(); }}
+          onSaved={(name) => {
+            setShowForm(false);
+            loadRules();
+            setSuccessAction({ action: editRule ? "updated" : "created", title: editRule ? "Split Rule Updated!" : "Split Rule Created!", itemName: name });
+          }}
         />
       )}
+      <GenericConfirmDialog
+        open={!!pendingDelete}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+        title="Delete Split Rule?"
+        itemName={pendingDelete?.name ?? ""}
+        warning="This action cannot be undone."
+        loading={deleting}
+      />
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </div>
   );
 }
@@ -199,7 +235,7 @@ function SplitRuleForm({
   dashboard: OrganizationOwnerDashboard;
   rule: SplitRule | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (name: string) => void;
 }) {
   const [name, setName] = useState(rule?.name ?? "");
   const [sourceBranchId, setSourceBranchId] = useState(rule?.source_branch_id ?? "");
@@ -250,7 +286,7 @@ function SplitRuleForm({
         if (desc) createData.description = desc;
         await createSplitRule(dashboard.organization.id, createData);
       }
-      onSaved();
+      onSaved(name.trim());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save rule.");
     } finally {

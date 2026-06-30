@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OrgOwnerDrawer, DrawerField } from "@/features/organization-owner/components/org-owner-drawer";
 import { showToast } from "@/components/ui/toast";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import type {
   ReportSchedule,
   CreateReportScheduleInput,
@@ -60,6 +61,8 @@ export function ReportSchedulesPanel({ dashboard, hasFeature }: ReportSchedulesP
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
+
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -140,7 +143,7 @@ export function ReportSchedulesPanel({ dashboard, hasFeature }: ReportSchedulesP
       setSchedules([created, ...schedules]);
       resetForm();
       setDrawerOpen(false);
-      showToast("Schedule created", "success");
+      setSuccessAction({ action: "created", title: "Schedule Created!", itemName: formName.trim() });
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Failed to create schedule", "error");
     }
@@ -167,7 +170,7 @@ export function ReportSchedulesPanel({ dashboard, hasFeature }: ReportSchedulesP
     try {
       await deleteReportSchedule(dashboard.organization.id, scheduleId);
       setSchedules(schedules.filter((s) => s.id !== scheduleId));
-      showToast("Schedule deleted", "success");
+      setSuccessAction({ action: "deleted", title: "Schedule Deleted!", itemName: schedules.find((s) => s.id === scheduleId)?.name ?? "Schedule" });
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Failed to delete", "error");
     }
@@ -385,6 +388,13 @@ export function ReportSchedulesPanel({ dashboard, hasFeature }: ReportSchedulesP
           </div>
         </div>
       </OrgOwnerDrawer>
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </div>
   );
 }

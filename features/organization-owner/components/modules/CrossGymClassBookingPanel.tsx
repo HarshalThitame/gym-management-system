@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
+import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import { OrgOwnerDrawer, DrawerField, DrawerSubmitButton, DrawerFormMessage } from "@/features/organization-owner/components/org-owner-drawer";
 import {
   getCrossGymClassSummary,
@@ -44,6 +46,9 @@ export function CrossGymClassBookingPanel({ dashboard }: Props) {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [ruleName, setRuleName] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<{ ruleId: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
   const [selectedFromGymId, setSelectedFromGymId] = useState("");
   const [selectedToGymId, setSelectedToGymId] = useState("");
   const [selectedAccess, setSelectedAccess] = useState<"allow" | "deny">("allow");
@@ -128,10 +133,10 @@ export function CrossGymClassBookingPanel({ dashboard }: Props) {
     try {
       if (editingRule) {
         await updateCrossGymClassRule(dashboard.organization.id, editingRule.id, data);
-        showToast("Rule updated", "success");
+        setSuccessAction({ action: "updated", title: "Rule Updated!", itemName: ruleName.trim() });
       } else {
         await createCrossGymClassRule(dashboard.organization.id, data);
-        showToast("Rule created", "success");
+        setSuccessAction({ action: "created", title: "Rule Created!", itemName: ruleName.trim() });
       }
       closeDrawer();
       refreshSummary();
@@ -139,18 +144,25 @@ export function CrossGymClassBookingPanel({ dashboard }: Props) {
       setFormError(err instanceof Error ? err.message : "Failed to save rule");
     }
     setSaving(false);
-  }, [editingRule, dashboard.organization.id, closeDrawer, refreshSummary, ruleName, selectedFromGymId, selectedToGymId, selectedAccess]);
+  }, [editingRule, dashboard.organization.id, closeDrawer, refreshSummary, ruleName, selectedFromGymId, selectedToGymId, selectedAccess, setSuccessAction]);
 
-  const handleDelete = useCallback(async (ruleId: string, name: string) => {
-    if (!window.confirm(`Delete rule "${name}"?`)) return;
+  const handleDelete = useCallback((ruleId: string, name: string) => {
+    setPendingDelete({ ruleId, name });
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
     try {
-      await deleteCrossGymClassRule(dashboard.organization.id, ruleId);
-      showToast("Rule deleted", "success");
+      await deleteCrossGymClassRule(dashboard.organization.id, pendingDelete.ruleId);
+      setSuccessAction({ action: "deleted", title: "Rule Deleted!", itemName: pendingDelete.name });
       refreshSummary();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to delete rule", "error");
     }
-  }, [dashboard.organization.id, refreshSummary]);
+    setPendingDelete(null);
+    setDeleting(false);
+  }, [pendingDelete, dashboard.organization.id, refreshSummary, setSuccessAction]);
 
   const handleToggleActive = useCallback(async (rule: CrossGymClassRule) => {
     try {
@@ -437,6 +449,22 @@ export function CrossGymClassBookingPanel({ dashboard }: Props) {
           </div>
         </>
       ) : null}
+      <GenericConfirmDialog
+        open={!!pendingDelete}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+        title="Delete Rule?"
+        itemName={pendingDelete?.name ?? ""}
+        warning="This action cannot be undone."
+        loading={deleting}
+      />
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </div>
   );
 }

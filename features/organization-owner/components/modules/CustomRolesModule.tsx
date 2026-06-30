@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect, useActionState } from "react";
+import { useCallback, useMemo, useState, useEffect, useActionState, useRef } from "react";
 import { Lock, Plus, Pencil, Trash2, UserPlus, ShieldCheck, CheckSquare, Square, UsersRound } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import type { ModuleSearchParams } from "@/features/organization-owner/services/module-data-resolver";
@@ -13,6 +13,8 @@ import { createCustomRoleAction, updateCustomRoleAction, deleteCustomRoleAction,
 import type { PermissionAction, AuthResource } from "@/types/auth";
 import { authResources, permissionActions } from "@/types/auth";
 import { cn } from "@/lib/utils";
+import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 
 type CustomRolesModuleProps = {
   dashboard: OrganizationOwnerDashboard;
@@ -372,6 +374,9 @@ export function CustomRolesModule({ dashboard, moduleData, hasFeature }: CustomR
   const [createState, createAction] = useActionState(createCustomRoleAction, initialAuthActionState);
   const [updateState, updateAction] = useActionState(updateCustomRoleAction, initialAuthActionState);
   const [userCounts, setUserCounts] = useState<Record<string, number>>({});
+  const [pendingDelete, setPendingDelete] = useState<{ roleId: string; name: string } | null>(null);
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
+  const lastDeletedRoleName = useRef("");
 
   const roles: CustomRole[] = (moduleData?.items as CustomRole[]) ?? [];
 
@@ -410,13 +415,22 @@ export function CustomRolesModule({ dashboard, moduleData, hasFeature }: CustomR
     setPreselectedRoleId(undefined);
   }, []);
 
+  const handleConfirmDelete = useCallback(() => {
+    if (!pendingDelete) return;
+    lastDeletedRoleName.current = pendingDelete.name;
+    const fd = new FormData();
+    fd.set("roleId", pendingDelete.roleId);
+    deleteAction(fd);
+    setPendingDelete(null);
+  }, [pendingDelete, deleteAction]);
+
   useEffect(() => {
     if (deleteState.status === "success") {
-      showToast(deleteState.message || "Role deleted.", "success");
+      setSuccessAction({ action: "deleted", title: "Role Deleted!", itemName: lastDeletedRoleName.current || "Role" });
     } else if (deleteState.status === "error") {
       showToast(deleteState.message || "Failed to delete role.", "error");
     }
-  }, [deleteState]);
+  }, [deleteState, setSuccessAction]);
 
   if (!hasFeature) {
     return (
@@ -452,12 +466,7 @@ export function CustomRolesModule({ dashboard, moduleData, hasFeature }: CustomR
       actions: [
         { label: "Edit", onClick: () => openEdit(role), variant: "secondary" as const, icon: <Pencil className="size-3.5" /> },
         { label: "Assign", onClick: () => openAssignForRole(role.id), variant: "secondary" as const, icon: <UserPlus className="size-3.5" /> },
-        { label: "Delete", onClick: () => {
-          if (!window.confirm(`Delete custom role "${role.name}"? This will also remove it from all assigned users.`)) return;
-          const fd = new FormData();
-          fd.set("roleId", role.id);
-          deleteAction(fd);
-        }, variant: "destructive" as const, icon: <Trash2 className="size-3.5" /> },
+        { label: "Delete", onClick: () => setPendingDelete({ roleId: role.id, name: role.name }), variant: "destructive" as const, icon: <Trash2 className="size-3.5" /> },
       ],
     };
   });
@@ -540,6 +549,21 @@ export function CustomRolesModule({ dashboard, moduleData, hasFeature }: CustomR
         open={assignDrawerOpen}
         onClose={closeAssign}
         preselectedRoleId={preselectedRoleId}
+      />
+      <GenericConfirmDialog
+        open={!!pendingDelete}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+        title="Delete Custom Role?"
+        itemName={pendingDelete?.name ?? ""}
+        warning="This will also remove it from all assigned users."
+      />
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
       />
     </div>
   );

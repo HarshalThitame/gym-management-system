@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { showToast } from "@/components/ui/toast";
+import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
 import type { WebhookConfig, WebhookDeliveryLog } from "@/features/organization-owner/actions/webhook-actions";
 import {
   getWebhooks,
@@ -66,6 +67,7 @@ export function WebhookPanel({ dashboard, hasFeature }: WebhookPanelProps) {
   const [logPage, setLogPage] = useState(1);
   const [logFilters, setLogFilters] = useState<{ status?: string }>({ status: "all" });
   const [testResults, setTestResults] = useState<Record<string, { loading: boolean; result?: { success: boolean; statusCode: number; responseBody: string; durationMs: number } }>>({});
+  const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
 
   const fetchWebhooks = useCallback(async () => {
     try {
@@ -146,7 +148,7 @@ export function WebhookPanel({ dashboard, hasFeature }: WebhookPanelProps) {
           events: formEvents,
           ...(generatedSecret ? { secret: generatedSecret } : {}),
         });
-        showToast("Webhook updated.", "success");
+        setSuccessAction({ action: "updated", title: "Webhook Updated!", itemName: formName.trim() });
       } else {
         const created = await createWebhook(orgId, {
           name: formName,
@@ -154,7 +156,7 @@ export function WebhookPanel({ dashboard, hasFeature }: WebhookPanelProps) {
           events: formEvents,
         });
         setGeneratedSecret(created.secret ?? "");
-        showToast("Webhook created. Copy your secret now — it won&apos;t be shown again.", "success");
+        setSuccessAction({ action: "created", title: "Webhook Created!", itemName: formName.trim() });
       }
       setDrawerOpen(false);
       await fetchWebhooks();
@@ -166,7 +168,7 @@ export function WebhookPanel({ dashboard, hasFeature }: WebhookPanelProps) {
   const handleDelete = async (webhookId: string) => {
     try {
       await deleteWebhook(orgId, webhookId);
-      showToast("Webhook deleted.", "success");
+      setSuccessAction({ action: "deleted", title: "Webhook Deleted!", itemName: webhooks.find((w) => w.id === webhookId)?.name ?? "Webhook" });
       await fetchWebhooks();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to delete.", "error");
@@ -540,6 +542,13 @@ export function WebhookPanel({ dashboard, hasFeature }: WebhookPanelProps) {
           )}
         </div>
       )}
+      <GenericSuccessDialog
+        action={successAction?.action ?? "created"}
+        itemName={successAction?.itemName ?? ""}
+        onClose={() => setSuccessAction(null)}
+        open={successAction !== null}
+        title={successAction?.title ?? ""}
+      />
     </div>
   );
 }
