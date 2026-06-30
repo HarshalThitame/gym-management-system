@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
-import { RuleCreatedDialog } from "@/features/organization-owner/components/modules/RuleCreatedDialog";
+import { RuleActionSuccessDialog } from "@/features/organization-owner/components/modules/RuleActionSuccessDialog";
 import {
   getAccessRules,
   createAccessRule,
@@ -45,7 +45,7 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
   const [selectedFromBranchId, setSelectedFromBranchId] = useState("");
   const [selectedToBranchId, setSelectedToBranchId] = useState("");
   const [selectedAccess, setSelectedAccess] = useState<"allow" | "deny">("allow");
-  const [successRule, setSuccessRule] = useState<AccessRule | null>(null);
+  const [successRule, setSuccessRule] = useState<{ rule: AccessRule; action: "created" | "updated" | "deleted" } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const [logFilters, setLogFilters] = useState<AccessLogsFilter>({ page: 1, pageSize: 50 });
@@ -157,31 +157,33 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
 
     try {
       if (editingRule) {
-        await updateAccessRule(dashboard.organization.id, editingRule.id, data);
-        showToast("Rule updated", "success");
+        const updated = await updateAccessRule(dashboard.organization.id, editingRule.id, data);
         closeDrawer();
+        setSuccessRule({ rule: updated, action: "updated" });
       } else {
         const created = await createAccessRule(dashboard.organization.id, data);
         closeDrawer();
-        setSuccessRule(created);
+        setSuccessRule({ rule: created, action: "created" });
       }
       refreshRules();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to save rule");
     }
     setSaving(false);
-  }, [editingRule, dashboard.organization.id, closeDrawer, refreshRules, ruleType, selectedMemberId, selectedFromBranchId, selectedToBranchId, selectedAccess]);
+  }, [editingRule, dashboard.organization.id, closeDrawer, refreshRules, ruleType, selectedMemberId, selectedFromBranchId, selectedToBranchId, selectedAccess, setSuccessRule]);
 
   const handleDelete = useCallback(async (ruleId: string, ruleName: string) => {
     if (!window.confirm(`Delete rule "${ruleName}"?`)) return;
+    const rule = rules.find((r) => r.id === ruleId);
+    if (!rule) { showToast("Rule not found", "error"); return; }
     try {
       await deleteAccessRule(dashboard.organization.id, ruleId);
-      showToast("Rule deleted", "success");
+      setSuccessRule({ rule, action: "deleted" });
       refreshRules();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to delete rule", "error");
     }
-  }, [dashboard.organization.id, refreshRules]);
+  }, [dashboard.organization.id, refreshRules, rules, setSuccessRule]);
 
   const handleToggleActive = useCallback(async (rule: AccessRule) => {
     try {
@@ -572,9 +574,10 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
         </>
       )}
 
-      <RuleCreatedDialog
+      <RuleActionSuccessDialog
+        action={successRule?.action ?? "created"}
         branches={allBranches}
-        data={successRule}
+        data={successRule?.rule ?? null}
         members={members}
         onClose={() => setSuccessRule(null)}
         open={successRule !== null}

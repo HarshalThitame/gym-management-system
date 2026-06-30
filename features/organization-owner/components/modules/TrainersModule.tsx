@@ -7,7 +7,19 @@ import {
   CalendarDays, BarChart3, ShieldAlert, CheckCircle2, UserPlus, Briefcase,
   ChevronRight, Search, AlertTriangle,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
+
+// Local animation presets for cinematic effects (page-scoped)
+const CINEMATIC = {
+  fadeInUp: {
+    initial: { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+  },
+  hoverLift: {
+    whileHover: { y: -6, scale: 1.02, transition: { duration: 0.25, ease: "easeOut" } },
+  },
+};
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
 import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
 import { OrgOwnerDrawer, DrawerField, DrawerSubmitButton, DrawerFormMessage } from "@/features/organization-owner/components/org-owner-drawer";
