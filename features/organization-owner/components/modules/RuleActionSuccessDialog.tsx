@@ -19,29 +19,29 @@ const actionConfig: Record<RuleAction, {
   gradient: string;
   icon: typeof Check;
   title: string;
-  accent: string;
   badgeBg: string;
+  textColor: string;
 }> = {
   created: {
     gradient: "from-violet-600 to-indigo-600",
     icon: Check,
     title: "Access Rule Created!",
-    accent: "violet",
     badgeBg: "bg-violet-50 border-violet-100",
+    textColor: "text-violet-800",
   },
   updated: {
     gradient: "from-blue-600 to-cyan-600",
     icon: Sparkles,
     title: "Access Rule Updated!",
-    accent: "blue",
     badgeBg: "bg-blue-50 border-blue-100",
+    textColor: "text-blue-800",
   },
   deleted: {
     gradient: "from-red-600 to-orange-600",
     icon: Trash2,
     title: "Access Rule Deleted!",
-    accent: "red",
     badgeBg: "bg-red-50 border-red-100",
+    textColor: "text-red-800",
   },
 };
 
@@ -102,7 +102,7 @@ export function RuleActionSuccessDialog({ open, data, action, members, branches,
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-muted-foreground">Rule</p>
-                <p className="text-lg font-black" style={{ color: `var(--${cfg.accent}-800)` }}>{data.name}</p>
+                <p className={`text-lg font-black ${cfg.textColor}`}>{data.name}</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-bold ${statusColor}`}>
                 {statusLabel}
