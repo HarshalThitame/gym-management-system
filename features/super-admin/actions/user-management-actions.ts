@@ -101,7 +101,8 @@ export async function inviteUserAction(_previousState: AuthActionState, formData
     email: parsed.data.email.toLowerCase().trim(),
     password: tempPassword,
     email_confirm: true,
-    user_metadata: { full_name: parsed.data.fullName, invited_by: context.userId }
+    user_metadata: { full_name: parsed.data.fullName, invited_by: context.userId },
+    app_metadata: { default_role: parsed.data.role }
   });
 
   if (authResult.error) {
@@ -147,15 +148,20 @@ export async function inviteUserAction(_previousState: AuthActionState, formData
   }
 
   if (parsed.data.role !== "member") {
-    const { error: roleError } = await supabase.from("user_roles").insert({
-      user_id: authUserId,
-      role_id: parsed.data.organizationId,
-      gym_id: parsed.data.gymId || null,
-      assigned_by: context.userId
-    });
+    const { data: targetRole } = await supabase.from("roles").select("id").eq("name", parsed.data.role as never).maybeSingle();
+    if (targetRole) {
+      const { error: roleError } = await supabase.from("user_roles").insert({
+        user_id: authUserId,
+        role_id: targetRole.id,
+        gym_id: parsed.data.role === "organization_owner" || parsed.data.role === "super_admin" ? null : (parsed.data.gymId || null),
+        assigned_by: context.userId
+      });
 
-    if (roleError) {
-      console.error("[super-admin-users] User role insertion failed.", roleError.message);
+      if (roleError) {
+        console.error("[super-admin-users] User role insertion failed.", roleError.message);
+      }
+    } else {
+      console.error(`[super-admin-users] Role "${parsed.data.role}" not found in roles table`);
     }
   }
 

@@ -1,18 +1,33 @@
 "use client";
 
 import { LogOut, AlertTriangle, X } from "lucide-react";
+import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type SignOutButtonProps = { compact?: boolean };
 
 export function SignOutButton({ compact = false }: SignOutButtonProps) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const handleSignOut = () => {
+  const handleSignOut = async (event: MouseEvent<HTMLButtonElement>) => {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_PRIVATE_CACHES" });
-    const form = document.getElementById(compact ? "sign-out-form-desktop" : "sign-out-form-mobile") as HTMLFormElement | null;
+    const form = event.currentTarget.closest("form") as HTMLFormElement | null;
+
+    try {
+      await createSupabaseBrowserClient().auth.signOut();
+    } catch (error) {
+      console.error("[auth] Browser sign out failed; submitting server sign out fallback.", error);
+    }
+
     if (form) form.requestSubmit();
+    else window.location.assign("/login");
+
     setShowConfirm(false);
   };
 
@@ -45,7 +60,7 @@ export function SignOutButton({ compact = false }: SignOutButtonProps) {
                   <p className="text-sm text-muted-foreground">Are you sure you want to sign out?</p>
                 </div>
               </div>
-              <button onClick={() => setShowConfirm(false)} className="rounded-md p-1 hover:bg-accent/10" aria-label="Close">
+              <button type="button" onClick={() => setShowConfirm(false)} className="rounded-md p-1 hover:bg-accent/10" aria-label="Close">
                 <X className="size-5" />
               </button>
             </div>
@@ -59,16 +74,19 @@ export function SignOutButton({ compact = false }: SignOutButtonProps) {
 
             <div className="mt-5 flex gap-3">
               <button
+                type="button"
                 onClick={() => setShowConfirm(false)}
                 className="flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold hover:bg-accent/10 transition-colors"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleSignOut}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+                disabled={isSigningOut}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Sign out
+                {isSigningOut ? "Signing out..." : "Sign out"}
               </button>
             </div>
           </div>

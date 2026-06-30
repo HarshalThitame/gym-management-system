@@ -110,7 +110,8 @@ export async function createOrgOwnerAction(_previousState: AuthActionState, form
     email: parsed.data.email.toLowerCase().trim(),
     password: parsed.data.password,
     email_confirm: true,
-    user_metadata: { full_name: parsed.data.fullName, created_by: context.userId, role: "org_owner" }
+    user_metadata: { full_name: parsed.data.fullName, created_by: context.userId },
+    app_metadata: { default_role: "organization_owner" }
   });
 
   if (authResult.error) {
@@ -179,15 +180,19 @@ export async function createOrgOwnerAction(_previousState: AuthActionState, form
     }
   });
 
-  const { error: roleError } = await supabase.from("user_roles").insert({
-    user_id: authUserId,
-    role_id: org.id,
-    organization_id: org.id,
-    assigned_by: context.userId
-  });
+  const { data: ownerRole } = await supabase.from("roles").select("id").eq("name", "organization_owner").maybeSingle();
+  if (ownerRole) {
+    const { error: roleError } = await supabase.from("user_roles").upsert({
+      user_id: authUserId,
+      role_id: ownerRole.id,
+      assigned_by: context.userId
+    }, { onConflict: "user_id,role_id,gym_id", ignoreDuplicates: true });
 
-  if (roleError) {
-    console.error("[org-owner-creation] User role insertion failed.", roleError.message);
+    if (roleError) {
+      console.error("[org-owner-creation] User role insertion failed.", roleError.message);
+    }
+  } else {
+    console.error("[org-owner-creation] organization_owner role not found in roles table");
   }
 
   await writeAuditLog({

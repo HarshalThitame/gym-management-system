@@ -271,18 +271,30 @@ export async function signOutAction() {
   const supabase = await createAuthClientOrNull();
 
   if (supabase) {
-    const { data: claimsData } = await supabase.auth.getClaims();
-    const actorId = claimsData?.claims?.sub ?? null;
+    let actorId: string | null = null;
 
-    await Promise.all([
-      writeAuditLog({
+    try {
+      const { data: claimsData } = await supabase.auth.getClaims();
+      actorId = claimsData?.claims?.sub ?? null;
+    } catch (error) {
+      console.error("[auth] Unable to read claims during sign out.", error);
+    }
+
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      console.error("[auth] Server sign out failed.", signOutError.message);
+    }
+
+    try {
+      await writeAuditLog({
         actorId,
         action: "auth.logout",
         entityType: "auth_user",
         entityId: actorId
-      }),
-      supabase.auth.signOut()
-    ]);
+      });
+    } catch (error) {
+      console.error("[auth] Logout audit write failed.", error);
+    }
   }
 
   redirect("/login");
