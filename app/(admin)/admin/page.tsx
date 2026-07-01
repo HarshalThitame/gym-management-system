@@ -68,7 +68,7 @@ export default async function AdminDashboardPage() {
                 {greeting}, Admin
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl">
-                Here's what's happening at your gym today. Track performance, manage operations, and make data-driven decisions.
+                Here&apos;s what&apos;s happening at your gym today. Track performance, manage operations, and make data-driven decisions.
               </p>
             </div>
             
@@ -133,7 +133,7 @@ export default async function AdminDashboardPage() {
                 </div>
                 <div>
                   <div className="text-2xl font-black">{formatCurrency(revenue.todayRevenue)}</div>
-                  <div className="text-xs text-muted-foreground">Today's Revenue</div>
+                  <div className="text-xs text-muted-foreground">Today&apos;s Revenue</div>
                 </div>
               </div>
             </div>
