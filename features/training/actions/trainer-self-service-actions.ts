@@ -43,7 +43,7 @@ export async function saveSelfAvailabilityAction(_previousState: AuthActionState
   const { data: trainer } = await supabase
     .from("trainers")
     .select("id")
-    .eq("user_id", context.userId)
+    .eq("user_id", context.userId!)
     .maybeSingle();
 
   if (!trainer) {
@@ -92,7 +92,7 @@ export async function deleteSelfAvailabilityAction(_previousState: AuthActionSta
   const { data: trainer } = await supabase
     .from("trainers")
     .select("id")
-    .eq("user_id", context.userId)
+    .eq("user_id", context.userId!)
     .maybeSingle();
 
   if (!trainer || trainer.id !== availability.trainer_id) {
@@ -136,7 +136,7 @@ export async function requestTimeOffAction(_previousState: AuthActionState, form
   const { data: trainer } = await supabase
     .from("trainers")
     .select("id")
-    .eq("user_id", context.userId)
+    .eq("user_id", context.userId!)
     .maybeSingle();
 
   if (!trainer) {
@@ -196,7 +196,7 @@ export async function cancelTimeOffAction(_previousState: AuthActionState, formD
   const { data: trainer } = await supabase
     .from("trainers")
     .select("id")
-    .eq("user_id", context.userId)
+    .eq("user_id", context.userId!)
     .maybeSingle();
 
   if (!trainer || trainer.id !== timeOff.trainer_id) {
@@ -244,7 +244,7 @@ export async function uploadProgressPhotoAction(_previousState: AuthActionState,
   const { data: trainer } = await supabase
     .from("trainers")
     .select("id, gym_id")
-    .eq("user_id", context.userId)
+    .eq("user_id", context.userId!)
     .maybeSingle();
 
   if (!trainer) {
@@ -298,7 +298,7 @@ export async function cloneProgramTemplateAction(_previousState: AuthActionState
   const { data: trainer } = await supabase
     .from("trainers")
     .select("id")
-    .eq("user_id", context.userId)
+    .eq("user_id", context.userId!)
     .maybeSingle();
 
   if (!trainer) {

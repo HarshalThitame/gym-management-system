@@ -51,6 +51,9 @@ const resourceLabels: Record<AuthResource, string> = {
   system_health: "System Health",
   content: "Content",
   audit_logs: "Audit Logs",
+  trainer_availability: "Trainer Availability",
+  trainer_commissions: "Trainer Commissions",
+  trainer_time_off: "Trainer Time Off",
 };
 
 const actionLabels: Record<PermissionAction, string> = {

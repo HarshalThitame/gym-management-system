@@ -27,7 +27,7 @@ import {
   X
 } from "lucide-react";
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export type MobilePortalIconKey =
@@ -66,7 +66,7 @@ type MobileBottomNavProps = {
   items: MobilePortalNavItem[];
 };
 
-const navVariants = {
+const navVariants: Variants = {
   hidden: { y: 80, opacity: 0 },
   visible: {
     y: 0,
@@ -75,7 +75,7 @@ const navVariants = {
   },
 };
 
-const panelVariants = {
+const panelVariants: Variants = {
   hidden: { y: 30, opacity: 0, scale: 0.96 },
   visible: {
     y: 0,
@@ -91,7 +91,7 @@ const panelVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   visible: (i: number) => ({
     opacity: 1,
@@ -156,7 +156,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
                 return (
                   <motion.div
                     key={`${item.href}-${item.label}`}
-                    variants={shouldReduceMotion ? undefined : itemVariants}
+                    variants={itemVariants}
                     custom={i}
                     initial="hidden"
                     animate="visible"
@@ -186,7 +186,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
       <motion.nav
         aria-label="Mobile primary portal navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/94 px-3 pb-[calc(env(safe-area-inset-bottom)+0.55rem)] pt-2 shadow-[0_-16px_50px_rgb(17_18_20/0.12)] backdrop-blur-xl lg:hidden"
-        variants={shouldReduceMotion ? undefined : navVariants}
+        variants={navVariants}
         initial="hidden"
         animate="visible"
       >

@@ -25,11 +25,9 @@ export const AnimatedInput = forwardRef<HTMLInputElement, AnimatedInputProps>(
             {label}
           </label>
         ) : null}
-        <motion.input
+        <input
           id={id}
           ref={ref}
-          whileFocus={shouldReduceMotion ? undefined : { scale: 1.01, borderColor: "var(--accent)" }}
-          transition={{ type: "spring", stiffness: 400, damping: 22 }}
           className={cn(
             "flex h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground placeholder:text-muted-foreground/50 transition-colors duration-200",
             "focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20",
@@ -75,11 +73,9 @@ export const AnimatedTextarea = forwardRef<HTMLTextAreaElement, AnimatedTextarea
             {label}
           </label>
         ) : null}
-        <motion.textarea
+        <textarea
           id={id}
           ref={ref}
-          whileFocus={shouldReduceMotion ? undefined : { scale: 1.005, borderColor: "var(--accent)" }}
-          transition={{ type: "spring", stiffness: 400, damping: 22 }}
           className={cn(
             "flex min-h-[80px] w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-semibold text-foreground placeholder:text-muted-foreground/50 transition-colors duration-200",
             "focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20",
@@ -126,10 +122,8 @@ export function AnimatedSelect({
           {label}
         </label>
       ) : null}
-      <motion.select
+      <select
         id={id}
-        whileFocus={shouldReduceMotion ? undefined : { scale: 1.005 }}
-        transition={{ type: "spring", stiffness: 400, damping: 22 }}
         className={cn(
           "flex h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground transition-colors duration-200",
           "focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20",
@@ -139,7 +133,7 @@ export function AnimatedSelect({
         {...props}
       >
         {children}
-      </motion.select>
+      </select>
       {error ? (
         <motion.p
           className="text-xs font-semibold text-red-500"

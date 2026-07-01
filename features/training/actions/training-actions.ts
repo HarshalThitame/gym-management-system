@@ -748,7 +748,7 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
     return { status: "error", message: "Failed to create session. Check for schedule conflicts." };
   }
 
-  await writeTrainingAudit(context, "trainer_session.created", "trainer_session", createdIds[0], { memberId: parsed.data.memberId, sessionCount: createdIds.length });
+  await writeTrainingAudit(context, "trainer_session.created", "trainer_session", createdIds[0]!, { memberId: parsed.data.memberId, sessionCount: createdIds.length });
 
   revalidatePath("/trainer");
   revalidatePath("/trainer/sessions");

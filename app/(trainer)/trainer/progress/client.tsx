@@ -125,7 +125,7 @@ export function ProgressPhotoSection({
                   <p className="text-sm font-bold">{new Date(date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {groupedByDate[date].map((photo) => (
+                  {groupedByDate[date]!.map((photo) => (
                     <div
                       key={photo.id}
                       className="group relative overflow-hidden rounded-xl border border-border bg-surface-muted/50 transition-all duration-300 hover:border-accent/30 hover:shadow-glow-sm"
