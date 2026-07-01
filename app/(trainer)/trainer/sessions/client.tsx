@@ -137,7 +137,7 @@ export function SessionsCalendar({
                   !isCurrent && "bg-surface-muted/30",
                   isToday && "bg-accent/5"
                 )}
-                onClick={() => daySessions.length > 0 && setSelectedSession(daySessions[0])}
+                onClick={() => daySessions.length > 0 && setSelectedSession(daySessions[0]!)}
               >
                 <span
                   className={cn(
