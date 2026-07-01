@@ -1,4 +1,4 @@
-const APP_VERSION = "apex-pwa-v17-20260610-auth-fix";
+const APP_VERSION = "apex-pwa-v18-20260701-next-static-refresh";
 const STATIC_CACHE = `${APP_VERSION}-static`;
 const RUNTIME_CACHE = `${APP_VERSION}-runtime`;
 const OFFLINE_URL = "/offline";
@@ -80,8 +80,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(networkFirst(request, STATIC_CACHE));
+    return;
+  }
+
   if (
-    url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname.startsWith("/screenshots/") ||
     url.pathname === "/manifest.webmanifest"
@@ -186,6 +190,24 @@ async function cacheFirst(request, cacheName) {
     cache.put(request, response.clone());
   }
   return response;
+}
+
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
+    throw new Error("Network request failed and no cache entry exists.");
+  }
 }
 
 async function staleWhileRevalidate(request, cacheName) {
