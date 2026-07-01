@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useCallback, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ChevronLeft, ChevronRight, CalendarDays, Filter, Clock, Download, X, User, Tag, FileText } from "lucide-react";
-import { AnimatedContainer, AnimatedDrawer, useStaggerChildren } from "@/components/motion";
+import { Search, ChevronLeft, ChevronRight, CalendarDays, Filter, Clock, Download, X, Tag, FileText } from "lucide-react";
+import { AnimatedContainer, useStaggerChildren } from "@/components/motion";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { TrainerSessionStatusForm } from "@/features/training/components/training-forms";
 import { cn } from "@/lib/utils";

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Apple, Camera, Dumbbell, Scale, Target, Trophy, UsersRound } from "lucide-react";
+import { Apple, Dumbbell, Scale, Target, Trophy, UsersRound } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { TrainerNoteForm, WorkoutAssignmentForm, WorkoutExerciseForm, WorkoutProgramForm } from "@/features/training/components/training-forms";
-import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
+import { TrainerNoteForm, WorkoutAssignmentForm, WorkoutProgramForm } from "@/features/training/components/training-forms";
 import { getTrainerDashboard, getTrainerProfileBundle, listProgramTemplates } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";

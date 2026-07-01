@@ -1,7 +1,7 @@
 "use client";
 
 import { Dumbbell, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const BASIC_SUGGESTIONS = [
@@ -14,7 +14,6 @@ const BASIC_SUGGESTIONS = [
 ];
 
 export function BasicWorkoutSuggestions({ showCard = true }: { showCard?: boolean }) {
-  const [suggestions] = useState(() => BASIC_SUGGESTIONS.sort(() => Math.random() - 0.5).slice(0, 3));
   const [refreshKey, setRefreshKey] = useState(0);
 
   const shuffle = () => {

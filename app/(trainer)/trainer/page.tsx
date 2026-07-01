@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { Activity, CalendarCheck, CalendarDays, Clock, Dumbbell, MessageSquare, Plus, Star, UsersRound, Sparkles } from "lucide-react";
+import { Activity, CalendarCheck, CalendarDays, Dumbbell, MessageSquare, Star, UsersRound, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { getTrainerClassesPortal } from "@/features/classes/services/class-service";
 import { getTrainerNotificationCenter } from "@/features/communications/services/communication-service";
 import { getTrainerFitnessPortal } from "@/features/fitness/services/fitness-service";
 import { TrainerSessionForm } from "@/features/training/components/training-forms";
-import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -30,7 +29,7 @@ export default async function TrainerDashboardPage() {
   const nutritionComplianceMembers = fitnessPortal.members.filter((member) => member.activeNutritionPlan).length;
 
   return (
-    <DashboardClient trainerName={dashboard.trainer?.display_name ?? "Trainer"}>
+    <DashboardClient>
       {/* Hero Section */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/95 to-accent/90 p-8 shadow-premium-lg md:p-12">
         <div className="absolute inset-0 bg-gradient-mesh-animated opacity-20" />

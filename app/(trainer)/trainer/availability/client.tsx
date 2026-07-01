@@ -3,11 +3,12 @@
 import { useActionState } from "react";
 import { Trash2, CalendarX, Plus, Clock, Sun, Monitor, Sunrise, Sunset, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { saveSelfAvailabilityAction, deleteSelfAvailabilityAction, requestTimeOffAction, cancelTimeOffAction } from "@/features/training/actions/trainer-self-service-actions";
+import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { TrainerAvailabilityRow, TrainerTimeOffRow } from "@/types/training";
+
+const idleActionState: AuthActionState = { status: "idle", message: "" };
 
 const dayIcons = [Sun, Monitor, Sunrise, Sunset, Moon, Sun, Monitor];
 const dayColors = [
@@ -26,7 +27,7 @@ function DayIcon({ day, className }: { day: number; className?: string }) {
 }
 
 export function AvailabilityForm() {
-  const [state, formAction, pending] = useActionState(saveSelfAvailabilityAction, null);
+  const [state, formAction, pending] = useActionState(saveSelfAvailabilityAction, idleActionState);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -186,7 +187,7 @@ export function AvailabilitySlotList({
 }
 
 export function TimeOffForm() {
-  const [state, formAction, pending] = useActionState(requestTimeOffAction, null);
+  const [state, formAction, pending] = useActionState(requestTimeOffAction, idleActionState);
 
   return (
     <form action={formAction} className="space-y-4">

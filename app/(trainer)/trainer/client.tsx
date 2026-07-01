@@ -2,21 +2,19 @@
 
 import { useState, useCallback, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Calendar, MessageSquare, Activity, Dumbbell, UsersRound } from "lucide-react";
+import { Plus, Calendar, MessageSquare, Activity, Dumbbell, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { TrainerSessionStatusForm } from "@/features/training/components/training-forms";
-import { AnimatedContainer, AnimatedItem, AnimatedCard, useStaggerChildren } from "@/components/motion";
+import { AnimatedContainer, AnimatedCard, useStaggerChildren } from "@/components/motion";
 import type { TrainerSessionRow } from "@/types/training";
 import type { MemberRow } from "@/types/membership";
 import type { TrainerAssignmentRow } from "@/types/training";
 
 export function DashboardClient({
-  trainerName,
   children,
 }: {
-  trainerName: string;
   children: ReactNode;
 }) {
   const { ref, isVisible } = useStaggerChildren({ threshold: 0.05 });

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Send, MessageSquare, UsersRound } from "lucide-react";
+import { Send, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { TrainerRow } from "@/types/training";
 
 export function StaffChatSection({

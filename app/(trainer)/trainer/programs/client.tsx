@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Copy, FileText, Layers, UsersRound } from "lucide-react";
+import { motion } from "framer-motion";
+import { Copy, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";

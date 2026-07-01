@@ -4,7 +4,6 @@ import { useActionState } from "react";
 import { motion } from "framer-motion";
 import { Camera, Upload, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { uploadProgressPhotoAction } from "@/features/training/actions/trainer-self-service-actions";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import type { MemberProgressPhotoRow } from "@/types/training";

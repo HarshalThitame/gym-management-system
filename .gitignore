@@ -13,3 +13,4 @@ test-results/
 .vercel
 .env*
 tsconfig.tsbuildinfo
+docs/Admin/
