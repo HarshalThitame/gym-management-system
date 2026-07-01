@@ -6,9 +6,10 @@ import { ArchiveNotificationForm, DirectNotificationForm, NotificationPreference
 import { CommunicationStatusBadge, PriorityBadge } from "@/features/communications/components/communication-status-badge";
 import { formatCommunicationLabel } from "@/features/communications/lib/business-rules";
 import { getTrainerNotificationCenter, listNotificationTemplates } from "@/features/communications/services/communication-service";
-import { getTrainerAssignedMembers } from "@/features/training/services/training-service";
+import { getTrainerAssignedMembers, getTrainerDashboard } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { StaffChatSection } from "./client";
 
 export const metadata: Metadata = createMetadata({
   title: "Trainer Communications",
@@ -19,10 +20,11 @@ export const metadata: Metadata = createMetadata({
 export default async function TrainerCommunicationsPage() {
   const context = await requireRole(["trainer"], "/trainer/communications");
   const gymId = context.profile?.gym_id ?? null;
-  const [center, assignedMembers, templates] = await Promise.all([
+  const [center, assignedMembers, templates, dashboard] = await Promise.all([
     context.userId ? getTrainerNotificationCenter(context.userId, gymId) : null,
     getTrainerAssignedMembers(context.userId ?? "", gymId),
-    listNotificationTemplates(gymId)
+    listNotificationTemplates(gymId),
+    getTrainerDashboard(context.userId ?? "", gymId)
   ]);
 
   if (!center) {
@@ -94,7 +96,7 @@ export default async function TrainerCommunicationsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[0.85fr_1fr]">
+      <div className="grid gap-5 xl:grid-cols-3">
         <Card>
           <CardHeader>
             <h3 className="text-2xl font-black">Staff Announcements</h3>
@@ -111,6 +113,26 @@ export default async function TrainerCommunicationsPage() {
               </div>
             ))}
             {center.announcements.length === 0 ? <EmptyState text="No staff announcements are active." /> : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-glow">
+                <MessageSquare className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black">Staff Chat</h3>
+                <p className="text-xs font-semibold text-muted-foreground">Message other trainers</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <StaffChatSection
+              trainers={dashboard.trainer ? [dashboard.trainer] : []}
+              currentTrainerId={dashboard.trainer?.id ?? ""}
+            />
           </CardContent>
         </Card>
 

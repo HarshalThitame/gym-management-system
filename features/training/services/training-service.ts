@@ -1,7 +1,7 @@
 import { addDays, formatISO } from "date-fns";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { MemberRow } from "@/types/membership";
-import type { MemberTrainingPortal, TrainerAssignmentRow, TrainerDashboardData, TrainerDirectoryItem, TrainerProfileBundle, TrainerRow, WorkoutProgramExerciseRow, WorkoutProgramRow } from "@/types/training";
+import type { MemberTrainingPortal, TrainerAssignmentRow, TrainerDashboardData, TrainerDirectoryItem, TrainerProfileBundle, TrainerRow, WorkoutProgramExerciseRow, WorkoutProgramRow, TrainerTimeOffRow, TrainerCommissionRow, TrainerAvailabilityRow, MemberProgressPhotoRow } from "@/types/training";
 
 type ListTrainersInput = {
   gymId: string | null;
@@ -545,6 +545,238 @@ function pickTrainer(trainer?: TrainerRow) {
     id: trainer.id,
     display_name: trainer.display_name,
     photo_url: trainer.photo_url
+  };
+}
+
+export async function getTrainerAvailability(userId: string, gymId: string | null): Promise<TrainerAvailabilityRow[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data: trainer } = await supabase
+    .from("trainers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!trainer) return [];
+
+  let query = supabase
+    .from("trainer_availability")
+    .select("*")
+    .eq("trainer_id", trainer.id)
+    .order("day_of_week", { ascending: true })
+    .order("starts_at", { ascending: true });
+
+  if (gymId) {
+    query = query.eq("gym_id", gymId);
+  }
+
+  const { data } = await query;
+  return data ?? [];
+}
+
+export async function getTrainerTimeOff(userId: string): Promise<TrainerTimeOffRow[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data: trainer } = await supabase
+    .from("trainers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!trainer) return [];
+
+  const { data } = await supabase
+    .from("trainer_time_off")
+    .select("*")
+    .eq("trainer_id", trainer.id)
+    .order("starts_at", { ascending: false });
+
+  return data ?? [];
+}
+
+export async function getTrainerCommissions(userId: string): Promise<TrainerCommissionRow[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data: trainer } = await supabase
+    .from("trainers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!trainer) return [];
+
+  const { data } = await supabase
+    .from("trainer_commissions")
+    .select("*")
+    .eq("trainer_id", trainer.id)
+    .order("calculated_at", { ascending: false })
+    .limit(100);
+
+  return data ?? [];
+}
+
+export async function getTrainerCommissionSummary(userId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: trainer } = await supabase
+    .from("trainers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!trainer) {
+    return { totalPending: 0, totalPaid: 0, totalCancelled: 0, recentCount: 0 };
+  }
+
+  const { data } = await supabase
+    .from("trainer_commissions")
+    .select("status, amount")
+    .eq("trainer_id", trainer.id);
+
+  const commissions = data ?? [];
+  return {
+    totalPending: commissions.filter((c) => c.status === "pending").reduce((s, c) => s + c.amount, 0),
+    totalPaid: commissions.filter((c) => c.status === "paid").reduce((s, c) => s + c.amount, 0),
+    totalCancelled: commissions.filter((c) => c.status === "cancelled").reduce((s, c) => s + c.amount, 0),
+    recentCount: commissions.length,
+  };
+}
+
+export async function listProgramTemplates(gymId: string | null): Promise<WorkoutProgramRow[]> {
+  const supabase = await createSupabaseServerClient();
+  let query = supabase
+    .from("workout_programs")
+    .select("*")
+    .eq("is_template", true)
+    .eq("status", "active")
+    .order("name", { ascending: true });
+
+  if (gymId) {
+    query = query.eq("gym_id", gymId);
+  }
+
+  const { data } = await query;
+  return data ?? [];
+}
+
+export async function cloneProgramTemplate(programId: string, newTrainerId: string, newName: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: original } = await supabase
+    .from("workout_programs")
+    .select("*")
+    .eq("id", programId)
+    .maybeSingle();
+
+  if (!original) {
+    throw new Error("Template not found.");
+  }
+
+  const { data: newProgram, error: insertError } = await supabase
+    .from("workout_programs")
+    .insert({
+      gym_id: original.gym_id,
+      trainer_id: newTrainerId,
+      name: newName,
+      goal: original.goal,
+      description: original.description,
+      difficulty: original.difficulty,
+      duration_weeks: original.duration_weeks,
+      status: "draft",
+      is_template: false,
+      cloned_from: original.id,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (insertError || !newProgram) {
+    throw new Error(insertError?.message ?? "Clone failed.");
+  }
+
+  const { data: exercises } = await supabase
+    .from("workout_program_exercises")
+    .select("*")
+    .eq("program_id", programId)
+    .order("day_number", { ascending: true })
+    .order("display_order", { ascending: true });
+
+  if (exercises && exercises.length > 0) {
+    const exerciseCopies = exercises.map((ex) => ({
+      program_id: newProgram.id,
+      day_number: ex.day_number,
+      exercise_name: ex.exercise_name,
+      category: ex.category,
+      sets: ex.sets,
+      reps: ex.reps,
+      rest_seconds: ex.rest_seconds,
+      tempo: ex.tempo,
+      instructions: ex.instructions,
+      display_order: ex.display_order,
+    }));
+
+    const { error: exerciseError } = await supabase
+      .from("workout_program_exercises")
+      .insert(exerciseCopies);
+
+    if (exerciseError) {
+      throw new Error(exerciseError.message);
+    }
+  }
+
+  return newProgram;
+}
+
+export async function getMemberProgressPhotos(memberId: string): Promise<MemberProgressPhotoRow[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("member_progress_photos")
+    .select("*")
+    .eq("member_id", memberId)
+    .order("recorded_on", { ascending: false });
+
+  return data ?? [];
+}
+
+export async function getTrainerPerformanceMetrics(userId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: trainer } = await supabase
+    .from("trainers")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!trainer) {
+    return {
+      assignedMembers: 0,
+      completedSessions: 0,
+      totalSessions: 0,
+      completionRate: 0,
+      averageRating: 0,
+      totalRevenue: 0,
+      activePrograms: 0,
+    };
+  }
+
+  const today = todayDate();
+  const [assignmentsResult, sessionsResult, feedbackResult, programsResult, ptPackagesResult] = await Promise.all([
+    supabase.from("trainer_assignments").select("id").eq("trainer_id", trainer.id).eq("status", "active"),
+    supabase.from("trainer_sessions").select("status").eq("trainer_id", trainer.id),
+    supabase.from("trainer_feedback").select("rating").eq("trainer_id", trainer.id).neq("status", "hidden"),
+    supabase.from("workout_program_assignments").select("id").eq("trainer_id", trainer.id).eq("status", "active"),
+    supabase.from("member_pt_packages").select("price_amount").eq("trainer_id", trainer.id).in("status", ["active", "completed"]),
+  ]);
+
+  const sessions = sessionsResult.data ?? [];
+  const totalSessions = sessions.length;
+  const completedSessions = sessions.filter((s) => s.status === "completed").length;
+  const feedback = feedbackResult.data ?? [];
+  const averageRating = feedback.length > 0
+    ? feedback.reduce((sum, f) => sum + f.rating, 0) / feedback.length
+    : 0;
+
+  return {
+    assignedMembers: assignmentsResult.data?.length ?? 0,
+    completedSessions,
+    totalSessions,
+    completionRate: totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0,
+    averageRating: Math.round(averageRating * 10) / 10,
+    totalRevenue: (ptPackagesResult.data ?? []).reduce((sum, p) => sum + p.price_amount, 0),
+    activePrograms: programsResult.data?.length ?? 0,
   };
 }
 

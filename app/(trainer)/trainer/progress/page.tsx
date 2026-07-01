@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Apple, Dumbbell, Scale, Target, Trophy, UsersRound } from "lucide-react";
+import { Apple, Camera, Dumbbell, Scale, Target, Trophy, UsersRound } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -7,8 +7,10 @@ import { FitnessStatusBadge } from "@/features/fitness/components/fitness-status
 import { BodyMeasurementForm, FitnessGoalForm, FitnessMilestoneForm, MealPlanForm, NutritionPlanForm, WorkoutSessionForm } from "@/features/fitness/components/fitness-forms";
 import { calculateGoalProgress, formatFitnessLabel } from "@/features/fitness/lib/business-rules";
 import { getTrainerFitnessPortal } from "@/features/fitness/services/fitness-service";
+import { getMemberProgressPhotos } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { ProgressPhotoSection } from "./client";
 
 type TrainerProgressPageProps = {
   searchParams: Promise<{ memberId?: string }>;
@@ -136,6 +138,10 @@ export default async function TrainerProgressPage({ searchParams }: TrainerProgr
               <CardContent><FitnessMilestoneForm goals={selected.goals} memberId={selected.member.id} /></CardContent>
             </Card>
           </div>
+
+          {selected ? (
+            <ProgressPhotoSection memberId={selected.member.id} photos={await getMemberProgressPhotos(selected.member.id)} />
+          ) : null}
         </>
       ) : null}
     </div>

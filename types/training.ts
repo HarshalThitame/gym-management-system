@@ -44,6 +44,10 @@ export type WorkoutProgramExerciseRow = Database["public"]["Tables"]["workout_pr
 export type WorkoutProgramAssignmentRow = Database["public"]["Tables"]["workout_program_assignments"]["Row"];
 export type TrainerFeedbackRow = Database["public"]["Tables"]["trainer_feedback"]["Row"];
 export type StaffProfileRow = Database["public"]["Tables"]["staff_profiles"]["Row"];
+export type TrainerTimeOffRow = Database["public"]["Tables"]["trainer_time_off"]["Row"];
+export type TrainerCommissionRow = Database["public"]["Tables"]["trainer_commissions"]["Row"];
+export type TrainerCommissionRateRow = Database["public"]["Tables"]["trainer_commission_rates"]["Row"];
+export type MemberProgressPhotoRow = Database["public"]["Tables"]["member_progress_photos"]["Row"];
 
 export type TrainerDirectoryItem = TrainerRow & {
   profile: TrainerProfileRow | null;

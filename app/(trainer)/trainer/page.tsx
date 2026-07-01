@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Activity, CalendarCheck, CalendarDays, Dumbbell, MessageSquare, Star, UsersRound } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
+import { Activity, CalendarCheck, CalendarDays, Clock, Dumbbell, MessageSquare, Plus, Star, UsersRound, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { getTrainerClassesPortal } from "@/features/classes/services/class-service";
 import { getTrainerNotificationCenter } from "@/features/communications/services/communication-service";
 import { getTrainerFitnessPortal } from "@/features/fitness/services/fitness-service";
-import { TrainerSessionForm, TrainerSessionStatusForm } from "@/features/training/components/training-forms";
+import { TrainerSessionForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { DashboardClient, TodayTimeline, MemberCardGrid, FloatingQuickActions } from "./client";
 
 export const metadata: Metadata = createMetadata({
   title: "Trainer Dashboard",
@@ -30,25 +30,48 @@ export default async function TrainerDashboardPage() {
   const nutritionComplianceMembers = fitnessPortal.members.filter((member) => member.activeNutritionPlan).length;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Trainer Dashboard</p>
-        <h2 className="mt-2 text-3xl font-black">{dashboard.trainer?.display_name ?? "Trainer profile not linked"}</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Manage today&apos;s coaching work, assigned members, upcoming personal training sessions, and performance signals.</p>
+    <DashboardClient trainerName={dashboard.trainer?.display_name ?? "Trainer"}>
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/95 to-accent/90 p-8 shadow-premium-lg md:p-12">
+        <div className="absolute inset-0 bg-gradient-mesh-animated opacity-20" />
+        <div className="absolute -right-20 -top-20 size-64 rounded-full bg-accent/20 blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 size-64 rounded-full from-purple-500/20 blur-3xl" />
+        <div className="relative z-10">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Trainer Portal</p>
+          <h1 className="mt-3 text-4xl font-black text-white md:text-5xl">
+            Welcome back,{" "}
+            <span className="bg-gradient-to-r from-amber-200 to-yellow-300 bg-clip-text text-transparent">
+              {dashboard.trainer?.display_name?.split(" ")[0] ?? "Coach"}
+            </span>
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">
+            Manage today&apos;s coaching work, assigned members, upcoming personal training sessions, and performance signals — all in one place.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center gap-3 text-xs font-semibold text-white/70">
+            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur">
+              <Sparkles className="size-3.5" /> {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </span>
+            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur">
+              <Activity className="size-3.5" /> {dashboard.metrics.todaySessions} sessions today
+            </span>
+          </div>
+        </div>
       </div>
 
+      {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard detail="Scheduled for today" icon={<CalendarDays className="size-5" />} label="Today's PT Sessions" value={String(dashboard.metrics.todaySessions)} />
         <StatCard detail="Active coaching assignments" icon={<UsersRound className="size-5" />} label="Assigned Members" value={String(dashboard.metrics.assignedMembers)} />
-        <StatCard detail="Members under active coaching" icon={<UsersRound className="size-5" />} label="Active Clients" value={String(fitnessPortal.metrics.assignedMembers)} />
         <StatCard detail="Next 30 days" icon={<Dumbbell className="size-5" />} label="Upcoming Appointments" value={String(dashboard.metrics.upcomingSessions)} />
         <StatCard detail="Assigned group sessions" icon={<CalendarCheck className="size-5" />} label="Assigned Classes" value={String(classPortal.sessions.length)} />
-        <StatCard detail="Members needing a new assessment" icon={<Activity className="size-5" />} label="Pending Assessments" value={String(fitnessPortal.metrics.membersMissingWorkouts)} />
-        <StatCard detail="Active goals to review" icon={<Activity className="size-5" />} label="Pending Reviews" value={String(fitnessPortal.metrics.activeGoals)} />
-        <StatCard detail="Completed workouts in 30 days" icon={<Activity className="size-5" />} label="Workout Compliance" value={String(fitnessPortal.metrics.completedWorkouts30Days)} />
-        <StatCard detail="Members with active nutrition plans" icon={<Star className="size-5" />} label="Nutrition Compliance" value={String(nutritionComplianceMembers)} />
-        <StatCard detail="Members needing coaching follow-up" icon={<Activity className="size-5" />} label="Progress Alerts" value={String(fitnessPortal.metrics.membersMissingWorkouts)} />
-        <StatCard detail={`${communications?.metrics.priority ?? 0} priority alerts`} icon={<MessageSquare className="size-5" />} label="Unread Messages" value={String(communications?.metrics.unread ?? 0)} />
+        <StatCard detail={`${communications?.metrics.unread ?? 0} unread`} icon={<MessageSquare className="size-5" />} label="Unread Messages" value={String(communications?.metrics.unread ?? 0)} />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard detail="Active goals to review" status={fitnessPortal.metrics.activeGoals > 0 ? "watch" : undefined} icon={<Activity className="size-5" />} label="Pending Reviews" value={String(fitnessPortal.metrics.activeGoals)} />
+        <StatCard detail="Completed in 30 days" icon={<Activity className="size-5" />} label="Workout Compliance" value={String(fitnessPortal.metrics.completedWorkouts30Days)} />
+        <StatCard detail="With active plans" icon={<Star className="size-5" />} label="Nutrition Compliance" value={String(nutritionComplianceMembers)} />
+        <StatCard detail="Needing follow-up" status={fitnessPortal.metrics.membersMissingWorkouts > 0 ? "risk" : "good"} icon={<UsersRound className="size-5" />} label="Progress Alerts" value={String(fitnessPortal.metrics.membersMissingWorkouts)} />
       </div>
 
       {!dashboard.trainer ? (
@@ -62,57 +85,25 @@ export default async function TrainerDashboardPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
+      {/* Main Content Grid */}
+      <div className="grid gap-6 xl:grid-cols-[1fr_0.85fr]">
+        <TodayTimeline sessions={dashboard.todaysSessions} />
         <Card>
           <CardHeader>
-            <h3 className="text-2xl font-black">Today&apos;s Sessions</h3>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {dashboard.todaysSessions.map((session) => (
-              <div className="rounded-md border border-border bg-surface-muted p-4" key={session.id}>
-                <div className="flex flex-col justify-between gap-3 md:flex-row">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-bold">{session.member?.full_name ?? "Member"}</p>
-                      <TrainingStatusBadge status={session.status} />
-                    </div>
-                    <p className="mt-1 text-xs font-semibold text-muted-foreground">{session.starts_at.slice(0, 5)}-{session.ends_at.slice(0, 5)} · {session.workout_type}</p>
-                  </div>
-                  {session.status === "scheduled" || session.status === "rescheduled" ? <div className="w-full max-w-sm"><TrainerSessionStatusForm session={session} /></div> : null}
-                </div>
-              </div>
-            ))}
-            {dashboard.todaysSessions.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No sessions scheduled for today.</div> : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Schedule Session</h3>
+            <h3 className="text-2xl font-black">Quick Actions</h3>
+            <p className="text-xs font-semibold text-muted-foreground">Schedule and manage from here</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <TrainerSessionForm members={dashboard.assignedMembers} trainers={trainerList} />
-            <ButtonLink href="/trainer/classes" variant="secondary">Manage Group Classes</ButtonLink>
-            <ButtonLink href="/trainer/progress" variant="secondary">Review Progress</ButtonLink>
-            <ButtonLink href="/trainer/communications" variant="secondary">Communications</ButtonLink>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <h3 className="text-2xl font-black">Assigned Members</h3>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          {dashboard.assignedMembers.map((member) => (
-            <div className="rounded-md border border-border bg-surface-muted p-4" key={member.id}>
-              <p className="font-bold">{member.full_name}</p>
-              <p className="mt-1 text-xs font-semibold text-muted-foreground">{member.member_code} · {member.phone}</p>
-            </div>
-          ))}
-          {dashboard.assignedMembers.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No active member assignments yet.</div> : null}
-        </CardContent>
-      </Card>
-    </div>
+      {/* Assigned Members */}
+      <MemberCardGrid members={dashboard.assignedMembers} />
+
+      {/* Floating Quick Actions */}
+      <FloatingQuickActions />
+    </DashboardClient>
   );
 }

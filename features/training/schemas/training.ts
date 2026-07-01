@@ -83,6 +83,11 @@ export const PtPurchaseSchema = z.object({
   paymentStatus: z.enum(["pending_payment", "active"])
 });
 
+export const RecurrenceSchema = z.object({
+  frequency: z.enum(["none", "weekly", "biweekly", "monthly"]).optional().default("none"),
+  occurrences: z.coerce.number().int().min(1).max(52).optional().default(1),
+});
+
 export const TrainerSessionSchema = z.object({
   sessionId: optionalUuid,
   trainerId: z.string().uuid(),
@@ -93,7 +98,9 @@ export const TrainerSessionSchema = z.object({
   startsAt: timeString,
   endsAt: timeString,
   workoutType: z.string().trim().min(2).max(120),
-  notes: z.string().trim().max(1200).optional().or(z.literal(""))
+  notes: z.string().trim().max(1200).optional().or(z.literal("")),
+  recurrenceFrequency: z.enum(["none", "weekly", "biweekly", "monthly"]).optional().default("none"),
+  recurrenceOccurrences: z.coerce.number().int().min(1).max(52).optional().default(1),
 });
 
 export const TrainerSessionStatusSchema = z.object({
@@ -112,7 +119,9 @@ export const WorkoutProgramSchema = z.object({
   description: z.string().trim().max(1000).optional().or(z.literal("")),
   difficulty: z.enum(workoutDifficulties),
   durationWeeks: z.coerce.number().int().min(1).max(52),
-  status: z.enum(["draft", "active", "archived"])
+  status: z.enum(["draft", "active", "archived"]),
+  isTemplate: z.coerce.boolean().optional().default(false),
+  cloneFromProgramId: z.string().uuid().optional().or(z.literal("")),
 });
 
 export const WorkoutExerciseSchema = z.object({
@@ -165,6 +174,30 @@ export const StaffProfileSchema = z.object({
   status: z.enum(["active", "on_leave", "suspended", "archived"]),
   employmentType: z.enum(["full_time", "part_time", "contract"]),
   joinedAt: z.string().min(10)
+});
+
+export const TrainerTimeOffSchema = z.object({
+  timeOffId: z.string().uuid().optional().or(z.literal("")),
+  startsAt: z.string().min(1, "Start date is required"),
+  endsAt: z.string().min(1, "End date is required"),
+  reason: z.string().trim().min(3, "Reason must be at least 3 characters").max(300),
+});
+
+export const TrainerAvailabilitySelfSchema = z.object({
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
+  startsAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm format"),
+  endsAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm format"),
+  breakStartsAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal("")),
+  breakEndsAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().or(z.literal("")),
+  isActive: z.coerce.boolean().optional().default(true),
+});
+
+export const DeleteAvailabilitySchema = z.object({
+  availabilityId: z.string().uuid(),
+});
+
+export const CancelTimeOffSchema = z.object({
+  timeOffId: z.string().uuid(),
 });
 
 export type TrainerInput = z.infer<typeof TrainerSchema>;

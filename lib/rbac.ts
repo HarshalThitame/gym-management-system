@@ -32,7 +32,10 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionSet> = {
     backups: allActions,
     system_health: allActions,
     content: allActions,
-    audit_logs: ["read", "export"]
+    audit_logs: ["read", "export"],
+    trainer_availability: allActions,
+    trainer_time_off: allActions,
+    trainer_commissions: allActions
   },
   organization_owner: {
     users: readCreateUpdateExport,
@@ -58,7 +61,10 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionSet> = {
     backups: ["read", "create", "export"],
     system_health: readOnly,
     content: allActions,
-    audit_logs: ["read", "export"]
+    audit_logs: ["read", "export"],
+    trainer_availability: allActions,
+    trainer_time_off: allActions,
+    trainer_commissions: allActions
   },
   gym_admin: {
     users: readCreateUpdateExport,
@@ -84,7 +90,10 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionSet> = {
     backups: ["read", "create"],
     system_health: readOnly,
     content: allActions,
-    audit_logs: ["read"]
+    audit_logs: ["read"],
+    trainer_availability: readCreateUpdate,
+    trainer_time_off: ["read", "create", "update"],
+    trainer_commissions: readOnly
   },
   reception_staff: {
     users: ["read", "create", "update"],
@@ -121,7 +130,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionSet> = {
     classes: ["read", "update"],
     class_bookings: readOnly,
     notifications: ["read", "create", "update"],
-    reports: readOnly,
+    reports: ["read", "export"],
     settings: ["read", "update"],
     organizations: readOnly,
     branches: readOnly,
@@ -129,7 +138,10 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionSet> = {
     licenses: readOnly,
     compliance: readOnly,
     system_health: readOnly,
-    content: readOnly
+    content: readOnly,
+    trainer_availability: ["read", "create", "update", "delete"],
+    trainer_time_off: ["read", "create", "update", "delete"],
+    trainer_commissions: ["read"]
   },
   member: {
     users: ["read", "create", "update"],

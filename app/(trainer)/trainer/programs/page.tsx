@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { TrainerNoteForm, WorkoutAssignmentForm, WorkoutExerciseForm, WorkoutProgramForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
-import { getTrainerDashboard, getTrainerProfileBundle } from "@/features/training/services/training-service";
+import { getTrainerDashboard, getTrainerProfileBundle, listProgramTemplates } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { TemplateLibrary, ProgramCard } from "./client";
 
 export const metadata: Metadata = createMetadata({
   title: "Trainer Workout Programs",
@@ -18,14 +19,23 @@ export default async function TrainerProgramsPage() {
   const bundle = dashboard.trainer ? await getTrainerProfileBundle(dashboard.trainer.id) : null;
   const trainerList = dashboard.trainer ? [dashboard.trainer] : [];
   const programs = bundle?.programs ?? [];
+  const templates = await listProgramTemplates(context.profile?.gym_id ?? null);
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-5 xl:grid-cols-2">
+    <div className="space-y-8">
+      <div className="animate-fade-in-up">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Training</p>
+        <h2 className="mt-2 text-3xl font-black">Workout Programs</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          Build structured workout plans, add exercises, assign to members, and browse shared templates.
+        </p>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-2xl font-black">Create Workout Program</h2>
-            <p className="text-sm leading-6 text-muted-foreground">Build structured plans with exercises, duration, goals, and member assignment.</p>
+            <h3 className="text-2xl font-black">Create Program</h3>
+            <p className="text-xs font-semibold text-muted-foreground">Build a new workout plan from scratch</p>
           </CardHeader>
           <CardContent>
             <WorkoutProgramForm members={dashboard.assignedMembers} trainers={trainerList} />
@@ -34,7 +44,8 @@ export default async function TrainerProgramsPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-2xl font-black">Assign Program</h2>
+            <h3 className="text-2xl font-black">Assign Program</h3>
+            <p className="text-xs font-semibold text-muted-foreground">Assign a program to a member</p>
           </CardHeader>
           <CardContent>
             <WorkoutAssignmentForm members={dashboard.assignedMembers} programs={programs} trainers={trainerList} />
@@ -42,35 +53,31 @@ export default async function TrainerProgramsPage() {
         </Card>
       </div>
 
+      {templates.length > 0 && (
+        <TemplateLibrary templates={templates} />
+      )}
+
       <Card>
         <CardHeader>
-          <h2 className="text-2xl font-black">Program Library</h2>
+          <h3 className="text-2xl font-black">My Programs</h3>
+          <p className="text-xs font-semibold text-muted-foreground">{programs.length} program{programs.length !== 1 ? "s" : ""}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {programs.map((program) => (
-            <div className="rounded-lg border border-border bg-surface-muted p-4" key={program.id}>
-              <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-black">{program.name}</h3>
-                    <TrainingStatusBadge status={program.status} />
-                  </div>
-                  <p className="mt-1 text-sm font-semibold text-muted-foreground">{program.goal} · {program.difficulty} · {program.duration_weeks} weeks</p>
-                  {program.description ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{program.description}</p> : null}
-                </div>
-              </div>
-              <div className="mt-4">
-                <WorkoutExerciseForm programId={program.id} />
-              </div>
-            </div>
+            <ProgramCard key={program.id} program={program} />
           ))}
-          {programs.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No workout programs created yet.</div> : null}
+          {programs.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border bg-surface-muted/50 p-8 text-center">
+              <p className="text-sm font-bold text-muted-foreground">No programs created yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">Create your first workout program above or clone a template.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <h2 className="text-2xl font-black">Program Notes</h2>
+          <h3 className="text-2xl font-black">Program Notes</h3>
         </CardHeader>
         <CardContent>
           <TrainerNoteForm members={dashboard.assignedMembers} trainers={trainerList} />

@@ -11,6 +11,7 @@ import {
   BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
+  Clock,
   CreditCard,
   Dumbbell,
   Gauge,
@@ -19,12 +20,14 @@ import {
   ReceiptText,
   Settings,
   Tags,
+  TrendingUp,
   UserRound,
   UserRoundPlus,
   UsersRound,
   X
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export type MobilePortalIconKey =
@@ -36,6 +39,7 @@ export type MobilePortalIconKey =
   | "briefcase"
   | "calendar-check"
   | "calendar-days"
+  | "clock"
   | "credit-card"
   | "dumbbell"
   | "gauge"
@@ -46,6 +50,7 @@ export type MobilePortalIconKey =
   | "settings"
   | "tags"
   | "target"
+  | "trending-up"
   | "user"
   | "user-plus"
   | "users"
@@ -61,57 +66,129 @@ type MobileBottomNavProps = {
   items: MobilePortalNavItem[];
 };
 
+const navVariants = {
+  hidden: { y: 80, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { type: "spring", stiffness: 300, damping: 30, mass: 1, delay: 0.15 },
+  },
+};
+
+const panelVariants = {
+  hidden: { y: 30, opacity: 0, scale: 0.96 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    scale: 1,
+    transition: { type: "spring", stiffness: 350, damping: 28, mass: 0.8 },
+  },
+  exit: {
+    y: 20,
+    opacity: 0,
+    scale: 0.96,
+    transition: { duration: 0.15, ease: "easeIn" },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: 0.04 * i, type: "spring", stiffness: 300, damping: 24 },
+  }),
+};
+
 export function MobileBottomNav({ items }: MobileBottomNavProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
   const primaryItems = useMemo(() => items.slice(0, 4), [items]);
   const overflowItems = useMemo(() => items.slice(4), [items]);
 
+  const close = useCallback(() => setIsOpen(false), []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    if (isOpen) {
+      document.addEventListener("keydown", onKeyDown);
+      return () => document.removeEventListener("keydown", onKeyDown);
+    }
+  }, [isOpen, close]);
+
   return (
     <>
-      {isOpen && overflowItems.length > 0 ? (
-        <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] z-40 rounded-lg border border-border bg-surface p-2 shadow-premium lg:hidden">
-          <div className="mb-2 flex items-center justify-between px-2 py-1">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">More</p>
-            <button
-              aria-label="Close mobile navigation"
-              className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground"
-              onClick={() => setIsOpen(false)}
-              type="button"
-            >
-              <X aria-hidden="true" className="size-5" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {overflowItems.map((item) => {
-              const active = isActivePath(pathname, item.href);
-              const Icon = getPortalIcon(item.iconKey);
+      <AnimatePresence>
+        {isOpen && overflowItems.length > 0 ? (
+          <motion.div
+            key="mobile-nav-overflow"
+            variants={panelVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] z-40 rounded-lg border border-border bg-surface p-2 shadow-premium lg:hidden"
+            drag={shouldReduceMotion ? false : "y"}
+            dragConstraints={{ top: 0, bottom: 50 }}
+            dragElastic={0.2}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 40) close();
+            }}
+          >
+            <div className="mb-2 flex items-center justify-between px-2 py-1">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">More</p>
+              <button
+                aria-label="Close mobile navigation"
+                className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+                onClick={close}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {overflowItems.map((item, i) => {
+                const active = isActivePath(pathname, item.href);
+                const Icon = getPortalIcon(item.iconKey);
 
-              return (
-                <Link
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex min-h-12 items-center gap-3 rounded-md border px-3 text-sm font-bold transition",
-                    active
-                      ? "border-accent bg-accent text-accent-foreground"
-                      : "border-border bg-background text-muted-foreground hover:border-border-strong hover:text-foreground"
-                  )}
-                  href={item.href}
-                  key={`${item.href}-${item.label}`}
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Icon aria-hidden="true" className="size-4 shrink-0" />
-                  <span className="min-w-0 truncate">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+                return (
+                  <motion.div
+                    key={`${item.href}-${item.label}`}
+                    variants={shouldReduceMotion ? undefined : itemVariants}
+                    custom={i}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    <Link
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex min-h-12 items-center gap-3 rounded-md border px-3 text-sm font-bold transition",
+                        active
+                          ? "border-accent bg-accent text-accent-foreground"
+                          : "border-border bg-background text-muted-foreground hover:border-border-strong hover:text-foreground"
+                      )}
+                      href={item.href}
+                      onClick={close}
+                    >
+                      <Icon aria-hidden="true" className="size-4 shrink-0" />
+                      <span className="min-w-0 truncate">{item.label}</span>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-      <nav
+      <motion.nav
         aria-label="Mobile primary portal navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/94 px-3 pb-[calc(env(safe-area-inset-bottom)+0.55rem)] pt-2 shadow-[0_-16px_50px_rgb(17_18_20/0.12)] backdrop-blur-xl lg:hidden"
+        variants={shouldReduceMotion ? undefined : navVariants}
+        initial="hidden"
+        animate="visible"
       >
         <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
           {primaryItems.map((item) => {
@@ -147,7 +224,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
             <span>More</span>
           </button>
         </div>
-      </nav>
+      </motion.nav>
     </>
   );
 }
@@ -192,6 +269,10 @@ function getPortalIcon(iconKey: MobilePortalIconKey) {
       return UserRoundPlus;
     case "users":
       return UsersRound;
+    case "clock":
+      return Clock;
+    case "trending-up":
+      return TrendingUp;
     case "gauge":
     default:
       return Gauge;

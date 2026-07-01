@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { ReactNode } from "react";
+import { motion } from "framer-motion";
+import { Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
@@ -320,6 +322,7 @@ export function TrainerSessionForm({
   defaultMemberId?: string;
 }) {
   const [state, formAction] = useActionState(saveTrainerSessionAction, initialAuthActionState);
+  const [showRecurrence, setShowRecurrence] = useState(false);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -346,6 +349,40 @@ export function TrainerSessionForm({
           ))}
         </select>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setShowRecurrence(!showRecurrence)}
+        className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent transition-all duration-200 hover:text-accent/80"
+      >
+        <Repeat className="size-4" />
+        {showRecurrence ? "Remove recurrence" : "Repeat this session"}
+      </button>
+
+      {showRecurrence && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          className="space-y-3 overflow-hidden"
+        >
+          <div className="grid grid-cols-2 gap-3 rounded-lg border border-accent/20 bg-accent/5 p-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Repeat every</label>
+              <select className={selectClass} name="recurrenceFrequency" defaultValue="weekly">
+                <option value="weekly">Week</option>
+                <option value="biweekly">2 Weeks</option>
+                <option value="monthly">Month</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Occurrences</label>
+              <Input name="recurrenceOccurrences" type="number" min="1" max="52" defaultValue="4" aria-label="Number of occurrences" />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <Textarea name="notes" placeholder="Session focus, constraints, or preparation notes" />
       <AuthSubmitButton>Schedule Session</AuthSubmitButton>
     </form>
@@ -389,15 +426,19 @@ export function WorkoutProgramForm({ trainers, members, defaultTrainerId = "", d
           <option value="advanced">Advanced</option>
           <option value="elite">Elite</option>
         </select>
-        <Input name="durationWeeks" type="number" min={1} defaultValue={4} aria-label="Duration weeks" />
-        <select className={selectClass} name="status" defaultValue="active" aria-label="Program status">
+        <Input name="durationWeeks" min={1} max={52} type="number" defaultValue={4} aria-label="Duration in weeks" />
+        <select className={selectClass} name="status" defaultValue="draft" aria-label="Status">
           <option value="draft">Draft</option>
           <option value="active">Active</option>
           <option value="archived">Archived</option>
         </select>
       </div>
-      <Textarea name="description" placeholder="Program structure and coaching notes" />
-      <AuthSubmitButton>Create Program</AuthSubmitButton>
+      <Textarea name="description" placeholder="Program description, key focus areas, and expected outcomes" />
+      <label className="flex items-center gap-3 text-sm font-bold">
+        <input className="size-4 accent-primary" name="isTemplate" type="checkbox" />
+        Share as template for other trainers
+      </label>
+      <AuthSubmitButton>Save Program</AuthSubmitButton>
     </form>
   );
 }

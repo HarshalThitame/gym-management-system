@@ -32,7 +32,10 @@ export const authResources = [
   "backups",
   "system_health",
   "content",
-  "audit_logs"
+  "audit_logs",
+  "trainer_availability",
+  "trainer_time_off",
+  "trainer_commissions"
 ] as const;
 
 export type AuthResource = (typeof authResources)[number];

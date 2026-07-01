@@ -1,6 +1,6 @@
 "use server";
 
-import { addDays, formatISO } from "date-fns";
+import { addDays, addWeeks, addMonths, formatISO } from "date-fns";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
@@ -643,7 +643,9 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
     startsAt: formData.get("startsAt"),
     endsAt: formData.get("endsAt"),
     workoutType: formData.get("workoutType"),
-    notes: formData.get("notes") ?? ""
+    notes: formData.get("notes") ?? "",
+    recurrenceFrequency: formData.get("recurrenceFrequency") ?? "none",
+    recurrenceOccurrences: formData.get("recurrenceOccurrences") ?? "1",
   });
 
   if (!parsed.success) {
@@ -669,13 +671,12 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
     return { status: "error", message: memberAccess.message };
   }
 
-  const payload = {
+  const basePayload = {
     gym_id: access.trainer.gym_id,
     trainer_id: parsed.data.trainerId,
     member_id: parsed.data.memberId,
     member_pt_package_id: parsed.data.memberPtPackageId || null,
     workout_program_id: parsed.data.workoutProgramId || null,
-    session_date: parsed.data.sessionDate,
     starts_at: parsed.data.startsAt,
     ends_at: parsed.data.endsAt,
     duration_minutes: minutesBetweenTimes(parsed.data.sessionDate, parsed.data.startsAt, parsed.data.endsAt),
@@ -683,36 +684,77 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
     notes: parsed.data.notes || null,
     created_by: context.userId
   };
-  const sessionId = parsed.data.sessionId || null;
-  const result = sessionId
-    ? await (
-        access.trainer.gym_id
-          ? supabase.from("trainer_sessions").update(payload).eq("id", sessionId).eq("trainer_id", access.trainer.id).eq("gym_id", access.trainer.gym_id)
-          : supabase.from("trainer_sessions").update(payload).eq("id", sessionId).eq("trainer_id", access.trainer.id).is("gym_id", null)
-      ).select("*").maybeSingle()
-    : await supabase.from("trainer_sessions").insert(payload).select("*").maybeSingle();
 
-  if (result.error || !result.data) {
-    return { status: "error", message: result.error?.message ?? "Session save failed. Check for schedule conflicts." };
+  const sessionId = parsed.data.sessionId || null;
+  const hasRecurrence = parsed.data.recurrenceFrequency !== "none" && parsed.data.recurrenceOccurrences > 1;
+
+  if (sessionId) {
+    const result = await (
+      access.trainer.gym_id
+        ? supabase.from("trainer_sessions").update({ ...basePayload, session_date: parsed.data.sessionDate }).eq("id", sessionId).eq("trainer_id", access.trainer.id).eq("gym_id", access.trainer.gym_id)
+        : supabase.from("trainer_sessions").update({ ...basePayload, session_date: parsed.data.sessionDate }).eq("id", sessionId).eq("trainer_id", access.trainer.id).is("gym_id", null)
+    ).select("id").maybeSingle();
+
+    if (result.error || !result.data) {
+      return { status: "error", message: result.error?.message ?? "Session update failed." };
+    }
+
+    revalidatePath("/trainer");
+    revalidatePath("/trainer/sessions");
+    return { status: "success", message: "Session updated." };
   }
 
-  await Promise.all([
-    supabase.from("trainer_notification_events").insert({
-      gym_id: payload.gym_id,
-      trainer_id: parsed.data.trainerId,
-      member_id: parsed.data.memberId,
-      session_id: result.data.id,
-      event_type: "session_scheduled",
-      metadata: { sessionDate: parsed.data.sessionDate, startsAt: parsed.data.startsAt } as Json
-    }),
-    writeTrainingAudit(context, sessionId ? "trainer_session.updated" : "trainer_session.created", "trainer_session", result.data.id, { memberId: parsed.data.memberId })
-  ]);
+  const baseDate = new Date(parsed.data.sessionDate);
+  const sessionsToCreate = hasRecurrence ? parsed.data.recurrenceOccurrences : 1;
+  const createdIds: string[] = [];
+
+  for (let i = 0; i < sessionsToCreate; i++) {
+    let sessionDate: Date;
+    if (parsed.data.recurrenceFrequency === "weekly") {
+      sessionDate = addWeeks(baseDate, i);
+    } else if (parsed.data.recurrenceFrequency === "biweekly") {
+      sessionDate = addWeeks(baseDate, i * 2);
+    } else if (parsed.data.recurrenceFrequency === "monthly") {
+      sessionDate = addMonths(baseDate, i);
+    } else {
+      sessionDate = baseDate;
+    }
+
+    const sessionPayload = {
+      ...basePayload,
+      session_date: formatISO(sessionDate, { representation: "date" }),
+    };
+
+    const { data: created, error } = await supabase.from("trainer_sessions").insert(sessionPayload).select("id").maybeSingle();
+
+    if (error) {
+      continue;
+    }
+
+    if (created) {
+      createdIds.push(created.id);
+      await supabase.from("trainer_notification_events").insert({
+        gym_id: sessionPayload.gym_id,
+        trainer_id: sessionPayload.trainer_id,
+        member_id: sessionPayload.member_id,
+        session_id: created.id,
+        event_type: "session_scheduled",
+        metadata: { sessionDate: sessionPayload.session_date, startsAt: sessionPayload.starts_at, recurrenceNumber: i + 1 } as Json
+      });
+    }
+  }
+
+  if (createdIds.length === 0) {
+    return { status: "error", message: "Failed to create session. Check for schedule conflicts." };
+  }
+
+  await writeTrainingAudit(context, "trainer_session.created", "trainer_session", createdIds[0], { memberId: parsed.data.memberId, sessionCount: createdIds.length });
 
   revalidatePath("/trainer");
   revalidatePath("/trainer/sessions");
   revalidatePath(`/admin/trainers/${parsed.data.trainerId}`);
   revalidatePath(`/admin/members/${parsed.data.memberId}`);
-  return { status: "success", message: sessionId ? "Session updated." : "Session scheduled." };
+  return { status: "success", message: createdIds.length > 1 ? `${createdIds.length} sessions scheduled.` : "Session scheduled." };
 }
 
 export async function updateTrainerSessionStatusAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {

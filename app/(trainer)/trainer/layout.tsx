@@ -1,9 +1,13 @@
-import { Activity, Brain, CalendarCheck, CalendarDays, Dumbbell, Gauge, MessageSquare, UsersRound } from "lucide-react";
+import { Activity, Brain, CalendarCheck, CalendarDays, Clock, Dumbbell, Gauge, MessageSquare, TrendingUp, UsersRound } from "lucide-react";
+import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { PortalShell, type PortalNavItem } from "@/components/layout/portal-shell";
 import { requireRole } from "@/lib/auth/guards";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getTenantSiteConfig } from "@/lib/tenant/site";
+
+const PageTransition = dynamic(() => import("@/components/motion/page-transition"), { ssr: false });
+const CommandPaletteWrapper = dynamic(() => import("./command-palette-wrapper"), { ssr: false });
 
 const trainerNav = [
   { href: "/trainer", label: "Dashboard", icon: <Gauge className="size-5" />, iconKey: "gauge" },
@@ -14,6 +18,8 @@ const trainerNav = [
   { href: "/trainer/programs", label: "Programs", icon: <Dumbbell className="size-5" />, iconKey: "dumbbell" },
   { href: "/trainer/progress", label: "Progress", icon: <Activity className="size-5" />, iconKey: "activity" },
   { href: "/trainer/ai", label: "AI Assistant", icon: <Brain className="size-5" />, iconKey: "brain" },
+  { href: "/trainer/availability", label: "Availability", icon: <Clock className="size-5" />, iconKey: "clock" },
+  { href: "/trainer/performance", label: "Performance", icon: <TrendingUp className="size-5" />, iconKey: "trending-up" },
   { href: "/trainer/communications", label: "Communications", icon: <MessageSquare className="size-5" />, iconKey: "message-square" }
 ] satisfies PortalNavItem[];
 
@@ -37,7 +43,8 @@ export default async function TrainerLayout({ children }: { children: ReactNode 
       tenantShortName={tenantSite.shortName}
       title="Trainer Dashboard"
     >
-      {children}
+      <PageTransition>{children}</PageTransition>
+      <CommandPaletteWrapper />
     </PortalShell>
   );
 }

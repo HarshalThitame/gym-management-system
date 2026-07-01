@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { TrainerSessionForm, TrainerSessionStatusForm } from "@/features/training/components/training-forms";
-import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
+import { TrainerSessionForm } from "@/features/training/components/training-forms";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
+import { SessionsClient, SessionsCalendar, SessionsFilteredList } from "./client";
 
 export const metadata: Metadata = createMetadata({
   title: "Trainer Sessions",
@@ -18,42 +18,40 @@ export default async function TrainerSessionsPage() {
   const trainerList = dashboard.trainer ? [dashboard.trainer] : [];
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <h2 className="text-2xl font-black">Schedule Session</h2>
-          <p className="text-sm leading-6 text-muted-foreground">Create member sessions with schedule conflict protection and package usage tracking when completed.</p>
-        </CardHeader>
-        <CardContent>
-          <TrainerSessionForm members={dashboard.assignedMembers} trainers={trainerList} />
-        </CardContent>
-      </Card>
+    <SessionsClient>
+      <div className="animate-fade-in-up">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Training</p>
+        <h2 className="mt-2 text-3xl font-black">Sessions</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          Schedule, manage, and track personal training sessions with conflict protection.
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-2xl font-black">Upcoming Sessions</h2>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {dashboard.upcomingSessions.map((session) => (
-            <div className="rounded-md border border-border bg-surface-muted p-4" key={session.id}>
-              <div className="flex flex-col justify-between gap-3 md:flex-row">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-bold">{session.member?.full_name ?? "Member"}</p>
-                    <TrainingStatusBadge status={session.status} />
-                  </div>
-                  <p className="mt-1 text-xs font-semibold text-muted-foreground">{session.session_date} · {session.starts_at.slice(0, 5)}-{session.ends_at.slice(0, 5)} · {session.workout_type}</p>
-                  {session.notes ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{session.notes}</p> : null}
-                </div>
-                <div className="w-full max-w-sm">
-                  <TrainerSessionStatusForm session={session} />
-                </div>
-              </div>
-            </div>
-          ))}
-          {dashboard.upcomingSessions.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No upcoming sessions scheduled.</div> : null}
-        </CardContent>
-      </Card>
-    </div>
+      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+        <div className="space-y-6">
+          <SessionsCalendar sessions={dashboard.upcomingSessions} />
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">All Sessions</h3>
+            </CardHeader>
+            <CardContent>
+              <SessionsFilteredList sessions={dashboard.upcomingSessions} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Schedule Session</h3>
+              <p className="text-xs font-semibold text-muted-foreground">Create new PT session with conflict checks</p>
+            </CardHeader>
+            <CardContent>
+              <TrainerSessionForm members={dashboard.assignedMembers} trainers={trainerList} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </SessionsClient>
   );
 }
