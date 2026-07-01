@@ -1,13 +1,10 @@
 import { Activity, Brain, CalendarCheck, CalendarDays, Clock, Dumbbell, Gauge, MessageSquare, TrendingUp, UsersRound } from "lucide-react";
-import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { PortalShell, type PortalNavItem } from "@/components/layout/portal-shell";
 import { requireRole } from "@/lib/auth/guards";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getTenantSiteConfig } from "@/lib/tenant/site";
-
-const PageTransition = dynamic(() => import("@/components/motion/page-transition"), { ssr: false });
-const CommandPaletteWrapper = dynamic(() => import("./command-palette-wrapper"), { ssr: false });
+import { PageTransitionWrapper, CommandPalette } from "./dynamic-components";
 
 const trainerNav = [
   { href: "/trainer", label: "Dashboard", icon: <Gauge className="size-5" />, iconKey: "gauge" },
@@ -43,8 +40,8 @@ export default async function TrainerLayout({ children }: { children: ReactNode 
       tenantShortName={tenantSite.shortName}
       title="Trainer Dashboard"
     >
-      <PageTransition>{children}</PageTransition>
-      <CommandPaletteWrapper />
+      <PageTransitionWrapper>{children}</PageTransitionWrapper>
+      <CommandPalette />
     </PortalShell>
   );
 }
