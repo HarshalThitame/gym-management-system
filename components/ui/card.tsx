@@ -2,8 +2,28 @@ import type { HTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-border bg-surface shadow-[0_18px_60px_rgb(17_18_20/0.06)]", className)} {...props} />;
+const cardVariants = cva(
+  "rounded-lg border transition-all duration-300",
+  {
+    variants: {
+      variant: {
+        default: "border-border bg-surface shadow-[0_18px_60px_rgb(17_18_20/0.06)]",
+        glass: "glass border-border/50 shadow-premium hover:shadow-premium-lg hover-lift",
+        elevated: "border-border bg-surface shadow-premium hover:shadow-premium-lg hover-lift",
+        gradient: "border-transparent bg-gradient-to-br from-surface to-surface-muted shadow-premium hover:shadow-glow",
+        glow: "border-accent/20 bg-surface shadow-glow-sm hover:shadow-glow hover:border-accent/40"
+      }
+    },
+    defaultVariants: {
+      variant: "default"
+    }
+  }
+);
+
+type CardProps = HTMLAttributes<HTMLDivElement> & VariantProps<typeof cardVariants>;
+
+export function Card({ className, variant, ...props }: CardProps) {
+  return <div className={cn(cardVariants({ variant }), className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

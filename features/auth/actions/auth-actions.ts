@@ -310,19 +310,26 @@ async function resolveUserRedirect(supabase: SupabaseClient<Database>, userId: s
   const { data: assignments } = await supabase.from("user_roles").select("role_id").eq("user_id", userId);
   const roleIds = assignments?.map((assignment) => assignment.role_id) ?? [];
 
-  if (roleIds.length === 0) {
-    return "/member";
-  }
-
-  const { data: roles } = await supabase.from("roles").select("id,name").in("id", roleIds);
+  const { data: roles } = roleIds.length > 0
+    ? await supabase.from("roles").select("id,name").in("id", roleIds)
+    : { data: [] };
   const roleNames = (roles ?? [])
     .map((role) => role.name)
     .filter(isRoleName);
+  const hasOrganizationOwnerScope = await userHasOrganizationOwnerScope(supabase, userId);
 
-  return getRoleRedirect(roleNames);
+  if (roleNames.length === 0 && !hasOrganizationOwnerScope) {
+    return "/member";
+  }
+
+  const mergedRoleNames = hasOrganizationOwnerScope && !roleNames.includes("organization_owner")
+    ? [...roleNames, "organization_owner" as const]
+    : roleNames;
+
+  return getRoleRedirect(mergedRoleNames);
 }
 
-async function resolveUserRoleNamesWithServiceRole(userId: string) {
+async function resolveUserRoleNamesWithServiceRole(userId: string): Promise<RoleName[]> {
   const url = getSupabaseUrl();
   const serviceKey = getSupabaseServiceKey();
 
@@ -348,12 +355,73 @@ async function resolveUserRoleNamesWithServiceRole(userId: string) {
     }
 
     const assignments = await response.json() as Array<{ roles?: { name?: string | null } | null }>;
-    return assignments
+    const roles = assignments
       .map((assignment) => assignment.roles?.name)
       .filter((roleName): roleName is RoleName => typeof roleName === "string" && isRoleName(roleName));
+    const hasOwnerScope = await userHasOrganizationOwnerScopeWithServiceRole(userId, url, serviceKey);
+
+    return hasOwnerScope && !roles.includes("organization_owner") ? [...roles, "organization_owner" as const] : roles;
   } catch {
     return [];
   }
+}
+
+async function userHasOrganizationOwnerScope(supabase: SupabaseClient<Database>, userId: string) {
+  const { data: branchUser } = await supabase
+    .from("branch_users")
+    .select("organization_id")
+    .eq("user_id", userId)
+    .eq("role_name", "organization_owner")
+    .eq("access_scope", "organization")
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (branchUser?.organization_id) return true;
+
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("owner_user_id", userId)
+    .maybeSingle();
+
+  return Boolean(organization?.id);
+}
+
+async function userHasOrganizationOwnerScopeWithServiceRole(userId: string, url: string, serviceKey: string) {
+  const branchUsersEndpoint = new URL("/rest/v1/branch_users", url);
+  branchUsersEndpoint.searchParams.set("select", "organization_id");
+  branchUsersEndpoint.searchParams.set("user_id", `eq.${userId}`);
+  branchUsersEndpoint.searchParams.set("role_name", "eq.organization_owner");
+  branchUsersEndpoint.searchParams.set("access_scope", "eq.organization");
+  branchUsersEndpoint.searchParams.set("status", "eq.active");
+  branchUsersEndpoint.searchParams.set("limit", "1");
+
+  const organizationsEndpoint = new URL("/rest/v1/organizations", url);
+  organizationsEndpoint.searchParams.set("select", "id");
+  organizationsEndpoint.searchParams.set("owner_user_id", `eq.${userId}`);
+  organizationsEndpoint.searchParams.set("limit", "1");
+
+  const headers = {
+    apikey: serviceKey,
+    authorization: `Bearer ${serviceKey}`
+  };
+
+  const [branchUsersResponse, organizationsResponse] = await Promise.all([
+    fetch(branchUsersEndpoint, { cache: "no-store", headers }),
+    fetch(organizationsEndpoint, { cache: "no-store", headers })
+  ]);
+
+  if (branchUsersResponse.ok) {
+    const branchUsers = await branchUsersResponse.json() as Array<{ organization_id?: string | null }>;
+    if (branchUsers.some((branchUser) => branchUser.organization_id)) return true;
+  }
+
+  if (organizationsResponse.ok) {
+    const organizations = await organizationsResponse.json() as Array<{ id?: string | null }>;
+    if (organizations.some((organization) => organization.id)) return true;
+  }
+
+  return false;
 }
 
 async function createAuthClientOrNull() {

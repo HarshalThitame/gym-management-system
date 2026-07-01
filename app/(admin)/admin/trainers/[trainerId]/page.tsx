@@ -11,6 +11,7 @@ import {
   AvailabilityForm,
   CertificationForm,
   EndAssignmentForm,
+  TrainerArchiveForm,
   TrainerAssignmentForm,
   TrainerForm,
   TrainerNoteForm,
@@ -97,6 +98,16 @@ export default async function AdminTrainerProfilePage({ params }: TrainerProfile
         </Card>
 
         <div className="space-y-5">
+          {bundle.trainer.status !== "archived" && (
+            <Card>
+              <CardHeader>
+                <h3 className="text-2xl font-black">Archive Trainer</h3>
+              </CardHeader>
+              <CardContent>
+                <TrainerArchiveForm trainerId={bundle.trainer.id} />
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <h3 className="text-2xl font-black">Specializations</h3>

@@ -37,6 +37,7 @@ type PortalShellProps = {
   planContext?: OrgPlanContext | null;
   planManageHref?: string | null;
   showPlanIndicator?: boolean;
+  headerActions?: ReactNode;
   children: ReactNode;
 };
 
@@ -59,6 +60,7 @@ export function PortalShell({
   planContext,
   planManageHref,
   showPlanIndicator = false,
+  headerActions,
   children
 }: PortalShellProps) {
   const displayName = context.profile?.full_name || context.email || `${tenantShortName} User`;
@@ -93,13 +95,13 @@ export function PortalShell({
   }, [sidebarOpen, closeSidebar]);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-background text-foreground bg-gradient-mesh">
       <ProtectedPageCacheGuard />
 
       {/* Mobile sidebar overlay */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-ink/45 transition-opacity duration-200 lg:hidden",
+          "fixed inset-0 z-40 bg-ink/45 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
           sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={closeSidebar}
@@ -110,33 +112,34 @@ export function PortalShell({
       <aside
         ref={sidebarRef}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-surface transition-transform duration-200 lg:hidden",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border/50 glass transition-all duration-300 lg:hidden",
+          sidebarOpen ? "translate-x-0 shadow-premium-lg" : "-translate-x-full",
         )}
         role="dialog"
         aria-modal={sidebarOpen}
         aria-label="Navigation menu"
       >
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <Link className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.16em]" href="/" onClick={closeSidebar}>
-            <span className="grid size-9 place-items-center rounded-md bg-accent text-accent-foreground">{tenantInitial}</span>
-            <span>{tenantShortName}</span>
+        <div className="flex items-center justify-between border-b border-border/50 p-4">
+          <Link className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.16em] group" href="/" onClick={closeSidebar}>
+            <span className="grid size-9 place-items-center rounded-lg bg-gradient-to-br from-accent to-purple-600 text-white shadow-glow transition-all duration-300 group-hover:scale-110 group-hover:shadow-glow-lg">{tenantInitial}</span>
+            <span className="gradient-text">{tenantShortName}</span>
           </Link>
           <button
             onClick={closeSidebar}
-            className="flex size-11 items-center justify-center rounded-md hover:bg-surface-muted"
+            className="flex size-11 items-center justify-center rounded-lg hover:bg-surface-muted transition-all duration-200 hover:scale-110"
             aria-label="Close navigation menu"
           >
             <X className="size-5" />
           </button>
         </div>
         <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-          {navItems.map((item) => (
+          {navItems.map((item, index) => (
             item.locked ? (
               <div
                 key={`${item.href}-${item.label}`}
-                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
+                className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
                 title={item.lockedReason}
+                style={{ animationDelay: `${index * 50}ms` }}
               >
                 <Lock className="size-4 shrink-0" />
                 {item.icon}
@@ -145,50 +148,62 @@ export function PortalShell({
             ) : (
               <Link
                 className={cn(
-                  "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold transition",
-                  isActiveItem(item.href) ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+                  "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-all duration-300 card-hover relative overflow-hidden group",
+                  isActiveItem(item.href) 
+                    ? "bg-gradient-to-r from-accent/10 to-purple-600/10 text-primary shadow-glow-sm" 
+                    : "text-muted-foreground hover:bg-surface-muted/80 hover:text-foreground hover:shadow-glow-sm"
                 )}
                 href={item.href}
                 key={`${item.href}-${item.label}`}
                 aria-current={isActiveItem(item.href) ? "page" : undefined}
                 onClick={closeSidebar}
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                {item.icon}
-                {item.label}
+                {isActiveItem(item.href) && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent to-purple-600 rounded-r-full" />
+                )}
+                <span className={cn(
+                  "transition-all duration-300",
+                  isActiveItem(item.href) ? "scale-110" : "group-hover:scale-110"
+                )}>
+                  {item.icon}
+                </span>
+                <span>{item.label}</span>
               </Link>
             )
           ))}
         </nav>
         {showPlanIndicator && planContext ? (
-          <div className="border-t border-border p-3">
+          <div className="border-t border-border/50 p-3">
             <PlanIndicator planContext={planContext} planManageHref={planManageHref} />
           </div>
         ) : null}
-        <form id="sign-out-form-mobile" action={signOutAction} className="border-t border-border p-3" onClick={closeSidebar}>
+        <form id="sign-out-form-mobile" action={signOutAction} className="border-t border-border/50 p-3" onClick={closeSidebar}>
           <SignOutButton />
         </form>
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-border bg-surface lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-border/50 glass lg:block shadow-premium">
         <div className="flex h-full flex-col">
-          <div className="border-b border-border p-6">
-            <Link className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.16em]" href="/">
-              <span className="grid size-9 place-items-center rounded-md bg-accent text-accent-foreground">{tenantInitial}</span>
-              <span>{tenantShortName}</span>
+          <div className="border-b border-border/50 p-6">
+            <Link className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.16em] group" href="/">
+              <span className="grid size-10 place-items-center rounded-lg bg-gradient-to-br from-accent to-purple-600 text-white shadow-glow transition-all duration-300 group-hover:scale-110 group-hover:shadow-glow-lg group-hover:rotate-3">{tenantInitial}</span>
+              <span className="gradient-text text-lg">{tenantShortName}</span>
             </Link>
-            <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
+            <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
             {branchName ? <p className="mt-2 text-xs font-semibold text-muted-foreground">{branchName}</p> : null}
           </div>
           <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-            {navItems.map((item) => {
+            {navItems.map((item, index) => {
               const active = isActiveItem(item.href);
               if (item.locked) {
                 return (
                   <div
                     key={`${item.href}-${item.label}`}
-                    className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
                     title={item.lockedReason}
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <Lock className="size-4 shrink-0" />
                     {item.icon}
@@ -199,21 +214,37 @@ export function PortalShell({
               return (
                 <Link
                   className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold transition",
-                    active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-surface-muted hover:text-foreground"
+                    "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-all duration-300 card-hover relative overflow-hidden group animate-fade-in-left",
+                    active 
+                      ? "bg-gradient-to-r from-accent/10 to-purple-600/10 text-primary shadow-glow-sm" 
+                      : "text-muted-foreground hover:bg-surface-muted/80 hover:text-foreground hover:shadow-glow-sm"
                   )}
                   href={item.href}
                   key={`${item.href}-${item.label}`}
                   aria-current={active ? "page" : undefined}
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  {item.icon}
-                  {item.label}
+                  {active && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent to-purple-600 rounded-r-full animate-pulse-glow" />
+                  )}
+                  <span className={cn(
+                    "transition-all duration-300",
+                    active ? "scale-110 text-accent" : "group-hover:scale-110 group-hover:text-accent"
+                  )}>
+                    {item.icon}
+                  </span>
+                  <span className="relative">
+                    {item.label}
+                    {active && (
+                      <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-purple-600 rounded-full" />
+                    )}
+                  </span>
                 </Link>
               );
             })}
           </nav>
           {showPlanIndicator && planContext ? (
-            <div className="border-t border-border p-3">
+            <div className="border-t border-border/50 p-3">
               <PlanIndicator planContext={planContext} planManageHref={planManageHref} />
             </div>
           ) : null}
@@ -221,24 +252,25 @@ export function PortalShell({
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
+        <header className="sticky top-0 z-20 border-b border-border/50 glass shadow-premium-sm">
           <div className="container-page flex min-h-16 items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="flex size-11 items-center justify-center rounded-md hover:bg-surface-muted lg:hidden"
+                className="flex size-11 items-center justify-center rounded-lg hover:bg-surface-muted transition-all duration-200 hover:scale-110 lg:hidden"
                 aria-label="Open navigation menu"
                 aria-expanded={sidebarOpen}
               >
                 <Menu className="size-5" />
               </button>
-              <div>
+              <div className="animate-fade-in-down">
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
-                <h1 className="text-xl font-black md:text-2xl">{title}</h1>
+                <h1 className="text-xl font-black md:text-2xl gradient-text">{title}</h1>
                 <p className="mt-1 text-xs font-semibold text-muted-foreground sm:hidden">{tenantName}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 animate-fade-in-right">
+              {headerActions}
               {showPlanIndicator && planContext ? (
                 <div className="hidden md:block lg:hidden">
                   <PackageBadge packageName={planContext.packageName} />
@@ -246,7 +278,7 @@ export function PortalShell({
               ) : null}
               <div className="hidden text-right sm:block">
                 <p className="text-xs font-semibold text-muted-foreground">{tenantName}</p>
-                <p className="text-sm font-black">{displayName}</p>
+                <p className="text-sm font-black gradient-text">{displayName}</p>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{context.primaryRole?.replace("_", " ") ?? "authenticated"}</p>
               </div>
               <form id="sign-out-form-desktop" action={signOutAction} className="lg:hidden">
@@ -255,7 +287,7 @@ export function PortalShell({
             </div>
           </div>
         </header>
-        <div className="container-page space-y-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-6 md:pb-10 md:pt-10">
+        <div className="container-page space-y-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-6 md:pb-10 md:pt-10 animate-fade-in-up">
           {showPlanBanner && planContext ? <PlanStatusBanner planContext={planContext} /> : null}
           {children}
         </div>

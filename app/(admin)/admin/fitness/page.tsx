@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Activity, Apple, Dumbbell, Library, Target, Trophy, UsersRound } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Metric } from "@/components/ui/metric-tile";
+import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
-import { ExerciseForm } from "@/features/fitness/components/fitness-forms";
+import { ExerciseDeleteForm, ExerciseForm } from "@/features/fitness/components/fitness-forms";
 import { formatFitnessLabel } from "@/features/fitness/lib/business-rules";
 import { getFitnessOperationsDashboard, listExercises } from "@/features/fitness/services/fitness-service";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
@@ -82,11 +84,28 @@ export default async function AdminFitnessPage({ searchParams }: AdminFitnessPag
                 </div>
                 <p className="mt-2 text-xs font-semibold text-muted-foreground">{formatFitnessLabel(exercise.category)} · {exercise.primary_muscle_group} · {exercise.equipment}</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{exercise.instructions}</p>
+                <details className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
+                  <summary className="cursor-pointer text-xs font-black text-destructive">Delete</summary>
+                  <div className="mt-2">
+                    <ExerciseDeleteForm exerciseId={exercise.id} />
+                  </div>
+                </details>
               </div>
             ))}
             {exerciseResult.exercises.length === 0 ? <p className="text-sm font-semibold text-muted-foreground">No exercises match the current filters.</p> : null}
           </CardContent>
         </Card>
+        
+        {Math.ceil(exerciseResult.total / exerciseResult.pageSize) > 1 && (
+          <div className="xl:col-span-2">
+            <Pagination 
+              currentPage={exerciseResult.page} 
+              totalPages={Math.ceil(exerciseResult.total / exerciseResult.pageSize)} 
+              baseHref="/admin/fitness"
+              totalItems={exerciseResult.total}
+            />
+          </div>
+        )}
 
         <Card>
           <CardHeader><h3 className="text-2xl font-black">Add Exercise</h3></CardHeader>
@@ -114,15 +133,6 @@ export default async function AdminFitnessPage({ searchParams }: AdminFitnessPag
           {dashboard.summaries.length === 0 ? <p className="text-sm font-semibold text-muted-foreground">No member progress records yet.</p> : null}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-black">{value}</p>
     </div>
   );
 }

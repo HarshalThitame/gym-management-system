@@ -293,21 +293,25 @@ export async function getMemberTrainingPortal(userId: string): Promise<MemberTra
   };
 }
 
-export async function listStaffProfiles(gymId: string | null) {
+export async function listStaffProfiles(gymId: string | null, options?: { page?: number; pageSize?: number }) {
   const supabase = await createSupabaseServerClient();
-  let query = supabase.from("staff_profiles").select("*").order("created_at", { ascending: false });
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 20;
+  const offset = (page - 1) * pageSize;
+  
+  let query = supabase.from("staff_profiles").select("*", { count: "exact" }).order("created_at", { ascending: false });
 
   if (gymId) {
     query = query.eq("gym_id", gymId);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query.range(offset, offset + pageSize - 1);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return data ?? [];
+  return { data: data ?? [], count: count ?? 0, page, pageSize };
 }
 
 export async function getTrainingReportRows(gymId: string | null, type: TrainingReportType) {

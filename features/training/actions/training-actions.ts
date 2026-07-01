@@ -152,6 +152,44 @@ export async function saveTrainerAction(_previousState: AuthActionState, formDat
   return { status: "success", message: trainerId ? "Trainer updated." : "Trainer created." };
 }
 
+export async function archiveTrainerAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  const scope = await requireGymAdminScope("/admin/trainers");
+  const trainerId = formData.get("trainerId");
+  if (!trainerId || typeof trainerId !== "string") {
+    return { status: "error", message: "Trainer ID is required." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("trainers")
+    .update({ status: "archived", archived_at: new Date().toISOString() })
+    .eq("id", trainerId)
+    .eq("gym_id", scope.gymId);
+
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  await supabase
+    .from("trainer_assignments")
+    .update({ status: "ended", ended_at: new Date().toISOString(), reason: "trainer_archived" })
+    .eq("trainer_id", trainerId)
+    .eq("status", "active");
+
+  await writeAuditLog({
+    actorId: scope.userId,
+    gymId: scope.gymId,
+    action: "trainer.archived",
+    entityType: "trainer",
+    entityId: trainerId,
+    metadata: {}
+  });
+
+  revalidatePath("/admin/trainers");
+  revalidatePath(`/admin/trainers/${trainerId}`);
+  return { status: "success", message: "Trainer archived and assignments ended." };
+}
+
 export async function addTrainerSpecializationAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/trainers");
   const context = scope;
@@ -469,6 +507,26 @@ export async function savePtPackageAction(_previousState: AuthActionState, formD
   revalidatePath("/admin/trainers/packages");
   revalidatePath("/admin/trainers");
   return { status: "success", message: packageId ? "PT package updated." : "PT package created." };
+}
+
+export async function deletePtPackageAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  const scope = await requireGymAdminScope("/admin/trainers/packages");
+  const packageId = formData.get("packageId");
+  if (!packageId || typeof packageId !== "string") {
+    return { status: "error", message: "Package ID is required." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("personal_training_packages").delete().eq("id", packageId).eq("gym_id", scope.gymId);
+
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  await writeTrainingAudit(scope, "pt_package.deleted", "personal_training_package", packageId, {});
+  revalidatePath("/admin/trainers/packages");
+  revalidatePath("/admin/trainers");
+  return { status: "success", message: "PT package deleted." };
 }
 
 export async function purchasePtPackageAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
@@ -1133,6 +1191,29 @@ export async function saveStaffProfileAction(_previousState: AuthActionState, fo
   await writeTrainingAudit(context, staffId ? "staff.updated" : "staff.created", "staff_profile", result.data.id, { role: parsed.data.staffRole });
   revalidatePath("/admin/staff");
   return { status: "success", message: staffId ? "Staff profile updated." : "Staff profile created." };
+}
+
+export async function archiveStaffAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  const scope = await requireGymAdminScope("/admin/staff");
+  const staffId = formData.get("staffId");
+  if (!staffId || typeof staffId !== "string") {
+    return { status: "error", message: "Staff ID is required." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("staff_profiles")
+    .update({ status: "archived" })
+    .eq("id", staffId)
+    .eq("gym_id", scope.gymId);
+
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  await writeTrainingAudit(scope, "staff.archived", "staff_profile", staffId, {});
+  revalidatePath("/admin/staff");
+  return { status: "success", message: "Staff profile archived." };
 }
 
 async function ensureTrainerWriteAccess(supabase: AppSupabase, context: AuthContext, trainerId: string): Promise<{ ok: true; trainer: TrainerRow } | { ok: false; message: string }> {

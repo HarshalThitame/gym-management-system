@@ -12,6 +12,7 @@ import type { TrainerRow } from "@/types/training";
 import {
   bookClassAction,
   cancelClassBookingAction,
+  deleteClassAction,
   generateClassScheduleAction,
   recordClassAttendanceAction,
   saveClassAction,
@@ -239,5 +240,22 @@ function Field({ id, label, name, state, children }: { id?: string; label: strin
       {children}
       <FieldError message={state.fieldErrors?.[name]?.[0]} />
     </div>
+  );
+}
+
+function HiddenInput({ name, value }: { name: string; value: string }) {
+  return <input name={name} suppressHydrationWarning type="hidden" value={value} />;
+}
+
+export function ClassDeleteForm({ classId }: { classId: string }) {
+  const [state, formAction] = useActionState(deleteClassAction, initialAuthActionState);
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <FormMessage state={state} />
+      <HiddenInput name="classId" value={classId} />
+      <p className="text-sm font-semibold text-destructive">This will permanently delete the class and all associated sessions.</p>
+      <AuthSubmitButton>Delete Class</AuthSubmitButton>
+    </form>
   );
 }

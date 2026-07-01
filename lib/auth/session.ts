@@ -52,16 +52,19 @@ export async function getAuthContext(): Promise<AuthContext> {
     .map((role) => role.name)
     .filter(isRoleName);
   const normalizedProfile = profile ? toAuthProfile(profile) : null;
-  const organizationId = await getUserOrganizationId(supabase, userId, normalizedProfile?.gym_id ?? null, normalizedProfile?.branch_id ?? null);
-  const primaryRole = getPrimaryRole(roles);
+  const organizationScope = await getUserOrganizationScope(supabase, userId, normalizedProfile?.gym_id ?? null, normalizedProfile?.branch_id ?? null);
+  const mergedRoles = organizationScope.isOrganizationOwner && !roles.includes("organization_owner")
+    ? [...roles, "organization_owner" as const]
+    : roles;
+  const primaryRole = getPrimaryRole(mergedRoles);
   const isActive = normalizedProfile?.status === "active" || normalizedProfile?.status === "invited";
 
   return {
     userId,
     email: normalizedProfile?.email ?? claimsEmail,
     profile: normalizedProfile,
-    organizationId,
-    roles,
+    organizationId: organizationScope.organizationId,
+    roles: mergedRoles,
     primaryRole,
     isAuthenticated: true,
     isActive
@@ -79,15 +82,17 @@ function normalizeProfileStatus(status: string): ProfileStatus {
   return status === "active" || status === "invited" || status === "suspended" || status === "archived" ? status : "active";
 }
 
-async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, gymId: string | null, branchId: string | null) {
+async function getUserOrganizationScope(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, gymId: string | null, branchId: string | null) {
+  let scopedOrganizationId: string | null = null;
+
   if (gymId) {
     const { data } = await supabase.from("gyms").select("organization_id").eq("id", gymId).maybeSingle();
-    if (data?.organization_id) return data.organization_id;
+    scopedOrganizationId = data?.organization_id ?? null;
   }
 
-  if (branchId) {
+  if (!scopedOrganizationId && branchId) {
     const { data } = await supabase.from("branches").select("organization_id").eq("id", branchId).maybeSingle();
-    if (data?.organization_id) return data.organization_id;
+    scopedOrganizationId = data?.organization_id ?? null;
   }
 
   const { data } = await supabase
@@ -99,17 +104,28 @@ async function getUserOrganizationId(supabase: Awaited<ReturnType<typeof createS
     .limit(10);
 
   const orgOwnerAssignment = data?.find((a) => a.role_name === "organization_owner" && a.access_scope === "organization");
-  if (orgOwnerAssignment?.organization_id) return orgOwnerAssignment.organization_id;
-  if (data?.[0]?.organization_id) return data[0].organization_id;
+  if (orgOwnerAssignment?.organization_id) return { organizationId: orgOwnerAssignment.organization_id, isOrganizationOwner: true };
+  if (data?.[0]?.organization_id) return { organizationId: data[0].organization_id, isOrganizationOwner: false };
 
-  // Fallback: check if user is the owner of any organization
+  if (scopedOrganizationId) {
+    const { data: scopedOrg } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("id", scopedOrganizationId)
+      .eq("owner_user_id", userId)
+      .maybeSingle();
+
+    return { organizationId: scopedOrganizationId, isOrganizationOwner: Boolean(scopedOrg?.id) };
+  }
+
+  // Fallback: check if user is the owner of any organization.
   const { data: org } = await supabase
     .from("organizations")
     .select("id")
     .eq("owner_user_id", userId)
     .maybeSingle();
 
-  return org?.id ?? null;
+  return { organizationId: org?.id ?? null, isOrganizationOwner: Boolean(org?.id) };
 }
 
 export function userHasRole(context: AuthContext, allowedRoles: readonly RoleName[]) {

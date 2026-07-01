@@ -13,6 +13,8 @@ import {
   TrendingUp,
   UsersRound
 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricTile } from "@/components/ui/metric-tile";
 import FeatureLocked from "@/components/ui/FeatureLocked";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -517,20 +519,6 @@ function KpiMetricCard({ kpi }: { kpi: KpiCard }) {
       </CardContent>
     </Card>
   );
-}
-
-function MetricTile({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface-muted p-4">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-3 text-3xl font-black">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p>
-    </div>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">{text}</div>;
 }
 
 function kpiIcon(category: KpiCard["category"]) {

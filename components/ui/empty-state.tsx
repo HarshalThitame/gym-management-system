@@ -21,6 +21,8 @@ type EmptyStateProps = {
   action?: EmptyStateAction;
   helpLink?: string;
   compact?: boolean;
+  simple?: boolean;
+  text?: string;
 };
 
 const defaults: Record<EmptyStateType, { icon: LucideIcon; title: string; description: string }> = {
@@ -30,7 +32,11 @@ const defaults: Record<EmptyStateType, { icon: LucideIcon; title: string; descri
   initial_setup: { icon: Settings, title: "Getting started", description: "Configure your settings to begin using this feature." }
 };
 
-export function EmptyState({ type = "no_data", title, description, icon, action, helpLink, compact = false }: EmptyStateProps) {
+export function EmptyState({ type = "no_data", title, description, icon, action, helpLink, compact = false, simple = false, text }: EmptyStateProps) {
+  if (simple) {
+    return <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">{text ?? "No data available"}</div>;
+  }
+
   const def = defaults[type];
   const Icon = def.icon;
   const displayTitle = title ?? def.title;

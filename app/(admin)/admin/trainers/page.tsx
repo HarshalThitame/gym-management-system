@@ -3,6 +3,7 @@ import { CalendarCheck, Dumbbell, Star, UsersRound } from "lucide-react";
 import FeatureLocked from "@/components/ui/FeatureLocked";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Metric } from "@/components/ui/metric-tile";
 import { StatCard } from "@/components/ui/stat-card";
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { formatMoney } from "@/features/memberships/lib/business-rules";
@@ -177,15 +178,6 @@ export default async function AdminTrainersPage({ searchParams }: AdminTrainersP
           </Card>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-black">{value}</p>
     </div>
   );
 }

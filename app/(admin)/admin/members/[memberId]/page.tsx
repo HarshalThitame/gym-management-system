@@ -12,6 +12,7 @@ import { getMemberProfile, listActiveMembershipPlans } from "@/features/membersh
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 import { createMetadata } from "@/lib/seo/metadata";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type MemberProfilePageProps = {
   params: Promise<{ memberId: string }>;
@@ -33,9 +34,11 @@ export default async function AdminMemberProfilePage({ params }: MemberProfilePa
   if (!organizationId) throw new Error("Organization scope required.");
   await requireOrganizationFeatureAccess({ organizationId, featureKey: "member_management", actionName: "admin.member.profile.read" });
   const { memberId } = await params;
-  const [profile, plans] = await Promise.all([
+  const supabase = await createSupabaseServerClient();
+  const [profile, plans, attendanceResult] = await Promise.all([
     getMemberProfile(memberId),
-    listActiveMembershipPlans(scope.gymId)
+    listActiveMembershipPlans(scope.gymId),
+    supabase.from("attendance_sessions").select("id, check_in_at, check_out_at, status").eq("member_id", memberId).order("check_in_at", { ascending: false }).limit(50)
   ]);
 
   if (!profile || profile.member.gym_id !== scope.gymId) {
@@ -44,6 +47,9 @@ export default async function AdminMemberProfilePage({ params }: MemberProfilePa
 
   const currentMembership = profile.currentMembership;
   const currentPlan = profile.currentPlan;
+  const attendanceSessions = attendanceResult.data ?? [];
+  const totalVisits = attendanceSessions.length;
+  const lastVisit = attendanceSessions[0]?.check_in_at ?? null;
 
   return (
     <div className="space-y-8">
@@ -61,7 +67,7 @@ export default async function AdminMemberProfilePage({ params }: MemberProfilePa
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail={currentPlan?.name ?? "No active plan"} icon={<CreditCard className="size-5" />} label="Current Plan" value={currentPlan ? currentPlan.plan_type.replace("_", " ") : "None"} />
         <StatCard detail={currentMembership?.end_date ?? "No expiry date"} icon={<CalendarDays className="size-5" />} label="Remaining Days" value={currentMembership ? String(getRemainingDays(currentMembership.end_date)) : "0"} />
-        <StatCard detail="Attendance connects in Phase 7" icon={<UserRound className="size-5" />} label="Attendance" value="Ready" />
+        <StatCard detail={lastVisit ? `Last visit: ${new Date(lastVisit).toLocaleDateString("en-IN")}` : "No visits recorded"} icon={<UserRound className="size-5" />} label="Attendance" value={String(totalVisits)} />
         <StatCard detail={currentMembership ? formatMoney(currentMembership.total_amount ?? 0) : "No invoice"} icon={<FileText className="size-5" />} label="Payment" value={currentMembership?.payment_status ?? "none"} />
       </div>
 

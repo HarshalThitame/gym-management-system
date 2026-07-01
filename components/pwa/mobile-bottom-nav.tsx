@@ -39,13 +39,17 @@ export type MobilePortalIconKey =
   | "credit-card"
   | "dumbbell"
   | "gauge"
+  | "gift"
+  | "life-buoy"
   | "message-square"
   | "receipt"
   | "settings"
   | "tags"
+  | "target"
   | "user"
   | "user-plus"
-  | "users";
+  | "users"
+  | "wrench";
 
 export type MobilePortalNavItem = {
   href: string;

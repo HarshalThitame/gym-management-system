@@ -22,8 +22,11 @@ import { formatDateInput } from "../lib/business-rules";
 import {
   addTrainerSpecializationAction,
   addWorkoutExerciseAction,
+  archiveStaffAction,
+  archiveTrainerAction,
   assignTrainerAction,
   assignWorkoutProgramAction,
+  deletePtPackageAction,
   endTrainerAssignmentAction,
   purchasePtPackageAction,
   saveAvailabilityAction,
@@ -577,4 +580,43 @@ function HiddenInput({ name, value }: { name: string; value: string }) {
 
 function moneyInputValue(value?: number | null) {
   return value ? value / 100 : 0;
+}
+
+export function StaffArchiveForm({ staffId }: { staffId: string }) {
+  const [state, formAction] = useActionState(archiveStaffAction, initialAuthActionState);
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <FormMessage state={state} />
+      <HiddenInput name="staffId" value={staffId} />
+      <p className="text-sm font-semibold text-destructive">This will archive the staff profile and revoke access.</p>
+      <AuthSubmitButton>Archive Staff</AuthSubmitButton>
+    </form>
+  );
+}
+
+export function PtPackageDeleteForm({ packageId }: { packageId: string }) {
+  const [state, formAction] = useActionState(deletePtPackageAction, initialAuthActionState);
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <FormMessage state={state} />
+      <HiddenInput name="packageId" value={packageId} />
+      <p className="text-sm font-semibold text-destructive">This will permanently delete the PT package.</p>
+      <AuthSubmitButton>Delete Package</AuthSubmitButton>
+    </form>
+  );
+}
+
+export function TrainerArchiveForm({ trainerId }: { trainerId: string }) {
+  const [state, formAction] = useActionState(archiveTrainerAction, initialAuthActionState);
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <FormMessage state={state} />
+      <HiddenInput name="trainerId" value={trainerId} />
+      <p className="text-sm font-semibold text-destructive">This will archive the trainer and end all active member assignments.</p>
+      <AuthSubmitButton>Archive Trainer</AuthSubmitButton>
+    </form>
+  );
 }

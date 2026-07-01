@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { PackageCheck, ReceiptText, TimerReset } from "lucide-react";
 import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Metric } from "@/components/ui/metric-tile";
 import { StatCard } from "@/components/ui/stat-card";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { listMembers } from "@/features/memberships/services/membership-service";
 import { formatMoney } from "@/features/memberships/lib/business-rules";
-import { PtPackageForm, PtPurchaseForm } from "@/features/training/components/training-forms";
+import { PtPackageDeleteForm, PtPackageForm, PtPurchaseForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { listActiveTrainers, listPersonalTrainingPackages } from "@/features/training/services/training-service";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -69,6 +70,12 @@ export default async function AdminTrainerPackagesPage() {
                   <Metric label="Validity" value={`${packageRow.validity_days} days`} />
                   <Metric label="Display" value={String(packageRow.display_order)} />
                 </div>
+                <details className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
+                  <summary className="cursor-pointer text-xs font-black text-destructive">Delete Package</summary>
+                  <div className="mt-2">
+                    <PtPackageDeleteForm packageId={packageRow.id} />
+                  </div>
+                </details>
               </div>
             ))}
             {packages.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No PT packages created yet.</div> : null}
@@ -102,15 +109,6 @@ export default async function AdminTrainerPackagesPage() {
           </Card>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-black">{value}</p>
     </div>
   );
 }

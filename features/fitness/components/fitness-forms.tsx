@@ -11,6 +11,7 @@ import type { ExerciseRow, FitnessGoalRow, NutritionPlanWithMeals, WorkoutSessio
 import type { WorkoutProgramAssignmentRow } from "@/types/training";
 import {
   addExerciseLogAction,
+  deleteExerciseAction,
   saveBodyMeasurementAction,
   saveExerciseAction,
   saveFitnessGoalAction,
@@ -334,4 +335,17 @@ function Field({ id, label, name, state, children }: { id: string; label: string
 
 function HiddenInput({ name, value }: { name: string; value: string }) {
   return <input name={name} suppressHydrationWarning type="hidden" value={value} />;
+}
+
+export function ExerciseDeleteForm({ exerciseId }: { exerciseId: string }) {
+  const [state, formAction] = useActionState(deleteExerciseAction, initialAuthActionState);
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <FormMessage state={state} />
+      <HiddenInput name="exerciseId" value={exerciseId} />
+      <p className="text-sm font-semibold text-destructive">This will permanently delete the exercise from the library.</p>
+      <AuthSubmitButton>Delete Exercise</AuthSubmitButton>
+    </form>
+  );
 }

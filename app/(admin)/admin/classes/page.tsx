@@ -3,9 +3,11 @@ import { BarChart3, CalendarDays, Dumbbell, ListChecks, UsersRound } from "lucid
 import FeatureLocked from "@/components/ui/FeatureLocked";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Metric } from "@/components/ui/metric-tile";
+import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
 import { ClassBookingTrendChart, ClassUtilizationChart } from "@/features/classes/components/lazy-class-charts";
-import { ClassCategoryForm, ClassForm, ClassScheduleForm, ClassSessionForm } from "@/features/classes/components/class-forms";
+import { ClassCategoryForm, ClassDeleteForm, ClassForm, ClassScheduleForm, ClassSessionForm } from "@/features/classes/components/class-forms";
 import { ClassStatusBadge } from "@/features/classes/components/class-status-badge";
 import { formatClassLabel } from "@/features/classes/lib/business-rules";
 import { getClassOperationsDashboard, listClassCategories, listClasses } from "@/features/classes/services/class-service";
@@ -112,11 +114,26 @@ export default async function AdminClassesPage({ searchParams }: AdminClassesPag
                   <Metric label="Booking" value={`${classRow.booking_window_days}d`} />
                   <Metric label="Cancel" value={`${classRow.cancellation_window_hours}h`} />
                 </div>
+                <details className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2">
+                  <summary className="cursor-pointer text-xs font-black text-destructive">Delete Class</summary>
+                  <div className="mt-2">
+                    <ClassDeleteForm classId={classRow.id} />
+                  </div>
+                </details>
               </div>
             ))}
             {classResult.classes.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No classes match the current filters.</div> : null}
           </CardContent>
         </Card>
+        
+        {Math.ceil(classResult.total / classResult.pageSize) > 1 && (
+          <Pagination 
+            currentPage={classResult.page} 
+            totalPages={Math.ceil(classResult.total / classResult.pageSize)} 
+            baseHref="/admin/classes"
+            totalItems={classResult.total}
+          />
+        )}
 
         <div className="space-y-5">
           <Card>
@@ -202,15 +219,6 @@ export default async function AdminClassesPage({ searchParams }: AdminClassesPag
           ))}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-black">{value}</p>
     </div>
   );
 }

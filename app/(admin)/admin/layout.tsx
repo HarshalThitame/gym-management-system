@@ -1,17 +1,23 @@
-import { Activity, BarChart3, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, MessageSquare, Settings, Tags, UserRoundPlus, UsersRound } from "lucide-react";
+import { Activity, BarChart3, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, MessageSquare, Settings, Tags, UserRoundPlus, UsersRound, Target, Wrench, LifeBuoy, Gift } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalShell, type PortalNavItem } from "@/components/layout/portal-shell";
+import { AdminNotificationCenter } from "@/components/layout/admin-notification-center";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getTenantSiteConfig } from "@/lib/tenant/site";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const adminNav = [
   { href: "/admin", label: "Dashboard", icon: <Gauge className="size-5" />, iconKey: "gauge" },
   { href: "/admin/members", label: "Members", icon: <UsersRound className="size-5" />, iconKey: "users" },
+  { href: "/admin/crm", label: "CRM & Leads", icon: <Target className="size-5" />, iconKey: "target" },
   { href: "/admin/attendance", label: "Attendance", icon: <CalendarCheck className="size-5" />, iconKey: "calendar-check" },
   { href: "/admin/classes", label: "Classes", icon: <CalendarDays className="size-5" />, iconKey: "calendar-days" },
   { href: "/admin/fitness", label: "Fitness", icon: <Activity className="size-5" />, iconKey: "activity" },
   { href: "/admin/trainers", label: "Trainers", icon: <Dumbbell className="size-5" />, iconKey: "dumbbell" },
+  { href: "/admin/equipment", label: "Equipment", icon: <Wrench className="size-5" />, iconKey: "wrench" },
+  { href: "/admin/support", label: "Support", icon: <LifeBuoy className="size-5" />, iconKey: "life-buoy" },
+  { href: "/admin/promotions", label: "Promotions", icon: <Gift className="size-5" />, iconKey: "gift" },
   { href: "/admin/membership-plans", label: "Plans", icon: <Tags className="size-5" />, iconKey: "tags" },
   { href: "/admin/payments", label: "Payments", icon: <CreditCard className="size-5" />, iconKey: "credit-card" },
   { href: "/admin/communications", label: "Communications", icon: <MessageSquare className="size-5" />, iconKey: "message-square" },
@@ -30,6 +36,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
   const planContext = organizationId ? await getOrgPlanContext(organizationId) : null;
 
+  // Fetch recent notifications
+  const supabase = await createSupabaseServerClient();
+  const { data: notifications } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("gym_id", scope.gymId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
   return (
     <PortalShell
       branchName={tenantSite.branchName}
@@ -42,6 +57,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       tenantName={tenantSite.name}
       tenantShortName={tenantSite.shortName}
       title="Branch Operations Dashboard"
+      headerActions={
+        notifications && notifications.length > 0 ? (
+          <AdminNotificationCenter notifications={notifications} />
+        ) : null
+      }
     >
       {children}
     </PortalShell>

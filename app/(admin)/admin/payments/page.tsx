@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { CreditCard, ReceiptText, RefreshCcw, WalletCards } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
 import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
 import { PaymentRefundForm } from "@/features/billing/components/payment-refund-form";
@@ -23,7 +25,11 @@ export const metadata: Metadata = createMetadata({
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
 type RefundRow = Database["public"]["Tables"]["refunds"]["Row"];
 
-export default async function AdminPaymentsPage() {
+type AdminPaymentsPageProps = {
+  searchParams: Promise<{ page?: string }>;
+};
+
+export default async function AdminPaymentsPage({ searchParams }: AdminPaymentsPageProps) {
   const scope = await requireGymAdminScope("/admin/payments");
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
   if (!organizationId) throw new Error("Organization scope required.");
@@ -31,7 +37,20 @@ export default async function AdminPaymentsPage() {
   const planContext = organizationId ? await getOrgPlanContext(organizationId) : null;
   const razorpayEnabled = planContext?.features.billingInvoices === true;
   const supabase = await createSupabaseServerClient();
-  const query = supabase.from("payments").select("*").eq("gym_id", scope.gymId).order("created_at", { ascending: false }).limit(50);
+  
+  const params = await searchParams;
+  const currentPage = Math.max(1, Number(params.page ?? "1"));
+  const pageSize = 20;
+  const offset = (currentPage - 1) * pageSize;
+  
+  const { count } = await supabase
+    .from("payments")
+    .select("*", { count: "exact", head: true })
+    .eq("gym_id", scope.gymId);
+  
+  const totalPages = Math.ceil((count ?? 0) / pageSize);
+  
+  const query = supabase.from("payments").select("*").eq("gym_id", scope.gymId).order("created_at", { ascending: false }).range(offset, offset + pageSize - 1);
 
   const { data, error } = await query;
   const payments = data ?? [];
@@ -95,7 +114,7 @@ export default async function AdminPaymentsPage() {
               requiredPlan="Standard"
             />
           ) : null}
-          {error ? <EmptyState text={error.message} /> : null}
+          {error ? <EmptyState simple text={error.message} /> : null}
           {payments.map((payment) => (
             <PaymentRowItem
               canManageRefunds={canManageRefunds}
@@ -106,9 +125,18 @@ export default async function AdminPaymentsPage() {
               refunds={refundsByPaymentId.get(payment.id) ?? []}
             />
           ))}
-          {!error && payments.length === 0 ? <EmptyState text="No payment records have been generated yet." /> : null}
+          {!error && payments.length === 0 ? <EmptyState simple text="No payment records have been generated yet." /> : null}
         </CardContent>
       </Card>
+      
+      {totalPages > 1 && (
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          baseHref="/admin/payments"
+          totalItems={count ?? 0}
+        />
+      )}
     </div>
   );
 }
@@ -190,8 +218,4 @@ function PaymentStatusBadge({ status }: { status: PaymentRow["status"] }) {
   }
 
   return <Badge variant="neutral">{status.replace(/_/g, " ")}</Badge>;
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">{text}</div>;
 }

@@ -166,6 +166,26 @@ export async function saveClassAction(_previousState: AuthActionState, formData:
   return { status: "success", message: parsed.data.classId ? "Class updated." : "Class created." };
 }
 
+export async function deleteClassAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const scope = await requireGymAdminScope("/admin/classes");
+  const classId = formData.get("classId");
+  if (!classId || typeof classId !== "string") {
+    return { status: "error", message: "Class ID is required." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("classes").delete().eq("id", classId).eq("gym_id", scope.gymId);
+
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  await writeClassAudit(scope, "class.deleted", "class", classId, {});
+  revalidateClassPaths();
+  return { status: "success", message: "Class deleted." };
+}
+
 export async function saveClassSessionAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const scope = await requireGymAdminScope("/admin/classes");

@@ -87,6 +87,26 @@ export async function saveExerciseAction(_previousState: AuthActionState, formDa
   return { status: "success", message: parsed.data.exerciseId ? "Exercise updated." : "Exercise added to library." };
 }
 
+export async function deleteExerciseAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  void _previousState;
+  const context = await requireRole(["super_admin", "organization_owner", "gym_admin"], "/admin/fitness");
+  const exerciseId = formData.get("exerciseId");
+  if (!exerciseId || typeof exerciseId !== "string") {
+    return { status: "error", message: "Exercise ID is required." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("exercises").delete().eq("id", exerciseId).eq("gym_id", context.profile?.gym_id ?? "");
+
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  await writeFitnessAudit(context, "exercise.deleted", "exercise", exerciseId, {});
+  revalidateFitnessPaths();
+  return { status: "success", message: "Exercise deleted." };
+}
+
 export async function saveFitnessGoalAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _previousState;
   const context = await requireRole(["super_admin", "organization_owner", "gym_admin", "reception_staff", "trainer", "member"], "/member/fitness");

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { BriefcaseBusiness, Clock, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
-import { StaffProfileForm } from "@/features/training/components/training-forms";
+import { StaffArchiveForm, StaffProfileForm } from "@/features/training/components/training-forms";
 import { TrainingStatusBadge } from "@/features/training/components/training-status-badge";
 import { listStaffProfiles } from "@/features/training/services/training-service";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
@@ -15,12 +16,24 @@ export const metadata: Metadata = createMetadata({
   path: "/admin/staff"
 });
 
-export default async function AdminStaffPage() {
+type AdminStaffPageProps = {
+  searchParams: Promise<{ page?: string }>;
+};
+
+export default async function AdminStaffPage({ searchParams }: AdminStaffPageProps) {
   const scope = await requireGymAdminScope("/admin/staff");
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
   if (!organizationId) throw new Error("Organization scope required.");
   await requireOrganizationFeatureAccess({ organizationId, featureKey: "staff_management", actionName: "admin.staff.read" });
-  const staff = await listStaffProfiles(scope.gymId);
+  
+  const params = await searchParams;
+  const currentPage = Math.max(1, Number(params.page ?? "1"));
+  const pageSize = 20;
+  
+  const staffResult = await listStaffProfiles(scope.gymId, { page: currentPage, pageSize });
+  const staff = staffResult.data;
+  const totalPages = Math.ceil(staffResult.count / pageSize);
+  
   const activeStaff = staff.filter((profile) => profile.status === "active");
   const receptionStaff = staff.filter((profile) => profile.staff_role === "reception");
 
@@ -56,11 +69,38 @@ export default async function AdminStaffPage() {
                     <p className="mt-1 text-xs font-semibold text-muted-foreground">{profile.phone ?? "No phone"} · joined {profile.joined_at}</p>
                   </div>
                 </div>
+                {profile.status !== "archived" && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <details className="rounded-md border border-border bg-surface p-3">
+                      <summary className="cursor-pointer text-xs font-black">Edit</summary>
+                      <div className="mt-3">
+                        <StaffProfileForm staff={profile} />
+                      </div>
+                    </details>
+                    <details className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                      <summary className="cursor-pointer text-xs font-black text-destructive">Archive</summary>
+                      <div className="mt-3">
+                        <StaffArchiveForm staffId={profile.id} />
+                      </div>
+                    </details>
+                  </div>
+                )}
               </div>
             ))}
             {staff.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No staff profiles created yet.</div> : null}
           </CardContent>
         </Card>
+
+        {totalPages > 1 && (
+          <div className="xl:col-start-1">
+            <Pagination 
+              currentPage={currentPage} 
+              totalPages={totalPages} 
+              baseHref="/admin/staff"
+              totalItems={staffResult.count}
+            />
+          </div>
+        )}
 
         <Card>
           <CardHeader>

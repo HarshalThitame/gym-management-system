@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import { Building2, Flag, Gauge, Globe2, Settings, ShieldCheck } from "lucide-react";
+import { Building2, Flag, Gauge, Globe2, Plus, Settings, ShieldCheck } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { BranchForm, BranchSettingForm, FeatureFlagForm, TenantDomainForm } from "@/features/branch-management/components/branch-forms";
 import { createMetadata } from "@/lib/seo/metadata";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -81,8 +83,17 @@ export default async function AdminSettingsPage() {
             </div>
             <p className="text-sm leading-6 text-muted-foreground">Branches attached to the current scope only.</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <BranchList branches={branches} />
+            <details className="rounded-md border border-border bg-surface-muted p-4">
+              <summary className="flex cursor-pointer items-center gap-2 text-sm font-black">
+                <Plus className="size-4" />
+                Create New Branch
+              </summary>
+              <div className="mt-4">
+                <BranchForm />
+              </div>
+            </details>
           </CardContent>
         </Card>
 
@@ -94,8 +105,19 @@ export default async function AdminSettingsPage() {
             </div>
             <p className="text-sm leading-6 text-muted-foreground">Operational setting records available in this gym scope.</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <SettingsList settings={settings} branches={branches} />
+            {branches.length > 0 && (
+              <details className="rounded-md border border-border bg-surface-muted p-4">
+                <summary className="flex cursor-pointer items-center gap-2 text-sm font-black">
+                  <Plus className="size-4" />
+                  Create New Setting
+                </summary>
+                <div className="mt-4">
+                  <BranchSettingForm branches={branches} />
+                </div>
+              </details>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -108,8 +130,19 @@ export default async function AdminSettingsPage() {
               <h3 className="text-2xl font-black">Feature Flags</h3>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <FeatureFlagList flags={flags} branches={branches} />
+            {branches.length > 0 && (
+              <details className="rounded-md border border-border bg-surface-muted p-4">
+                <summary className="flex cursor-pointer items-center gap-2 text-sm font-black">
+                  <Plus className="size-4" />
+                  Create New Flag
+                </summary>
+                <div className="mt-4">
+                  <FeatureFlagForm branches={branches} />
+                </div>
+              </details>
+            )}
           </CardContent>
         </Card>
 
@@ -120,8 +153,17 @@ export default async function AdminSettingsPage() {
               <h3 className="text-2xl font-black">Domains</h3>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <DomainList domains={domains} />
+            <details className="rounded-md border border-border bg-surface-muted p-4">
+              <summary className="flex cursor-pointer items-center gap-2 text-sm font-black">
+                <Plus className="size-4" />
+                Add Domain
+              </summary>
+              <div className="mt-4">
+                <TenantDomainForm />
+              </div>
+            </details>
           </CardContent>
         </Card>
 
@@ -143,7 +185,7 @@ export default async function AdminSettingsPage() {
 
 function BranchList({ branches }: { branches: BranchRow[] }) {
   if (branches.length === 0) {
-    return <EmptyState text="No branch records are attached to this gym yet." />;
+    return <EmptyState simple text="No branch records are attached to this gym yet." />;
   }
 
   return (
@@ -165,7 +207,7 @@ function BranchList({ branches }: { branches: BranchRow[] }) {
 
 function SettingsList({ settings, branches }: { settings: BranchSettingRow[]; branches: BranchRow[] }) {
   if (settings.length === 0) {
-    return <EmptyState text="No branch settings records are available for this gym." />;
+    return <EmptyState simple text="No branch settings records are available for this gym." />;
   }
 
   return (
@@ -182,7 +224,7 @@ function SettingsList({ settings, branches }: { settings: BranchSettingRow[]; br
 
 function FeatureFlagList({ flags, branches }: { flags: FeatureFlagRow[]; branches: BranchRow[] }) {
   if (flags.length === 0) {
-    return <EmptyState text="No branch feature flags are enabled in this gym scope." />;
+    return <EmptyState simple text="No branch feature flags are enabled in this gym scope." />;
   }
 
   return (
@@ -203,7 +245,7 @@ function FeatureFlagList({ flags, branches }: { flags: FeatureFlagRow[]; branche
 
 function DomainList({ domains }: { domains: TenantDomainRow[] }) {
   if (domains.length === 0) {
-    return <EmptyState text="No custom or system domains are linked to this gym." />;
+    return <EmptyState simple text="No custom or system domains are linked to this gym." />;
   }
 
   return (
@@ -223,7 +265,7 @@ function DomainList({ domains }: { domains: TenantDomainRow[] }) {
 
 function HealthList({ healthChecks, branches }: { healthChecks: HealthCheckRow[]; branches: BranchRow[] }) {
   if (healthChecks.length === 0) {
-    return <EmptyState text="No branch health checks are available yet." />;
+    return <EmptyState simple text="No branch health checks are available yet." />;
   }
 
   return (
@@ -247,8 +289,4 @@ function branchName(branches: BranchRow[], branchId: string | null) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(value));
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">{text}</div>;
 }

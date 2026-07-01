@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bell, Mail, Megaphone, MessageSquare, Send, UsersRound, Workflow } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -111,7 +112,7 @@ export default async function AdminCommunicationsPage() {
                   </div>
                 </div>
               ))}
-              {dashboard.campaigns.length === 0 ? <EmptyState text="No campaigns created yet." /> : null}
+              {dashboard.campaigns.length === 0 ? <EmptyState simple text="No campaigns created yet." /> : null}
             </CardContent>
           </Card>
         </div>
@@ -231,14 +232,10 @@ export default async function AdminCommunicationsPage() {
                 <p className="text-xs font-bold text-muted-foreground">{formatCommunicationLabel(history.channel)}</p>
               </div>
             ))}
-            {dashboard.recentHistory.length === 0 ? <EmptyState text="No communication history has been recorded yet." /> : null}
+            {dashboard.recentHistory.length === 0 ? <EmptyState simple text="No communication history has been recorded yet." /> : null}
           </CardContent>
         </Card>
       </div>
     </div>
   );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">{text}</div>;
 }
