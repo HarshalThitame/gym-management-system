@@ -22,7 +22,7 @@ import {
 import type { TrainerSessionRow } from "@/types/training";
 
 export function SessionsClient({ children }: { children: ReactNode }) {
-  const { ref, isVisible } = useStaggerChildren({ threshold: 0.05 });
+  const { ref, isVisible } = useStaggerChildren();
 
   return (
     <div ref={ref} className="space-y-8">

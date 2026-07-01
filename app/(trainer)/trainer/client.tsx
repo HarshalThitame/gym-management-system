@@ -17,7 +17,7 @@ export function DashboardClient({
 }: {
   children: ReactNode;
 }) {
-  const { ref, isVisible } = useStaggerChildren({ threshold: 0.05 });
+  const { ref, isVisible } = useStaggerChildren();
 
   return (
     <div ref={ref} className="space-y-8">
