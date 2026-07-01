@@ -17,11 +17,11 @@ export function DashboardClient({
 }: {
   children: ReactNode;
 }) {
-  const { ref, isVisible } = useStaggerChildren();
+  const { ref } = useStaggerChildren();
 
   return (
     <div ref={ref} className="space-y-8">
-      <AnimatedContainer isVisible={isVisible}>{children}</AnimatedContainer>
+      <AnimatedContainer>{children}</AnimatedContainer>
     </div>
   );
 }

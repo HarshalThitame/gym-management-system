@@ -22,11 +22,11 @@ import {
 import type { TrainerSessionRow } from "@/types/training";
 
 export function SessionsClient({ children }: { children: ReactNode }) {
-  const { ref, isVisible } = useStaggerChildren();
+  const { ref } = useStaggerChildren();
 
   return (
     <div ref={ref} className="space-y-8">
-      <AnimatedContainer isVisible={isVisible}>
+      <AnimatedContainer>
         {children}
       </AnimatedContainer>
     </div>
