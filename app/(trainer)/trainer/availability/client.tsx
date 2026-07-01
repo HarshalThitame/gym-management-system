@@ -26,6 +26,38 @@ function DayIcon({ day, className }: { day: number; className?: string }) {
   return <Icon className={className} />;
 }
 
+function DeleteSlotForm({ slotId }: { slotId: string }) {
+  const [, formAction] = useActionState(deleteSelfAvailabilityAction, idleActionState);
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="availabilityId" value={slotId} />
+      <button
+        type="submit"
+        className="text-muted-foreground/50 transition-all duration-200 hover:text-destructive hover:scale-110"
+        aria-label="Delete availability slot"
+      >
+        <Trash2 className="size-4" />
+      </button>
+    </form>
+  );
+}
+
+function CancelTimeOffForm({ timeOffId }: { timeOffId: string }) {
+  const [, formAction] = useActionState(cancelTimeOffAction, idleActionState);
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="timeOffId" value={timeOffId} />
+      <button
+        type="submit"
+        className="shrink-0 text-muted-foreground/50 transition-all duration-200 hover:text-destructive hover:scale-110"
+        aria-label="Cancel time-off request"
+      >
+        <Trash2 className="size-4" />
+      </button>
+    </form>
+  );
+}
+
 export function AvailabilityForm() {
   const [state, formAction, pending] = useActionState(saveSelfAvailabilityAction, idleActionState);
 
@@ -166,16 +198,7 @@ export function AvailabilitySlotList({
                       </span>
                     )}
                   </div>
-                  <form action={deleteSelfAvailabilityAction}>
-                    <input type="hidden" name="availabilityId" value={slot.id} />
-                    <button
-                      type="submit"
-                      className="text-muted-foreground/50 transition-all duration-200 hover:text-destructive hover:scale-110"
-                      aria-label="Delete availability slot"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </form>
+                  <DeleteSlotForm slotId={slot.id} />
                 </div>
               ))}
             </div>
@@ -279,16 +302,7 @@ export function TimeOffList({ timeOff }: { timeOff: TrainerTimeOffRow[] }) {
               <p className="mt-1 text-xs font-semibold text-muted-foreground">{entry.reason}</p>
             </div>
             {entry.status === "requested" && (
-              <form action={cancelTimeOffAction}>
-                <input type="hidden" name="timeOffId" value={entry.id} />
-                <button
-                  type="submit"
-                  className="shrink-0 text-muted-foreground/50 transition-all duration-200 hover:text-destructive hover:scale-110"
-                  aria-label="Cancel time-off request"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </form>
+              <CancelTimeOffForm timeOffId={entry.id} />
             )}
           </div>
         </div>

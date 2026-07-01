@@ -1,7 +1,7 @@
 "use client";
 
 import { Dumbbell, RefreshCw } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const BASIC_SUGGESTIONS = [
