@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:unit": "vitest run tests/unit",
+    "test:e2e": "playwright test",
+    "test:load": "k6 run tests/load/api-load-test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -39,6 +41,7 @@
     "react-dom": "^19.2.1",
     "react-hook-form": "^7.68.0",
     "recharts": "^3.5.1",
+    "redis": "^4.6.13",
     "resend": "^6.12.4",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.1.13",
