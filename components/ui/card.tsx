@@ -34,6 +34,10 @@ export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingEle
   return <h3 className={cn("text-lg font-semibold", className)} {...props} />;
 }
 
+export function CardDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
+  return <p className={cn("text-sm text-muted-foreground", className)} {...props} />;
+}
+
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("p-5 pt-0 md:p-6 md:pt-0", className)} {...props} />;
 }
@@ -68,4 +72,3 @@ type CinematicCardProps = HTMLAttributes<HTMLDivElement> & VariantProps<typeof c
 export function CinematicCard({ className, variant, ...props }: CinematicCardProps) {
   return <div className={cn(cinematicCardVariants({ variant }), className)} {...props} />;
 }
-

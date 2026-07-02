@@ -18,7 +18,9 @@ import {
   MessageSquare,
   MoreHorizontal,
   ReceiptText,
+  Scale,
   Settings,
+  Shield,
   Tags,
   TrendingUp,
   UserRound,
@@ -47,7 +49,10 @@ export type MobilePortalIconKey =
   | "life-buoy"
   | "message-square"
   | "receipt"
+  | "scale"
   | "settings"
+  | "shield"
+  | "shield-check"
   | "tags"
   | "target"
   | "trending-up"
@@ -259,8 +264,14 @@ function getPortalIcon(iconKey: MobilePortalIconKey) {
       return MessageSquare;
     case "receipt":
       return ReceiptText;
+    case "scale":
+      return Scale;
     case "settings":
       return Settings;
+    case "shield":
+      return Shield;
+    case "shield-check":
+      return Shield;
     case "tags":
       return Tags;
     case "user":
