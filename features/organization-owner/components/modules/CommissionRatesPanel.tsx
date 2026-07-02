@@ -5,7 +5,7 @@ import { Check, Edit3, Percent, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
-import type { CommissionRateRow } from "@/features/organization-owner/actions/commission-actions";
+import type { CommissionRateRow } from "@/features/organization-owner/services/commission-service";
 import { setCommissionRate, setDefaultCommissionRate, getDefaultCommissionRates } from "@/features/organization-owner/actions/commission-actions";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { showToast } from "@/components/ui/toast";

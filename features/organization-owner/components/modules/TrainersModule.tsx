@@ -845,7 +845,7 @@ function TrainerDetailPanel({
                 <div className="rounded-lg border border-dashed border-border bg-surface-muted p-6 text-center">
                   <UserPlus className="mx-auto size-8 text-muted-foreground" />
                   <p className="mt-2 text-sm font-bold text-muted-foreground">No members assigned</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Click "Assign Member" above to link a member.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Click &quot;Assign Member&quot; above to link a member.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

@@ -18,8 +18,6 @@ import type {
   CommissionResult,
 } from "../services/commission-service";
 
-export type { CommissionRow, CommissionRateRow, CommissionFilters, CommissionResult };
-
 type TrainerCommissionRateRow = Database["public"]["Tables"]["trainer_commission_rates"]["Row"];
 
 export async function getTrainerCommissions(

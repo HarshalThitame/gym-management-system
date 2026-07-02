@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { formatCurrency } from "@/features/enterprise/lib/business-rules";
-import type { PayrollRecord } from "@/features/organization-owner/actions/payroll-actions";
+import type { PayrollRecord } from "@/features/organization-owner/services/payroll-service";
 import { showToast } from "@/components/ui/toast";
 
 type Props = {

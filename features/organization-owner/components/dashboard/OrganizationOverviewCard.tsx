@@ -121,7 +121,7 @@ export const OrganizationOverviewCard = React.forwardRef<
                   </div>
 
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Monitor your organization's key performance metrics and
+                    Monitor your organization&apos;s key performance metrics and
                     manage all branches from a single dashboard.
                   </p>
                 </div>

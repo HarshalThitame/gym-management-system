@@ -8,7 +8,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
-import type { CommissionRow, CommissionResult } from "@/features/organization-owner/actions/commission-actions";
+import type { CommissionRow, CommissionResult } from "@/features/organization-owner/services/commission-service";
 import { markCommissionPaid, cancelCommission } from "@/features/organization-owner/actions/commission-actions";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { showToast } from "@/components/ui/toast";

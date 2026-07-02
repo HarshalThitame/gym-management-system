@@ -199,7 +199,7 @@ export const StaffRoleAssignment = React.forwardRef<
             → {selectedRole}
           </p>
           <p className="text-xs text-yellow-200/70 mt-1">
-            This user's permissions will be updated accordingly.
+            This user&apos;s permissions will be updated accordingly.
           </p>
         </motion.div>
       )}

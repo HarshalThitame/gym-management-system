@@ -5,8 +5,6 @@ import { requireOrgFeatureAccess } from "@/features/entitlement";
 import { getMonthlyPayroll as getPayroll } from "../services/payroll-service";
 import type { PayrollRecord, PayrollResult } from "../services/payroll-service";
 
-export type { PayrollRecord, PayrollResult };
-
 export async function getMonthlyPayroll(
   organizationId: string,
   month: string,
