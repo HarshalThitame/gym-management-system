@@ -11,7 +11,6 @@ const nextConfig: NextConfig = {
   },
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
-  output: "standalone",
   experimental: {
     optimizePackageImports: ["recharts", "lucide-react", "date-fns", "framer-motion"],
     webpackBuildWorker: true,
