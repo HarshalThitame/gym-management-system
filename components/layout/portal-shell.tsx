@@ -265,7 +265,7 @@ export function PortalShell({
               </button>
               <div className="animate-fade-in-down">
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
-                <h1 className="text-xl font-black md:text-2xl gradient-text">{title}</h1>
+                <div className="text-xl font-black md:text-2xl gradient-text">{title}</div>
                 <p className="mt-1 text-xs font-semibold text-muted-foreground sm:hidden">{tenantName}</p>
               </div>
             </div>

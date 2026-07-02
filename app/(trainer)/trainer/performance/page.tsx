@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { DollarSign, Star, UsersRound, Dumbbell, TrendingUp, Activity } from "lucide-react";
+import { DollarSign, Star, UsersRound, Dumbbell, TrendingUp, Activity, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { getTrainerCommissionSummary, getTrainerPerformanceMetrics } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
@@ -19,8 +20,11 @@ export default async function TrainerPerformancePage() {
     getTrainerCommissionSummary(context.userId ?? ""),
   ]);
 
+  const isEmpty = metrics.assignedMembers === 0 && metrics.totalSessions === 0 && metrics.averageRating === 0 && metrics.totalRevenue === 0;
+
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "Performance" }]} />
       <div className="animate-fade-in-up">
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Analytics</p>
         <h2 className="mt-2 text-3xl font-black">My Performance</h2>
@@ -28,6 +32,16 @@ export default async function TrainerPerformancePage() {
           Track your coaching impact, session completion rates, member satisfaction, and earnings.
         </p>
       </div>
+
+      {isEmpty && (
+        <div className="rounded-lg border border-dashed border-border bg-surface-muted/50 p-12 text-center">
+          <BarChart3 className="mx-auto size-12 text-muted-foreground/50" />
+          <p className="mt-4 text-lg font-black text-muted-foreground">No performance data yet</p>
+          <p className="mt-2 text-sm text-muted-foreground">Start coaching sessions and completing member feedback to see your metrics appear here.</p>
+        </div>
+      )}
+
+      {!isEmpty && (<>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Active coaching assignments" icon={<UsersRound className="size-5" />} label="Assigned Members" value={String(metrics.assignedMembers)} />
@@ -100,6 +114,7 @@ export default async function TrainerPerformancePage() {
           </CardContent>
         </Card>
       </div>
+      </>)}
     </div>
   );
 }

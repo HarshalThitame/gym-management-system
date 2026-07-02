@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { TrainerNoteForm, WorkoutAssignmentForm, WorkoutProgramForm } from "@/features/training/components/training-forms";
 import { getTrainerDashboard, getTrainerProfileBundle, listProgramTemplates } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
@@ -22,6 +23,7 @@ export default async function TrainerProgramsPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "Workout Programs" }]} />
       <div className="animate-fade-in-up">
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Training</p>
         <h2 className="mt-2 text-3xl font-black">Workout Programs</h2>

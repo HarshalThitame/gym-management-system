@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Apple, Dumbbell, Scale, Target, Trophy, UsersRound } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { FitnessStatusBadge } from "@/features/fitness/components/fitness-status-badge";
 import { BodyMeasurementForm, FitnessGoalForm, FitnessMilestoneForm, MealPlanForm, NutritionPlanForm, WorkoutSessionForm } from "@/features/fitness/components/fitness-forms";
@@ -42,6 +43,7 @@ export default async function TrainerProgressPage({ searchParams }: TrainerProgr
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "Progress" }]} />
       <div>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Progress Coaching</p>
         <h2 className="mt-2 text-3xl font-black">Member fitness progress</h2>
@@ -140,7 +142,7 @@ export default async function TrainerProgressPage({ searchParams }: TrainerProgr
           </div>
 
           {selected ? (
-            <ProgressPhotoSection memberId={selected.member.id} photos={await getMemberProgressPhotos(selected.member.id)} />
+            <ProgressPhotoSection memberId={selected.member.id} photos={await getMemberProgressPhotos(selected.member.id, portal.trainer?.id)} />
           ) : null}
         </>
       ) : null}

@@ -7,6 +7,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
+import type { Json } from "@/types/database";
 import {
   TrainerAvailabilitySelfSchema,
   DeleteAvailabilitySchema,
@@ -104,6 +105,14 @@ export async function deleteSelfAvailabilityAction(_previousState: AuthActionSta
   if (error) {
     return { status: "error", message: error.message };
   }
+
+  await writeAuditLog({
+    actorId: context.userId,
+    gymId: context.profile?.gym_id ?? null,
+    action: "trainer.availability_deleted",
+    entityType: "trainer_availability",
+    entityId: parsed.data.availabilityId,
+  });
 
   revalidatePath("/trainer/availability");
   return { status: "success", message: "Availability slot deleted." };
@@ -212,6 +221,14 @@ export async function cancelTimeOffAction(_previousState: AuthActionState, formD
     return { status: "error", message: error.message };
   }
 
+  await writeAuditLog({
+    actorId: context.userId,
+    gymId: context.profile?.gym_id ?? null,
+    action: "trainer.time_off_cancelled",
+    entityType: "trainer_time_off",
+    entityId: parsed.data.timeOffId,
+  });
+
   revalidatePath("/trainer/availability");
   return { status: "success", message: "Time-off request cancelled." };
 }
@@ -312,6 +329,78 @@ export async function cloneProgramTemplateAction(_previousState: AuthActionState
     return { status: "error", message: error instanceof Error ? error.message : "Clone failed." };
   }
 
+  await writeAuditLog({
+    actorId: context.userId,
+    gymId: context.profile?.gym_id ?? null,
+    action: "trainer.program_cloned",
+    entityType: "workout_programs",
+    entityId: templateId,
+    metadata: { newName, clonedToTrainerId: trainer.id },
+  });
+
   revalidatePath("/trainer/programs");
   return { status: "success", message: "Program cloned from template." };
+}
+
+export async function sendStaffMessageAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  const context = await requireRole(["trainer"], "/trainer/communications");
+  const recipientId = formData.get("recipientId");
+  const message = formData.get("message");
+
+  if (!recipientId || typeof recipientId !== "string") {
+    return { status: "error", message: "Recipient is required." };
+  }
+  if (!message || typeof message !== "string" || message.trim().length < 1) {
+    return { status: "error", message: "Message is required." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: sender } = await supabase
+    .from("trainers")
+    .select("id, gym_id, display_name")
+    .eq("user_id", context.userId!)
+    .maybeSingle();
+
+  if (!sender) {
+    return { status: "error", message: "Trainer profile not found." };
+  }
+
+  const { data: recipient } = await supabase
+    .from("trainers")
+    .select("id, display_name")
+    .eq("id", recipientId)
+    .maybeSingle();
+
+  if (!recipient) {
+    return { status: "error", message: "Recipient trainer not found." };
+  }
+
+  const { error } = await supabase.from("trainer_notification_events").insert({
+    gym_id: sender.gym_id,
+    trainer_id: sender.id,
+    member_id: recipientId,
+    event_type: "staff_chat_message",
+    channel: "in_app",
+    status: "pending",
+    metadata: {
+      message: message.trim(),
+      senderName: sender.display_name,
+      recipientName: recipient.display_name,
+    } as Json,
+  });
+
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  await writeAuditLog({
+    actorId: context.userId,
+    gymId: sender.gym_id,
+    action: "trainer.staff_message_sent",
+    entityType: "trainer_notification_events",
+    metadata: { recipientId, recipientName: recipient.display_name },
+  });
+
+  revalidatePath("/trainer/communications");
+  return { status: "success", message: "Message sent." };
 }

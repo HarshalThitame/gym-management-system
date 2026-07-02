@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { Bell, Megaphone, MessageSquare, UsersRound } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { ArchiveNotificationForm, DirectNotificationForm, NotificationPreferencesForm, NotificationStateForm } from "@/features/communications/components/communication-forms";
 import { CommunicationStatusBadge, PriorityBadge } from "@/features/communications/components/communication-status-badge";
 import { formatCommunicationLabel } from "@/features/communications/lib/business-rules";
 import { getTrainerNotificationCenter, listNotificationTemplates } from "@/features/communications/services/communication-service";
-import { getTrainerAssignedMembers, getTrainerDashboard } from "@/features/training/services/training-service";
+import { getTrainerAssignedMembers, getTrainerDashboard, getStaffChatMessages, listActiveTrainers } from "@/features/training/services/training-service";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
 import { StaffChatSection } from "./client";
@@ -20,11 +22,18 @@ export const metadata: Metadata = createMetadata({
 export default async function TrainerCommunicationsPage() {
   const context = await requireRole(["trainer"], "/trainer/communications");
   const gymId = context.profile?.gym_id ?? null;
-  const [center, assignedMembers, templates, dashboard] = await Promise.all([
+  const supabase = await createSupabaseServerClient();
+  const { data: trainerRow } = context.userId
+    ? await supabase.from("trainers").select("id").eq("user_id", context.userId).maybeSingle()
+    : { data: null };
+  const trainerId = trainerRow?.id ?? "";
+  const [center, assignedMembers, templates, dashboard, activeTrainers, chatMessages] = await Promise.all([
     context.userId ? getTrainerNotificationCenter(context.userId, gymId) : null,
     getTrainerAssignedMembers(context.userId ?? "", gymId),
     listNotificationTemplates(gymId),
-    getTrainerDashboard(context.userId ?? "", gymId)
+    getTrainerDashboard(context.userId ?? "", gymId),
+    listActiveTrainers(gymId),
+    trainerId ? getStaffChatMessages(trainerId) : [],
   ]);
 
   if (!center) {
@@ -44,6 +53,7 @@ export default async function TrainerCommunicationsPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "Communications" }]} />
       <div>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Trainer Communications</p>
         <h2 className="mt-2 text-3xl font-black">Member updates, reminders, and staff notices</h2>
@@ -130,8 +140,9 @@ export default async function TrainerCommunicationsPage() {
           </CardHeader>
           <CardContent>
             <StaffChatSection
-              trainers={dashboard.trainer ? [dashboard.trainer] : []}
-              currentTrainerId={dashboard.trainer?.id ?? ""}
+              trainers={activeTrainers}
+              currentTrainerId={trainerId}
+              messages={chatMessages}
             />
           </CardContent>
         </Card>

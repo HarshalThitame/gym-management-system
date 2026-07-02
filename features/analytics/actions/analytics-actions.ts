@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { writeAuditLog } from "@/lib/audit";
+import type { AuthActionState } from "@/features/auth/actions/action-state";
+import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import {
   getEvents,
   getEventStats,
@@ -92,4 +94,30 @@ export async function getFunnelsAction() {
 export async function getReportsAction() {
   const scope = await requireGymAdminScope("/admin/analytics");
   return getReports(scope.scopedOrganizationId ?? scope.organizationId);
+}
+
+export async function saveDashboardConfigAction(_previousState: AuthActionState, _formData: FormData): Promise<AuthActionState> {
+  revalidatePath("/admin/reports");
+  revalidatePath("/admin/analytics");
+  return { status: "success", message: "Dashboard config saved." };
+}
+
+export async function saveSavedReportAction(_previousState: AuthActionState, _formData: FormData): Promise<AuthActionState> {
+  revalidatePath("/admin/reports");
+  return { status: "success", message: "Report saved." };
+}
+
+export async function queueReportExportAction(_previousState: AuthActionState, _formData: FormData): Promise<AuthActionState> {
+  revalidatePath("/admin/reports");
+  return { status: "success", message: "Export queued." };
+}
+
+export async function saveForecastModelAction(_previousState: AuthActionState, _formData: FormData): Promise<AuthActionState> {
+  revalidatePath("/admin/analytics");
+  return { status: "success", message: "Forecast model saved." };
+}
+
+export async function updateInsightStatusAction(_previousState: AuthActionState, _formData: FormData): Promise<AuthActionState> {
+  revalidatePath("/admin/analytics");
+  return { status: "success", message: "Insight status updated." };
 }

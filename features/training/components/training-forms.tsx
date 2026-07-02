@@ -330,24 +330,36 @@ export function TrainerSessionForm({
       <div className="grid gap-4 md:grid-cols-2">
         <SelectTrainer trainers={trainers} defaultTrainerId={defaultTrainerId} />
         <SelectMember members={members} defaultMemberId={defaultMemberId} />
-        <Input name="sessionDate" type="date" defaultValue={formatDateInput(new Date())} aria-label="Session date" />
+        <Field name="sessionDate" label="Session Date" state={state}>
+          <Input id="sessionDate" name="sessionDate" type="date" defaultValue={formatDateInput(new Date())} />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Input name="startsAt" type="time" defaultValue="07:00" aria-label="Session start" />
-          <Input name="endsAt" type="time" defaultValue="08:00" aria-label="Session end" />
+          <Field name="startsAt" label="Start" state={state}>
+            <Input id="startsAt" name="startsAt" type="time" defaultValue="07:00" />
+          </Field>
+          <Field name="endsAt" label="End" state={state}>
+            <Input id="endsAt" name="endsAt" type="time" defaultValue="08:00" />
+          </Field>
         </div>
-        <Input name="workoutType" defaultValue="Strength coaching" aria-label="Workout type" />
-        <select className={selectClass} name="memberPtPackageId" defaultValue="" aria-label="PT package">
-          <option value="">No PT package</option>
-          {packages.map((packageRow) => (
-            <option key={packageRow.id} value={packageRow.id}>{packageRow.status} · {packageRow.remaining_sessions} left</option>
-          ))}
-        </select>
-        <select className={selectClass} name="workoutProgramId" defaultValue="" aria-label="Workout program">
-          <option value="">No workout program</option>
-          {programs.map((program) => (
-            <option key={program.id} value={program.id}>{program.name}</option>
-          ))}
-        </select>
+        <Field name="workoutType" label="Workout Type" state={state}>
+          <Input id="workoutType" name="workoutType" defaultValue="Strength coaching" />
+        </Field>
+        <Field name="memberPtPackageId" label="PT Package" state={state}>
+          <select className={selectClass} id="memberPtPackageId" name="memberPtPackageId" defaultValue="" aria-label="PT package">
+            <option value="">No PT package</option>
+            {packages.map((packageRow) => (
+              <option key={packageRow.id} value={packageRow.id}>{packageRow.status} · {packageRow.remaining_sessions} left</option>
+            ))}
+          </select>
+        </Field>
+        <Field name="workoutProgramId" label="Workout Program" state={state}>
+          <select className={selectClass} id="workoutProgramId" name="workoutProgramId" defaultValue="" aria-label="Workout program">
+            <option value="">No workout program</option>
+            {programs.map((program) => (
+              <option key={program.id} value={program.id}>{program.name}</option>
+            ))}
+          </select>
+        </Field>
       </div>
 
       <button
@@ -383,7 +395,9 @@ export function TrainerSessionForm({
         </motion.div>
       )}
 
-      <Textarea name="notes" placeholder="Session focus, constraints, or preparation notes" />
+      <Field name="notes" label="Notes" state={state}>
+        <Textarea id="notes" name="notes" placeholder="Session focus, constraints, or preparation notes" />
+      </Field>
       <AuthSubmitButton>Schedule Session</AuthSubmitButton>
     </form>
   );
@@ -396,14 +410,20 @@ export function TrainerSessionStatusForm({ session }: { session: TrainerSessionR
     <form action={formAction} className="space-y-3">
       <FormMessage state={state} />
       <HiddenInput name="sessionId" value={session.id} />
-      <select className={selectClass} name="nextStatus" defaultValue="completed" aria-label="Next session status">
-        <option value="completed">Complete</option>
-        <option value="missed">Missed</option>
-        <option value="cancelled">Cancel</option>
-        <option value="rescheduled">Reschedule required</option>
-      </select>
-      <Textarea name="completionNotes" placeholder="Completion notes" />
-      <Input name="reason" placeholder="Reason if missed, cancelled, or rescheduled" />
+      <Field name="nextStatus" label="Status" state={state}>
+        <select className={selectClass} id="nextStatus" name="nextStatus" defaultValue="completed" aria-label="Next session status">
+          <option value="completed">Complete</option>
+          <option value="missed">Missed</option>
+          <option value="cancelled">Cancel</option>
+          <option value="rescheduled">Reschedule required</option>
+        </select>
+      </Field>
+      <Field name="completionNotes" label="Completion Notes" state={state}>
+        <Textarea id="completionNotes" name="completionNotes" placeholder="Completion notes" />
+      </Field>
+      <Field name="reason" label="Reason" state={state}>
+        <Input id="reason" name="reason" placeholder="Reason if missed, cancelled, or rescheduled" />
+      </Field>
       <AuthSubmitButton>Update Session</AuthSubmitButton>
     </form>
   );
@@ -418,22 +438,34 @@ export function WorkoutProgramForm({ trainers, members, defaultTrainerId = "", d
       <div className="grid gap-4 md:grid-cols-2">
         <SelectTrainer trainers={trainers} defaultTrainerId={defaultTrainerId} />
         <SelectMember members={members} defaultMemberId={defaultMemberId} includeEmpty />
-        <Input name="name" placeholder="12-week strength base" aria-label="Program name" />
-        <Input name="goal" placeholder="Build strength, improve movement quality" aria-label="Program goal" />
-        <select className={selectClass} name="difficulty" defaultValue="intermediate" aria-label="Difficulty">
-          <option value="beginner">Beginner</option>
-          <option value="intermediate">Intermediate</option>
-          <option value="advanced">Advanced</option>
-          <option value="elite">Elite</option>
-        </select>
-        <Input name="durationWeeks" min={1} max={52} type="number" defaultValue={4} aria-label="Duration in weeks" />
-        <select className={selectClass} name="status" defaultValue="draft" aria-label="Status">
-          <option value="draft">Draft</option>
-          <option value="active">Active</option>
-          <option value="archived">Archived</option>
-        </select>
+        <Field name="name" label="Program Name" state={state}>
+          <Input id="name" name="name" placeholder="12-week strength base" />
+        </Field>
+        <Field name="goal" label="Goal" state={state}>
+          <Input id="goal" name="goal" placeholder="Build strength, improve movement quality" />
+        </Field>
+        <Field name="difficulty" label="Difficulty" state={state}>
+          <select className={selectClass} id="difficulty" name="difficulty" defaultValue="intermediate" aria-label="Difficulty">
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+            <option value="elite">Elite</option>
+          </select>
+        </Field>
+        <Field name="durationWeeks" label="Duration (Weeks)" state={state}>
+          <Input id="durationWeeks" name="durationWeeks" min={1} max={52} type="number" defaultValue={4} />
+        </Field>
+        <Field name="status" label="Status" state={state}>
+          <select className={selectClass} id="status" name="status" defaultValue="draft" aria-label="Status">
+            <option value="draft">Draft</option>
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+          </select>
+        </Field>
       </div>
-      <Textarea name="description" placeholder="Program description, key focus areas, and expected outcomes" />
+      <Field name="description" label="Description" state={state}>
+        <Textarea id="description" name="description" placeholder="Program description, key focus areas, and expected outcomes" />
+      </Field>
       <label className="flex items-center gap-3 text-sm font-bold">
         <input className="size-4 accent-primary" name="isTemplate" type="checkbox" />
         Share as template for other trainers

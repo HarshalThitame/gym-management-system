@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Brain, Dumbbell, Target, UsersRound, Lightbulb, Sparkles, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { AiProgramGeneratorForm } from "@/features/ai/components/ai-forms";
 import { AiReviewBadge, AiRiskBadge } from "@/features/ai/components/ai-status-badge";
@@ -26,6 +27,7 @@ export default async function TrainerAiPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "AI Assistant" }]} />
       <div>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Trainer Intelligence</p>
         <h2 className="mt-2 text-3xl font-black">AI-assisted coaching operations</h2>

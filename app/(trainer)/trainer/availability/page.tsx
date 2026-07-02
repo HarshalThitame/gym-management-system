@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CalendarRange, Clock, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { getTrainerAvailability, getTrainerTimeOff } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -23,6 +24,7 @@ export default async function TrainerAvailabilityPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "My Availability" }]} />
       <div className="animate-fade-in-up">
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Schedule</p>
         <h2 className="mt-2 text-3xl font-black">My Availability</h2>

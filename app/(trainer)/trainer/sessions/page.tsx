@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { TrainerSessionForm } from "@/features/training/components/training-forms";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
 import { requireRole } from "@/lib/auth/guards";
@@ -19,6 +20,7 @@ export default async function TrainerSessionsPage() {
 
   return (
     <SessionsClient>
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "Sessions" }]} />
       <div className="animate-fade-in-up">
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Training</p>
         <h2 className="mt-2 text-3xl font-black">Sessions</h2>

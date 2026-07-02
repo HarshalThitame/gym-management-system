@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { CalendarCheck, ClipboardCheck, UsersRound } from "lucide-react";
+import { CalendarCheck, ClipboardCheck, UsersRound, Calendar, UserCheck } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { ClassAttendanceForm, ClassSessionStatusForm } from "@/features/classes/components/class-forms";
 import { ClassStatusBadge } from "@/features/classes/components/class-status-badge";
@@ -23,6 +24,7 @@ export default async function TrainerClassesPage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "Classes" }]} />
       <div>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Trainer Classes</p>
         <h2 className="mt-2 text-3xl font-black">Schedule, attendance, and class notes</h2>
@@ -55,7 +57,7 @@ export default async function TrainerClassesPage() {
                 </div>
               </div>
             ))}
-            {portal.sessions.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No assigned class sessions found.</div> : null}
+            {portal.sessions.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-surface-muted/50 p-8 text-center"><Calendar className="mx-auto size-8 text-muted-foreground/50" /><p className="mt-3 text-sm font-bold text-muted-foreground">No assigned class sessions</p><p className="mt-1 text-xs text-muted-foreground">Class session assignments from the admin will appear here.</p></div> : null}
           </CardContent>
         </Card>
 
@@ -68,7 +70,7 @@ export default async function TrainerClassesPage() {
                 <p className="mt-1 text-xs font-semibold text-muted-foreground">{session.starts_at.slice(0, 5)} · {session.location ?? "Studio"}</p>
               </div>
             ))}
-            {todaysSessions.length === 0 ? <p className="text-sm font-semibold text-muted-foreground">No class sessions today.</p> : null}
+            {todaysSessions.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-surface-muted/50 p-6 text-center"><Calendar className="mx-auto size-6 text-muted-foreground/50" /><p className="mt-2 text-sm font-bold text-muted-foreground">No class sessions today</p></div> : null}
           </CardContent>
         </Card>
       </div>
@@ -85,7 +87,7 @@ export default async function TrainerClassesPage() {
               <ClassAttendanceForm booking={booking} />
             </div>
           ))}
-          {activeBookings.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No active bookings to mark.</div> : null}
+          {activeBookings.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-surface-muted/50 p-8 text-center"><UserCheck className="mx-auto size-8 text-muted-foreground/50" /><p className="mt-3 text-sm font-bold text-muted-foreground">No active bookings</p><p className="mt-1 text-xs text-muted-foreground">Member bookings for your sessions will appear in the attendance queue.</p></div> : null}
         </CardContent>
       </Card>
     </div>

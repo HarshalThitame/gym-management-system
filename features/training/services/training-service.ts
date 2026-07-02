@@ -721,14 +721,46 @@ export async function cloneProgramTemplate(programId: string, newTrainerId: stri
   return newProgram;
 }
 
-export async function getMemberProgressPhotos(memberId: string): Promise<MemberProgressPhotoRow[]> {
+export async function getStaffChatMessages(trainerId: string): Promise<Array<{
+  id: string;
+  senderId: string;
+  senderName: string;
+  recipientId: string;
+  message: string;
+  createdAt: string;
+}>> {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
+    .from("trainer_notification_events")
+    .select("*")
+    .eq("event_type", "staff_chat_message")
+    .or(`trainer_id.eq.${trainerId},member_id.eq.${trainerId}`)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    senderId: row.trainer_id ?? "",
+    recipientId: row.member_id ?? "",
+    message: (row.metadata as { message?: string })?.message ?? "",
+    senderName: (row.metadata as { senderName?: string })?.senderName ?? "Unknown",
+    createdAt: row.created_at,
+  }));
+}
+
+export async function getMemberProgressPhotos(memberId: string, trainerId?: string): Promise<MemberProgressPhotoRow[]> {
+  const supabase = await createSupabaseServerClient();
+  let query = supabase
     .from("member_progress_photos")
     .select("*")
     .eq("member_id", memberId)
     .order("recorded_on", { ascending: false });
 
+  if (trainerId) {
+    query = query.eq("trainer_id", trainerId);
+  }
+
+  const { data } = await query;
   return data ?? [];
 }
 

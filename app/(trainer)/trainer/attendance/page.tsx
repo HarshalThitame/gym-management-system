@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Activity, Clock, UsersRound } from "lucide-react";
+import { Activity, Clock, UsersRound, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { HourlyTrafficChart } from "@/features/attendance/components/lazy-attendance-charts";
 import { getTrainerAttendanceView } from "@/features/attendance/services/attendance-service";
@@ -23,6 +24,7 @@ export default async function TrainerAttendancePage() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/trainer" }, { label: "Attendance" }]} />
       <div>
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Trainer Attendance</p>
         <h2 className="mt-2 text-3xl font-black">Assigned member visit trends</h2>
@@ -57,7 +59,7 @@ export default async function TrainerAttendancePage() {
                 <p className="mt-3 text-xs font-semibold text-muted-foreground">Last visit: {member.lastVisitAt ? new Date(member.lastVisitAt).toLocaleString("en-IN") : "No visits recorded"}</p>
               </div>
             ))}
-            {view.assignedMembers.length === 0 ? <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No assigned member attendance records yet.</div> : null}
+            {view.assignedMembers.length === 0 ? <div className="rounded-lg border border-dashed border-border bg-surface-muted/50 p-8 text-center"><ClipboardList className="mx-auto size-8 text-muted-foreground/50" /><p className="mt-3 text-sm font-bold text-muted-foreground">No attendance records yet</p><p className="mt-1 text-xs text-muted-foreground">Assigned member visit data will appear here as sessions are completed.</p></div> : null}
           </CardContent>
         </Card>
 

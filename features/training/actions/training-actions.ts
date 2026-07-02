@@ -671,6 +671,46 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
     return { status: "error", message: memberAccess.message };
   }
 
+  const sessionId = parsed.data.sessionId || null;
+
+  if (!sessionId && parsed.data.recurrenceFrequency !== "none") {
+    const baseDate = new Date(parsed.data.sessionDate);
+    const checkDates: string[] = [];
+    for (let i = 0; i < parsed.data.recurrenceOccurrences; i++) {
+      let d: Date;
+      if (parsed.data.recurrenceFrequency === "weekly") d = addWeeks(baseDate, i);
+      else if (parsed.data.recurrenceFrequency === "biweekly") d = addWeeks(baseDate, i * 2);
+      else if (parsed.data.recurrenceFrequency === "monthly") d = addMonths(baseDate, i);
+      else d = baseDate;
+      checkDates.push(formatISO(d, { representation: "date" }));
+    }
+    const { data: overlaps } = await supabase
+      .from("trainer_sessions")
+      .select("session_date, starts_at, ends_at")
+      .eq("trainer_id", access.trainer.id)
+      .in("session_date", checkDates)
+      .in("status", ["scheduled", "rescheduled"])
+      .lt("starts_at", parsed.data.endsAt)
+      .gt("ends_at", parsed.data.startsAt);
+
+    if (overlaps && overlaps.length > 0) {
+      return { status: "error", message: `Session conflicts with existing session on ${overlaps[0]!.session_date} (${overlaps[0]!.starts_at.slice(0, 5)}-${overlaps[0]!.ends_at.slice(0, 5)}).` };
+    }
+  } else if (!sessionId) {
+    const { data: overlaps } = await supabase
+      .from("trainer_sessions")
+      .select("session_date, starts_at, ends_at")
+      .eq("trainer_id", access.trainer.id)
+      .eq("session_date", parsed.data.sessionDate)
+      .in("status", ["scheduled", "rescheduled"])
+      .lt("starts_at", parsed.data.endsAt)
+      .gt("ends_at", parsed.data.startsAt);
+
+    if (overlaps && overlaps.length > 0) {
+      return { status: "error", message: `Session conflicts with existing session (${overlaps[0]!.starts_at.slice(0, 5)}-${overlaps[0]!.ends_at.slice(0, 5)}).` };
+    }
+  }
+
   const basePayload = {
     gym_id: access.trainer.gym_id,
     trainer_id: parsed.data.trainerId,
@@ -685,7 +725,6 @@ export async function saveTrainerSessionAction(_previousState: AuthActionState, 
     created_by: context.userId
   };
 
-  const sessionId = parsed.data.sessionId || null;
   const hasRecurrence = parsed.data.recurrenceFrequency !== "none" && parsed.data.recurrenceOccurrences > 1;
 
   if (sessionId) {

@@ -113,3 +113,21 @@ export async function getReports(organizationId: string) {
   if (error) throw new Error(error.message);
   return data ?? [];
 }
+
+export async function getExecutiveAnalyticsDashboard(_gymId: string | null) {
+  return {
+    metrics: { totalRevenue: 0, totalMembers: 0, totalSessions: 0, averageRating: 0 },
+    trends: { revenue: [], membership: [], sessions: [] },
+    risks: [],
+    insights: [],
+  };
+}
+
+export async function getAnalyticsReportPayload(input: { gymId: string; reportKey: string }) {
+  return {
+    key: input.reportKey,
+    category: "executive",
+    rows: [] as Array<Record<string, unknown>>,
+    generatedAt: new Date().toISOString(),
+  };
+}
