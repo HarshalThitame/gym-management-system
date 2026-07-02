@@ -82,7 +82,7 @@ export async function adminGetIpWhitelistAction() {
   return getIpWhitelist(scope.scopedOrganizationId ?? undefined, scope.gymId ?? undefined);
 }
 
-export async function adminAddIpAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+export async function adminAddIpAction(formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/security");
   const ipAddress = formData.get("ipAddress") as string;
   const label = formData.get("label") as string;
@@ -111,7 +111,7 @@ export async function adminAddIpAction(_prevState: AuthActionState, formData: Fo
   }
 }
 
-export async function adminRemoveIpAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+export async function adminRemoveIpAction(formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/security");
   const id = formData.get("id") as string;
 
@@ -140,7 +140,7 @@ export async function adminGetPasswordPolicyAction() {
   return getPasswordPolicy(scope.scopedOrganizationId ?? undefined);
 }
 
-export async function adminUpdatePasswordPolicyAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+export async function adminUpdatePasswordPolicyAction(formData: FormData): Promise<AuthActionState> {
   const scope = await requireGymAdminScope("/admin/security");
 
   try {
