@@ -97,6 +97,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.workflows TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.workflow_runs TO authenticated;
 GRANT SELECT ON public.workflow_execution_logs TO authenticated;
 
+DROP TRIGGER IF EXISTS set_workflows_updated_at ON public.workflows;
 CREATE TRIGGER set_workflows_updated_at
 BEFORE UPDATE ON public.workflows
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -166,6 +167,7 @@ CREATE POLICY automation_rules_delete ON public.automation_rules FOR DELETE USIN
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.automation_rules TO authenticated;
 GRANT SELECT ON public.automation_logs TO authenticated;
 
+DROP TRIGGER IF EXISTS set_automation_rules_updated_at ON public.automation_rules;
 CREATE TRIGGER set_automation_rules_updated_at
 BEFORE UPDATE ON public.automation_rules
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -231,6 +233,7 @@ CREATE POLICY integrations_delete ON public.integrations FOR DELETE USING (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.integrations TO authenticated;
 GRANT SELECT ON public.integration_logs TO authenticated;
 
+DROP TRIGGER IF EXISTS set_integrations_updated_at ON public.integrations;
 CREATE TRIGGER set_integrations_updated_at
 BEFORE UPDATE ON public.integrations
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -253,6 +256,38 @@ CREATE TABLE IF NOT EXISTS public.feature_flags (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add columns if table already existed from previous partial run
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='key') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN key TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='name') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='category') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN category TEXT DEFAULT 'general';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='status') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'deprecated'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='metadata') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN metadata JSONB DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='default_enabled') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN default_enabled BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='rollout_percentage') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN rollout_percentage INT DEFAULT 100 CHECK (rollout_percentage >= 0 AND rollout_percentage <= 100);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='requires_plan') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN requires_plan TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feature_flags' AND column_name='dependencies') THEN
+    ALTER TABLE public.feature_flags ADD COLUMN dependencies TEXT[] DEFAULT '{}';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_feature_flags_key ON public.feature_flags(key);
 CREATE INDEX IF NOT EXISTS idx_feature_flags_category ON public.feature_flags(category);
@@ -305,10 +340,12 @@ CREATE POLICY org_feature_flags_update ON public.org_feature_flags FOR UPDATE US
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.feature_flags TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.org_feature_flags TO authenticated;
 
+DROP TRIGGER IF EXISTS set_feature_flags_updated_at ON public.feature_flags;
 CREATE TRIGGER set_feature_flags_updated_at
 BEFORE UPDATE ON public.feature_flags
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS set_org_feature_flags_updated_at ON public.org_feature_flags;
 CREATE TRIGGER set_org_feature_flags_updated_at
 BEFORE UPDATE ON public.org_feature_flags
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -326,6 +363,29 @@ CREATE TABLE IF NOT EXISTS public.analytics_events (
   session_id TEXT,
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add columns if table already existed from previous partial run
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='analytics_events' AND column_name='organization_id') THEN
+    ALTER TABLE public.analytics_events ADD COLUMN organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='analytics_events' AND column_name='event_type') THEN
+    ALTER TABLE public.analytics_events ADD COLUMN event_type TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='analytics_events' AND column_name='event_name') THEN
+    ALTER TABLE public.analytics_events ADD COLUMN event_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='analytics_events' AND column_name='properties') THEN
+    ALTER TABLE public.analytics_events ADD COLUMN properties JSONB DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='analytics_events' AND column_name='session_id') THEN
+    ALTER TABLE public.analytics_events ADD COLUMN session_id TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='analytics_events' AND column_name='timestamp') THEN
+    ALTER TABLE public.analytics_events ADD COLUMN timestamp TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_analytics_events_org ON public.analytics_events(organization_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON public.analytics_events(event_type);
@@ -382,10 +442,12 @@ GRANT SELECT, INSERT ON public.analytics_events TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.analytics_funnels TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.analytics_reports TO authenticated;
 
+DROP TRIGGER IF EXISTS set_analytics_funnels_updated_at ON public.analytics_funnels;
 CREATE TRIGGER set_analytics_funnels_updated_at
 BEFORE UPDATE ON public.analytics_funnels
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS set_analytics_reports_updated_at ON public.analytics_reports;
 CREATE TRIGGER set_analytics_reports_updated_at
 BEFORE UPDATE ON public.analytics_reports
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();

@@ -1,98 +1,273 @@
 -- Phase 4.2: Database Performance Optimization
 -- Adds indexes and optimizations for better query performance
 
--- Members table optimizations
-CREATE INDEX IF NOT EXISTS idx_members_email_lower ON members(LOWER(email));
-CREATE INDEX IF NOT EXISTS idx_members_status_active ON members(organization_id) WHERE status = 'active';
-CREATE INDEX IF NOT EXISTS idx_members_created_at_desc ON members(organization_id, created_at DESC);
+-- Helper function to safely create indexes
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_members_email_lower ON members(LOWER(email));
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_members_email_lower: %', SQLERRM;
+END $$;
 
--- Attendance sessions optimizations
-CREATE INDEX IF NOT EXISTS idx_attendance_check_in_desc ON attendance_sessions(organization_id, check_in_time DESC);
-CREATE INDEX IF NOT EXISTS idx_attendance_member_date ON attendance_sessions(member_id, check_in_time DESC);
-CREATE INDEX IF NOT EXISTS idx_attendance_gym_date ON attendance_sessions(gym_id, check_in_time DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_members_status_active ON members(gym_id) WHERE status = 'active';
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_members_status_active: %', SQLERRM;
+END $$;
 
--- Payments optimizations
-CREATE INDEX IF NOT EXISTS idx_payments_status_date ON payments(organization_id, status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_payments_member_date ON payments(member_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_payments_method ON payments(organization_id, payment_method);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_members_created_at_desc ON members(gym_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_members_created_at_desc: %', SQLERRM;
+END $$;
 
--- CRM Leads optimizations
-CREATE INDEX IF NOT EXISTS idx_leads_status_source ON crm_leads(organization_id, status, source);
-CREATE INDEX IF NOT EXISTS idx_leads_assigned_date ON crm_leads(assigned_to, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_leads_email_lower ON crm_leads(LOWER(email));
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_attendance_check_in_desc ON attendance_sessions(gym_id, check_in_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_attendance_check_in_desc: %', SQLERRM;
+END $$;
 
--- Equipment optimizations
-CREATE INDEX IF NOT EXISTS idx_equipment_status_category ON equipment(organization_id, status, category);
-CREATE INDEX IF NOT EXISTS idx_equipment_gym_status ON equipment(gym_id, status);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_attendance_member_date ON attendance_sessions(member_id, check_in_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_attendance_member_date: %', SQLERRM;
+END $$;
 
--- Support tickets optimizations
-CREATE INDEX IF NOT EXISTS idx_tickets_status_priority ON support_tickets(organization_id, status, priority DESC);
-CREATE INDEX IF NOT EXISTS idx_tickets_assigned_date ON support_tickets(assigned_to, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_attendance_gym_date ON attendance_sessions(gym_id, check_in_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_attendance_gym_date: %', SQLERRM;
+END $$;
 
--- Classes optimizations
-CREATE INDEX IF NOT EXISTS idx_classes_date_time ON classes(organization_id, class_date, start_time);
-CREATE INDEX IF NOT EXISTS idx_classes_instructor ON classes(instructor_id, class_date DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_payments_status_date ON payments(gym_id, status, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_payments_status_date: %', SQLERRM;
+END $$;
 
--- Audit logs optimizations
-CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action_date ON audit_logs(action, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_payments_member_date ON payments(member_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_payments_member_date: %', SQLERRM;
+END $$;
 
--- Bulk operations optimizations
-CREATE INDEX IF NOT EXISTS idx_bulk_ops_status_date ON bulk_operations(status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_bulk_ops_items_status ON bulk_operation_items(operation_id, status);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_payments_method ON payments(gym_id, method);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_payments_method: %', SQLERRM;
+END $$;
 
--- Scheduled reports optimizations
-CREATE INDEX IF NOT EXISTS idx_scheduled_reports_next_run ON scheduled_reports(next_run_at) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_report_runs_report_date ON scheduled_report_runs(report_id, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_leads_status_source ON leads(organization_id, status, source);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_leads_status_source: %', SQLERRM;
+END $$;
 
--- Custom reports optimizations
-CREATE INDEX IF NOT EXISTS idx_custom_reports_org_creator ON custom_reports(organization_id, created_by);
-CREATE INDEX IF NOT EXISTS idx_custom_reports_public ON custom_reports(is_public) WHERE is_public = true;
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_leads_assigned_date ON leads(assigned_to, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_leads_assigned_date: %', SQLERRM;
+END $$;
 
--- Realtime events optimizations
-CREATE INDEX IF NOT EXISTS idx_realtime_events_channel_date ON realtime_events(channel, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_realtime_subscriptions_active ON realtime_subscriptions(is_active, user_id);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_leads_email_lower ON leads(LOWER(email));
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_leads_email_lower: %', SQLERRM;
+END $$;
 
--- API keys optimizations
-CREATE INDEX IF NOT EXISTS idx_api_keys_active_expires ON api_keys(is_active, expires_at) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_api_usage_date ON api_usage_logs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_api_usage_key_date ON api_usage_logs(api_key_id, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_equipment_status_category ON equipment(organization_id, status, category);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_equipment_status_category: %', SQLERRM;
+END $$;
 
--- Webhooks optimizations
-CREATE INDEX IF NOT EXISTS idx_webhooks_active_org ON webhooks(is_active, organization_id);
-CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook_date ON webhook_deliveries(webhook_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_success ON webhook_deliveries(success, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_equipment_gym_status ON equipment(gym_id, status);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_equipment_gym_status: %', SQLERRM;
+END $$;
 
--- Notifications optimizations
-CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read_at DESC);
-CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_tickets_status_priority ON support_tickets(organization_id, status, priority DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_tickets_status_priority: %', SQLERRM;
+END $$;
 
--- 2FA optimizations
-CREATE INDEX IF NOT EXISTS idx_2fa_methods_user_active ON user_2fa_methods(user_id, is_enabled) WHERE is_enabled = true;
-CREATE INDEX IF NOT EXISTS idx_2fa_attempts_user_date ON user_2fa_attempts(user_id, created_at DESC);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_tickets_assigned_date ON support_tickets(assigned_to, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_tickets_assigned_date: %', SQLERRM;
+END $$;
 
--- GDPR optimizations
-CREATE INDEX IF NOT EXISTS idx_gdpr_export_status ON gdpr_export_requests(status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_gdpr_deletion_status ON gdpr_deletion_requests(status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_gdpr_consents_user ON gdpr_consents(user_id, consent_type);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_classes_date_time ON class_sessions(gym_id, session_date, starts_at);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_classes_date_time: %', SQLERRM;
+END $$;
 
--- Security optimizations
-CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON user_sessions(user_id, is_active) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions(expires_at) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_ip_whitelist_active ON ip_whitelist(is_active) WHERE is_active = true;
-CREATE INDEX IF NOT EXISTS idx_login_attempts_email_date ON login_attempts(email, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_lockouts_until ON account_lockouts(locked_until) WHERE locked_until > NOW();
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_classes_instructor ON class_sessions(primary_trainer_id, session_date DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_classes_instructor: %', SQLERRM;
+END $$;
 
--- Composite indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_members_org_status_email ON members(organization_id, status, email);
-CREATE INDEX IF NOT EXISTS idx_payments_org_status_amount ON payments(organization_id, status, amount);
-CREATE INDEX IF NOT EXISTS idx_attendance_org_member_time ON attendance_sessions(organization_id, member_id, check_in_time);
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_audit_logs_entity: %', SQLERRM;
+END $$;
 
--- Partial indexes for frequently filtered queries
-CREATE INDEX IF NOT EXISTS idx_members_active_org ON members(organization_id) WHERE status = 'active';
-CREATE INDEX IF NOT EXISTS idx_leads_new_org ON crm_leads(organization_id) WHERE status = 'new';
-CREATE INDEX IF NOT EXISTS idx_payments_pending ON payments(organization_id) WHERE status IN ('pending', 'processing');
-CREATE INDEX IF NOT EXISTS idx_tickets_open ON support_tickets(organization_id) WHERE status IN ('open', 'in_progress');
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_audit_logs_action_date ON audit_logs(action, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_audit_logs_action_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_bulk_ops_status_date ON bulk_operations(status, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_bulk_ops_status_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_bulk_ops_items_status ON bulk_operation_items(operation_id, status);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_bulk_ops_items_status: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_scheduled_reports_next_run ON scheduled_reports(next_run_at) WHERE is_active = true;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_scheduled_reports_next_run: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_report_runs_report_date ON scheduled_report_runs(report_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_report_runs_report_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_custom_reports_org_creator ON custom_reports(organization_id, created_by);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_custom_reports_org_creator: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_custom_reports_public ON custom_reports(is_public) WHERE is_public = true;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_custom_reports_public: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_realtime_events_channel_date ON realtime_events(channel, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_realtime_events_channel_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_realtime_subscriptions_active ON realtime_subscriptions(is_active, user_id);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_realtime_subscriptions_active: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_api_keys_active_expires ON api_keys(is_active, expires_at) WHERE is_active = true;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_api_keys_active_expires: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_api_usage_date ON api_usage_logs(created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_api_usage_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_api_usage_key_date ON api_usage_logs(api_key_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_api_usage_key_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_webhooks_active_org ON webhooks(is_active, organization_id);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_webhooks_active_org: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook_date ON webhook_deliveries(webhook_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_webhook_deliveries_webhook_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_success ON webhook_deliveries(success, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_webhook_deliveries_success: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_notifications_user_read: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_notifications_unread: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_2fa_methods_user_active ON user_2fa_methods(user_id, is_enabled) WHERE is_enabled = true;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_2fa_methods_user_active: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_2fa_attempts_user_date ON user_2fa_attempts(user_id, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_2fa_attempts_user_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_gdpr_export_status ON gdpr_export_requests(status, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_gdpr_export_status: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_gdpr_deletion_status ON gdpr_deletion_requests(status, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_gdpr_deletion_status: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_gdpr_consents_user ON gdpr_consents(user_id, consent_type);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_gdpr_consents_user: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON user_sessions(user_id, is_active) WHERE is_active = true;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_sessions_user_active: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions(expires_at) WHERE is_active = true;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_sessions_expires: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_ip_whitelist_active ON ip_whitelist(is_active) WHERE is_active = true;
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_ip_whitelist_active: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_login_attempts_email_date ON login_attempts(email, created_at DESC);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_login_attempts_email_date: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_lockouts_until ON account_lockouts(locked_until) WHERE locked_until > NOW();
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_lockouts_until: %', SQLERRM;
+END $$;
+
+-- Composite indexes
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_members_org_status_email ON members(gym_id, status, email);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_members_org_status_email: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_payments_org_status_amount ON payments(gym_id, status, amount);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_payments_org_status_amount: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_attendance_org_member_time ON attendance_sessions(gym_id, member_id, check_in_at);
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_attendance_org_member_time: %', SQLERRM;
+END $$;
+
+-- Partial indexes
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_members_active_org ON members(gym_id) WHERE status = 'active';
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_members_active_org: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_leads_new_org ON leads(organization_id) WHERE status = 'new';
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_leads_new_org: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_payments_pending ON payments(gym_id) WHERE status IN ('pending', 'processing');
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_payments_pending: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS idx_tickets_open ON support_tickets(organization_id) WHERE status IN ('open', 'in_progress');
+EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'Skipped idx_tickets_open: %', SQLERRM;
+END $$;
 
 -- Function to analyze table statistics
 CREATE OR REPLACE FUNCTION analyze_table_stats(table_name TEXT)

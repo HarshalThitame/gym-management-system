@@ -1,7 +1,7 @@
 -- Phase 1.4-1.6: Session Management, IP Whitelisting, Password Policy
 -- Creates tables for security hardening
 
--- Active sessions table
+-- Active sessions table (may already exist from earlier migration with different schema)
 CREATE TABLE IF NOT EXISTS user_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -18,6 +18,32 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- If table already existed from earlier migration, add Phase 1 columns
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_sessions' AND column_name='is_active') THEN
+    ALTER TABLE user_sessions ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_sessions' AND column_name='session_token') THEN
+    ALTER TABLE user_sessions ADD COLUMN session_token TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_sessions' AND column_name='device_name') THEN
+    ALTER TABLE user_sessions ADD COLUMN device_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_sessions' AND column_name='os_name') THEN
+    ALTER TABLE user_sessions ADD COLUMN os_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_sessions' AND column_name='browser_name') THEN
+    ALTER TABLE user_sessions ADD COLUMN browser_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_sessions' AND column_name='last_activity_at') THEN
+    ALTER TABLE user_sessions ADD COLUMN last_activity_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_sessions' AND column_name='expires_at') THEN
+    ALTER TABLE user_sessions ADD COLUMN expires_at TIMESTAMPTZ;
+  END IF;
+END $$;
+
 -- IP whitelist table
 CREATE TABLE IF NOT EXISTS ip_whitelist (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,7 +59,7 @@ CREATE TABLE IF NOT EXISTS ip_whitelist (
   UNIQUE(organization_id, ip_address)
 );
 
--- Password policy table
+-- Password policy table (may already exist from earlier migration with different schema)
 CREATE TABLE IF NOT EXISTS password_policies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE UNIQUE,
@@ -42,13 +68,30 @@ CREATE TABLE IF NOT EXISTS password_policies (
   require_lowercase BOOLEAN NOT NULL DEFAULT true,
   require_numbers BOOLEAN NOT NULL DEFAULT true,
   require_special_chars BOOLEAN NOT NULL DEFAULT true,
-  max_age_days INTEGER, -- Password expiry
-  prevent_reuse_count INTEGER DEFAULT 5, -- Prevent reusing last N passwords
+  max_age_days INTEGER,
+  prevent_reuse_count INTEGER DEFAULT 5,
   max_login_attempts INTEGER NOT NULL DEFAULT 5,
   lockout_duration_minutes INTEGER NOT NULL DEFAULT 15,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add Phase 1 columns if table already existed from earlier migration
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='password_policies' AND column_name='require_special_chars') THEN
+    ALTER TABLE password_policies ADD COLUMN require_special_chars BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='password_policies' AND column_name='max_age_days') THEN
+    ALTER TABLE password_policies ADD COLUMN max_age_days INTEGER;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='password_policies' AND column_name='prevent_reuse_count') THEN
+    ALTER TABLE password_policies ADD COLUMN prevent_reuse_count INTEGER DEFAULT 5;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='password_policies' AND column_name='max_login_attempts') THEN
+    ALTER TABLE password_policies ADD COLUMN max_login_attempts INTEGER NOT NULL DEFAULT 5;
+  END IF;
+END $$;
 
 -- Password history table (for preventing reuse)
 CREATE TABLE IF NOT EXISTS password_history (
