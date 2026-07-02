@@ -5,15 +5,6 @@ export type IntegrationRow = Database["public"]["Tables"]["integrations"]["Row"]
 export type IntegrationInsert = Database["public"]["Tables"]["integrations"]["Insert"];
 export type IntegrationUpdate = Database["public"]["Tables"]["integrations"]["Update"];
 
-export const INTEGRATION_PROVIDERS = [
-  { id: "stripe", label: "Stripe", description: "Payment processing & subscriptions", icon: "credit-card" },
-  { id: "slack", label: "Slack", description: "Team notifications & alerts", icon: "message-square" },
-  { id: "zoom", label: "Zoom", description: "Virtual classes & meetings", icon: "video" },
-  { id: "google-calendar", label: "Google Calendar", description: "Schedule sync & availability", icon: "calendar-days" },
-  { id: "mailchimp", label: "Mailchimp", description: "Email marketing automation", icon: "mail" },
-  { id: "twilio", label: "Twilio", description: "SMS notifications & alerts", icon: "message-circle" },
-] as const;
-
 export async function getIntegrations(organizationId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase

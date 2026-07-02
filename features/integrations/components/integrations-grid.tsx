@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { CreditCard, MessageSquare, Video, CalendarDays, Mail, MessageCircle, Link2, Link2Off } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { INTEGRATION_PROVIDERS, type IntegrationRow } from "../services/integrations-service";
+import { INTEGRATION_PROVIDERS } from "../shared/integration-providers";
+import type { IntegrationRow } from "../services/integrations-service";
 import { connectIntegrationAction, disconnectIntegrationAction } from "../actions/integrations-actions";
 
 type Props = {
