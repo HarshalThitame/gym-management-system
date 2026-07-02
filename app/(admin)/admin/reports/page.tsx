@@ -42,6 +42,8 @@ import { createMetadata } from "@/lib/seo/metadata";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import type { KpiCard } from "@/types/analytics";
 import { requireOrganizationFeatureAccess } from "@/features/entitlement";
+import { CustomReportBuilder } from "@/features/custom-reports/components/custom-report-builder";
+import { ScheduledReportsManager } from "@/features/scheduled-reports/components/scheduled-reports-manager";
 
 export const metadata: Metadata = createMetadata({
   title: "Analytics and Reporting Center",
@@ -495,6 +497,16 @@ export default async function AdminReportsPage() {
             <MetricTile label="Forecast Models" value={String(dashboard.forecastModels.length)} detail="Active or paused forecasting definitions" />
           </CardContent>
         </Card>
+      </section>
+
+      {/* Custom Report Builder */}
+      <section>
+        <CustomReportBuilder />
+      </section>
+
+      {/* Scheduled Reports */}
+      <section>
+        <ScheduledReportsManager />
       </section>
     </div>
   );
