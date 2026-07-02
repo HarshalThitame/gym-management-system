@@ -15,6 +15,7 @@ import { absoluteUrl } from "@/lib/utils";
 import { sendEmail } from "@/services/email/resend";
 import type { Database } from "@/types/database";
 import { isRoleName, type RoleName } from "@/types/auth";
+import { checkUserHasTwoFactor } from "@/features/two-factor-auth/services/two-factor-service";
 import {
   ChangePasswordSchema,
   ForgotPasswordSchema,
@@ -69,6 +70,13 @@ export async function signInAction(_previousState: AuthActionState, formData: Fo
     entityType: "auth_user",
     entityId: data.user.id
   });
+
+  // Check if user has 2FA enabled
+  const has2fa = await checkUserHasTwoFactor(data.user.id);
+  if (has2fa) {
+    const nextPath = parsed.data.next ?? await resolveUserRedirect(supabase, data.user.id);
+    redirect(`/verify-2fa?next=${encodeURIComponent(nextPath)}`);
+  }
 
   const nextPath = sanitizeRedirectPath(parsed.data.next, await resolveUserRedirect(supabase, data.user.id));
   redirect(nextPath);
