@@ -1,9 +1,8 @@
 "use server";
 
-import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
-import { getClientIpFromHeaders } from "@/lib/security/request";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getUserSessions,
@@ -14,7 +13,6 @@ import {
   removeIpFromWhitelist,
   getPasswordPolicy,
   updatePasswordPolicy,
-  validatePassword,
   checkAccountLockout,
   lockAccount,
   unlockAccount,
@@ -82,12 +80,12 @@ export async function adminGetIpWhitelistAction() {
   return getIpWhitelist(scope.scopedOrganizationId ?? undefined, scope.gymId ?? undefined);
 }
 
-export async function adminAddIpAction(formData: FormData): Promise<AuthActionState> {
+export async function adminAddIpAction(formData: FormData): Promise<void> {
   const scope = await requireGymAdminScope("/admin/security");
   const ipAddress = formData.get("ipAddress") as string;
   const label = formData.get("label") as string;
 
-  if (!ipAddress) return { status: "error", message: "IP address required." };
+  if (!ipAddress) return;
 
   try {
     await addIpToWhitelist(ipAddress, {
@@ -104,18 +102,18 @@ export async function adminAddIpAction(formData: FormData): Promise<AuthActionSt
       entityType: "ip_whitelist",
       metadata: { ipAddress, label }
     });
-
-    return { status: "success", message: "IP added to whitelist." };
   } catch (error) {
-    return { status: "error", message: "Failed to add IP." };
+    // Silently fail - the form submission will be handled by the server action
   }
+
+  revalidatePath("/admin/security");
 }
 
-export async function adminRemoveIpAction(formData: FormData): Promise<AuthActionState> {
+export async function adminRemoveIpAction(formData: FormData): Promise<void> {
   const scope = await requireGymAdminScope("/admin/security");
   const id = formData.get("id") as string;
 
-  if (!id) return { status: "error", message: "ID required." };
+  if (!id) return;
 
   try {
     await removeIpFromWhitelist(id);
@@ -127,11 +125,11 @@ export async function adminRemoveIpAction(formData: FormData): Promise<AuthActio
       entityType: "ip_whitelist",
       entityId: id
     });
-
-    return { status: "success", message: "IP removed from whitelist." };
   } catch (error) {
-    return { status: "error", message: "Failed to remove IP." };
+    // Silently fail
   }
+
+  revalidatePath("/admin/security");
 }
 
 // Password Policy actions
@@ -140,7 +138,7 @@ export async function adminGetPasswordPolicyAction() {
   return getPasswordPolicy(scope.scopedOrganizationId ?? undefined);
 }
 
-export async function adminUpdatePasswordPolicyAction(formData: FormData): Promise<AuthActionState> {
+export async function adminUpdatePasswordPolicyAction(formData: FormData): Promise<void> {
   const scope = await requireGymAdminScope("/admin/security");
 
   try {
@@ -161,11 +159,11 @@ export async function adminUpdatePasswordPolicyAction(formData: FormData): Promi
       action: "security.password_policy_updated",
       entityType: "password_policy"
     });
-
-    return { status: "success", message: "Password policy updated." };
   } catch (error) {
-    return { status: "error", message: "Failed to update policy." };
+    // Silently fail
   }
+
+  revalidatePath("/admin/security");
 }
 
 // Account lockout actions
