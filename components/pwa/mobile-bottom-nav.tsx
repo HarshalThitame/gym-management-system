@@ -14,7 +14,9 @@ import {
   Clock,
   CreditCard,
   Dumbbell,
+  Flag,
   Gauge,
+  Link2,
   MessageSquare,
   MoreHorizontal,
   ReceiptText,
@@ -26,7 +28,9 @@ import {
   UserRound,
   UserRoundPlus,
   UsersRound,
-  X
+  Workflow,
+  X,
+  Zap
 } from "lucide-react";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
@@ -44,9 +48,11 @@ export type MobilePortalIconKey =
   | "clock"
   | "credit-card"
   | "dumbbell"
+  | "flag"
   | "gauge"
   | "gift"
   | "life-buoy"
+  | "link"
   | "message-square"
   | "receipt"
   | "scale"
@@ -59,7 +65,8 @@ export type MobilePortalIconKey =
   | "user"
   | "user-plus"
   | "users"
-  | "wrench";
+  | "wrench"
+  | "zap";
 
 export type MobilePortalNavItem = {
   href: string;
@@ -284,6 +291,14 @@ function getPortalIcon(iconKey: MobilePortalIconKey) {
       return Clock;
     case "trending-up":
       return TrendingUp;
+    case "flag":
+      return Flag;
+    case "link":
+      return Link2;
+    case "workflow":
+      return Workflow;
+    case "zap":
+      return Zap;
     case "gauge":
     default:
       return Gauge;

@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, MessageSquare, Settings, Tags, UserRoundPlus, UsersRound, Target, Wrench, LifeBuoy, Gift, Shield, Scale } from "lucide-react";
+import { Activity, BarChart3, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Gauge, MessageSquare, Settings, Tags, UserRoundPlus, UsersRound, Target, Wrench, LifeBuoy, Gift, Shield, Scale, Link2, Workflow, Zap, Flag } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalShell, type PortalNavItem } from "@/components/layout/portal-shell";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
@@ -19,11 +19,16 @@ const adminNav = [
   { href: "/admin/membership-plans", label: "Plans", icon: <Tags className="size-5" />, iconKey: "tags" },
   { href: "/admin/payments", label: "Payments", icon: <CreditCard className="size-5" />, iconKey: "credit-card" },
   { href: "/admin/communications", label: "Communications", icon: <MessageSquare className="size-5" />, iconKey: "message-square" },
+  { href: "/admin/integrations", label: "Integrations", icon: <Link2 className="size-5" />, iconKey: "link" },
+  { href: "/admin/analytics", label: "Analytics", icon: <BarChart3 className="size-5" />, iconKey: "bar-chart" },
+  { href: "/admin/automation/workflows", label: "Workflows", icon: <Workflow className="size-5" />, iconKey: "wrench" },
+  { href: "/admin/automation/triggers", label: "Automation", icon: <Zap className="size-5" />, iconKey: "zap" },
   { href: "/admin/ai", label: "AI Intelligence", icon: <Brain className="size-5" />, iconKey: "brain" },
   { href: "/admin/reports", label: "Reports", icon: <BarChart3 className="size-5" />, iconKey: "bar-chart" },
   { href: "/admin/audit", label: "Audit Trail", icon: <Shield className="size-5" />, iconKey: "shield" },
   { href: "/admin/gdpr", label: "GDPR", icon: <Scale className="size-5" />, iconKey: "scale" },
   { href: "/admin/security", label: "Security", icon: <Shield className="size-5" />, iconKey: "shield-check" },
+  { href: "/admin/feature-flags", label: "Feature Flags", icon: <Flag className="size-5" />, iconKey: "flag" },
   { href: "/admin/staff", label: "Staff", icon: <BriefcaseBusiness className="size-5" />, iconKey: "briefcase" },
   { href: "/admin/members/new", label: "Create User", icon: <UserRoundPlus className="size-5" />, iconKey: "user-plus" },
   { href: "/admin/settings", label: "Settings", icon: <Settings className="size-5" />, iconKey: "settings" }
