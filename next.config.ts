@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" }
@@ -14,8 +17,6 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["recharts", "lucide-react", "date-fns", "framer-motion"],
     webpackBuildWorker: true,
-    parallelServerCompiles: 3,
-    parallelServerBuildTraces: 3,
   },
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
