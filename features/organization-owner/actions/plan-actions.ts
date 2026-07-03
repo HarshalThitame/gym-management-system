@@ -8,6 +8,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireOrgFeatureAccess, entitlementSimpleCatch } from "@/features/entitlement";
 import { getOrgOwnerContext } from "./action-utils";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
+import { syncSubscriptionArtifactsForOrganization } from "@/features/super-admin/services/subscription-entitlement-sync";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
 
@@ -97,6 +98,11 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
     if (!result.success || !result.subscriptionId) {
       return { status: "error", message: result.error ?? "Failed to cancel subscription." };
     }
+
+    await syncSubscriptionArtifactsForOrganization(
+      ctx.organizationId,
+      "Organization owner cancelled subscription.",
+    );
 
     await writeAuditLog({
       actorId: ctx.userId,

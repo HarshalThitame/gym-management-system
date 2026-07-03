@@ -1,9 +1,11 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { SUBSCRIPTION_STATUSES, type SubscriptionStatus as CanonicalSubscriptionStatus } from "@/features/entitlement";
 import { normalizePackageTierOrFallback } from "@/features/entitlement/package-tier";
+import { syncSubscriptionArtifactsForOrganization } from "./subscription-entitlement-sync";
 
-export const subscriptionStatuses = ["active", "trial", "expired", "suspended", "cancelled"] as const;
+export const subscriptionStatuses = SUBSCRIPTION_STATUSES;
 
-export type SubscriptionStatus = (typeof subscriptionStatuses)[number];
+export type SubscriptionStatus = CanonicalSubscriptionStatus;
 
 export type PackageRow = {
   id: string;
@@ -297,6 +299,11 @@ export async function assignPackageToOrg({
     throw new Error(error?.message ?? "Subscription assignment failed.");
   }
 
+  await syncSubscriptionArtifactsForOrganization(
+    organizationId,
+    `Package assignment synced for ${organizationId}.`,
+  );
+
   return data;
 }
 
@@ -315,6 +322,11 @@ export async function updateSubscriptionStatus(subscriptionId: string, status: S
   if (error || !data) {
     throw new Error(error?.message ?? "Subscription status update failed.");
   }
+
+  await syncSubscriptionArtifactsForOrganization(
+    data.organization_id,
+    `Subscription status changed to ${status}.`,
+  );
 
   return data;
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { recordSubscriptionEvent } from "@/features/super-admin/services/subscription-events-service";
 import { recordSubscriptionHistory } from "@/features/super-admin/services/entitlement-service";
+import { syncSubscriptionArtifactsForOrganization } from "@/features/super-admin/services/subscription-entitlement-sync";
 
 const GRACE_PERIOD_DAYS = 7;
 
@@ -68,6 +69,10 @@ export async function GET(request: Request) {
     if (!error) {
       results.push(`Suspended ${ids.length} subscription(s) past grace period`);
       for (const sub of expiredGrace) {
+        await syncSubscriptionArtifactsForOrganization(
+          sub.organization_id as string,
+          "Subscription lifecycle cron suspended subscription after grace period.",
+        );
         await recordSubscriptionEvent({
           organizationId: sub.organization_id as string,
           subscriptionId: sub.id as string,
@@ -103,6 +108,10 @@ export async function GET(request: Request) {
     if (!error) {
       results.push(`Expired ${ids.length} cancelled subscription(s) after data retention`);
       for (const sub of retentionExpired) {
+        await syncSubscriptionArtifactsForOrganization(
+          sub.organization_id as string,
+          "Subscription lifecycle cron expired cancelled subscription after retention period.",
+        );
         await recordSubscriptionEvent({
           organizationId: sub.organization_id as string,
           subscriptionId: sub.id as string,

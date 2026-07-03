@@ -282,7 +282,7 @@ export function PortalShell({
                 <p className="text-sm font-black gradient-text">{displayName}</p>
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{context.primaryRole?.replace("_", " ") ?? "authenticated"}</p>
               </div>
-              <form id="sign-out-form-desktop" action={signOutAction} className="lg:hidden">
+              <form id="sign-out-form-desktop" action={signOutAction} className="shrink-0">
                 <SignOutButton compact />
               </form>
             </div>

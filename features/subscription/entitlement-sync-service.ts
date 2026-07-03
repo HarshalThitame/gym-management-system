@@ -14,6 +14,7 @@ type RawTableQuery = {
   select(columns: string): RawSelectQuery;
   upsert(row: RawRow, options?: RawRow): Promise<{ data: RawRow[] | null; error: RawError }>;
   insert(row: RawRow): Promise<{ data: RawRow[] | null; error: RawError }>;
+  delete(): { eq(column: string, value: unknown): Promise<{ data: RawRow[] | null; error: RawError }> };
 };
 type RawDbClient = {
   from(table: string): RawTableQuery;
@@ -51,7 +52,9 @@ export async function syncOrganizationEntitlements(organizationId: string, reaso
   try {
     const subscription = await getActiveSubscription(organizationId);
     if (!subscription) {
-      return { ok: false, error: "No active subscription found." };
+      const client = rawDb();
+      await client.from("organization_entitlements").delete().eq("organization_id", organizationId);
+      return { ok: true, subscriptionId: "none" };
     }
 
     const client = rawDb();
@@ -62,6 +65,14 @@ export async function syncOrganizationEntitlements(organizationId: string, reaso
 
     if (error) {
       return { ok: false, error: error.message };
+    }
+
+    const { error: deleteError } = await client
+      .from("organization_entitlements")
+      .delete()
+      .eq("organization_id", organizationId);
+    if (deleteError) {
+      return { ok: false, error: deleteError.message };
     }
 
     for (const feature of features ?? []) {
@@ -103,7 +114,9 @@ export async function syncOrganizationUsageLimits(organizationId: string, reason
   try {
     const subscription = await getActiveSubscription(organizationId);
     if (!subscription) {
-      return { ok: false, error: "No active subscription found." };
+      const client = rawDb();
+      await client.from("organization_usage_limits").delete().eq("organization_id", organizationId);
+      return { ok: true, subscriptionId: "none" };
     }
 
     const client = rawDb();
@@ -114,6 +127,14 @@ export async function syncOrganizationUsageLimits(organizationId: string, reason
 
     if (error) {
       return { ok: false, error: error.message };
+    }
+
+    const { error: deleteError } = await client
+      .from("organization_usage_limits")
+      .delete()
+      .eq("organization_id", organizationId);
+    if (deleteError) {
+      return { ok: false, error: deleteError.message };
     }
 
     for (const limit of limits ?? []) {

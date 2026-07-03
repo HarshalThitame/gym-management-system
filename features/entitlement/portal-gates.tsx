@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createElement } from "react";
-import { Activity, BarChart3, Bell, Bot, Brain, BriefcaseBusiness, Calendar, CalendarCheck, CalendarDays, CalendarPlus, Clock, CreditCard, Dumbbell, FileText, Gauge, Gift, Link2, ListChecks, MessageSquare, Phone, ReceiptText, Scale, Settings, Shield, Target, TrendingUp, UserRound, UserRoundPlus, UsersRound, Wrench, Zap } from "lucide-react";
+import { Activity, BarChart3, Bell, Bot, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, Clock, CreditCard, Dumbbell, Gauge, Gift, Link2, ListChecks, MessageSquare, ReceiptText, Scale, Settings, Shield, Target, TrendingUp, UserRound, UserRoundPlus, UsersRound, Wrench, Zap } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import type { PortalNavItem } from "@/components/layout/portal-shell";
 import type { FeatureKey } from "./feature-registry";
@@ -133,6 +133,7 @@ const memberPortalGates = [
   defineGate({ href: "/member/fitness", label: "Fitness", icon: portalIcon("activity"), iconKey: "activity", featureKey: "goal_tracking", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/member/ai-coach", label: "AI Coach", icon: portalIcon("bot"), iconKey: "bot", featureKey: "ai_coach", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/member/notifications", label: "Notifications", icon: portalIcon("bell"), iconKey: "bell", featureKey: "in_app_push_notifications", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/member/referral", label: "Referral", icon: portalIcon("gift"), iconKey: "gift", featureKey: "referral_program", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/member/profile", label: "Profile", icon: portalIcon("user"), iconKey: "user", visibilityMode: "always_on", match: "exact" }),
   defineGate({ href: "/member/settings", label: "Settings", icon: portalIcon("settings"), iconKey: "settings", visibilityMode: "always_on", match: "exact" }),
   defineGate({ href: "/member/survey", label: "Survey", icon: portalIcon("message-square"), iconKey: "message-square", visibilityMode: "always_on", match: "prefix" }),

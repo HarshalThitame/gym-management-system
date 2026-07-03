@@ -6,6 +6,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { z } from "zod";
+import { FEATURE_KEYS } from "@/features/entitlement";
+import { syncSubscriptionArtifactsForOrganization } from "../services/subscription-entitlement-sync";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SbClient = any;
@@ -20,6 +22,10 @@ const packageSchema = z.object({
   maxStaff: z.coerce.number().int().min(-1).default(0),
   maxStorage: z.coerce.number().int().min(-1).default(0),
   maxApiCalls: z.coerce.number().int().min(-1).default(0),
+  maxGyms: z.coerce.number().int().min(-1).default(0),
+  membershipPlanTypes: z.coerce.number().int().min(-1).default(0),
+  weeklyClasses: z.coerce.number().int().min(-1).default(0),
+  smsMonthly: z.coerce.number().int().min(-1).default(0),
   trialDays: z.coerce.number().int().min(0).default(0),
   sortOrder: z.coerce.number().int().min(0).default(0),
   price: z.coerce.number().int().min(0).default(0),
@@ -132,6 +138,14 @@ const FEATURE_FIELD_MAP: Record<string, string> = {
 
 };
 
+const FEATURE_FORM_FIELD_ALIASES: Record<string, string> = Object.fromEntries(
+  FEATURE_KEYS.map((featureCode) => [featureCode, FEATURE_FIELD_MAP[featureCode] ?? featureCode]),
+);
+
+function readCheckbox(formData: FormData, fieldName: string) {
+  return formData.get(fieldName) === "on" || formData.get(fieldName) === "true";
+}
+
 export async function savePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _prev;
   const auth = await requireApiRole(["super_admin"]);
@@ -148,6 +162,10 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     maxStaff: formData.get("maxStaff") ?? "0",
     maxStorage: formData.get("maxStorage") ?? "0",
     maxApiCalls: formData.get("maxApiCalls") ?? "0",
+    maxGyms: formData.get("maxGyms") ?? "0",
+    membershipPlanTypes: formData.get("membershipPlanTypes") ?? "0",
+    weeklyClasses: formData.get("weeklyClasses") ?? "0",
+    smsMonthly: formData.get("smsMonthly") ?? "0",
     trialDays: formData.get("trialDays") ?? "0",
     sortOrder: formData.get("sortOrder") ?? "0",
     price: formData.get("price") ?? "0",
@@ -160,17 +178,10 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     recommended: formData.get("recommended") === "on",
   };
 
-  // Collect feature toggles from form
-  for (const [featureCode, fieldName] of Object.entries(FEATURE_FIELD_MAP)) {
-    raw[fieldName] = formData.get(fieldName) === "on";
-  }
-
-  // Also catch any feature_xxx or direct boolean toggles from the editor
-  const allKeys = Array.from(formData.keys());
-  for (const key of allKeys) {
-    if (key.startsWith("feature_") && !raw[key]) {
-      raw[key] = formData.get(key) === "on";
-    }
+  // Collect feature toggles from form. Support both historical alias field
+  // names and canonical feature-code field names from the editor.
+  for (const [featureCode, fieldName] of Object.entries(FEATURE_FORM_FIELD_ALIASES)) {
+    raw[fieldName] = readCheckbox(formData, fieldName) || readCheckbox(formData, featureCode);
   }
 
   const parsed = packageSchema.safeParse(raw);
@@ -216,11 +227,10 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
 
     // Save feature toggles to package_features table
     const featureValues: Array<{ package_id: string; feature_code: string; value: string }> = [];
-
-    // Map from form field names back to feature codes
-    for (const [featureCode, fieldName] of Object.entries(FEATURE_FIELD_MAP)) {
-      const value = raw[fieldName] === true ? "true" : "false";
-      featureValues.push({ package_id: packageId, feature_code: featureCode, value });
+    for (const featureCode of FEATURE_KEYS) {
+      const fieldName = FEATURE_FORM_FIELD_ALIASES[featureCode];
+      const enabled = Boolean(raw[fieldName]);
+      featureValues.push({ package_id: packageId, feature_code: featureCode, value: enabled ? "true" : "false" });
     }
 
     // Upsert each feature
@@ -239,6 +249,10 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
       { limit_code: "max_staff", label: "Maximum Staff", value: parsed.data.maxStaff, sort_order: 4 },
       { limit_code: "max_storage_gb", label: "Storage Limit (GB)", value: parsed.data.maxStorage, sort_order: 5 },
       { limit_code: "max_api_calls", label: "Monthly API Calls", value: parsed.data.maxApiCalls, sort_order: 6 },
+      { limit_code: "max_gyms", label: "Maximum Gyms", value: parsed.data.maxGyms, sort_order: 7 },
+      { limit_code: "membership_plan_types", label: "Membership Plan Types", value: parsed.data.membershipPlanTypes, sort_order: 8 },
+      { limit_code: "weekly_classes", label: "Weekly Classes", value: parsed.data.weeklyClasses, sort_order: 9 },
+      { limit_code: "sms_monthly", label: "Monthly SMS Limit", value: parsed.data.smsMonthly, sort_order: 10 },
     ];
 
     for (const lm of limitMappings) {
@@ -279,6 +293,27 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
       : { trial_days: parsed.data.trialDays || 0, is_trial_available: parsed.data.isTrialAvailable };
 
     await sb.from("packages").update({ metadata: pkgMeta }).eq("id", packageId);
+
+    const { data: impactedSubscriptions } = await sb
+      .from("organization_subscriptions")
+      .select("organization_id")
+      .eq("package_id", packageId)
+      .in("status", ["active", "trial"]);
+
+    const impactedOrganizationIds = [...new Set(
+      ((impactedSubscriptions ?? []) as Array<Record<string, unknown>>)
+        .map((row) => row.organization_id)
+        .filter((value): value is string => typeof value === "string" && value.length > 0),
+    )];
+
+    await Promise.all(
+      impactedOrganizationIds.map((organizationId) =>
+        syncSubscriptionArtifactsForOrganization(
+          organizationId,
+          `Package ${packageId} configuration updated by Super Admin.`,
+        ),
+      ),
+    );
 
     revalidatePath("/super-admin/subscriptions");
     return { status: "success", message: parsed.data.id ? "Package updated." : "Package created." };

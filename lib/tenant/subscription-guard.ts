@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { organizationHasFeature, checkOrganizationLimit } from "@/features/super-admin/services/entitlement-service";
+import {
+  checkFeatureAccess,
+  canCreateResource,
+  getOrganizationEntitlements,
+  isFeatureKey,
+  isLimitKey,
+} from "@/features/entitlement";
 import { writeAuditLog } from "@/lib/audit";
 
 export type SubscriptionStatus = "active" | "trial" | "expired" | "suspended" | "cancelled" | "none" | "grace_period" | "paused";
@@ -18,51 +23,15 @@ export type SubscriptionCheckResult = {
  * Returns ok: false with appropriate error if the subscription is not active/trial.
  */
 export async function checkSubscriptionStatus(organizationId: string): Promise<SubscriptionCheckResult> {
-  const supabase = await createSupabaseServerClient();
-  const s = supabase as never as {
-    from(t: string): {
-      select(c: string): {
-        eq(k: string, v: string): {
-          in(k: string, v: string[]): {
-            order(k: string, o: { ascending: boolean }): {
-              limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
-            };
-          };
-        };
-      };
-    };
-  };
+  const snapshot = await getOrganizationEntitlements(organizationId);
 
-  const { data: subs } = await s
-    .from("organization_subscriptions")
-    .select("status, expires_at, trial_ends_at")
-    .eq("organization_id", organizationId)
-    .in("status", ["active", "trial", "expired", "suspended", "cancelled"])
-    .order("started_at", { ascending: false })
-    .limit(1);
-
-  const sub = (subs ?? [])[0];
-  if (!sub) {
+  if (!snapshot.subscriptionId) {
     return { ok: false, status: "none", error: "No subscription found", code: "no_subscription" };
   }
 
-  const status = sub.status as SubscriptionStatus;
-  const expiresAt = sub.expires_at as string | null;
-  const trialEndsAt = sub.trial_ends_at as string | null;
-
-  // Check active/trial
-  if (status === "active") {
-    if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
-      return { ok: false, status: "expired", error: "Subscription has expired", code: "subscription_expired" };
-    }
-    return { ok: true, status: "active" };
-  }
-
-  if (status === "trial") {
-    if (trialEndsAt && new Date(trialEndsAt).getTime() < Date.now()) {
-      return { ok: false, status: "expired", error: "Trial has expired", code: "trial_expired" };
-    }
-    return { ok: true, status: "trial" };
+  const status = snapshot.subscriptionStatus as SubscriptionStatus;
+  if (snapshot.isActive && (status === "active" || status === "trial")) {
+    return { ok: true, status };
   }
 
   // Non-active statuses
@@ -70,13 +39,16 @@ export async function checkSubscriptionStatus(organizationId: string): Promise<S
     expired: "Your subscription has expired. Please renew to continue.",
     suspended: "Your subscription has been suspended. Contact support.",
     cancelled: "Your subscription has been cancelled. Please reactivate.",
+    paused: "Your subscription is paused.",
+    grace_period: "Your subscription is in grace period.",
+    none: "No subscription found",
   };
 
   return {
     ok: false,
     status,
-    error: messages[status] ?? "Subscription is not active",
-    code: `subscription_${status}`,
+    error: snapshot.message ?? messages[status] ?? "Subscription is not active",
+    code: snapshot.reason ? `subscription_${snapshot.reason.toLowerCase()}` : `subscription_${status}`,
   };
 }
 
@@ -141,8 +113,12 @@ export async function requireFeature(
     return { ok: false, error: subCheck.error };
   }
 
-  const hasFeature = await organizationHasFeature(organizationId, featureCode);
-  if (!hasFeature) {
+  if (!isFeatureKey(featureCode)) {
+    return { ok: false, error: `Unknown feature "${featureCode}".` };
+  }
+
+  const result = await checkFeatureAccess(organizationId, featureCode);
+  if (!result.allowed) {
     await writeAuditLog({
       actorId: null,
       action: `feature_gate.blocked.${featureCode}` as const,
@@ -151,7 +127,7 @@ export async function requireFeature(
       metadata: { featureCode, actionName } as never,
     });
 
-    return { ok: false as const, error: `Feature "${featureCode}" is not available on your current plan.` };
+    return { ok: false as const, error: result.message ?? `Feature "${featureCode}" is not available on your current plan.` };
   }
 
   return { ok: true };
@@ -166,14 +142,21 @@ export async function requireWithinLimit(
   limitCode: string,
   currentUsage: number,
 ): Promise<{ ok: boolean; error?: string; limit?: number }> {
-  const result = await checkOrganizationLimit(organizationId, limitCode, currentUsage);
-  if (!result.withinLimit) {
+  if (!isLimitKey(limitCode)) {
+    return {
+      ok: false,
+      error: `Unknown limit "${limitCode}".`,
+    };
+  }
+
+  const result = await canCreateResource(organizationId, limitCode, 1);
+  if (!result.allowed && currentUsage >= result.limitValue) {
     const label = limitCode.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     return {
       ok: false,
-      error: `Your plan limits ${label} to ${result.limit}. You currently have ${result.usage}. Upgrade your plan to increase this limit.`,
-      limit: result.limit,
+      error: `Your plan limits ${label} to ${result.limitValue}. You currently have ${currentUsage}. Upgrade your plan to increase this limit.`,
+      limit: result.limitValue,
     };
   }
-  return { ok: true, limit: result.limit };
+  return { ok: true, limit: result.limitValue };
 }

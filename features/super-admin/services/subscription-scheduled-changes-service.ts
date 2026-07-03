@@ -2,6 +2,7 @@ import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { recordSubscriptionEvent } from "./subscription-events-service";
+import { syncSubscriptionArtifactsForOrganization } from "./subscription-entitlement-sync";
 
 export type ScheduledChange = {
   id: string;
@@ -151,6 +152,18 @@ export async function applyScheduledChanges(): Promise<{ applied: number }> {
         .from("scheduled_plan_changes")
         .update({ status: "applied", applied_at: now })
         .eq("id", change.id as string);
+
+      const { data: subscription } = await db
+        .from("organization_subscriptions")
+        .select("")
+        .eq("id", change.subscription_id as string)
+        .single();
+      if (subscription?.organization_id) {
+        await syncSubscriptionArtifactsForOrganization(
+          subscription.organization_id as string,
+          `Scheduled plan change applied for subscription ${change.subscription_id as string}.`,
+        );
+      }
 
       applied++;
     } catch {

@@ -614,8 +614,12 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
               <LimitField label="Max Branches (-1 = ∞)" name="maxBranches" value={pkg?.max_branches ?? pkg?._limits?.max_branches ?? 0} disabled={savePending} />
               <LimitField label="Max Trainers (-1 = ∞)" name="maxTrainers" value={pkg?.max_trainers ?? pkg?._limits?.max_trainers ?? 0} disabled={savePending} />
               <LimitField label="Max Staff (-1 = ∞)" name="maxStaff" value={pkg?.max_staff ?? pkg?._limits?.max_staff ?? 0} disabled={savePending} />
+              <LimitField label="Max Gyms (-1 = ∞)" name="maxGyms" value={pkg?.max_gyms ?? pkg?._limits?.max_gyms ?? 0} disabled={savePending} />
               <LimitField label="Storage GB (-1 = ∞)" name="maxStorage" value={pkg?.max_storage_gb ?? pkg?._limits?.max_storage_gb ?? 0} disabled={savePending} />
               <LimitField label="Monthly API Calls (-1 = ∞)" name="maxApiCalls" value={pkg?.max_api_calls ?? pkg?._limits?.max_api_calls ?? 0} disabled={savePending} />
+              <LimitField label="Membership Plan Types (-1 = ∞)" name="membershipPlanTypes" value={pkg?.membership_plan_types ?? pkg?._limits?.membership_plan_types ?? 0} disabled={savePending} />
+              <LimitField label="Weekly Classes (-1 = ∞)" name="weeklyClasses" value={pkg?.weekly_classes ?? pkg?._limits?.weekly_classes ?? 0} disabled={savePending} />
+              <LimitField label="Monthly SMS (-1 = ∞)" name="smsMonthly" value={pkg?.sms_monthly ?? pkg?._limits?.sms_monthly ?? 0} disabled={savePending} />
               <LimitField label="Sort Order" name="sortOrder" value={pkg?.sort_order ?? 0} disabled={savePending} />
             </div>
           </div>

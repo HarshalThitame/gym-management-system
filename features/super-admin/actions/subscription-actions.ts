@@ -9,6 +9,7 @@ import { assignPackageToOrg, updateSubscriptionStatus } from "../services/subscr
 import type { AssignPackageToOrgInput } from "../services/subscription-service";
 import { assignPackageSchema, updateStatusSchema } from "../schemas/subscription-schemas";
 import { recordSubscriptionEvent } from "../services/subscription-events-service";
+import { syncSubscriptionArtifactsForOrganization } from "../services/subscription-entitlement-sync";
 
 const superAdminRoles = ["super_admin"] as const;
 
@@ -46,6 +47,10 @@ export async function assignPackageAction(input: unknown): Promise<AuthActionSta
     }
 
     const subscription = await assignPackageToOrg(assignmentInput);
+    await syncSubscriptionArtifactsForOrganization(
+      parsed.data.organizationId,
+      `Super Admin assigned package ${parsed.data.packageId}.`,
+    );
 
     await writeSubscriptionAudit(auth.context.userId, "organization_subscription.assigned", subscription.id, {
       organizationId: parsed.data.organizationId,
@@ -99,6 +104,10 @@ export async function updateSubscriptionStatusAction(input: unknown): Promise<Au
     }
 
     const subscription = await updateSubscriptionStatus(parsed.data.subscriptionId, parsed.data.status);
+    await syncSubscriptionArtifactsForOrganization(
+      parsed.data.organizationId || subscription.organization_id,
+      `Super Admin updated subscription status to ${parsed.data.status}.`,
+    );
 
     const auditMetadata: Record<string, unknown> = {
       status: parsed.data.status,
@@ -106,7 +115,7 @@ export async function updateSubscriptionStatusAction(input: unknown): Promise<Au
     if (parsed.data.reason) auditMetadata.reason = parsed.data.reason;
     if (parsed.data.stepUpEmail) auditMetadata.stepUpEmail = parsed.data.stepUpEmail;
 
-    await writeSubscriptionAudit(auth.context.userId, "organization_subscription.status_updated", subscription.id, auditMetadata as any);
+    await writeSubscriptionAudit(auth.context.userId, "organization_subscription.status_updated", subscription.id, auditMetadata as Json);
 
     // Record subscription event for suspend
     if (parsed.data.status === "suspended") {

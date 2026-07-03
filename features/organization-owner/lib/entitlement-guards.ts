@@ -1,4 +1,10 @@
-import { requireFeature, requireWithinLimit, checkSubscriptionStatus } from "@/lib/tenant/subscription-guard";
+import {
+  canCreateResource,
+  checkFeatureAccess,
+  getOrganizationEntitlements,
+  isFeatureKey,
+  isLimitKey,
+} from "@/features/entitlement";
 import { getOrgOwnerContext } from "@/features/organization-owner/actions/action-utils";
 
 export type GuardResult = { ok: true } | { ok: false; error: string };
@@ -15,9 +21,9 @@ export async function requireOrgSubscription(): Promise<GuardResult & { organiza
     return { ok: false, error: "Authentication required." };
   }
 
-  const status = await checkSubscriptionStatus(ctx.organizationId);
-  if (!status.ok) {
-    return { ok: false as const, error: status.error ?? "No active subscription." };
+  const snapshot = await getOrganizationEntitlements(ctx.organizationId);
+  if (!snapshot.isActive) {
+    return { ok: false as const, error: snapshot.message ?? "No active subscription." };
   }
 
   return { ok: true as const, organizationId: ctx.organizationId as string, userId: ctx.userId as string };
@@ -31,9 +37,14 @@ export async function requireOrgFeature(
   featureCode: string,
   actionName: string,
 ): Promise<GuardResult> {
-  const result = await requireFeature(organizationId, featureCode, actionName);
-  if (!result.ok) {
-    return { ok: false, error: result.error ?? "Feature not available on your plan." };
+  void actionName;
+  if (!isFeatureKey(featureCode)) {
+    return { ok: false, error: `Unknown feature "${featureCode}".` };
+  }
+
+  const result = await checkFeatureAccess(organizationId, featureCode);
+  if (!result.allowed) {
+    return { ok: false, error: result.message ?? "Feature not available on your plan." };
   }
   return { ok: true };
 }
@@ -46,9 +57,13 @@ export async function requireOrgWithinLimit(
   limitCode: string,
   currentUsage: number,
 ): Promise<GuardResult> {
-  const result = await requireWithinLimit(organizationId, limitCode, currentUsage);
-  if (!result.ok) {
-    return { ok: false, error: result.error ?? "Resource limit exceeded." };
+  if (!isLimitKey(limitCode)) {
+    return { ok: false, error: `Unknown limit "${limitCode}".` };
+  }
+
+  const result = await canCreateResource(organizationId, limitCode, 1);
+  if (!result.allowed && currentUsage >= result.limitValue) {
+    return { ok: false, error: result.message ?? "Resource limit exceeded." };
   }
   return { ok: true };
 }

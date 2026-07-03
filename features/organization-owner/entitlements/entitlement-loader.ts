@@ -1,8 +1,9 @@
 "use server";
 
-import { getOrganizationEntitlements } from "@/features/entitlement";
+import { assertUserBelongsToOrganization, getOrganizationEntitlements } from "@/features/entitlement";
 import type { FeatureKey } from "@/features/entitlement";
 import type { OrgFeatureFlags } from "@/lib/tenant/feature-flags";
+import { getOrgFeatureFlags } from "@/lib/tenant/feature-resolver";
 
 export type EntitlementKey = FeatureKey;
 
@@ -29,7 +30,9 @@ export type EntitlementSummary = {
 };
 
 export async function getEntitlementSummaryAction(organizationId: string): Promise<EntitlementSummary> {
+  await assertUserBelongsToOrganization(organizationId);
   const snapshot = await getOrganizationEntitlements(organizationId);
+  const allFeatures = await getOrgFeatureFlags(organizationId);
 
   const activeFeatureKeys = snapshot.activeFeatureKeys;
 
@@ -53,6 +56,6 @@ export async function getEntitlementSummaryAction(organizationId: string): Promi
     plan,
     features: { active: activeFeatureKeys, locked: [] },
     limits,
-    allFeatures: {} as OrgFeatureFlags,
+    allFeatures,
   };
 }
