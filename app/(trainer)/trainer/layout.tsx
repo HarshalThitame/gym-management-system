@@ -5,7 +5,7 @@ import { buildPortalNavFromEntitlements } from "@/features/entitlement/portal-ga
 import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getTenantSiteConfig } from "@/lib/tenant/site";
-import { PageTransitionWrapper, CommandPalette } from "./dynamic-components";
+import { PageTransitionWrapper } from "./dynamic-components";
 
 export default async function TrainerLayout({ children }: { children: ReactNode }) {
   const [context, tenantSite] = await Promise.all([
@@ -33,7 +33,6 @@ export default async function TrainerLayout({ children }: { children: ReactNode 
       title="Trainer Dashboard"
     >
       <PageTransitionWrapper>{children}</PageTransitionWrapper>
-      <CommandPalette />
     </PortalShell>
   );
 }

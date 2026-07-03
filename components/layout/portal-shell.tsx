@@ -132,14 +132,11 @@ export function PortalShell({
 
   useEffect(() => {
     if (!sidebarOpen) return;
-    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeSidebar(); };
-    document.addEventListener("keydown", handleKey);
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
     };
-  }, [sidebarOpen, closeSidebar]);
+  }, [sidebarOpen]);
 
   return (
     <main className="min-h-screen bg-background text-foreground bg-gradient-mesh">

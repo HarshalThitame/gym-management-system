@@ -2,7 +2,6 @@
 
 import { Search, Users, CalendarCheck, CalendarDays, CreditCard, Dumbbell, Target, MessageSquare, Settings, Zap, FileText, TrendingUp, LifeBuoy, Gift } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { modKey } from "@/features/ux/hooks/use-keyboard-shortcuts";
 import { motion, AnimatePresence } from "framer-motion";
 
 type CommandItem = {
@@ -11,7 +10,6 @@ type CommandItem = {
   description?: string;
   category: string;
   icon?: React.ReactNode;
-  shortcut?: string;
   href?: string;
   onSelect: () => void;
 };
@@ -72,6 +70,12 @@ export function CommandPalette({ open, onClose, items = [] }: CommandPaletteProp
     }
   }, [open]);
 
+  const filtered = items.filter((i) =>
+    i.label.toLowerCase().includes(query.toLowerCase()) ||
+    i.description?.toLowerCase().includes(query.toLowerCase()) ||
+    i.category.toLowerCase().includes(query.toLowerCase())
+  );
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!open) return;
@@ -92,13 +96,7 @@ export function CommandPalette({ open, onClose, items = [] }: CommandPaletteProp
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose, selectedIndex, query]);
-
-  const filtered = items.filter((i) =>
-    i.label.toLowerCase().includes(query.toLowerCase()) ||
-    i.description?.toLowerCase().includes(query.toLowerCase()) ||
-    i.category.toLowerCase().includes(query.toLowerCase())
-  );
+  }, [open, onClose, selectedIndex, query, filtered]);
 
   const grouped = filtered.reduce<Record<string, CommandItem[]>>((acc, item) => {
     (acc[item.category] ??= []).push(item);
@@ -177,9 +175,6 @@ export function CommandPalette({ open, onClose, items = [] }: CommandPaletteProp
                             )}
                           </div>
                         </div>
-                        {item.shortcut && (
-                          <kbd className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1 text-xs font-bold text-muted-foreground">{item.shortcut}</kbd>
-                        )}
                       </button>
                     );
                   })}
@@ -204,7 +199,6 @@ export function CommandPalette({ open, onClose, items = [] }: CommandPaletteProp
                 <span className="flex items-center gap-1"><kbd className="rounded border border-border bg-surface-muted px-1.5 py-0.5 text-[10px] font-bold">↵</kbd> Select</span>
                 <span className="flex items-center gap-1"><kbd className="rounded border border-border bg-surface-muted px-1.5 py-0.5 text-[10px] font-bold">Esc</kbd> Close</span>
               </div>
-              <span>{modKey}+K to toggle</span>
             </div>
           </motion.div>
         </motion.div>

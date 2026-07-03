@@ -32,7 +32,7 @@ import {
   X,
   Zap
 } from "lucide-react";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -120,16 +120,6 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
   const overflowItems = useMemo(() => items.slice(4), [items]);
 
   const close = useCallback(() => setIsOpen(false), []);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    if (isOpen) {
-      document.addEventListener("keydown", onKeyDown);
-      return () => document.removeEventListener("keydown", onKeyDown);
-    }
-  }, [isOpen, close]);
 
   return (
     <>

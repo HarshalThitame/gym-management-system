@@ -50,29 +50,6 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
         label: `${tenantSite.shortName} operations dashboard`
       }
     ],
-    shortcuts: [
-      {
-        name: "Check In",
-        short_name: "Check In",
-        description: "Open attendance and QR check-in.",
-        url: "/member/attendance?source=pwa-shortcut",
-        icons: [{ src: "/icons/shortcut-check-in.svg", sizes: "192x192", type: "image/svg+xml" }]
-      },
-      {
-        name: "Book a Class",
-        short_name: "Classes",
-        description: "Browse and book upcoming classes.",
-        url: "/member/classes?source=pwa-shortcut",
-        icons: [{ src: "/icons/shortcut-classes.svg", sizes: "192x192", type: "image/svg+xml" }]
-      },
-      {
-        name: "Log Workout",
-        short_name: "Workout",
-        description: "Open workout tracking.",
-        url: "/member/workouts?source=pwa-shortcut",
-        icons: [{ src: "/icons/shortcut-workout.svg", sizes: "192x192", type: "image/svg+xml" }]
-      }
-    ],
     prefer_related_applications: false
   };
 }
