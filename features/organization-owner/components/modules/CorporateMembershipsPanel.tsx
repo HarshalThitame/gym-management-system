@@ -574,9 +574,9 @@ export function CorporateMembershipsPanel({ dashboard, hasFeature }: CorporateMe
           <DrawerFormMessage status={bulkState.status} message={bulkState.message} />
           <input name="accountId" type="hidden" value={selectedAccount.id} />
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Branch" required>
+            <DrawerField label="Gym" required>
               <select className={selectClass} name="gymId" required value={bulkGymId} onChange={(e) => { setBulkGymId(e.target.value); setBulkPlanId(""); }}>
-                <option value="">Select branch</option>
+                <option value="">Select gym</option>
                 {dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </DrawerField>

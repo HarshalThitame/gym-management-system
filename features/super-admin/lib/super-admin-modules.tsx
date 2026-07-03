@@ -48,13 +48,13 @@ export const superAdminModules = [
   {
     slug: "branches",
     href: "/super-admin/branches",
-    label: "Branches",
-    title: "Branch and Location Management",
-    description: "Manage branches, locations, status, assignments, capacity, and tenant-level operational visibility.",
+    label: "Gyms",
+    title: "Gym and Location Management",
+    description: "Manage gyms, locations, status, assignments, capacity, and tenant-level operational visibility.",
     icon: <Building2 className="size-5" />,
     iconKey: "users",
-    responsibilities: ["Create and assign branches to organizations", "Activate, suspend, or archive branches", "View branch members, staff, trainers, revenue, and usage", "Track branch codes, cities, timezones, and currencies"],
-    safeguards: ["Cross-tenant access is allowed only for Super Admin", "Branch changes are written to activity logs", "Operational edits remain auditable"]
+    responsibilities: ["Create and assign gyms to organizations", "Activate, suspend, or archive gyms", "View gym members, staff, trainers, revenue, and usage", "Track gym codes, cities, timezones, and currencies"],
+    safeguards: ["Cross-tenant access is allowed only for Super Admin", "Gym changes are written to activity logs", "Operational edits remain auditable"]
   },
   {
     slug: "domains",

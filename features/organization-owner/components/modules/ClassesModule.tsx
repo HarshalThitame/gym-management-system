@@ -156,7 +156,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
         { label: "Time", value: `${s.starts_at?.slice(0, 5) ?? ""} - ${s.ends_at?.slice(0, 5) ?? ""}` },
         { label: "Fill Rate", value: `${sessionFillRate}%` },
         { label: "Trainer", value: trainer?.display_name ?? "—" },
-        ...(hasCrossBranchFeature && crossCount > 0 ? [{ label: "Cross-branch", value: `${crossCount}`, icon: <GitBranch className="size-3.5" /> }] : []),
+        ...(hasCrossBranchFeature && crossCount > 0 ? [{ label: "Cross-gym", value: `${crossCount}`, icon: <GitBranch className="size-3.5" /> }] : []),
       ],
       actions: [
         { label: "Details", onClick: () => setDetailSession(s), variant: "secondary" as const, icon: <Eye className="size-3.5" /> },
@@ -270,9 +270,9 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
                 <DrawerField label="Class Name" required>
                   <input className={selectClass} defaultValue={editingClass?.name ?? ""} name="name" required type="text" placeholder="e.g. Signature Strength Club" />
                 </DrawerField>
-                <DrawerField label="Branch" required>
-                  <select className={selectClass} defaultValue={editingClass?.gym_id ?? ""} name="gymId" required>
-                    <option value="">Select gym</option>
+              <DrawerField label="Gym" required>
+                <select className={selectClass} defaultValue={editingClass?.gym_id ?? ""} name="gymId" required>
+                  <option value="">Select gym</option>
                     {dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </DrawerField>
@@ -363,7 +363,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
         <StatCard detail="Overall class fill rate" icon={<CalendarDays className="size-5" />} label="Fill Rate" status={fillRate >= 80 ? "good" : fillRate >= 50 ? "watch" : "risk"} value={`${fillRate}%`} />
         <StatCard detail="Waitlisted requests" icon={<UsersRound className="size-5" />} label="Waitlist" value={formatCompactNumber(totalWaitlist)} />
         <StatCard detail="Total class capacity" icon={<CalendarDays className="size-5" />} label="Capacity" value={formatCompactNumber(totalCapacity)} />
-        {hasCrossBranchFeature ? <StatCard detail="Cross-branch bookings" icon={<GitBranch className="size-5" />} label="Cross-branch" value={formatCompactNumber(totalCrossBranch)} /> : null}
+        {hasCrossBranchFeature ? <StatCard detail="Cross-gym bookings" icon={<GitBranch className="size-5" />} label="Cross-gym" value={formatCompactNumber(totalCrossBranch)} /> : null}
       </section>
 
       {/* ═══ FILL RATE CHART ═══ */}
@@ -393,7 +393,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
           { key: "status", label: "Status", options: [
             { value: "scheduled", label: "Scheduled" }, { value: "completed", label: "Completed" }, { value: "cancelled", label: "Cancelled" }
           ]},
-          { key: "gymId", label: "Branch", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
+          { key: "gymId", label: "Gym", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
         ]}
         searchPlaceholder="Search by date, location, or trainer..."
         onApply={handleApply}
@@ -422,7 +422,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
           <DrawerFormMessage status={state.status} message={state.message} />
           {editingSession ? <input name="sessionId" type="hidden" value={editingSession.id} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Branch" required>
+            <DrawerField label="Gym" required>
               <select className={selectClass} defaultValue={editingSession?.gym_id ?? ""} name="gymId" required onChange={(e) => setSelectedGymId(e.target.value)}>
                 <option value="">Select gym</option>{dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>

@@ -200,7 +200,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
             onClick={() => setModuleTab("cross-branch")}
             type="button"
           >
-            <ShieldCheck className="size-4" /> Cross-Branch Access
+            <ShieldCheck className="size-4" /> Cross-Gym Access
           </motion.button>
         ) : null}
       </motion.div>

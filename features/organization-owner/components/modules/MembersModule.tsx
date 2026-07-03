@@ -323,7 +323,7 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
           { key: "status", label: "Status", options: [
             { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }, { value: "archived", label: "Archived" }
           ]},
-          { key: "gymId", label: "Branch", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
+          { key: "gymId", label: "Gym", options: dashboard.gyms.map((g) => ({ value: g.id, label: g.name })) }
         ]}
         searchPlaceholder="Search by name, phone, email, or member code..."
         onApply={handleApplyFilters}
@@ -362,7 +362,7 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
           {editingMember ? <input name="memberId" type="hidden" value={editingMember.id} /> : null}
           {editingMember ? <MemberAvatar name={editingMember.full_name} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Branch" required>
+            <DrawerField label="Gym" required>
               <select className={selectClass} defaultValue={editingMember?.gym_id ?? ""} name="gymId" required>
                 <option value="">Select gym</option>
                 {dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -463,7 +463,7 @@ export function MembersModule({ dashboard, moduleData }: MembersModuleProps) {
               </div>
             </div>
           ) : null}
-          <DrawerField label="Target Branch" required>
+          <DrawerField label="Target Gym" required>
             <select className={selectClass} defaultValue="" name="targetGymId" required>
               <option value="">Select target gym</option>
               {dashboard.gyms.filter((g) => g.id !== transferringMember?.gym_id).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}

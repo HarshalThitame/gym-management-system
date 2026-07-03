@@ -38,7 +38,7 @@ const ALL_WIDGETS: Widget[] = [
   { id: "class_occupancy", label: "Class Occupancy", enabled: false, order: 12 },
   { id: "revenue_per_member", label: "Revenue/Member", enabled: false, order: 13 },
   { id: "check_ins_today", label: "Check-ins Today", enabled: false, order: 14 },
-  { id: "cross_branch", label: "Cross-Branch", enabled: false, order: 15 },
+  { id: "cross_branch", label: "Cross-Gym", enabled: false, order: 15 },
   { id: "corporate", label: "Corporate", enabled: false, order: 16 },
   { id: "loyalty_balance", label: "Loyalty Balance", enabled: false, order: 17 },
 ];

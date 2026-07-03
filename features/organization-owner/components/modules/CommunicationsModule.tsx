@@ -274,7 +274,7 @@ export function CommunicationsEnterpriseModule({ dashboard, moduleData }: Commun
           <DrawerFormMessage status={state.status} message={state.message} />
           {editingCampaign ? <input name="campaignId" type="hidden" value={editingCampaign.id} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Branch" required>
+            <DrawerField label="Gym" required>
               <select className={selectClass} defaultValue={editingCampaign?.gym_id ?? ""} name="gymId" required>
                 <option value="">Select gym</option>{dashboard.gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>

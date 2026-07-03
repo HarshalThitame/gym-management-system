@@ -41,9 +41,9 @@ export const organizationOwnerModules = [
   {
     slug: "branches",
     href: "/organization/branches",
-    label: "Branches",
-    title: "Branch and Location Operations",
-    description: "View every branch and location inside your organization with status, capacity, staff assignments, and performance metrics.",
+    label: "Gyms",
+    title: "Gym and Location Operations",
+    description: "View every gym and location inside your organization with status, capacity, staff assignments, and performance metrics.",
     icon: <Building2 className="size-5" />,
     iconKey: "briefcase",
     featureKey: "multi_branch_management" as FeatureKey,

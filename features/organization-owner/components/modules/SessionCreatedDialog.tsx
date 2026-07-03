@@ -26,7 +26,7 @@ export function SessionCreatedDialog({ open, data, onClose }: SessionCreatedDial
 
   const details = [
     { icon: Dumbbell, label: "Class", value: data.className },
-    { icon: Building2, label: "Branch", value: data.gymName },
+    { icon: Building2, label: "Gym", value: data.gymName },
     { icon: CalendarDays, label: "Date", value: data.sessionDate },
     { icon: Clock, label: "Time", value: `${data.startsAt.slice(0, 5)} - ${data.endsAt.slice(0, 5)}` },
     { icon: UserRound, label: "Trainer", value: data.trainerName || "No trainer" },

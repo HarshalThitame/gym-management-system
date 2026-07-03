@@ -26,28 +26,34 @@ export function OrgOwnerDrawer({ open, onClose, title, description, children, si
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<Element | null>(null);
 
+  // Track whether we've focused for the current open session
+  const hasFocusedRef = useRef(false);
+
   // Store the element that triggered the drawer open
   useEffect(() => {
     if (open) {
       triggerRef.current = document.activeElement;
+      hasFocusedRef.current = false;
     }
   }, [open]);
 
-  // Focus trap + Escape key
+  // Focus trap + Escape key + initial auto-focus
   useEffect(() => {
     if (!open) return;
 
     const container = containerRef.current;
     if (!container) return;
 
-    // Focus the first focusable element inside the drawer
-    const firstFocusable = container.querySelector(FOCUSABLE_SELECTOR) as HTMLElement | null;
-    const closeButton = container.querySelector('[aria-label="Close drawer"]') as HTMLElement | null;
+    // Only auto-focus once per open (not when deps like onClose change)
+    if (!hasFocusedRef.current) {
+      hasFocusedRef.current = true;
+      const firstFocusable = container.querySelector(FOCUSABLE_SELECTOR) as HTMLElement | null;
+      const closeButton = container.querySelector('[aria-label="Close drawer"]') as HTMLElement | null;
 
-    // Small delay for DOM to render
-    requestAnimationFrame(() => {
-      (firstFocusable ?? closeButton)?.focus();
-    });
+      requestAnimationFrame(() => {
+        (firstFocusable ?? closeButton)?.focus();
+      });
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {

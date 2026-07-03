@@ -94,9 +94,9 @@ export function MemberExportPanel({ organizationId, gyms, currentFilters, select
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold">Branch</label>
+            <label className="text-sm font-bold">Gym</label>
             <select className={selectClass} value={gymId} onChange={(e) => setGymId(e.target.value)}>
-              <option value="all">All Branches</option>
+              <option value="all">All Gyms</option>
               {gyms.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>

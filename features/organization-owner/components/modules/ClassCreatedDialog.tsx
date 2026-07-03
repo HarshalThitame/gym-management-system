@@ -34,7 +34,7 @@ export function ClassCreatedDialog({ open, data, onClose }: ClassCreatedDialogPr
     "bg-amber-100 text-amber-800";
 
   const details = [
-    { icon: Building2, label: "Branch", value: data.gymName },
+    { icon: Building2, label: "Gym", value: data.gymName },
     { icon: Dumbbell, label: "Type", value: formatLabel(data.classType) },
     { icon: Award, label: "Difficulty", value: formatLabel(data.difficulty) },
     { icon: Clock, label: "Duration", value: `${data.durationMinutes} min` },

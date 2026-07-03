@@ -307,7 +307,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total staff across all branches" icon={<UsersRound className="size-5" />} label="Total Staff" value={String(staffItems.length)} />
         <StatCard detail="Active staff members" icon={<ShieldCheck className="size-5" />} label="Active" value={String(activeCount)} />
-        <StatCard detail="Gym administrators" icon={<ShieldCheck className="size-5" />} label="Branch Managers" value={String(gymAdminCount)} />
+        <StatCard detail="Gym administrators" icon={<ShieldCheck className="size-5" />} label="Gym Managers" value={String(gymAdminCount)} />
         <StatCard detail="Pending invitations" icon={<Mail className="size-5" />} label="Invited" value={String(invitedCount)} />
         <StatCard detail="Front desk staff" icon={<UsersRound className="size-5" />} label="Reception" value={String(receptionCount)} />
         <StatCard detail="Fitness trainers" icon={<UsersRound className="size-5" />} label="Trainers" value={String(trainerCount)} />
@@ -317,7 +317,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       <FilterBar
         filterGroups={[
           { key: "role", label: "Role", options: [
-            { value: "gym_admin", label: "Branch Manager" }, { value: "reception_staff", label: "Reception" }, { value: "trainer", label: "Trainer" }
+            { value: "gym_admin", label: "Gym Manager" }, { value: "reception_staff", label: "Reception" }, { value: "trainer", label: "Trainer" }
           ]},
           { key: "status", label: "Status", options: [
             { value: "active", label: "Active" }, { value: "invited", label: "Invited" }, { value: "suspended", label: "Suspended" }

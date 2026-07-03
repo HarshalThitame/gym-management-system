@@ -276,7 +276,7 @@ export function EnterpriseDashboard({ dashboard, planContext }: EnterpriseDashbo
             ? [
                 {
                   icon: Globe2,
-                  label: "Cross-Branch Check-ins",
+                  label: "Cross-Gym Check-ins",
                   value: String(crossBranchCheckIns),
                   gradient: { from: "from-sky-500", to: "to-blue-500" },
                   accentColor: "bg-sky-500",
