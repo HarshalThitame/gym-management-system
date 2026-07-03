@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { TrainerNoteForm } from "@/features/training/components/training-forms";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -14,7 +14,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerMembersPage() {
-  const context = await requireRole(["trainer"], "/trainer/members");
+  const context = await requireTrainerPortalAccess("/trainer/members");
   const dashboard = await getTrainerDashboard(context.userId ?? "", context.profile?.gym_id ?? null);
   const trainerList = dashboard.trainer ? [dashboard.trainer] : [];
 

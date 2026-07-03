@@ -1,5 +1,8 @@
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { organizationHasFeature } from "@/features/super-admin/services/entitlement-service";
+import {
+  getOrganizationEntitlements,
+  hasFeatureAccess as hasCanonicalFeatureAccess,
+} from "@/features/entitlement";
+import type { FeatureKey } from "@/features/entitlement/feature-registry";
 import type { OrgFeatureFlags, FeatureFlagKey } from "./feature-flags";
 
 const SAFE_DEFAULT: OrgFeatureFlags = {
@@ -7,54 +10,42 @@ const SAFE_DEFAULT: OrgFeatureFlags = {
   membershipPlanTypes: 0, weeklyClasses: 0, smsMonthly: 0,
   manualAttendance: false, qrAttendanceEnabled: false, dynamicQrAttendance: false,
   trainerAttendance: false, staffAttendance: false, branchAttendance: false,
-  biometricAttendanceEnabled: false, fingerprintAttendance: false,
-  rfidAttendanceEnabled: false, nfcAttendance: false, geoFencingAttendance: false,
-  attendanceApi: false, attendanceReports: false,
-  memberManagement: false, membershipRenewals: false, expiryTracking: false,
-  goalTracking: false, progressPhotos: false, membershipPauseFreeze: false,
-  memberTaggingSegments: false, memberProgressTracking: false,
+  biometricAttendanceEnabled: false, fingerprintAttendance: false, rfidAttendanceEnabled: false,
+  nfcAttendance: false, geoFencingAttendance: false, attendanceApi: false, attendanceReports: false,
+  memberManagement: false, membershipRenewals: false, expiryTracking: false, goalTracking: false,
+  progressPhotos: false, membershipPauseFreeze: false, memberTaggingSegments: false, memberProgressTracking: false,
   crossBranchMemberAccess: false, customMemberFields: false, memberDataImportExport: false,
-  leadManagement: false, trialManagement: false,
-  leadFollowupReminders: false, reEngagementAutomation: false,
+  leadManagement: false, trialManagement: false, leadFollowupReminders: false, reEngagementAutomation: false,
   advancedCrmLeadPipeline: false, referralProgram: false, loyaltyPointsSystem: false,
   networkWideCampaignManager: false, memberNpsSurveys: false,
-  trainerManagement: false, workoutAssignment: false, nutritionPlans: false,
-  ptSessions: false, classBooking: false, waitlistManagement: false,
-  crossBranchClassBooking: false, trainerCommissionsPayroll: false, staffAttendanceLeave: false,
-  classAttendanceTracking: false, payrollExport: false, roleBasedPermissions: false,
-  networkWideClassCalendar: false, trainerSharingAcrossBranches: false,
-  customRolesGranularPermissions: false, multiBranchStaffAssignment: false, hrDocumentStorage: false,
-  billingInvoices: false, receipts: false, paymentTracking: false,
-  onlinePaymentLinks: false, renewalReminders: false,
-  autoBilling: false, discountPromoCodes: false, corporateBulkMemberships: false,
+  trainerManagement: false, workoutAssignment: false, nutritionPlans: false, ptSessions: false,
+  classBooking: false, waitlistManagement: false, crossBranchClassBooking: false,
+  trainerCommissionsPayroll: false, staffAttendanceLeave: false, classAttendanceTracking: false,
+  payrollExport: false, roleBasedPermissions: false, networkWideClassCalendar: false,
+  trainerSharingAcrossBranches: false, customRolesGranularPermissions: false,
+  multiBranchStaffAssignment: false, hrDocumentStorage: false,
+  billingInvoices: false, receipts: false, paymentTracking: false, onlinePaymentLinks: false,
+  renewalReminders: false, autoBilling: false, discountPromoCodes: false, corporateBulkMemberships: false,
   paymentFailureHandling: false, partialPaymentDues: false, razorpayPayuIntegration: false,
-  multiGstinSupport: false,
-  branchRevenueSplit: false,
-  basicReports: false, advancedReportsEnabled: false, customDashboards: false,
-  customDashboardsKpis: false,
+  multiGstinSupport: false, branchRevenueSplit: false,
+  basicReports: false, advancedReportsEnabled: false, customDashboards: false, customDashboardsKpis: false,
   trainerPerformanceReport: false, classOccupancyReport: false, leadConversionReport: false,
-  branchRevenueComparison: false,
-  scheduledReportDelivery: false, equipmentInventoryMaintenance: false, dataExportCsvDownload: false,
-  emailNotifications: false, inAppNotifications: false,
-  whatsappIntegration: false, smsIntegration: false,
-  birthdayGreetings: false, broadcastMessages: false, emailCampaigns: false,
-  whatsappBusinessApi: false, customEmailDomain: false,
+  branchRevenueComparison: false, scheduledReportDelivery: false, equipmentInventoryMaintenance: false,
+  dataExportCsvDownload: false,
+  emailNotifications: false, inAppNotifications: false, whatsappIntegration: false, smsIntegration: false,
+  birthdayGreetings: false, broadcastMessages: false, emailCampaigns: false, whatsappBusinessApi: false,
+  customEmailDomain: false,
   memberPortal: false, trainerPortal: false, brandedMobileApp: false, dietWorkoutPlans: false,
-  googleCalendarSync: false,
-  inAppPushNotifications: false, digitalMembershipCard: false, loyaltyRewardsInApp: false,
+  googleCalendarSync: false, inAppPushNotifications: false, digitalMembershipCard: false, loyaltyRewardsInApp: false,
   aiEnabled: false, aiCoach: false, aiRetentionAnalysis: false, aiRevenueInsights: false,
   whiteLabelEnabled: false, customDomainEnabled: false, customBranding: false,
-  multiBranchManagement: false,
-  apiAccessEnabled: false, webhooks: false, auditLogs: false,
-  advancedRbac: false, prioritySupport: false, staffManagement: false,
-  tallyZohoBooksIntegration: false, restApiAccess: false,
-
-  classSchedulingEnabled: false, communicationsEnabled: false,
-  trainerAssignmentEnabled: false, razorpayEnabled: false,
+  multiBranchManagement: false, apiAccessEnabled: false, webhooks: false, auditLogs: false,
+  advancedRbac: false, prioritySupport: false, staffManagement: false, tallyZohoBooksIntegration: false,
+  restApiAccess: false,
+  classSchedulingEnabled: false, communicationsEnabled: false, trainerAssignmentEnabled: false, razorpayEnabled: false,
 };
 
-const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "limit"; code: string }> = {
-  // Limits
+const FEATURE_MAP: Record<string, { type: "feature"; code: FeatureKey } | { type: "limit"; code: string }> = {
   maxMembers: { type: "limit", code: "max_members" },
   maxBranches: { type: "limit", code: "max_branches" },
   maxTrainers: { type: "limit", code: "max_trainers" },
@@ -64,8 +55,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   membershipPlanTypes: { type: "limit", code: "membership_plan_types" },
   weeklyClasses: { type: "limit", code: "weekly_classes" },
   smsMonthly: { type: "limit", code: "sms_monthly" },
-
-  // Attendance features
   manualAttendance: { type: "feature", code: "manual_attendance" },
   qrAttendanceEnabled: { type: "feature", code: "qr_attendance" },
   dynamicQrAttendance: { type: "feature", code: "dynamic_qr_attendance" },
@@ -79,8 +68,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   geoFencingAttendance: { type: "feature", code: "geo_fencing_attendance" },
   attendanceApi: { type: "feature", code: "attendance_api" },
   attendanceReports: { type: "feature", code: "attendance_reports" },
-
-  // Membership
   memberManagement: { type: "feature", code: "member_management" },
   membershipRenewals: { type: "feature", code: "membership_renewals" },
   expiryTracking: { type: "feature", code: "expiry_tracking" },
@@ -92,8 +79,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   crossBranchMemberAccess: { type: "feature", code: "cross_branch_member_access" },
   customMemberFields: { type: "feature", code: "custom_member_fields" },
   memberDataImportExport: { type: "feature", code: "member_data_import_export" },
-
-  // CRM
   leadManagement: { type: "feature", code: "lead_management" },
   trialManagement: { type: "feature", code: "trial_management" },
   leadFollowupReminders: { type: "feature", code: "lead_followup_reminders" },
@@ -103,8 +88,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   loyaltyPointsSystem: { type: "feature", code: "loyalty_points_system" },
   networkWideCampaignManager: { type: "feature", code: "network_wide_campaign_manager" },
   memberNpsSurveys: { type: "feature", code: "member_nps_surveys" },
-
-  // Trainer
   trainerManagement: { type: "feature", code: "trainer_management" },
   trainerAssignmentEnabled: { type: "feature", code: "workout_assignment" },
   workoutAssignment: { type: "feature", code: "workout_assignment" },
@@ -124,8 +107,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   customRolesGranularPermissions: { type: "feature", code: "custom_roles_granular_permissions" },
   multiBranchStaffAssignment: { type: "feature", code: "multi_branch_staff_assignment" },
   hrDocumentStorage: { type: "feature", code: "hr_document_storage" },
-
-  // Billing
   billingInvoices: { type: "feature", code: "billing_invoices" },
   razorpayEnabled: { type: "feature", code: "billing_invoices" },
   receipts: { type: "feature", code: "receipts" },
@@ -140,8 +121,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   razorpayPayuIntegration: { type: "feature", code: "razorpay_payu_integration" },
   multiGstinSupport: { type: "feature", code: "multi_gstin_support" },
   branchRevenueSplit: { type: "feature", code: "branch_revenue_split" },
-
-  // Reports
   basicReports: { type: "feature", code: "basic_reports" },
   advancedReportsEnabled: { type: "feature", code: "advanced_reports" },
   customDashboards: { type: "feature", code: "custom_dashboards" },
@@ -150,12 +129,9 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   classOccupancyReport: { type: "feature", code: "class_occupancy_report" },
   leadConversionReport: { type: "feature", code: "lead_conversion_report" },
   branchRevenueComparison: { type: "feature", code: "branch_revenue_comparison" },
-
   scheduledReportDelivery: { type: "feature", code: "scheduled_report_delivery" },
   equipmentInventoryMaintenance: { type: "feature", code: "equipment_inventory_maintenance" },
   dataExportCsvDownload: { type: "feature", code: "data_export_csv_download" },
-
-  // Communication
   customEmailDomain: { type: "feature", code: "custom_email_domain" },
   emailNotifications: { type: "feature", code: "email_notifications" },
   inAppNotifications: { type: "feature", code: "in_app_notifications" },
@@ -166,8 +142,6 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   broadcastMessages: { type: "feature", code: "broadcast_messages" },
   emailCampaigns: { type: "feature", code: "email_campaigns" },
   whatsappBusinessApi: { type: "feature", code: "whatsapp_business_api" },
-
-  // Portals
   memberPortal: { type: "feature", code: "member_portal" },
   trainerPortal: { type: "feature", code: "trainer_portal" },
   brandedMobileApp: { type: "feature", code: "branded_mobile_app" },
@@ -176,19 +150,13 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   inAppPushNotifications: { type: "feature", code: "in_app_push_notifications" },
   digitalMembershipCard: { type: "feature", code: "digital_membership_card" },
   loyaltyRewardsInApp: { type: "feature", code: "loyalty_rewards_in_app" },
-
-  // AI
   aiEnabled: { type: "feature", code: "ai_recommendations" },
   aiCoach: { type: "feature", code: "ai_coach" },
   aiRetentionAnalysis: { type: "feature", code: "ai_retention_analysis" },
   aiRevenueInsights: { type: "feature", code: "ai_revenue_insights" },
-
-  // White Label
   whiteLabelEnabled: { type: "feature", code: "white_label" },
   customDomainEnabled: { type: "feature", code: "custom_domain" },
   customBranding: { type: "feature", code: "custom_branding" },
-
-  // Enterprise
   multiBranchManagement: { type: "feature", code: "multi_branch_management" },
   apiAccessEnabled: { type: "feature", code: "api_access" },
   webhooks: { type: "feature", code: "webhooks" },
@@ -198,86 +166,21 @@ const FEATURE_MAP: Record<string, { type: "feature"; code: string } | { type: "l
   staffManagement: { type: "feature", code: "staff_management" },
   tallyZohoBooksIntegration: { type: "feature", code: "tally_zoho_books_integration" },
   restApiAccess: { type: "feature", code: "rest_api_access" },
-
 };
 
 export async function getOrgFeatureFlags(organizationId: string): Promise<OrgFeatureFlags> {
   try {
-    const admin = getSupabaseAdminClient();
-    if (!admin) return { ...SAFE_DEFAULT };
-    const s = admin as never as {
-      from(t: string): {
-        select(c: string): {
-          eq(k: string, v: string): {
-            in(k: string, v: string[]): {
-              order(k: string, o: { ascending: boolean }): {
-                limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
-              };
-            };
-          };
-        };
-      };
-    };
-
-    const { data: subs } = await s
-      .from("organization_subscriptions")
-      .select("status, trial_ends_at, package_id")
-      .eq("organization_id", organizationId)
-      .in("status", ["active", "trial"])
-      .order("started_at", { ascending: false } as never)
-      .limit(1);
-
-    const sub = (subs ?? [])[0];
-    if (!sub) return { ...SAFE_DEFAULT };
-
-    const status = sub.status as string;
-    if (status !== "active" && status !== "trial") return { ...SAFE_DEFAULT };
-    if (status === "trial") {
-      const trialEnds = sub.trial_ends_at as string | null;
-      if (trialEnds && new Date(trialEnds).getTime() < Date.now()) return { ...SAFE_DEFAULT };
-    }
-
-    const packageId = sub.package_id as string;
-    if (!packageId) return { ...SAFE_DEFAULT };
-
-    const [featuresData, limitsData] = await Promise.all([
-      (s as never as {
-        from(t: string): {
-          select(c: string): {
-            eq(k: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
-          };
-        };
-      }).from("package_features").select("feature_code, value").eq("package_id", packageId),
-      (s as never as {
-        from(t: string): {
-          select(c: string): {
-            eq(k: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
-          };
-        };
-      }).from("package_limits").select("limit_code, value").eq("package_id", packageId),
-    ]);
-
-    const featureValues: Record<string, boolean> = {};
-    for (const f of (featuresData.data ?? [])) {
-      const val = f.value;
-      featureValues[f.feature_code as string] = val === true || val === "true";
-    }
-
-    const limitValues: Record<string, number> = {};
-    for (const l of (limitsData.data ?? [])) {
-      limitValues[l.limit_code as string] = l.value as number;
-    }
+    const snapshot = await getOrganizationEntitlements(organizationId);
+    const featureSet = new Set(snapshot.activeFeatureKeys);
 
     const result: Record<string, unknown> = {};
     for (const [key, mapping] of Object.entries(FEATURE_MAP)) {
-      if (mapping.type === "feature") {
-        result[key] = featureValues[mapping.code] ?? false;
-      } else {
-        result[key] = limitValues[mapping.code] ?? 0;
-      }
+      result[key] = mapping.type === "feature"
+        ? featureSet.has(mapping.code)
+        : snapshot.limits[mapping.code] ?? 0;
     }
 
-    return result as unknown as OrgFeatureFlags;
+    return { ...SAFE_DEFAULT, ...result } as OrgFeatureFlags;
   } catch (error) {
     console.error("Feature resolver failed:", error instanceof Error ? error.message : "Unknown error");
     return { ...SAFE_DEFAULT };
@@ -293,7 +196,7 @@ export async function hasFeature(organizationId: string, feature: FeatureFlagKey
   if (mapping.type !== "feature") {
     return false;
   }
-  return organizationHasFeature(organizationId, mapping.code);
+  return hasCanonicalFeatureAccess(organizationId, mapping.code);
 }
 
 export async function assertFeature(organizationId: string, feature: FeatureFlagKey): Promise<void> {

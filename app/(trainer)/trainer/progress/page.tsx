@@ -9,7 +9,7 @@ import { BodyMeasurementForm, FitnessGoalForm, FitnessMilestoneForm, MealPlanFor
 import { calculateGoalProgress, formatFitnessLabel } from "@/features/fitness/lib/business-rules";
 import { getTrainerFitnessPortal } from "@/features/fitness/services/fitness-service";
 import { getMemberProgressPhotos } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { ProgressPhotoSection } from "./client";
 
@@ -24,7 +24,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerProgressPage({ searchParams }: TrainerProgressPageProps) {
-  const context = await requireRole(["trainer"], "/trainer/progress");
+  const context = await requireTrainerPortalAccess("/trainer/progress");
   const params = await searchParams;
   const portal = context.userId ? await getTrainerFitnessPortal(context.userId, context.profile?.gym_id ?? null) : { trainer: null, members: [], metrics: { assignedMembers: 0, activeGoals: 0, completedWorkouts30Days: 0, membersMissingWorkouts: 0 } };
   const selected = portal.members.find((item) => item.member.id === params.memberId) ?? portal.members[0] ?? null;

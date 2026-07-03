@@ -1,4 +1,5 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getOrganizationEntitlements } from "@/features/entitlement";
+import { normalizePackageTier } from "@/features/entitlement/package-tier";
 import { getOrgFeatureFlags } from "./feature-resolver";
 import type { OrgFeatureFlags } from "./feature-flags";
 
@@ -27,33 +28,10 @@ export async function getOrgPlanContext(organizationId: string): Promise<OrgPlan
   const features = await getOrgFeatureFlags(organizationId);
 
   try {
-    const supabase = await createSupabaseServerClient();
-    const s = supabase as never as {
-      from(t: string): {
-        select(c: string): {
-          eq(k: string, v: string): {
-            in(k: string, v: string[]): {
-              order(k: string, o: { ascending: boolean }): {
-                limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
-              };
-            };
-          };
-        };
-      };
-    };
+    const snapshot = await getOrganizationEntitlements(organizationId);
+    if (!snapshot.subscriptionId) return defaultPlanContext(features);
 
-    const { data: subs } = await s
-      .from("organization_subscriptions")
-      .select("status, expires_at, trial_ends_at, package_id, packages!inner(name, slug)")
-      .eq("organization_id", organizationId)
-      .in("status", ["active", "trial", "expired", "suspended", "cancelled"])
-      .order("started_at", { ascending: false })
-      .limit(1);
-
-    const sub = (subs ?? [])[0];
-    if (!sub) return defaultPlanContext(features);
-
-    return mapPlanContext(sub, features);
+    return mapPlanContext(snapshot, features);
   } catch (error) {
     console.error("Unexpected plan context failure", {
       organizationId,
@@ -86,17 +64,19 @@ function defaultPlanContext(features: OrgFeatureFlags): OrgPlanContext {
   };
 }
 
-function mapPlanContext(sub: Record<string, unknown>, features: OrgFeatureFlags): OrgPlanContext {
-  const status = typeof sub.status === "string" ? sub.status : "none";
-  const expiresAt = readDate(sub.expires_at);
-  const trialEndsAt = readDate(sub.trial_ends_at);
-  const pkg = readPackage(sub.packages);
-  const packageId = sub.package_id as string | null;
+function mapPlanContext(
+  snapshot: Awaited<ReturnType<typeof getOrganizationEntitlements>>,
+  features: OrgFeatureFlags,
+): OrgPlanContext {
+  const status = snapshot.subscriptionStatus;
+  const expiresAt = readDate(snapshot.endDate);
+  const trialEndsAt = status === "trial" ? readDate(snapshot.endDate) : null;
+  const packageSlug = normalizePackageTier(snapshot.packageName) ?? normalizePackageTier(snapshot.packageId) ?? "";
 
   return {
-    packageName: pkg?.name ?? "No Plan",
-    packageSlug: pkg?.slug ?? "",
-    packageId,
+    packageName: snapshot.packageName ?? "No Plan",
+    packageSlug,
+    packageId: snapshot.packageId,
     status,
     expiresAt,
     trialEndsAt,
@@ -113,14 +93,6 @@ function mapPlanContext(sub: Record<string, unknown>, features: OrgFeatureFlags)
     weeklyClasses: features.weeklyClasses,
     smsMonthly: features.smsMonthly,
   };
-}
-
-function readPackage(value: unknown): { name: string; slug?: string } | null {
-  const pkgRecord = Array.isArray(value) ? value[0] : value;
-  if (!pkgRecord || typeof pkgRecord !== "object") return null;
-  const r = pkgRecord as Record<string, unknown>;
-  if (typeof r.name !== "string" || !r.name.trim()) return null;
-  return { name: r.name, slug: (r.slug as string) ?? undefined };
 }
 
 function readDate(value: unknown): Date | null {

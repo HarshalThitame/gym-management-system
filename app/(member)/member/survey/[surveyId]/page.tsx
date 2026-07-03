@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requirePrimaryRole } from "@/lib/auth/guards";
+import { requireMemberPortalAccess } from "@/features/member/lib/access";
 import { NPSSurveyForm } from "./survey-form";
 
 export default async function MemberSurveyPage({
@@ -10,7 +10,7 @@ export default async function MemberSurveyPage({
   params: Promise<{ surveyId: string }>;
   searchParams: Promise<{ memberId?: string }>;
 }) {
-  const context = await requirePrimaryRole(["member"], "/login");
+  const context = await requireMemberPortalAccess("/member/survey");
   const { surveyId } = await params;
   const { memberId } = await searchParams;
 

@@ -19,8 +19,16 @@ export default async function ReceptionMessagesPage() {
   const scope = await requireReceptionScope("/reception/messages");
   const [dashboard, membersResult, trainers, templates] = await Promise.all([
     getCommunicationDashboard(scope.gymId),
-    listMembers({ gymId: scope.gymId, pageSize: 100 }),
-    listActiveTrainers(scope.gymId),
+    listMembers({
+      gymId: scope.gymId,
+      branchId: scope.branchId,
+      organizationId: scope.scopedOrganizationId ?? scope.organizationId,
+      pageSize: 100
+    }),
+    listActiveTrainers(scope.gymId, {
+      branchId: scope.branchId,
+      organizationId: scope.scopedOrganizationId ?? scope.organizationId,
+    }),
     listNotificationTemplates(scope.gymId)
   ]);
 

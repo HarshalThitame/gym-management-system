@@ -6,7 +6,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
 import { formatCurrency } from "@/features/billing/lib/money";
 import { getMemberDashboard } from "@/features/memberships/services/membership-service";
-import { requirePrimaryRole } from "@/lib/auth/guards";
+import { requireMemberPortalAccess } from "@/features/member/lib/access";
+import { PageHeader, AnimatedCardSection, AnimatedListSection, AnimatedListItem } from "@/features/member/components/page-wrappers";
 import { createMetadata } from "@/lib/seo/metadata";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -22,18 +23,14 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberPaymentsPage() {
-  const context = await requirePrimaryRole(["member"], "/member/payments");
+  const context = await requireMemberPortalAccess("/member/payments");
   const profile = context.userId ? await getMemberDashboard(context.userId) : null;
 
   if (!profile?.member) {
     return (
       <Card>
-        <CardHeader>
-          <h2 className="text-2xl font-black">Payments</h2>
-        </CardHeader>
-        <CardContent>
-          <EmptyState text="No member record is connected to this login yet." />
-        </CardContent>
+        <CardHeader><h2 className="text-2xl font-black">Payments</h2></CardHeader>
+        <CardContent><EmptyState text="No member record is connected to this login yet." /></CardContent>
       </Card>
     );
   }
@@ -49,61 +46,61 @@ export default async function MemberPaymentsPage() {
   const invoiceRows = invoices ?? [];
   const refundRows = refunds ?? [];
   const paidTotal = paymentRows.filter((payment) => payment.status === "paid").reduce((total, payment) => total + payment.amount, 0);
-  const outstandingTotal = paymentRows
-    .filter((payment) => payment.status === "pending" || payment.status === "processing" || payment.status === "failed")
-    .reduce((total, payment) => total + payment.amount, 0);
-  const refundedTotal = refundRows
-    .filter((refund) => refund.status === "processed" || refund.status === "processing")
-    .reduce((total, refund) => total + refund.amount, 0);
+  const outstandingTotal = paymentRows.filter((payment) => payment.status === "pending" || payment.status === "processing" || payment.status === "failed").reduce((total, payment) => total + payment.amount, 0);
+  const refundedTotal = refundRows.filter((refund) => refund.status === "processed" || refund.status === "processing").reduce((total, refund) => total + refund.amount, 0);
 
   return (
     <div className="space-y-6">
-      <section>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Billing</p>
-        <h2 className="mt-2 text-3xl font-black">Payments, invoices, and refunds</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Review your membership billing history, complete pending online payments, and track refund status.
-        </p>
-      </section>
+      <PageHeader eyebrow="Billing" title="Payments, invoices, and refunds" description="Review your membership billing history, complete pending online payments, and track refund status." />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="Verified paid payments" icon={<CreditCard className="size-5" />} label="Paid" value={formatCurrency(paidTotal)} />
-        <StatCard detail="Pending, processing, or failed payments" icon={<RefreshCcw className="size-5" />} label="Outstanding" value={formatCurrency(outstandingTotal)} />
-        <StatCard detail="Processed or processing refunds" icon={<ReceiptText className="size-5" />} label="Refunded" value={formatCurrency(refundedTotal)} />
-        <StatCard detail="Invoices linked to your account" icon={<FileText className="size-5" />} label="Invoices" value={String(invoiceRows.length)} />
-      </section>
+      <AnimatedCardSection>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard detail="Verified paid payments" icon={<CreditCard className="size-5" />} label="Paid" value={formatCurrency(paidTotal)} />
+          <StatCard detail="Pending, processing, or failed payments" icon={<RefreshCcw className="size-5" />} label="Outstanding" value={formatCurrency(outstandingTotal)} />
+          <StatCard detail="Processed or processing refunds" icon={<ReceiptText className="size-5" />} label="Refunded" value={formatCurrency(refundedTotal)} />
+          <StatCard detail="Invoices linked to your account" icon={<FileText className="size-5" />} label="Invoices" value={String(invoiceRows.length)} />
+        </section>
+      </AnimatedCardSection>
 
-      <Card>
-        <CardHeader>
-          <h3 className="text-2xl font-black">Payment History</h3>
-          <p className="text-sm leading-6 text-muted-foreground">Pending Razorpay payments can be completed here without contacting reception.</p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {paymentRows.map((payment) => <MemberPaymentRow key={payment.id} payment={payment} profile={profile.member} />)}
-          {paymentRows.length === 0 ? <EmptyState text="No payments are available yet." /> : null}
-        </CardContent>
-      </Card>
+      <AnimatedCardSection delay={0.1}>
+        <Card variant="glass">
+          <CardHeader>
+            <h3 className="text-2xl font-black">Payment History</h3>
+            <p className="text-sm leading-6 text-muted-foreground">Pending Razorpay payments can be completed here without contacting reception.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <AnimatedListSection>
+              {paymentRows.map((payment) => (
+                <AnimatedListItem key={payment.id}>
+                  <MemberPaymentRow payment={payment} profile={profile.member} />
+                </AnimatedListItem>
+              ))}
+            </AnimatedListSection>
+            {paymentRows.length === 0 ? <EmptyState text="No payments are available yet." /> : null}
+          </CardContent>
+        </Card>
+      </AnimatedCardSection>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Invoices</h3>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {invoiceRows.map((invoice) => <InvoiceRowItem invoice={invoice} key={invoice.id} />)}
-            {invoiceRows.length === 0 ? <EmptyState text="No invoices are available yet." /> : null}
-          </CardContent>
-        </Card>
+        <AnimatedCardSection delay={0.15}>
+          <Card variant="glass">
+            <CardHeader><h3 className="text-2xl font-black">Invoices</h3></CardHeader>
+            <CardContent className="space-y-3">
+              {invoiceRows.map((invoice) => <InvoiceRowItem invoice={invoice} key={invoice.id} />)}
+              {invoiceRows.length === 0 ? <EmptyState text="No invoices are available yet." /> : null}
+            </CardContent>
+          </Card>
+        </AnimatedCardSection>
 
-        <Card>
-          <CardHeader>
-            <h3 className="text-2xl font-black">Refunds</h3>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {refundRows.map((refund) => <RefundRowItem key={refund.id} refund={refund} />)}
-            {refundRows.length === 0 ? <EmptyState text="No refunds have been recorded." /> : null}
-          </CardContent>
-        </Card>
+        <AnimatedCardSection delay={0.2}>
+          <Card variant="glass">
+            <CardHeader><h3 className="text-2xl font-black">Refunds</h3></CardHeader>
+            <CardContent className="space-y-3">
+              {refundRows.map((refund) => <RefundRowItem key={refund.id} refund={refund} />)}
+              {refundRows.length === 0 ? <EmptyState text="No refunds have been recorded." /> : null}
+            </CardContent>
+          </Card>
+        </AnimatedCardSection>
       </div>
     </div>
   );
@@ -113,7 +110,7 @@ function MemberPaymentRow({ payment, profile }: { payment: PaymentRow; profile: 
   const canCheckout = payment.provider === "razorpay" && (payment.status === "pending" || payment.status === "processing" || payment.status === "failed");
 
   return (
-    <div className="grid gap-3 rounded-md border border-border bg-surface-muted p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+    <div className="grid gap-3 rounded-lg border border-border bg-surface-muted p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center card-hover">
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-black">{payment.payment_number}</p>
@@ -142,7 +139,7 @@ function MemberPaymentRow({ payment, profile }: { payment: PaymentRow; profile: 
 
 function InvoiceRowItem({ invoice }: { invoice: InvoiceRow }) {
   return (
-    <div className="rounded-md border border-border bg-surface-muted p-4">
+    <div className="rounded-lg border border-border bg-surface-muted p-4 card-hover">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -167,7 +164,7 @@ function InvoiceRowItem({ invoice }: { invoice: InvoiceRow }) {
 
 function RefundRowItem({ refund }: { refund: RefundRow }) {
   return (
-    <div className="rounded-md border border-border bg-surface-muted p-4">
+    <div className="rounded-lg border border-border bg-surface-muted p-4 card-hover">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -186,18 +183,9 @@ function RefundRowItem({ refund }: { refund: RefundRow }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (["paid", "processed", "approved"].includes(status)) {
-    return <Badge variant="success">{status.replace(/_/g, " ")}</Badge>;
-  }
-
-  if (["failed", "cancelled", "refunded"].includes(status)) {
-    return <Badge variant="error">{status.replace(/_/g, " ")}</Badge>;
-  }
-
-  if (["pending", "processing", "partially_paid", "partially_refunded", "requested"].includes(status)) {
-    return <Badge variant="warning">{status.replace(/_/g, " ")}</Badge>;
-  }
-
+  if (["paid", "processed", "approved"].includes(status)) return <Badge variant="success">{status.replace(/_/g, " ")}</Badge>;
+  if (["failed", "cancelled", "refunded"].includes(status)) return <Badge variant="error">{status.replace(/_/g, " ")}</Badge>;
+  if (["pending", "processing", "partially_paid", "partially_refunded", "requested"].includes(status)) return <Badge variant="warning">{status.replace(/_/g, " ")}</Badge>;
   return <Badge variant="neutral">{status.replace(/_/g, " ")}</Badge>;
 }
 

@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizePackageTierOrFallback } from "@/features/entitlement/package-tier";
 
 export const subscriptionStatuses = ["active", "trial", "expired", "suspended", "cancelled"] as const;
 
@@ -91,7 +92,7 @@ type PackageSummaryRow = {
 type PlatformSubscriptionFallbackRow = {
   id: string;
   organization_id: string;
-  plan_tier: "starter" | "professional" | "enterprise";
+  plan_tier: "starter" | "growth" | "professional" | "enterprise";
   status: "trial" | "active" | "past_due" | "cancelled" | "suspended";
   starts_on: string;
   renews_on: string | null;
@@ -378,15 +379,10 @@ function legacySubscriptionStatus(status: PlatformSubscriptionFallbackRow["statu
 }
 
 function legacyPackageName(planTier: PlatformSubscriptionFallbackRow["plan_tier"]) {
-  if (planTier === "starter") {
-    return "Lite";
-  }
-
-  if (planTier === "professional") {
-    return "Standard";
-  }
-
-  return "Premium";
+  const normalizedTier = normalizePackageTierOrFallback(planTier);
+  if (normalizedTier === "starter") return "Starter";
+  if (normalizedTier === "growth") return "Growth";
+  return "Enterprise";
 }
 
 function isSchemaCacheMissing(error: SupabaseQueryError | null | undefined) {

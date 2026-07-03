@@ -18,7 +18,12 @@ export default async function ReceptionClassesPage() {
   const scope = await requireReceptionScope("/reception/classes");
   const [dashboard, membersResult] = await Promise.all([
     getClassOperationsDashboard(scope.gymId),
-    listMembers({ gymId: scope.gymId, pageSize: 80 })
+    listMembers({
+      gymId: scope.gymId,
+      branchId: scope.branchId,
+      organizationId: scope.scopedOrganizationId ?? scope.organizationId,
+      pageSize: 80
+    })
   ]);
 
   return (

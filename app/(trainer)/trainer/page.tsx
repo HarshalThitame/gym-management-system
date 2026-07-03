@@ -7,7 +7,7 @@ import { getTrainerNotificationCenter } from "@/features/communications/services
 import { getTrainerFitnessPortal } from "@/features/fitness/services/fitness-service";
 import { TrainerSessionForm } from "@/features/training/components/training-forms";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { DashboardClient, TodayTimeline, MemberCardGrid, FloatingQuickActions } from "./client";
 
@@ -18,7 +18,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerDashboardPage() {
-  const context = await requireRole(["trainer"], "/trainer");
+  const context = await requireTrainerPortalAccess("/trainer");
   const [dashboard, classPortal, fitnessPortal, communications] = await Promise.all([
     getTrainerDashboard(context.userId ?? "", context.profile?.gym_id ?? null),
     getTrainerClassesPortal(context.userId ?? "", context.profile?.gym_id ?? null),

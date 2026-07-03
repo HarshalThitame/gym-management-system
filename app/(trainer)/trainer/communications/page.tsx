@@ -9,7 +9,7 @@ import { formatCommunicationLabel } from "@/features/communications/lib/business
 import { getTrainerNotificationCenter, listNotificationTemplates } from "@/features/communications/services/communication-service";
 import { getTrainerAssignedMembers, getTrainerDashboard, getStaffChatMessages, listActiveTrainers } from "@/features/training/services/training-service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { StaffChatSection } from "./client";
 
@@ -20,7 +20,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerCommunicationsPage() {
-  const context = await requireRole(["trainer"], "/trainer/communications");
+  const context = await requireTrainerPortalAccess("/trainer/communications");
   const gymId = context.profile?.gym_id ?? null;
   const supabase = await createSupabaseServerClient();
   const { data: trainerRow } = context.userId

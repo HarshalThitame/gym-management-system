@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { CreditCard, ReceiptText, RefreshCcw } from "lucide-react";
+import { CreditCard, ReceiptText, RefreshCcw, Banknote, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { formatCurrency } from "@/features/billing/lib/money";
@@ -20,7 +21,10 @@ export default async function ReceptionPaymentsPage() {
   const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
   if (!organizationId) throw new Error("Organization scope required.");
   await requireOrganizationFeatureAccess({ organizationId, featureKey: "billing_invoices", actionName: "reception.payments.read" });
-  const payments = await listReceptionPayments(scope.gymId);
+  const payments = await listReceptionPayments(scope.gymId, {
+    branchId: scope.branchId,
+    organizationId: scope.scopedOrganizationId ?? scope.organizationId,
+  });
   const paidPayments = payments.filter((payment) => payment.status === "paid");
   const pendingPayments = payments.filter((payment) => payment.status === "pending" || payment.status === "processing" || payment.status === "failed");
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -37,6 +41,27 @@ export default async function ReceptionPaymentsPage() {
         <StatCard detail="Paid payments collected today" icon={<CreditCard className="size-5" />} label="Today's Payments" value={String(todayPayments.length)} />
         <StatCard detail="Pending, processing, or failed rows" icon={<RefreshCcw className="size-5" />} label="Pending Dues" value={String(pendingPayments.length)} />
         <StatCard detail="Paid amount in recent payment window" icon={<ReceiptText className="size-5" />} label="Collected" value={formatCurrency(paidPayments.reduce((total, payment) => total + payment.amount, 0))} />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <Card className="flex flex-col items-center justify-center border-dashed border-border bg-surface-muted p-6 text-center">
+          <Banknote className="mb-3 size-8 text-green-400" />
+          <p className="text-lg font-black">Cash</p>
+          <p className="mt-1 text-sm text-muted-foreground">Record a cash payment at the front desk counter.</p>
+          <ButtonLink className="mt-4 w-full" href={`/reception/payments/collect?method=cash`} variant="secondary">Collect Cash</ButtonLink>
+        </Card>
+        <Card className="flex flex-col items-center justify-center border-dashed border-border bg-surface-muted p-6 text-center">
+          <Smartphone className="mb-3 size-8 text-blue-400" />
+          <p className="text-lg font-black">UPI / Card</p>
+          <p className="mt-1 text-sm text-muted-foreground">Process UPI, debit, or credit card payment with POS.</p>
+          <ButtonLink className="mt-4 w-full" href={`/reception/payments/collect?method=upi`} variant="secondary">Process UPI/Card</ButtonLink>
+        </Card>
+        <Card className="flex flex-col items-center justify-center border-dashed border-border bg-surface-muted p-6 text-center">
+          <ReceiptText className="mb-3 size-8 text-purple-400" />
+          <p className="text-lg font-black">Receipts</p>
+          <p className="mt-1 text-sm text-muted-foreground">View, print, or email generated payment receipts.</p>
+          <ButtonLink className="mt-4 w-full" href={`/reception/payments`} variant="secondary">View Receipts</ButtonLink>
+        </Card>
       </section>
       <Card>
         <CardHeader>

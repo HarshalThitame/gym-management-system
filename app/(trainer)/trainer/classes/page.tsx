@@ -6,7 +6,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { ClassAttendanceForm, ClassSessionStatusForm } from "@/features/classes/components/class-forms";
 import { ClassStatusBadge } from "@/features/classes/components/class-status-badge";
 import { getTrainerClassesPortal } from "@/features/classes/services/class-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -16,7 +16,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerClassesPage() {
-  const context = await requireRole(["trainer"], "/trainer/classes");
+  const context = await requireTrainerPortalAccess("/trainer/classes");
   const portal = await getTrainerClassesPortal(context.userId ?? "", context.profile?.gym_id ?? null);
   const todaysSessions = portal.sessions.filter((session) => session.session_date === new Date().toISOString().slice(0, 10));
   const activeBookings = portal.bookings.filter((booking) => ["booked", "checked_in"].includes(booking.status));

@@ -3,7 +3,7 @@ import { CalendarRange, Clock, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { getTrainerAvailability, getTrainerTimeOff } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { AvailabilityForm, AvailabilitySlotList, TimeOffForm, TimeOffList } from "./client";
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = createMetadata({
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default async function TrainerAvailabilityPage() {
-  const context = await requireRole(["trainer"], "/trainer/availability");
+  const context = await requireTrainerPortalAccess("/trainer/availability");
   const [availability, timeOff] = await Promise.all([
     getTrainerAvailability(context.userId ?? "", context.profile?.gym_id ?? null),
     getTrainerTimeOff(context.userId ?? ""),

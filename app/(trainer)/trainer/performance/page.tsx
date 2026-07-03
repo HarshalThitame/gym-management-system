@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { getTrainerCommissionSummary, getTrainerPerformanceMetrics } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -14,7 +14,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerPerformancePage() {
-  const context = await requireRole(["trainer"], "/trainer/performance");
+  const context = await requireTrainerPortalAccess("/trainer/performance");
   const [metrics, commissions] = await Promise.all([
     getTrainerPerformanceMetrics(context.userId ?? ""),
     getTrainerCommissionSummary(context.userId ?? ""),

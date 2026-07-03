@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,8 @@ function LockedContent({
   featureName: string;
   requiredPlan: string;
 }) {
+  const router = useRouter();
+
   return (
     <div className="mx-auto flex max-w-md flex-col items-center text-center">
       <div className="grid size-12 place-items-center rounded-md border border-amber-200 bg-amber-50 text-amber-800">
@@ -70,7 +73,7 @@ function LockedContent({
       <Badge className={cn("mt-4 border-amber-200 bg-amber-50 text-amber-800")}>
         Required plan: {requiredPlan}
       </Badge>
-      <Button className="mt-5" onClick={() => console.info("redirect to upgrade flow")} type="button" variant="accent">
+      <Button className="mt-5" onClick={() => router.push("/membership-plans")} type="button" variant="accent">
         Upgrade Plan
       </Button>
     </div>

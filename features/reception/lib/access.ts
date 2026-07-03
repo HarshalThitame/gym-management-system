@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { requirePortalFeatureAccess } from "@/features/entitlement/portal-gates";
 import { requireRole } from "@/lib/auth/guards";
 import { getTenantContext } from "@/lib/tenant/context";
 import type { AuthContext, RoleName } from "@/types/auth";
@@ -28,10 +29,21 @@ export async function requireGymFrontDeskScope(allowedRoles: readonly RoleName[]
     redirect("/unauthorized?reason=gym_scope");
   }
 
-  return {
+  const scope = {
     ...context,
     gymId,
-    branchId: tenant.resolved ? tenant.branch.id : null,
+    branchId: tenant.resolved ? tenant.branch.id : context.profile?.branch_id ?? null,
     scopedOrganizationId: tenant.resolved && tenant.organizationId ? tenant.organizationId : context.organizationId
   };
+
+  if (scope.scopedOrganizationId) {
+    await requirePortalFeatureAccess({
+      portal: "reception",
+      organizationId: scope.scopedOrganizationId,
+      pathname: nextPath,
+      actionName: `portal.reception.${nextPath}`,
+    });
+  }
+
+  return scope;
 }

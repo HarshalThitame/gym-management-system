@@ -65,7 +65,7 @@ export async function listTrainers(input: ListTrainersInput) {
   };
 }
 
-export async function listActiveTrainers(gymId: string | null) {
+export async function listActiveTrainers(gymId: string | null, scope?: { branchId?: string | null; organizationId?: string | null }) {
   const supabase = await createSupabaseServerClient();
   let query = supabase
     .from("trainers")
@@ -75,6 +75,12 @@ export async function listActiveTrainers(gymId: string | null) {
 
   if (gymId) {
     query = query.eq("gym_id", gymId);
+  }
+  if (scope?.branchId) {
+    query = query.eq("branch_id", scope.branchId);
+  }
+  if (scope?.organizationId) {
+    query = query.eq("organization_id", scope.organizationId);
   }
 
   const { data, error } = await query;

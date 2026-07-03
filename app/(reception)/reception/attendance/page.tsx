@@ -29,7 +29,13 @@ export default async function ReceptionAttendancePage({ searchParams }: Receptio
   const memberQuery = params.memberQuery?.trim() ?? "";
   const [dashboard, membersResult, devices] = await Promise.all([
     getAttendanceDashboard(scope.gymId),
-    listMembers({ gymId: scope.gymId, pageSize: 80, query: memberQuery || undefined }),
+    listMembers({
+      gymId: scope.gymId,
+      branchId: scope.branchId,
+      organizationId: scope.scopedOrganizationId ?? scope.organizationId,
+      pageSize: 80,
+      query: memberQuery || undefined
+    }),
     listAccessDevices(scope.gymId)
   ]);
 

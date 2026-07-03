@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ProfileForm } from "@/features/profile/components/profile-form";
-import { requirePrimaryRole } from "@/lib/auth/guards";
+import { requireMemberPortalAccess } from "@/features/member/lib/access";
+import { PageHeader, AnimatedCardSection } from "@/features/member/components/page-wrappers";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -11,7 +12,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function MemberProfilePage() {
-  const context = await requirePrimaryRole(["member"], "/member/profile");
+  const context = await requireMemberPortalAccess("/member/profile");
 
   if (!context.profile) {
     return (
@@ -25,14 +26,18 @@ export default async function MemberProfilePage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <h2 className="text-2xl font-black">Profile</h2>
-        <p className="text-sm leading-6 text-muted-foreground">Keep contact and emergency details current for gym operations and trainer safety.</p>
-      </CardHeader>
-      <CardContent>
-        <ProfileForm profile={context.profile} />
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <PageHeader title="Profile" description="Keep contact and emergency details current for gym operations and trainer safety." />
+      <AnimatedCardSection>
+        <Card variant="glass">
+          <CardHeader>
+            <h2 className="text-2xl font-black">Edit Profile</h2>
+          </CardHeader>
+          <CardContent>
+            <ProfileForm profile={context.profile} />
+          </CardContent>
+        </Card>
+      </AnimatedCardSection>
+    </div>
   );
 }

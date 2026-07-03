@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { StatCard } from "@/components/ui/stat-card";
 import { HourlyTrafficChart } from "@/features/attendance/components/lazy-attendance-charts";
 import { getTrainerAttendanceView } from "@/features/attendance/services/attendance-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -15,7 +15,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerAttendancePage() {
-  const context = await requireRole(["trainer"], "/trainer/attendance");
+  const context = await requireTrainerPortalAccess("/trainer/attendance");
   const view = await getTrainerAttendanceView(context.userId ?? "", context.profile?.gym_id ?? null);
   const inactiveMembers = view.assignedMembers.filter((member) => member.inactiveDays >= 7);
   const averageDuration = view.assignedMembers.length > 0

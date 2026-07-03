@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { TrainerSessionForm } from "@/features/training/components/training-forms";
 import { getTrainerDashboard } from "@/features/training/services/training-service";
-import { requireRole } from "@/lib/auth/guards";
+import { requireTrainerPortalAccess } from "@/features/trainer/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
 import { SessionsClient, SessionsCalendar, SessionsFilteredList } from "./client";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 export default async function TrainerSessionsPage() {
-  const context = await requireRole(["trainer"], "/trainer/sessions");
+  const context = await requireTrainerPortalAccess("/trainer/sessions");
   const dashboard = await getTrainerDashboard(context.userId ?? "", context.profile?.gym_id ?? null);
   const trainerList = dashboard.trainer ? [dashboard.trainer] : [];
 

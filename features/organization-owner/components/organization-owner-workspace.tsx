@@ -37,6 +37,7 @@ import type { OrganizationOwnerModule } from "@/features/organization-owner/lib/
 import { organizationOwnerModules } from "@/features/organization-owner/lib/organization-owner-modules";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import type { ModuleSearchParams } from "@/features/organization-owner/services/module-data-resolver";
+import { normalizePackageTier } from "@/features/entitlement/package-tier";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import { cn } from "@/lib/utils";
 
@@ -49,9 +50,9 @@ type OrganizationOwnerWorkspaceProps = {
 };
 
 const packageClasses: Record<string, string> = {
-  lite: "border-slate-200 bg-slate-50 text-slate-700",
-  standard: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  premium: "border-amber-200 bg-amber-50 text-amber-800"
+  starter: "border-slate-200 bg-slate-50 text-slate-700",
+  growth: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  enterprise: "border-amber-200 bg-amber-50 text-amber-800"
 };
 
 export function OrganizationOwnerWorkspace({ dashboard, module, moduleData, moduleFilters, planContext }: OrganizationOwnerWorkspaceProps) {
@@ -132,7 +133,7 @@ function ModuleContent({ dashboard, module, moduleData, moduleFilters, planConte
 }
 
 function PackageBadge({ packageName }: { packageName: string }) {
-  const normalizedName = packageName.toLowerCase();
+  const normalizedName = normalizePackageTier(packageName) ?? packageName.toLowerCase();
 
   return (
     <Badge className={cn(packageClasses[normalizedName] ?? "border-border bg-surface-muted text-muted-foreground")}>
@@ -140,5 +141,4 @@ function PackageBadge({ packageName }: { packageName: string }) {
     </Badge>
   );
 }
-
 

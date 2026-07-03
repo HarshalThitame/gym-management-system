@@ -13,6 +13,8 @@ import type {
 
 type ListMembersInput = {
   gymId: string | null;
+  branchId?: string | null;
+  organizationId?: string | null;
   query?: string | undefined;
   memberStatus?: string | undefined;
   membershipStatus?: string | undefined;
@@ -168,6 +170,12 @@ export async function listMembers(input: ListMembersInput) {
 
   if (input.gymId) {
     query = query.eq("gym_id", input.gymId);
+  }
+  if (input.branchId) {
+    query = query.eq("branch_id", input.branchId);
+  }
+  if (input.organizationId) {
+    query = query.eq("organization_id", input.organizationId);
   }
 
   if (input.query) {

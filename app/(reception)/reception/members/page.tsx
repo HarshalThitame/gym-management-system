@@ -23,6 +23,8 @@ export default async function ReceptionMembersPage({ searchParams }: ReceptionMe
   const params = await searchParams;
   const result = await listMembers({
     gymId: scope.gymId,
+    branchId: scope.branchId,
+    organizationId: scope.scopedOrganizationId ?? scope.organizationId,
     query: params.q,
     membershipStatus: params.membershipStatus,
     expiry: params.expiry,

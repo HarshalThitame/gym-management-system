@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { requirePortalFeatureAccess } from "@/features/entitlement/portal-gates";
 import { requireRole } from "@/lib/auth/guards";
 import { getTenantContext } from "@/lib/tenant/context";
 import type { AuthContext } from "@/types/auth";
@@ -25,13 +26,24 @@ export async function requireGymAdminScope(nextPath = "/admin"): Promise<GymAdmi
     redirect(context.roles.includes("super_admin") ? "/super-admin" : "/unauthorized?reason=gym_scope");
   }
 
-  return {
+  const scope = {
     ...context,
     gymId,
     branchId: tenant.resolved ? tenant.branch.id : null,
     scopedOrganizationId: tenant.resolved && tenant.organizationId ? tenant.organizationId : context.organizationId,
     isSuperAdminScope: context.roles.includes("super_admin")
   };
+
+  if (scope.scopedOrganizationId) {
+    await requirePortalFeatureAccess({
+      portal: "gym-admin",
+      organizationId: scope.scopedOrganizationId,
+      pathname: nextPath,
+      actionName: `portal.gym_admin.${nextPath}`,
+    });
+  }
+
+  return scope;
 }
 
 export function canManageGymFinancials(scope: Pick<GymAdminScope, "roles">) {

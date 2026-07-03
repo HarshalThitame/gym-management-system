@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       access_devices: {
@@ -319,6 +344,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      account_lockouts: {
+        Row: {
+          email: string
+          id: string
+          ip_address: string | null
+          locked_at: string
+          locked_until: string
+          reason: string | null
+          unlocked_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          email: string
+          id?: string
+          ip_address?: string | null
+          locked_at?: string
+          locked_until: string
+          reason?: string | null
+          unlocked_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          ip_address?: string | null
+          locked_at?: string
+          locked_until?: string
+          reason?: string | null
+          unlocked_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       activity_events: {
         Row: {
@@ -2649,11 +2707,15 @@ export type Database = {
           entity_id: string | null
           entity_type: string | null
           event_name: string
+          event_type: string | null
           gym_id: string | null
           id: string
           occurred_at: string
+          organization_id: string | null
           properties: Json
+          session_id: string | null
           source: string
+          timestamp: string | null
         }
         Insert: {
           actor_id?: string | null
@@ -2662,11 +2724,15 @@ export type Database = {
           entity_id?: string | null
           entity_type?: string | null
           event_name: string
+          event_type?: string | null
           gym_id?: string | null
           id?: string
           occurred_at?: string
+          organization_id?: string | null
           properties?: Json
+          session_id?: string | null
           source?: string
+          timestamp?: string | null
         }
         Update: {
           actor_id?: string | null
@@ -2675,11 +2741,15 @@ export type Database = {
           entity_id?: string | null
           entity_type?: string | null
           event_name?: string
+          event_type?: string | null
           gym_id?: string | null
           id?: string
           occurred_at?: string
+          organization_id?: string | null
           properties?: Json
+          session_id?: string | null
           source?: string
+          timestamp?: string | null
         }
         Relationships: [
           {
@@ -2730,6 +2800,113 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mobile_trainer_dashboard"
             referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "analytics_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      analytics_funnels: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          organization_id: string
+          steps: Json
+          time_window_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          steps?: Json
+          time_window_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          steps?: Json
+          time_window_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_funnels_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_funnels_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_funnels_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_funnels_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_funnels_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3311,6 +3488,84 @@ export type Database = {
           },
         ]
       }
+      analytics_reports: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          last_generated_at: string | null
+          name: string
+          organization_id: string
+          report_type: string
+          schedule: string | null
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          last_generated_at?: string | null
+          name: string
+          organization_id: string
+          report_type: string
+          schedule?: string | null
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          last_generated_at?: string | null
+          name?: string
+          organization_id?: string
+          report_type?: string
+          schedule?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "analytics_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           body: string
@@ -3418,6 +3673,87 @@ export type Database = {
           },
         ]
       }
+      api_keys: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          organization_id: string | null
+          scopes: string[]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          organization_id?: string | null
+          scopes?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          organization_id?: string | null
+          scopes?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "api_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_rate_limits: {
         Row: {
           count: number
@@ -3441,6 +3777,257 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      api_usage_logs: {
+        Row: {
+          api_key_id: string | null
+          created_at: string
+          endpoint: string
+          id: string
+          ip_address: string | null
+          method: string
+          response_time_ms: number | null
+          status_code: number
+          user_agent: string | null
+        }
+        Insert: {
+          api_key_id?: string | null
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip_address?: string | null
+          method: string
+          response_time_ms?: number | null
+          status_code: number
+          user_agent?: string | null
+        }
+        Update: {
+          api_key_id?: string | null
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip_address?: string | null
+          method?: string
+          response_time_ms?: number | null
+          status_code?: number
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointments: {
+        Row: {
+          branch_id: string | null
+          cancel_reason: string | null
+          cancelled_by: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          ends_at: string
+          gym_id: string | null
+          id: string
+          location: string | null
+          member_id: string | null
+          notes: string | null
+          organization_id: string | null
+          starts_at: string
+          status: Database["public"]["Enums"]["appointment_status"]
+          title: string
+          trainer_id: string | null
+          type: Database["public"]["Enums"]["appointment_type"]
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          cancel_reason?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_at: string
+          gym_id?: string | null
+          id?: string
+          location?: string | null
+          member_id?: string | null
+          notes?: string | null
+          organization_id?: string | null
+          starts_at: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          title: string
+          trainer_id?: string | null
+          type?: Database["public"]["Enums"]["appointment_type"]
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          cancel_reason?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string
+          gym_id?: string | null
+          id?: string
+          location?: string | null
+          member_id?: string | null
+          notes?: string | null
+          organization_id?: string | null
+          starts_at?: string
+          status?: Database["public"]["Enums"]["appointment_status"]
+          title?: string
+          trainer_id?: string | null
+          type?: Database["public"]["Enums"]["appointment_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_branch_metrics_latest"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "appointments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "appointments_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "appointments_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "appointments_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "appointments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "ai_member_risk_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "appointments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_member_frequency"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "appointments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "fitness_member_progress_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "appointments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["trainer_id"]
+          },
+          {
+            foreignKeyName: "appointments_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_performance_summary"
+            referencedColumns: ["trainer_id"]
+          },
+          {
+            foreignKeyName: "appointments_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "trainers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       attendance_alerts: {
         Row: {
@@ -4526,6 +5113,137 @@ export type Database = {
           },
           {
             foreignKeyName: "audit_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          result: Json | null
+          rule_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          result?: Json | null
+          rule_id: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          result?: Json | null
+          rule_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_logs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_rules: {
+        Row: {
+          actions: Json
+          cooldown_minutes: number | null
+          created_at: string
+          created_by: string
+          description: string | null
+          event_filters: Json | null
+          event_type: string
+          id: string
+          last_run_at: string | null
+          name: string
+          organization_id: string
+          priority: number
+          run_count: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actions?: Json
+          cooldown_minutes?: number | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          event_filters?: Json | null
+          event_type: string
+          id?: string
+          last_run_at?: string | null
+          name: string
+          organization_id: string
+          priority?: number
+          run_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actions?: Json
+          cooldown_minutes?: number | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          event_filters?: Json | null
+          event_type?: string
+          id?: string
+          last_run_at?: string | null
+          name?: string
+          organization_id?: string
+          priority?: number
+          run_count?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "automation_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "automation_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "automation_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "automation_rules_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -5964,6 +6682,165 @@ export type Database = {
           },
           {
             foreignKeyName: "branches_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_operation_items: {
+        Row: {
+          created_at: string
+          entity_id: string
+          error_message: string | null
+          id: string
+          operation_id: string
+          processed_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          error_message?: string | null
+          id?: string
+          operation_id: string
+          processed_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          error_message?: string | null
+          id?: string
+          operation_id?: string
+          processed_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_operation_items_operation_id_fkey"
+            columns: ["operation_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_operations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_operations: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          entity_type: string
+          error_message: string | null
+          failed_count: number
+          gym_id: string | null
+          id: string
+          metadata: Json | null
+          operation_type: string
+          organization_id: string | null
+          started_at: string | null
+          status: string
+          success_count: number
+          total_count: number
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          entity_type: string
+          error_message?: string | null
+          failed_count?: number
+          gym_id?: string | null
+          id?: string
+          metadata?: Json | null
+          operation_type: string
+          organization_id?: string | null
+          started_at?: string | null
+          status?: string
+          success_count?: number
+          total_count?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          entity_type?: string
+          error_message?: string | null
+          failed_count?: number
+          gym_id?: string | null
+          id?: string
+          metadata?: Json | null
+          operation_type?: string
+          organization_id?: string | null
+          started_at?: string | null
+          status?: string
+          success_count?: number
+          total_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_operations_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "bulk_operations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -10399,6 +11276,124 @@ export type Database = {
           },
           {
             foreignKeyName: "custom_member_fields_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_reports: {
+        Row: {
+          columns: string[]
+          created_at: string
+          created_by: string | null
+          description: string | null
+          entity_type: string
+          filters: Json | null
+          gym_id: string | null
+          id: string
+          is_public: boolean
+          limit_count: number | null
+          name: string
+          organization_id: string | null
+          sort_by: string | null
+          sort_order: string | null
+          updated_at: string
+        }
+        Insert: {
+          columns: string[]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entity_type: string
+          filters?: Json | null
+          gym_id?: string | null
+          id?: string
+          is_public?: boolean
+          limit_count?: number | null
+          name: string
+          organization_id?: string | null
+          sort_by?: string | null
+          sort_order?: string | null
+          updated_at?: string
+        }
+        Update: {
+          columns?: string[]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entity_type?: string
+          filters?: Json | null
+          gym_id?: string | null
+          id?: string
+          is_public?: boolean
+          limit_count?: number | null
+          name?: string
+          organization_id?: string | null
+          sort_by?: string | null
+          sort_order?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "custom_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "custom_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "custom_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "custom_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "custom_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "custom_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "custom_reports_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -19146,14 +20141,20 @@ export type Database = {
       feature_flags: {
         Row: {
           branch_id: string | null
+          category: string | null
           created_at: string
           created_by: string | null
+          default_enabled: boolean
+          dependencies: string[] | null
           description: string
           enabled: boolean
           flag_key: string
           id: string
+          key: string | null
+          metadata: Json | null
           name: string
           organization_id: string | null
+          requires_plan: string | null
           rollout_percentage: number
           rules: Json
           status: string
@@ -19163,14 +20164,20 @@ export type Database = {
         }
         Insert: {
           branch_id?: string | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
+          default_enabled?: boolean
+          dependencies?: string[] | null
           description?: string
           enabled?: boolean
           flag_key: string
           id?: string
+          key?: string | null
+          metadata?: Json | null
           name: string
           organization_id?: string | null
+          requires_plan?: string | null
           rollout_percentage?: number
           rules?: Json
           status?: string
@@ -19180,14 +20187,20 @@ export type Database = {
         }
         Update: {
           branch_id?: string | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
+          default_enabled?: boolean
+          dependencies?: string[] | null
           description?: string
           enabled?: boolean
           flag_key?: string
           id?: string
+          key?: string | null
+          metadata?: Json | null
           name?: string
           organization_id?: string | null
+          requires_plan?: string | null
           rollout_percentage?: number
           rules?: Json
           status?: string
@@ -19988,6 +21001,382 @@ export type Database = {
           },
         ]
       }
+      gdpr_breach_records: {
+        Row: {
+          affected_subjects_count: number | null
+          containment_actions: string | null
+          created_at: string
+          data_categories: string[] | null
+          description: string
+          discovered_at: string
+          id: string
+          organization_id: string | null
+          remediation_actions: string | null
+          reported_to_authority_at: string | null
+          reported_to_subjects_at: string | null
+          severity: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          affected_subjects_count?: number | null
+          containment_actions?: string | null
+          created_at?: string
+          data_categories?: string[] | null
+          description: string
+          discovered_at?: string
+          id?: string
+          organization_id?: string | null
+          remediation_actions?: string | null
+          reported_to_authority_at?: string | null
+          reported_to_subjects_at?: string | null
+          severity?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          affected_subjects_count?: number | null
+          containment_actions?: string | null
+          created_at?: string
+          data_categories?: string[] | null
+          description?: string
+          discovered_at?: string
+          id?: string
+          organization_id?: string | null
+          remediation_actions?: string | null
+          reported_to_authority_at?: string | null
+          reported_to_subjects_at?: string | null
+          severity?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gdpr_breach_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_breach_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_breach_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_breach_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_breach_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gdpr_consent_types: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          key: string
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          key: string
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          key?: string
+          label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      gdpr_consents: {
+        Row: {
+          consent_type: string
+          created_at: string
+          granted: boolean
+          granted_at: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+          version: string | null
+          withdrawn_at: string | null
+        }
+        Insert: {
+          consent_type: string
+          created_at?: string
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+          version?: string | null
+          withdrawn_at?: string | null
+        }
+        Update: {
+          consent_type?: string
+          created_at?: string
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+          version?: string | null
+          withdrawn_at?: string | null
+        }
+        Relationships: []
+      }
+      gdpr_deletion_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          data_summary: Json | null
+          id: string
+          legal_hold: boolean
+          legal_hold_reason: string | null
+          reason: string | null
+          rejection_reason: string | null
+          requested_by: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          data_summary?: Json | null
+          id?: string
+          legal_hold?: boolean
+          legal_hold_reason?: string | null
+          reason?: string | null
+          rejection_reason?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          data_summary?: Json | null
+          id?: string
+          legal_hold?: boolean
+          legal_hold_reason?: string | null
+          reason?: string | null
+          rejection_reason?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gdpr_export_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          download_expires_at: string | null
+          download_url: string | null
+          error_message: string | null
+          expires_at: string
+          format: string
+          id: string
+          requested_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          download_expires_at?: string | null
+          download_url?: string | null
+          error_message?: string | null
+          expires_at?: string
+          format?: string
+          id?: string
+          requested_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          download_expires_at?: string | null
+          download_url?: string | null
+          error_message?: string | null
+          expires_at?: string
+          format?: string
+          id?: string
+          requested_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gdpr_processing_records: {
+        Row: {
+          created_at: string
+          data_categories: string[]
+          data_subjects: string[]
+          gym_id: string | null
+          id: string
+          international_transfers: boolean
+          is_active: boolean
+          legal_basis: string
+          organization_id: string | null
+          purpose: string
+          retention_period: string
+          security_measures: string | null
+          third_party_recipients: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_categories: string[]
+          data_subjects: string[]
+          gym_id?: string | null
+          id?: string
+          international_transfers?: boolean
+          is_active?: boolean
+          legal_basis: string
+          organization_id?: string | null
+          purpose: string
+          retention_period: string
+          security_measures?: string | null
+          third_party_recipients?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_categories?: string[]
+          data_subjects?: string[]
+          gym_id?: string | null
+          id?: string
+          international_transfers?: boolean
+          is_active?: boolean
+          legal_basis?: string
+          organization_id?: string | null
+          purpose?: string
+          retention_period?: string
+          security_measures?: string | null
+          third_party_recipients?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gdpr_processing_records_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "gdpr_processing_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gym_branch_approval_requests: {
         Row: {
           action: string
@@ -20336,6 +21725,128 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "security_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_logs: {
+        Row: {
+          action: string
+          created_at: string
+          error_message: string | null
+          id: string
+          integration_id: string
+          request_data: Json | null
+          response_data: Json | null
+          status: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          integration_id: string
+          request_data?: Json | null
+          response_data?: Json | null
+          status: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          integration_id?: string
+          request_data?: Json | null
+          response_data?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          config: Json | null
+          created_at: string
+          created_by: string
+          credentials: Json | null
+          error_message: string | null
+          id: string
+          label: string | null
+          last_sync_at: string | null
+          organization_id: string
+          provider: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string
+          created_by: string
+          credentials?: Json | null
+          error_message?: string | null
+          id?: string
+          label?: string | null
+          last_sync_at?: string | null
+          organization_id: string
+          provider: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string
+          created_by?: string
+          credentials?: Json | null
+          error_message?: string | null
+          id?: string
+          label?: string | null
+          last_sync_at?: string | null
+          organization_id?: string
+          provider?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -20709,6 +22220,109 @@ export type Database = {
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "organization_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ip_whitelist: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          gym_id: string | null
+          id: string
+          ip_address: string
+          ip_range: string | null
+          is_active: boolean
+          label: string | null
+          organization_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          gym_id?: string | null
+          id?: string
+          ip_address: string
+          ip_range?: string | null
+          is_active?: boolean
+          label?: string | null
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          gym_id?: string | null
+          id?: string
+          ip_address?: string
+          ip_range?: string | null
+          is_active?: boolean
+          label?: string | null
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ip_whitelist_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ip_whitelist_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -21239,6 +22853,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      login_attempts: {
+        Row: {
+          created_at: string
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+        }
+        Relationships: []
       }
       login_history: {
         Row: {
@@ -21960,6 +23601,127 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mobile_member_dashboard"
             referencedColumns: ["member_id"]
+          },
+        ]
+      }
+      member_progress_photos: {
+        Row: {
+          created_at: string
+          gym_id: string | null
+          id: string
+          member_id: string
+          notes: string | null
+          photo_type: string
+          photo_url: string
+          recorded_on: string
+          trainer_id: string
+        }
+        Insert: {
+          created_at?: string
+          gym_id?: string | null
+          id?: string
+          member_id: string
+          notes?: string | null
+          photo_type: string
+          photo_url: string
+          recorded_on?: string
+          trainer_id: string
+        }
+        Update: {
+          created_at?: string
+          gym_id?: string | null
+          id?: string
+          member_id?: string
+          notes?: string | null
+          photo_type?: string
+          photo_url?: string
+          recorded_on?: string
+          trainer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_progress_photos_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "ai_member_risk_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_member_frequency"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "fitness_member_progress_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["trainer_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_performance_summary"
+            referencedColumns: ["trainer_id"]
+          },
+          {
+            foreignKeyName: "member_progress_photos_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "trainers"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -23723,6 +25485,7 @@ export type Database = {
           gym_id: string | null
           id: string
           member_id: string | null
+          message: string | null
           metadata: Json
           pinned: boolean
           priority: string
@@ -23733,6 +25496,7 @@ export type Database = {
           template_id: string | null
           title: string
           trainer_id: string | null
+          type: string
           user_id: string | null
         }
         Insert: {
@@ -23746,6 +25510,7 @@ export type Database = {
           gym_id?: string | null
           id?: string
           member_id?: string | null
+          message?: string | null
           metadata?: Json
           pinned?: boolean
           priority?: string
@@ -23756,6 +25521,7 @@ export type Database = {
           template_id?: string | null
           title: string
           trainer_id?: string | null
+          type?: string
           user_id?: string | null
         }
         Update: {
@@ -23769,6 +25535,7 @@ export type Database = {
           gym_id?: string | null
           id?: string
           member_id?: string | null
+          message?: string | null
           metadata?: Json
           pinned?: boolean
           priority?: string
@@ -23779,6 +25546,7 @@ export type Database = {
           template_id?: string | null
           title?: string
           trainer_id?: string | null
+          type?: string
           user_id?: string | null
         }
         Relationships: [
@@ -26733,6 +28501,79 @@ export type Database = {
           },
         ]
       }
+      org_feature_flags: {
+        Row: {
+          config: Json | null
+          created_at: string
+          enabled: boolean
+          feature_flag_id: string
+          id: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string
+          enabled?: boolean
+          feature_flag_id: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string
+          enabled?: boolean
+          feature_flag_id?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_feature_flags_feature_flag_id_fkey"
+            columns: ["feature_flag_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_feature_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_feature_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_feature_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_feature_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_feature_flags_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_payment_methods: {
         Row: {
           card_network: string | null
@@ -28637,6 +30478,27 @@ export type Database = {
           },
         ]
       }
+      password_history: {
+        Row: {
+          created_at: string
+          id: string
+          password_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          password_hash: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          password_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       password_policies: {
         Row: {
           created_at: string
@@ -28645,15 +30507,19 @@ export type Database = {
           id: string
           is_active: boolean
           lockout_duration_minutes: number | null
+          max_age_days: number | null
           max_failed_attempts: number | null
+          max_login_attempts: number
           min_length: number
           name: string
           organization_id: string | null
           prevent_breached: boolean
           prevent_common: boolean
+          prevent_reuse_count: number | null
           require_lowercase: boolean
           require_numbers: boolean
           require_special: boolean
+          require_special_chars: boolean
           require_uppercase: boolean
           updated_at: string
         }
@@ -28664,15 +30530,19 @@ export type Database = {
           id?: string
           is_active?: boolean
           lockout_duration_minutes?: number | null
+          max_age_days?: number | null
           max_failed_attempts?: number | null
+          max_login_attempts?: number
           min_length?: number
           name: string
           organization_id?: string | null
           prevent_breached?: boolean
           prevent_common?: boolean
+          prevent_reuse_count?: number | null
           require_lowercase?: boolean
           require_numbers?: boolean
           require_special?: boolean
+          require_special_chars?: boolean
           require_uppercase?: boolean
           updated_at?: string
         }
@@ -28683,15 +30553,19 @@ export type Database = {
           id?: string
           is_active?: boolean
           lockout_duration_minutes?: number | null
+          max_age_days?: number | null
           max_failed_attempts?: number | null
+          max_login_attempts?: number
           min_length?: number
           name?: string
           organization_id?: string | null
           prevent_breached?: boolean
           prevent_common?: boolean
+          prevent_reuse_count?: number | null
           require_lowercase?: boolean
           require_numbers?: boolean
           require_special?: boolean
+          require_special_chars?: boolean
           require_uppercase?: boolean
           updated_at?: string
         }
@@ -30704,6 +32578,63 @@ export type Database = {
           },
         ]
       }
+      realtime_events: {
+        Row: {
+          channel: string
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
+      realtime_subscriptions: {
+        Row: {
+          channel: string
+          created_at: string
+          event_type: string
+          filters: Json | null
+          id: string
+          is_active: boolean
+          last_seen_at: string
+          user_id: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          event_type: string
+          filters?: Json | null
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          event_type?: string
+          filters?: Json | null
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       reconciliation: {
         Row: {
           branch_id: string | null
@@ -31605,6 +33536,42 @@ export type Database = {
           },
         ]
       }
+      report_templates: {
+        Row: {
+          category: string
+          created_at: string
+          default_columns: string[]
+          default_filters: Json | null
+          description: string | null
+          entity_type: string
+          id: string
+          is_system: boolean
+          name: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          default_columns: string[]
+          default_filters?: Json | null
+          description?: string | null
+          entity_type: string
+          id?: string
+          is_system?: boolean
+          name: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          default_columns?: string[]
+          default_filters?: Json | null
+          description?: string | null
+          entity_type?: string
+          id?: string
+          is_system?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       retention_policies: {
         Row: {
           branch_id: string | null
@@ -32415,6 +34382,177 @@ export type Database = {
             columns: ["to_package_id"]
             isOneToOne: false
             referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_report_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          file_url: string | null
+          id: string
+          records_count: number | null
+          report_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_url?: string | null
+          id?: string
+          records_count?: number | null
+          report_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_url?: string | null
+          id?: string
+          records_count?: number | null
+          report_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_report_runs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_reports: {
+        Row: {
+          columns: string[] | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          filters: Json | null
+          format: string
+          gym_id: string | null
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          name: string
+          next_run_at: string | null
+          organization_id: string | null
+          recipients: string[]
+          report_type: string
+          schedule_config: Json
+          schedule_type: string
+          updated_at: string
+        }
+        Insert: {
+          columns?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          filters?: Json | null
+          format?: string
+          gym_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name: string
+          next_run_at?: string | null
+          organization_id?: string | null
+          recipients?: string[]
+          report_type: string
+          schedule_config?: Json
+          schedule_type: string
+          updated_at?: string
+        }
+        Update: {
+          columns?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          filters?: Json | null
+          format?: string
+          gym_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string | null
+          organization_id?: string | null
+          recipients?: string[]
+          report_type?: string
+          schedule_config?: Json
+          schedule_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "scheduled_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -34892,6 +37030,154 @@ export type Database = {
           },
         ]
       }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          branch_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          entity_id: string | null
+          entity_type: string | null
+          gym_id: string | null
+          id: string
+          notes: string | null
+          organization_id: string | null
+          priority: string
+          status: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          gym_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          priority?: string
+          status?: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          branch_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          gym_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string | null
+          priority?: string
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_branch_metrics_latest"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "tasks_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["branch_id"]
+          },
+          {
+            foreignKeyName: "tasks_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gym_compat"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "tasks_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "tasks_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["gym_id"]
+          },
+          {
+            foreignKeyName: "tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tax_rates: {
         Row: {
           applies_to: string[]
@@ -35769,7 +38055,6 @@ export type Database = {
           created_at: string
           day_of_week: number
           ends_at: string
-          gym_id: string | null
           id: string
           is_active: boolean
           starts_at: string
@@ -35782,7 +38067,6 @@ export type Database = {
           created_at?: string
           day_of_week: number
           ends_at: string
-          gym_id?: string | null
           id?: string
           is_active?: boolean
           starts_at: string
@@ -35795,7 +38079,6 @@ export type Database = {
           created_at?: string
           day_of_week?: number
           ends_at?: string
-          gym_id?: string | null
           id?: string
           is_active?: boolean
           starts_at?: string
@@ -37345,7 +39628,6 @@ export type Database = {
           approved_by: string | null
           created_at: string
           ends_at: string
-          gym_id: string | null
           id: string
           reason: string
           starts_at: string
@@ -37357,7 +39639,6 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           ends_at: string
-          gym_id?: string | null
           id?: string
           reason: string
           starts_at: string
@@ -37369,7 +39650,6 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           ends_at?: string
-          gym_id?: string | null
           id?: string
           reason?: string
           starts_at?: string
@@ -37809,6 +40089,138 @@ export type Database = {
           },
         ]
       }
+      user_2fa_attempts: {
+        Row: {
+          created_at: string
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          method_type: string
+          success: boolean
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          method_type: string
+          success?: boolean
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          method_type?: string
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_2fa_methods: {
+        Row: {
+          backup_codes: string[] | null
+          created_at: string
+          id: string
+          is_enabled: boolean
+          is_verified: boolean
+          last_used_at: string | null
+          method_type: string
+          phone_number: string | null
+          secret_key: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backup_codes?: string[] | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          is_verified?: boolean
+          last_used_at?: string | null
+          method_type: string
+          phone_number?: string | null
+          secret_key?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backup_codes?: string[] | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          is_verified?: boolean
+          last_used_at?: string | null
+          method_type?: string
+          phone_number?: string | null
+          secret_key?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_2fa_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          preferred_method: string | null
+          remember_device_days: number
+          require_2fa: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preferred_method?: string | null
+          remember_device_days?: number
+          require_2fa?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preferred_method?: string | null
+          remember_device_days?: number
+          require_2fa?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_2fa_recovery_codes: {
+        Row: {
+          code_hash: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_custom_roles: {
         Row: {
           created_at: string
@@ -38050,69 +40462,90 @@ export type Database = {
       user_sessions: {
         Row: {
           browser: string | null
+          browser_name: string | null
           created_at: string
           device_fingerprint: string | null
+          device_name: string | null
           device_type: string | null
           expired_at: string | null
+          expires_at: string | null
           id: string
           ip_address: unknown
+          is_active: boolean
           is_current: boolean
           is_trusted: boolean
           last_active_at: string
+          last_activity_at: string
           location_city: string | null
           location_country: string | null
           location_lat: number | null
           location_lng: number | null
           logged_in_at: string
           os: string | null
+          os_name: string | null
           revoked_at: string | null
           risk_score: number | null
+          session_token: string | null
           session_token_hash: string
           user_agent: string | null
           user_id: string
         }
         Insert: {
           browser?: string | null
+          browser_name?: string | null
           created_at?: string
           device_fingerprint?: string | null
+          device_name?: string | null
           device_type?: string | null
           expired_at?: string | null
+          expires_at?: string | null
           id?: string
           ip_address?: unknown
+          is_active?: boolean
           is_current?: boolean
           is_trusted?: boolean
           last_active_at?: string
+          last_activity_at?: string
           location_city?: string | null
           location_country?: string | null
           location_lat?: number | null
           location_lng?: number | null
           logged_in_at?: string
           os?: string | null
+          os_name?: string | null
           revoked_at?: string | null
           risk_score?: number | null
+          session_token?: string | null
           session_token_hash: string
           user_agent?: string | null
           user_id: string
         }
         Update: {
           browser?: string | null
+          browser_name?: string | null
           created_at?: string
           device_fingerprint?: string | null
+          device_name?: string | null
           device_type?: string | null
           expired_at?: string | null
+          expires_at?: string | null
           id?: string
           ip_address?: unknown
+          is_active?: boolean
           is_current?: boolean
           is_trusted?: boolean
           last_active_at?: string
+          last_activity_at?: string
           location_city?: string | null
           location_country?: string | null
           location_lat?: number | null
           location_lng?: number | null
           logged_in_at?: string
           os?: string | null
+          os_name?: string | null
           revoked_at?: string | null
           risk_score?: number | null
+          session_token?: string | null
           session_token_hash?: string
           user_agent?: string | null
           user_id?: string
@@ -38190,6 +40623,53 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_deliveries: {
+        Row: {
+          attempts: number
+          created_at: string
+          delivered_at: string | null
+          event_type: string
+          id: string
+          payload: Json
+          response_body: string | null
+          response_status: number | null
+          success: boolean
+          webhook_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          response_body?: string | null
+          response_status?: number | null
+          success?: boolean
+          webhook_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          response_body?: string | null
+          response_status?: number | null
+          success?: boolean
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
             referencedColumns: ["id"]
           },
         ]
@@ -38278,6 +40758,81 @@ export type Database = {
             columns: ["webhook_id"]
             isOneToOne: false
             referencedRelation: "webhook_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhooks: {
+        Row: {
+          created_at: string
+          events: string[]
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string | null
+          secret: string
+          updated_at: string
+          url: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id?: string | null
+          secret: string
+          updated_at?: string
+          url: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string | null
+          secret?: string
+          updated_at?: string
+          url?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "webhooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -38487,6 +41042,184 @@ export type Database = {
             columns: ["trainer_id"]
             isOneToOne: false
             referencedRelation: "trainers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_execution_logs: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          input: Json | null
+          output: Json | null
+          started_at: string
+          status: string
+          step_index: number
+          step_type: string
+          workflow_run_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          input?: Json | null
+          output?: Json | null
+          started_at?: string
+          status: string
+          step_index: number
+          step_type: string
+          workflow_run_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          input?: Json | null
+          output?: Json | null
+          started_at?: string
+          status?: string
+          step_index?: number
+          step_type?: string
+          workflow_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_execution_logs_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          input_data: Json | null
+          output_data: Json | null
+          started_at: string | null
+          status: string
+          trigger_event: string | null
+          workflow_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_data?: Json | null
+          output_data?: Json | null
+          started_at?: string | null
+          status?: string
+          trigger_event?: string | null
+          workflow_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_data?: Json | null
+          output_data?: Json | null
+          started_at?: string | null
+          status?: string
+          trigger_event?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflows: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          organization_id: string
+          status: string
+          steps: Json | null
+          tags: string[] | null
+          trigger_config: Json | null
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          status?: string
+          steps?: Json | null
+          tags?: string[] | null
+          trigger_config?: Json | null
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          status?: string
+          steps?: Json | null
+          tags?: string[] | null
+          trigger_config?: Json | null
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflows_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "enterprise_tenant_usage_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "workflows_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "financial_org_billing_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "workflows_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_member_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "workflows_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_trainer_dashboard"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "workflows_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -38790,6 +41523,13 @@ export type Database = {
             referencedColumns: ["branch_id"]
           },
           {
+            foreignKeyName: "workout_programs_cloned_from_fkey"
+            columns: ["cloned_from"]
+            isOneToOne: false
+            referencedRelation: "workout_programs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "workout_programs_gym_id_fkey"
             columns: ["gym_id"]
             isOneToOne: false
@@ -38868,64 +41608,6 @@ export type Database = {
           },
           {
             foreignKeyName: "workout_programs_trainer_id_fkey"
-            columns: ["trainer_id"]
-            isOneToOne: false
-            referencedRelation: "trainers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      member_progress_photos: {
-        Row: {
-          created_at: string
-          gym_id: string | null
-          id: string
-          member_id: string
-          notes: string | null
-          photo_type: string
-          photo_url: string
-          recorded_on: string
-          trainer_id: string
-        }
-        Insert: {
-          created_at?: string
-          gym_id?: string | null
-          id?: string
-          member_id: string
-          notes?: string | null
-          photo_type: string
-          photo_url: string
-          recorded_on?: string
-          trainer_id: string
-        }
-        Update: {
-          created_at?: string
-          gym_id?: string | null
-          id?: string
-          member_id?: string
-          notes?: string | null
-          photo_type?: string
-          photo_url?: string
-          recorded_on?: string
-          trainer_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "member_progress_photos_gym_id_fkey"
-            columns: ["gym_id"]
-            isOneToOne: false
-            referencedRelation: "gyms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_progress_photos_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_progress_photos_trainer_id_fkey"
             columns: ["trainer_id"]
             isOneToOne: false
             referencedRelation: "trainers"
@@ -41490,6 +44172,15 @@ export type Database = {
       }
     }
     Functions: {
+      analyze_table_stats: {
+        Args: { table_name: string }
+        Returns: {
+          index_size: string
+          row_count: number
+          table_size: string
+          total_size: string
+        }[]
+      }
       apply_branch_scope_remediation: {
         Args: { p_actor_id?: string; p_branch_id: string }
         Returns: Json
@@ -41540,6 +44231,10 @@ export type Database = {
       branch_belongs_to_gym: {
         Args: { target_branch_id: string; target_gym_id: string }
         Returns: boolean
+      }
+      calculate_next_run: {
+        Args: { schedule_config: Json; schedule_type: string }
+        Returns: string
       }
       can_access_branch: {
         Args: { target_branch_id: string }
@@ -41612,6 +44307,19 @@ export type Database = {
         Args: { p_feature: string; p_organization_id: string }
         Returns: boolean
       }
+      check_storage_objects_rls_count: { Args: never; Returns: number }
+      check_tables_with_rls: {
+        Args: never
+        Returns: {
+          tablename: string
+        }[]
+      }
+      check_tables_without_rls: {
+        Args: { check_tables: string[] }
+        Returns: {
+          uncovered_table: string
+        }[]
+      }
       check_usage_limit: {
         Args: { limit_key: string; org_id: string }
         Returns: {
@@ -41620,6 +44328,7 @@ export type Database = {
           within_limit: boolean
         }[]
       }
+      cleanup_old_realtime_events: { Args: never; Returns: number }
       current_trainer_id: { Args: never; Returns: string }
       current_user_branch_id: { Args: never; Returns: string }
       current_user_gym_id: { Args: never; Returns: string }
@@ -41711,6 +44420,16 @@ export type Database = {
             }
             Returns: boolean
           }
+      find_missing_indexes: {
+        Args: never
+        Returns: {
+          attname: string
+          correlated: number
+          n_distinct: number
+          schemaname: string
+          tablename: string
+        }[]
+      }
       forecast_metric: {
         Args: {
           p_horizon_days?: number
@@ -41723,6 +44442,7 @@ export type Database = {
           forecast_value: number
         }[]
       }
+      generate_api_key: { Args: never; Returns: string }
       generate_credit_note_number: {
         Args: { target_gym_id: string }
         Returns: string
@@ -41748,6 +44468,7 @@ export type Database = {
         Args: { target_gym_id: string }
         Returns: string
       }
+      generate_webhook_secret: { Args: never; Returns: string }
       get_effective_organization_type: {
         Args: { org_id: string }
         Returns: string
@@ -41764,6 +44485,20 @@ export type Database = {
         Args: { org_id: string }
         Returns: number
       }
+      get_recent_2fa_failed_attempts: {
+        Args: { p_minutes?: number; p_user_id: string }
+        Returns: number
+      }
+      get_slow_queries: {
+        Args: { limit_count?: number }
+        Returns: {
+          calls: number
+          mean_time: number
+          query: string
+          rows: number
+          total_time: number
+        }[]
+      }
       get_top_loyalty_members: {
         Args: { limit_count?: number; org_id: string }
         Returns: {
@@ -41772,10 +44507,21 @@ export type Database = {
           member_id: string
         }[]
       }
+      get_unread_notification_count: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      get_user_data_summary: { Args: { p_user_id: string }; Returns: Json }
       gym_has_active_branches: { Args: { gym_id: string }; Returns: boolean }
       has_any_role: { Args: { role_names: string[] }; Returns: boolean }
       has_gym_admin_or_branch_manager_role: { Args: never; Returns: boolean }
       has_role: { Args: { role_name: string }; Returns: boolean }
+      hash_api_key: { Args: { p_key: string }; Returns: string }
+      is_account_locked: { Args: { p_email: string }; Returns: boolean }
+      is_ip_whitelisted: {
+        Args: { p_gym_id?: string; p_ip: string; p_org_id?: string }
+        Returns: boolean
+      }
       is_organization_owner: {
         Args: { target_organization_id: string }
         Returns: boolean
@@ -41817,6 +44563,10 @@ export type Database = {
           risk_score: number
           top_signals: string[]
         }[]
+      }
+      publish_realtime_event: {
+        Args: { p_channel: string; p_event_type: string; p_payload?: Json }
+        Returns: string
       }
       query_executive_kpis: {
         Args: { p_branch_id?: string; p_tenant_id?: string }
@@ -41892,10 +44642,28 @@ export type Database = {
         Args: { p_permissions: Json; p_role_id: string }
         Returns: undefined
       }
+      user_has_2fa_enabled: { Args: { p_user_id: string }; Returns: boolean }
+      validate_api_key: { Args: { p_key: string }; Returns: string }
       validate_gstin: { Args: { gstin: string }; Returns: boolean }
+      validate_password_strength: {
+        Args: { p_org_id?: string; p_password: string }
+        Returns: Json
+      }
     }
     Enums: {
-      [_ in never]: never
+      appointment_status:
+        | "scheduled"
+        | "confirmed"
+        | "completed"
+        | "cancelled"
+        | "no_show"
+      appointment_type:
+        | "consultation"
+        | "pt_session"
+        | "trial_session"
+        | "trainer_meeting"
+        | "follow_up"
+        | "general"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -42021,7 +44789,26 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  public: {
+  graphql_public: {
     Enums: {},
+  },
+  public: {
+    Enums: {
+      appointment_status: [
+        "scheduled",
+        "confirmed",
+        "completed",
+        "cancelled",
+        "no_show",
+      ],
+      appointment_type: [
+        "consultation",
+        "pt_session",
+        "trial_session",
+        "trainer_meeting",
+        "follow_up",
+        "general",
+      ],
+    },
   },
 } as const

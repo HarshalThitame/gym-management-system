@@ -93,6 +93,28 @@ export {
   revalidateOrganizationEntitlements,
 } from "./entitlement-service";
 
+export {
+  buildPortalNavFromEntitlements,
+  canAccessPortalHref,
+  denyHiddenFeatureRoute,
+  getPortalRouteGate,
+  mapHiddenFeatureApiDenial,
+  PORTAL_NAV_REGISTRY,
+  PORTAL_ROUTE_REGISTRY,
+  requirePortalFeatureAccess,
+  validatePortalRegistryFeatureKeys,
+} from "./portal-gates";
+
+export type { PortalKey, PortalVisibilityMode } from "./portal-gates";
+
+export {
+  CANONICAL_PACKAGE_TIERS,
+  normalizePackageTier,
+  normalizePackageTierOrFallback,
+} from "./package-tier";
+
+export type { CanonicalPackageTier } from "./package-tier";
+
 // ─── Auth context (Phase 3 — tenant safety) ────────────────────────────────
 export {
   getAuthenticatedUser,
