@@ -76,20 +76,20 @@ export async function getAppointmentDashboard(gymId: string, scope: AppointmentS
 
   if (firstError) throw new Error(firstError.message);
 
-  const today = await attachAppointmentDetails((todayResult.data ?? []) as AppointmentRow[]);
+  const todayAppts = await attachAppointmentDetails((todayResult.data ?? []) as AppointmentRow[]);
   const upcoming = await attachAppointmentDetails((upcomingResult.data ?? []) as AppointmentRow[]);
   const recent = await attachAppointmentDetails((recentResult.data ?? []) as AppointmentRow[]);
 
   return {
     metrics: {
-      todayAppointments: today.length,
+      todayAppointments: todayAppts.length,
       todayCompleted: completedResult.count ?? 0,
       todayCancelled: cancelledResult.count ?? 0,
       todayNoShows: noShowResult.count ?? 0,
       upcomingAppointments: upcomingResult.count ?? 0,
       pendingConfirmations: pendingConfirmationsResult.count ?? 0
     },
-    today,
+    today: todayAppts,
     upcoming,
     recent
   };
