@@ -108,20 +108,20 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   const isSuspended = planContext.isSuspended;
   const autoRenew = currentSubscription ? (currentSubscription as unknown as { auto_renew: boolean }).auto_renew : true;
 
-  // Get features from the package's _features enriched data
-  const currentPkgFeatures = useMemo(() => {
-    if (!currentSubscription?.package?._features) return {};
-    return currentSubscription.package._features;
-  }, [currentSubscription]);
-
-  const currentPkgLimits = useMemo(() => {
-    if (!currentSubscription?.package?._limits) return {};
-    return currentSubscription.package._limits;
-  }, [currentSubscription]);
-
   const currentPkg = currentSubscription
     ? allPackages.find((p) => p.id === currentSubscription.package_id) ?? null
     : null;
+
+  // Get features/limits from the enriched allPackages data (raw subscription has no _features)
+  const currentPkgFeatures = useMemo(() => {
+    if (!currentPkg?._features) return {};
+    return currentPkg._features;
+  }, [currentPkg]);
+
+  const currentPkgLimits = useMemo(() => {
+    if (!currentPkg?._limits) return {};
+    return currentPkg._limits;
+  }, [currentPkg]);
 
   const trialDaysRemaining = useMemo(() => {
     if (!planContext.trialEndsAt) return null;
