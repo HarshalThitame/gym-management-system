@@ -28,7 +28,9 @@ async function DashboardContent() {
 export default function OrganizationOwnerDashboardPage() {
   return (
     <Suspense fallback={<DashboardPageFallback />}>
-      <DashboardContent />
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <DashboardContent />
+      </div>
     </Suspense>
   );
 }

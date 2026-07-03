@@ -69,6 +69,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://bobqiyhljubfrzmhqnqq.supabase.co" />
+        <link rel="dns-prefetch" href="https://bobqiyhljubfrzmhqnqq.supabase.co" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`} style={tenantThemeStyle}>
         <a className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-accent focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-accent-foreground focus:shadow-lg focus:outline-none" href="#main-content" id="skip-link">
           Skip to content

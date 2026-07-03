@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, Lock } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { MobileBottomNav, type MobilePortalIconKey } from "@/components/pwa/mobile-bottom-nav";
 import { SignOutButton } from "@/components/pwa/sign-out-button";
@@ -15,6 +15,52 @@ import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import { cn } from "@/lib/utils";
 import type { AuthContext } from "@/types/auth";
 import { ProtectedPageCacheGuard } from "./protected-page-cache-guard";
+
+const NavItem = memo(function NavItem({ item, isActive, index, onClick }: { item: PortalNavItem; isActive: boolean; index: number; onClick?: () => void }) {
+  if (item.locked) {
+    return (
+      <div
+        className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
+        title={item.lockedReason}
+        style={{ animationDelay: `${index * 50}ms` }}
+      >
+        <Lock className="size-4 shrink-0" />
+        {item.icon}
+        {item.label}
+      </div>
+    );
+  }
+  return (
+    <Link
+      className={cn(
+        "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-all duration-300 card-hover relative overflow-hidden group animate-fade-in-left",
+        isActive
+          ? "bg-gradient-to-r from-accent/10 to-purple-600/10 text-primary shadow-glow-sm"
+          : "text-muted-foreground hover:bg-surface-muted/80 hover:text-foreground hover:shadow-glow-sm"
+      )}
+      href={item.href}
+      aria-current={isActive ? "page" : undefined}
+      onClick={onClick}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      {isActive && (
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent to-purple-600 rounded-r-full animate-pulse-glow" />
+      )}
+      <span className={cn(
+        "transition-all duration-300",
+        isActive ? "scale-110 text-accent" : "group-hover:scale-110 group-hover:text-accent"
+      )}>
+        {item.icon}
+      </span>
+      <span className="relative">
+        {item.label}
+        {isActive && (
+          <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-purple-600 rounded-full" />
+        )}
+      </span>
+    </Link>
+  );
+});
 
 export type PortalNavItem = {
   href: string;
@@ -135,43 +181,7 @@ export function PortalShell({
         </div>
         <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {navItems.map((item, index) => (
-            item.locked ? (
-              <div
-                key={`${item.href}-${item.label}`}
-                className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
-                title={item.lockedReason}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <Lock className="size-4 shrink-0" />
-                {item.icon}
-                {item.label}
-              </div>
-            ) : (
-              <Link
-                className={cn(
-                  "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-all duration-300 card-hover relative overflow-hidden group",
-                  isActiveItem(item.href) 
-                    ? "bg-gradient-to-r from-accent/10 to-purple-600/10 text-primary shadow-glow-sm" 
-                    : "text-muted-foreground hover:bg-surface-muted/80 hover:text-foreground hover:shadow-glow-sm"
-                )}
-                href={item.href}
-                key={`${item.href}-${item.label}`}
-                aria-current={isActiveItem(item.href) ? "page" : undefined}
-                onClick={closeSidebar}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                {isActiveItem(item.href) && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent to-purple-600 rounded-r-full" />
-                )}
-                <span className={cn(
-                  "transition-all duration-300",
-                  isActiveItem(item.href) ? "scale-110" : "group-hover:scale-110"
-                )}>
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </Link>
-            )
+            <NavItem key={`${item.href}-${item.label}`} item={item} isActive={isActiveItem(item.href)} index={index} onClick={closeSidebar} />
           ))}
         </nav>
         {showPlanIndicator && planContext ? (
@@ -196,53 +206,9 @@ export function PortalShell({
             {branchName ? <p className="mt-2 text-xs font-semibold text-muted-foreground">{branchName}</p> : null}
           </div>
           <nav aria-label="Portal" className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
-            {navItems.map((item, index) => {
-              const active = isActiveItem(item.href);
-              if (item.locked) {
-                return (
-                  <div
-                    key={`${item.href}-${item.label}`}
-                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-muted-foreground/50 cursor-not-allowed"
-                    title={item.lockedReason}
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <Lock className="size-4 shrink-0" />
-                    {item.icon}
-                    {item.label}
-                  </div>
-                );
-              }
-              return (
-                <Link
-                  className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-all duration-300 card-hover relative overflow-hidden group animate-fade-in-left",
-                    active 
-                      ? "bg-gradient-to-r from-accent/10 to-purple-600/10 text-primary shadow-glow-sm" 
-                      : "text-muted-foreground hover:bg-surface-muted/80 hover:text-foreground hover:shadow-glow-sm"
-                  )}
-                  href={item.href}
-                  key={`${item.href}-${item.label}`}
-                  aria-current={active ? "page" : undefined}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  {active && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent to-purple-600 rounded-r-full animate-pulse-glow" />
-                  )}
-                  <span className={cn(
-                    "transition-all duration-300",
-                    active ? "scale-110 text-accent" : "group-hover:scale-110 group-hover:text-accent"
-                  )}>
-                    {item.icon}
-                  </span>
-                  <span className="relative">
-                    {item.label}
-                    {active && (
-                      <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-purple-600 rounded-full" />
-                    )}
-                  </span>
-                </Link>
-              );
-            })}
+            {navItems.map((item, index) => (
+              <NavItem key={`${item.href}-${item.label}`} item={item} isActive={isActiveItem(item.href)} index={index} />
+            ))}
           </nav>
           {showPlanIndicator && planContext ? (
             <div className="border-t border-border/50 p-3">

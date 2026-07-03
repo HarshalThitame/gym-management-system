@@ -134,12 +134,14 @@ export default async function OrganizationOwnerModuleRoute({ params, searchParam
     <div className="space-y-6">
       <Breadcrumbs items={[{ href: "/organization", label: "Dashboard" }, { href: selectedModule.href, label: selectedModule.label }]} />
       <Suspense fallback={<ModulePageSkeleton />}>
-        <ModuleContentLoader
-          context={context}
-          module={selectedModule}
-          filters={filters}
-          moduleData={moduleResult.moduleData}
-        />
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <ModuleContentLoader
+            context={context}
+            module={selectedModule}
+            filters={filters}
+            moduleData={moduleResult.moduleData}
+          />
+        </div>
       </Suspense>
     </div>
   );
