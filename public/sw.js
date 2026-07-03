@@ -75,13 +75,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/api/")) {
-    event.respondWith(networkOnlyJson(request));
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(fetch(request));
     return;
   }
 
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(networkFirst(request, STATIC_CACHE));
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(networkOnlyJson(request));
     return;
   }
 
@@ -139,6 +139,10 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 async function handleNavigation(request, url) {
+  if (url.pathname.startsWith("/api/calendar/google/callback")) {
+    return fetch(request);
+  }
+
   if (isProtectedRoute(url.pathname)) {
     try {
       return await fetch(request);
@@ -190,24 +194,6 @@ async function cacheFirst(request, cacheName) {
     cache.put(request, response.clone());
   }
   return response;
-}
-
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    const cached = await cache.match(request);
-    if (cached) {
-      return cached;
-    }
-    throw new Error("Network request failed and no cache entry exists.");
-  }
 }
 
 async function staleWhileRevalidate(request, cacheName) {
