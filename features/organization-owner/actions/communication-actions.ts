@@ -308,7 +308,7 @@ export async function executeNetworkCampaignAction(
     const subject = (messageBody?.["email_subject"] ?? "Campaign Update") as string;
     const body = (messageBody?.[channel as string] ?? messageBody?.["body"] ?? "") as string;
 
-    const result = await sendViaChannel(channel, recipient, subject, body, emailConfig.from ?? undefined, emailConfig.replyTo ?? undefined);
+    const result = await sendViaChannel(organizationId, channel, recipient, subject, body, emailConfig.from ?? undefined, emailConfig.replyTo ?? undefined);
     if (result.ok) {
       sentCount++;
       if (deliveryId) {
@@ -408,10 +408,10 @@ export async function getOrganizationCampaignStatsAction(
 
   if (gymIds.length === 0) return { totalSent: 0, totalCampaigns: 0, avgEngagementRate: 0 };
 
-  const [campaignsRes, deliveriesRes] = await Promise.all([
-    supabase.from("campaigns").select("id, sent_count, delivered_count, opened_count").in("gym_id", gymIds),
-    supabase.from("campaign_deliveries").select("status").eq("organization_id", organizationId),
-  ]);
+  const campaignsRes = await supabase
+    .from("campaigns")
+    .select("id, sent_count, delivered_count, opened_count")
+    .in("gym_id", gymIds);
 
   const campaigns = campaignsRes.data ?? [];
   const totalSent = campaigns.reduce((sum, c) => sum + (c.sent_count ?? 0), 0);

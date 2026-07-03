@@ -2,6 +2,17 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrganizationFeatureAccess, hasFeatureAccess } from "@/features/entitlement";
+import type { Database } from "@/types/database";
+import {
+  createGoogleCalendarEvent,
+  deleteGoogleCalendarEvent as deleteGoogleCalendarProviderEvent,
+  exchangeGoogleCodeForTokens,
+  getGoogleCalendarAuthUrl,
+  type CalendarIntegrationRow,
+  testGoogleCalendarConnection,
+  updateGoogleCalendarEvent,
+  upsertGoogleCalendarTokens,
+} from "@/features/integrations/services/google-calendar-service";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -57,14 +68,12 @@ type SyncLogFilters = {
   pageSize?: number;
 };
 
-type UnsafeSupabase = {
-  // Local shim for newly added calendar tables that are not present in generated Database types yet.
-  // Regenerate types after applying the calendar migrations, then remove this cast.
-  from(table: string): any;
-};
+type CalendarDb = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+type CalendarIntegrationInsert = Database["public"]["Tables"]["calendar_integrations"]["Insert"];
+type CalendarIntegrationUpdate = Database["public"]["Tables"]["calendar_integrations"]["Update"];
 
-async function createCalendarDb() {
-  return (await createSupabaseServerClient()) as unknown as UnsafeSupabase;
+async function createCalendarDb(): Promise<CalendarDb> {
+  return createSupabaseServerClient();
 }
 
 // ─── Integration management ─────────────────────────────────────────────────
@@ -109,7 +118,7 @@ export async function saveCalendarConfig(
     .maybeSingle();
 
   if (existing) {
-    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const update: CalendarIntegrationUpdate = { updated_at: new Date().toISOString() };
     if (data.calendarId !== undefined) update.calendar_id = data.calendarId;
     if (data.syncEnabled !== undefined) update.sync_enabled = data.syncEnabled;
     if (data.syncClasses !== undefined) update.sync_classes = data.syncClasses;
@@ -126,7 +135,7 @@ export async function saveCalendarConfig(
     return updated as CalendarIntegration;
   }
 
-  const insert: Record<string, unknown> = {
+  const insert: CalendarIntegrationInsert = {
     organization_id: organizationId,
     provider: "google",
     sync_enabled: data.syncEnabled ?? false,
@@ -181,9 +190,53 @@ type ClassSessionForSync = {
   session_date: string;
   starts_at: string;
   ends_at: string;
+  location: string | null;
+  notes: string | null;
   classes: { name: string } | { name: string }[];
   primary_trainer_id: string | null;
 };
+
+const DEFAULT_CALENDAR_TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE?.trim() || "Asia/Kolkata";
+
+function getClassName(classes: ClassSessionForSync["classes"]) {
+  return Array.isArray(classes) ? classes[0]?.name ?? "Class Session" : classes?.name ?? "Class Session";
+}
+
+function buildCalendarDateTime(sessionDate: string, time: string) {
+  const normalized = time.length === 5 ? `${time}:00` : time;
+  return `${sessionDate}T${normalized}`;
+}
+
+function buildCalendarEventInput(session: ClassSessionForSync) {
+  const className = getClassName(session.classes);
+  return {
+    summary: className,
+    description: session.notes ?? `${className} session synced from gym operations.`,
+    location: session.location ?? undefined,
+    start: buildCalendarDateTime(session.session_date, session.starts_at),
+    end: buildCalendarDateTime(session.session_date, session.ends_at),
+    timeZone: DEFAULT_CALENDAR_TIMEZONE,
+  };
+}
+
+async function getLatestExternalEventId(
+  supabase: CalendarDb,
+  classSessionId: string,
+) {
+  const { data, error } = await supabase
+    .from("calendar_sync_logs")
+    .select("external_event_id")
+    .eq("class_session_id", classSessionId)
+    .in("event_type", ["create", "update"])
+    .eq("status", "success")
+    .not("external_event_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data?.external_event_id as string | null | undefined) ?? null;
+}
 
 export async function syncClassSessionToCalendar(
   organizationId: string,
@@ -203,7 +256,7 @@ export async function syncClassSessionToCalendar(
       .maybeSingle(),
     supabase
       .from("class_sessions")
-      .select("id, session_date, starts_at, ends_at, classes!inner(name), primary_trainer_id")
+      .select("id, session_date, starts_at, ends_at, location, notes, classes!inner(name), primary_trainer_id")
       .eq("id", classSessionId)
       .single(),
   ]);
@@ -220,16 +273,18 @@ export async function syncClassSessionToCalendar(
   }
 
   try {
-    // Stubbed: In production, this would call Google Calendar API
-    // with class name, time, etc. from the session.
-    const externalEventId = `stubbed-${classSessionId}-${Date.now()}`;
+    const existingEventId = await getLatestExternalEventId(supabase, classSessionId);
+    const eventInput = buildCalendarEventInput(session);
+    const event = existingEventId
+      ? await updateGoogleCalendarEvent(integration as CalendarIntegrationRow, existingEventId, eventInput)
+      : await createGoogleCalendarEvent(integration as CalendarIntegrationRow, eventInput);
 
     await supabase.from("calendar_sync_logs").insert({
       organization_id: organizationId,
       integration_id: integration.id,
-      event_type: "create",
+      event_type: existingEventId ? "update" : "create",
       class_session_id: classSessionId,
-      external_event_id: externalEventId,
+      external_event_id: event.id,
       status: "success",
     });
 
@@ -239,7 +294,7 @@ export async function syncClassSessionToCalendar(
       .update({ last_synced_at: new Date().toISOString() })
       .eq("id", integration.id);
 
-    return { synced: true, externalEventId };
+    return { synced: true, externalEventId: event.id };
   } catch (err) {
     await supabase.from("calendar_sync_logs").insert({
       organization_id: organizationId,
@@ -274,16 +329,20 @@ export async function deleteCalendarEvent(
   const integrationRow = integration as { id: string; sync_enabled: boolean };
 
   try {
-    // Stubbed: In production, this would call Google Calendar API to delete event
-    // const log = await supabase.from("calendar_sync_logs").select("external_event_id")
-    //   .eq("class_session_id", classSessionId).eq("event_type", "create").maybeSingle();
-    // if (log?.data?.external_event_id) await googleCalendar.events.delete({...});
+    const fullIntegration = await getCalendarIntegration(organizationId);
+    const externalEventId = await getLatestExternalEventId(supabase, classSessionId);
+    if (!fullIntegration || !externalEventId) {
+      return { deleted: false };
+    }
+
+    await deleteGoogleCalendarProviderEvent(fullIntegration as unknown as CalendarIntegrationRow, externalEventId);
 
     await supabase.from("calendar_sync_logs").insert({
       organization_id: organizationId,
       integration_id: integrationRow.id,
       event_type: "delete",
       class_session_id: classSessionId,
+      external_event_id: externalEventId,
       status: "success",
     });
 
@@ -321,7 +380,7 @@ export async function syncAllUpcomingClasses(
       .maybeSingle(),
     supabase
       .from("class_sessions")
-      .select("id, session_date, starts_at, ends_at, classes!inner(name), primary_trainer_id")
+      .select("id, session_date, starts_at, ends_at, location, notes, classes!inner(name), primary_trainer_id")
       .gte("session_date", new Date().toISOString().split("T")[0])
       .in("status", ["scheduled"])
       .order("session_date", { ascending: true }),
@@ -340,15 +399,18 @@ export async function syncAllUpcomingClasses(
 
   for (const session of sessions) {
     try {
-      // In production, className would be extracted and used for the calendar event title.
-      const externalEventId = `stubbed-${session.id}-${Date.now()}`;
+      const existingEventId = await getLatestExternalEventId(supabase, session.id);
+      const eventInput = buildCalendarEventInput(session);
+      const event = existingEventId
+        ? await updateGoogleCalendarEvent(integration as CalendarIntegrationRow, existingEventId, eventInput)
+        : await createGoogleCalendarEvent(integration as CalendarIntegrationRow, eventInput);
 
       await supabase.from("calendar_sync_logs").insert({
         organization_id: organizationId,
         integration_id: integration.id,
-        event_type: "create",
+        event_type: existingEventId ? "update" : "create",
         class_session_id: session.id,
-        external_event_id: externalEventId,
+        external_event_id: event.id,
         status: "success",
       });
       synced++;
@@ -418,9 +480,15 @@ export async function getGoogleAuthUrl(
     actionName: "calendar.get_auth_url",
   });
 
-  // Stubbed: when Google OAuth credentials are configured, build the consent URL
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/calendar/google/callback`;
-  return `https://accounts.google.com/o/oauth2/v2/auth?client_id=PLACEHOLDER&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=https://www.googleapis.com/auth/calendar.events&access_type=offline&prompt=consent`;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("You must be signed in to connect Google Calendar.");
+  }
+
+  return getGoogleCalendarAuthUrl({ organizationId, userId: user.id });
 }
 
 export async function handleGoogleCallback(
@@ -433,56 +501,23 @@ export async function handleGoogleCallback(
     actionName: "calendar.handle_callback",
   });
 
-  const supabase = await createCalendarDb();
+  const existing = await getCalendarIntegration(organizationId);
+  const authSupabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await authSupabase.auth.getUser();
+  const tokens = await exchangeGoogleCodeForTokens(code);
+  const record = await upsertGoogleCalendarTokens({
+    organizationId,
+    userId: user?.id ?? existing?.connected_by ?? "organization-owner",
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresInSeconds: tokens.expires_in,
+  });
 
-  // Stubbed: exchange code for tokens via Google OAuth2 API
-  // const tokens = await exchangeCodeForTokens(code);
-  const placeholderTokens = {
-    access_token: `placeholder-access-${code.slice(0, 8)}`,
-    refresh_token: `placeholder-refresh-${code.slice(0, 8)}`,
-    expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-  };
-
-  const { data: existing } = await supabase
-    .from("calendar_integrations")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .eq("provider", "google")
-    .maybeSingle();
-
-  if (existing) {
-    const { data: updated, error } = await supabase
-      .from("calendar_integrations")
-      .update({
-        access_token: placeholderTokens.access_token,
-        refresh_token: placeholderTokens.refresh_token,
-        token_expires_at: placeholderTokens.expires_at,
-        sync_enabled: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id)
-      .select("*")
-      .single();
-
-    if (error) throw new Error(error.message);
-    return updated as CalendarIntegration;
-  }
-
-  const { data: created, error } = await supabase
-    .from("calendar_integrations")
-    .insert({
-      organization_id: organizationId,
-      provider: "google",
-      access_token: placeholderTokens.access_token,
-      refresh_token: placeholderTokens.refresh_token,
-      token_expires_at: placeholderTokens.expires_at,
-      sync_enabled: true,
-    })
-    .select("*")
-    .single();
-
-  if (error) throw new Error(error.message);
-  return created as CalendarIntegration;
+  const verified = record as CalendarIntegrationRow;
+  await testGoogleCalendarConnection(verified);
+  return record as unknown as CalendarIntegration;
 }
 
 // ─── Trainer calendar connections ───────────────────────────────────────────

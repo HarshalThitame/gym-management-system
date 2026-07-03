@@ -1,15 +1,40 @@
+import type { IntegrationProviderId } from "../services/integrations-service";
+
 export type IntegrationProvider = {
-  id: string;
+  id: IntegrationProviderId;
   label: string;
   description: string;
   icon: string;
+  category: "payments" | "calendar" | "whatsapp" | "sms";
 };
 
 export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
-  { id: "stripe", label: "Stripe", description: "Payment processing & subscriptions", icon: "credit-card" },
-  { id: "slack", label: "Slack", description: "Team notifications & alerts", icon: "message-square" },
-  { id: "zoom", label: "Zoom", description: "Virtual classes & meetings", icon: "video" },
-  { id: "google-calendar", label: "Google Calendar", description: "Schedule sync & availability", icon: "calendar-days" },
-  { id: "mailchimp", label: "Mailchimp", description: "Email marketing automation", icon: "mail" },
-  { id: "twilio", label: "Twilio", description: "SMS notifications & alerts", icon: "message-circle" },
+  {
+    id: "razorpay",
+    label: "Razorpay",
+    description: "UPI, cards, subscriptions, refunds, and webhook-backed payment operations.",
+    icon: "credit-card",
+    category: "payments",
+  },
+  {
+    id: "google_calendar",
+    label: "Google Calendar",
+    description: "Real schedule sync for classes and operational calendar visibility.",
+    icon: "calendar-days",
+    category: "calendar",
+  },
+  {
+    id: "msg91_whatsapp",
+    label: "MSG91 WhatsApp",
+    description: "Template-based WhatsApp delivery for campaigns, reminders, and member updates.",
+    icon: "message-square",
+    category: "whatsapp",
+  },
+  {
+    id: "msg91_sms",
+    label: "MSG91 SMS",
+    description: "India-first SMS delivery using approved MSG91 flow templates and DLT-aware routing.",
+    icon: "message-circle",
+    category: "sms",
+  },
 ];
