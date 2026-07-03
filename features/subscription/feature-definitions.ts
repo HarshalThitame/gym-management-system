@@ -57,6 +57,7 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
       { key: "corporateBulkMemberships", label: "Corporate / bulk memberships", description: "Company tie-ups for employee memberships, company-level invoicing", featureCode: "corporate_bulk_memberships", isNewInEnterprise: true },
       { key: "multiGstinSupport", label: "Multi-GSTIN support", description: "Each branch can have its own GST number", featureCode: "multi_gstin_support", isNewInEnterprise: true },
       { key: "branchRevenueSplit", label: "Revenue split across branches", description: "Track and split collections branch-wise for P&L", featureCode: "branch_revenue_split", isNewInEnterprise: true },
+      { key: "receipts", label: "Payment receipts", description: "Generate and send payment receipts to members", featureCode: "receipts" },
     ],
   },
   {
@@ -88,6 +89,8 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
       { key: "trainerManagement", label: "Trainer profile", description: "Bio, certifications, photo on member portal", featureCode: "trainer_management" },
       { key: "trainerCommissionsPayroll", label: "Trainer commission tracking", description: "Auto-calculate earnings per PT session or class", featureCode: "trainer_commissions_payroll", isNewInGrowth: true },
       { key: "payrollExport", label: "Payroll export", description: "Export salary and commission report as CSV/PDF", featureCode: "payroll_export", isNewInGrowth: true },
+      { key: "workoutAssignment", label: "Workout assignment", description: "Assign workout plans to members from trainer dashboard", featureCode: "workout_assignment", isNewInGrowth: true },
+      { key: "nutritionPlans", label: "Nutrition plans", description: "Create and assign diet/nutrition plans to members", featureCode: "nutrition_plans", isNewInGrowth: true },
       { key: "customRolesGranularPermissions", label: "Custom roles & granular permissions", description: "Build custom roles: Branch Head, Franchise Manager, Regional Manager", featureCode: "custom_roles_granular_permissions", isNewInEnterprise: true },
       { key: "staffAttendanceLeaveTracking", label: "Staff attendance & leave tracking", description: "Clock-in/out, leave requests, monthly attendance reports", featureCode: "staff_attendance_leave", isNewInEnterprise: true },
       { key: "multiBranchStaffAssignment", label: "Multi-branch staff assignment", description: "Assign staff to one or multiple branches", featureCode: "multi_branch_staff_assignment", isNewInEnterprise: true },
@@ -105,6 +108,7 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
       { key: "birthdayGreetings", label: "Birthday greetings", description: "Auto WhatsApp on member birthday", featureCode: "birthday_greetings" },
       { key: "broadcastMessages", label: "WhatsApp broadcast", description: "Bulk messages to all members or segments", featureCode: "broadcast_messages", isNewInGrowth: true },
       { key: "emailCampaigns", label: "Email campaigns", description: "Templates for offers, renewals, events", featureCode: "email_campaigns", isNewInGrowth: true },
+      { key: "customEmailDomain", label: "Custom email domain", description: "Send emails from your own domain via DNS verification", featureCode: "custom_email_domain", isNewInEnterprise: true },
       { key: "leadManagement", label: "Lead / enquiry management", description: "Capture walk-in and online enquiries", featureCode: "lead_management", isNewInGrowth: true },
       { key: "leadFollowupReminders", label: "Follow-up reminders", description: "Call/visit reminders, lead pipeline", featureCode: "lead_followup_reminders", isNewInGrowth: true },
       { key: "reEngagementAutomation", label: "Re-engagement automation", description: "Auto-message inactive members", featureCode: "re_engagement_automation", isNewInGrowth: true },
@@ -164,6 +168,7 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
       { key: "restApiAccess", label: "REST API access", description: "Full API for custom integrations", featureCode: "rest_api_access", isNewInEnterprise: true },
       { key: "tallyZohoBooksIntegration", label: "Tally / Zoho Books integration", description: "Sync revenue, GST, expenses with accounting", featureCode: "tally_zoho_books_integration", isNewInEnterprise: true },
       { key: "webhookSupport", label: "Webhook support", description: "Push events: new member, payment, check-in, renewal", featureCode: "webhooks", isNewInEnterprise: true },
+      { key: "auditLogs", label: "Audit logs", description: "Full activity log for compliance and security monitoring", featureCode: "audit_logs", isNewInEnterprise: true },
     ],
   },
   {
