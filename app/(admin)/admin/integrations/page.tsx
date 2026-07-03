@@ -1,14 +1,18 @@
-import { getIntegrationDashboardAction } from "@/features/integrations/actions/integrations-actions";
-import { IntegrationsGrid } from "@/features/integrations/components/integrations-grid";
+import { redirect } from "next/navigation";
+import { requireRole } from "@/lib/auth/guards";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const metadata = { title: "Integrations", description: "Enterprise integration control hub" };
+export const metadata = { title: "Integrations", description: "Integration management" };
 
 export default async function IntegrationsPage() {
-  let dashboard: Awaited<ReturnType<typeof getIntegrationDashboardAction>> | null = null;
-  try {
-    dashboard = await getIntegrationDashboardAction();
-  } catch {}
+  const context = await requireRole(["organization_owner", "gym_admin", "super_admin"], "/admin/integrations");
+
+  const isOwner = context.roles.includes("organization_owner");
+  const isSuperAdmin = context.roles.includes("super_admin");
+
+  if (isOwner || isSuperAdmin) {
+    redirect("/organization/integrations");
+  }
 
   return (
     <div className="space-y-8">
@@ -20,38 +24,28 @@ export default async function IntegrationsPage() {
               Enterprise Control Hub
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Manage production-ready payment, calendar, SMS, and WhatsApp providers with live validation, operational visibility, and provider-specific controls.
+              Manage production-ready payment, calendar, SMS, and WhatsApp providers.
             </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border/60 bg-background/90 px-4 py-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Providers</p>
-              <p className="mt-2 text-2xl font-black">4</p>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/90 px-4 py-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Runtime</p>
-              <p className="mt-2 text-2xl font-black">Live</p>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/90 px-4 py-3">
-              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">Mode</p>
-              <p className="mt-2 text-2xl font-black">India-first</p>
-            </div>
           </div>
         </div>
       </section>
 
       <Card variant="elevated" className="border-border/70">
         <CardHeader className="border-b border-border/60 bg-surface/70">
-          <CardTitle>Operational Providers</CardTitle>
+          <CardTitle>Access Restricted</CardTitle>
         </CardHeader>
         <CardContent>
-          {dashboard ? (
-            <IntegrationsGrid dashboard={dashboard} />
-          ) : (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-700">
-              Failed to load integration health. Check provider environment variables and database connectivity.
-            </div>
-          )}
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-700">
+            <p className="font-bold mb-1">Integration management has moved</p>
+            <p>
+              Integration setup and management is now available in the{" "}
+              <a href="/organization/integrations" className="underline font-semibold">Organization Owner workspace</a>.
+              Only organization owners can configure integrations.
+            </p>
+            <p className="mt-2">
+              Contact your organization owner if you need to update any integration settings.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

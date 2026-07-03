@@ -275,7 +275,11 @@ export function getMaskedIntegrationStatus(record: IntegrationRow | null): Maske
         label: record.label ?? "Razorpay",
         errorMessage: record.error_message,
         lastActivityAt: record.last_sync_at ?? record.updated_at,
-        maskedConfig: {},
+        maskedConfig: {
+          keyId: maskSecret(typeof credentials.keyId === "string" ? credentials.keyId : null, 8),
+          environment: typeof config.environment === "string" ? config.environment : null,
+          webhookSecret: typeof credentials.webhookSecret === "string" ? "Configured" : null,
+        },
       };
     case "google_calendar":
       return {

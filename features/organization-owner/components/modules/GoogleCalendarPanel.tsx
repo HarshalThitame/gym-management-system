@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, CheckCircle2, ExternalLink, Link2, Plug, RefreshCw, Trash2, Wrench, UserRound } from "lucide-react";
+import { Calendar, CheckCircle2, ExternalLink, Plug, RefreshCw, Trash2, Wrench } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { showToast } from "@/components/ui/toast";
-import type { CalendarIntegration, CalendarSyncLog, TrainerCalendarConnection } from "@/features/organization-owner/actions/calendar-actions";
+import type { CalendarIntegration, CalendarSyncLog } from "@/features/organization-owner/actions/calendar-actions";
 import {
   getCalendarIntegration,
   saveCalendarConfig,
@@ -15,9 +15,6 @@ import {
   syncAllUpcomingClasses,
   getSyncLogs,
   getGoogleAuthUrl,
-  getTrainerCalendarConnections,
-  connectTrainerCalendar,
-  disconnectTrainerCalendar,
 } from "@/features/organization-owner/actions/calendar-actions";
 import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
 
@@ -28,7 +25,7 @@ type GoogleCalendarPanelProps = {
 
 export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPanelProps) {
   const orgId = dashboard.organization.id;
-  const [activeTab, setActiveTab] = useState<"connection" | "logs" | "trainers">("connection");
+  const [activeTab, setActiveTab] = useState<"connection" | "logs">("connection");
   const [integration, setIntegration] = useState<CalendarIntegration | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -38,7 +35,6 @@ export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPan
   const [logStatusFilter, setLogStatusFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [trainerConnections, setTrainerConnections] = useState<TrainerCalendarConnection[]>([]);
 
   const fetchIntegration = useCallback(async () => {
     try {
@@ -64,23 +60,14 @@ export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPan
     }
   }, [orgId, logStatusFilter, dateFrom, dateTo, logPage]);
 
-  const fetchTrainers = useCallback(async () => {
-    try {
-      const result = await getTrainerCalendarConnections(orgId);
-      setTrainerConnections(result);
-    } catch {
-      setTrainerConnections([]);
-    }
-  }, [orgId]);
-
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchIntegration(), fetchLogs(), fetchTrainers()]);
+      await Promise.all([fetchIntegration(), fetchLogs()]);
       setLoading(false);
     };
     load();
-  }, [fetchIntegration, fetchLogs, fetchTrainers]);
+  }, [fetchIntegration, fetchLogs]);
 
   if (!hasFeature) {
     return (
@@ -100,15 +87,11 @@ export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPan
     );
   }
 
-  const trainerMap = new Map(
-    dashboard.trainers.map((t) => [t.id, t.display_name ?? t.id]),
-  );
-
   return (
     <div className="space-y-6">
       {/* Tab Bar */}
       <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 flex-wrap" role="tablist">
-        {(["connection", "logs", "trainers"] as const).map((tab) => (
+        {(["connection", "logs"] as const).map((tab) => (
           <button
             key={tab}
             className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${
@@ -121,7 +104,7 @@ export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPan
             aria-selected={activeTab === tab}
             type="button"
           >
-            {tab === "connection" ? "Connection" : tab === "logs" ? "Sync Logs" : "Trainer Connections"}
+            {tab === "connection" ? "Connection" : "Sync Logs"}
           </button>
         ))}
       </div>
@@ -153,16 +136,6 @@ export function GoogleCalendarPanel({ dashboard, hasFeature }: GoogleCalendarPan
         />
       )}
 
-      {/* Trainer Connections Tab */}
-      {activeTab === "trainers" && (
-        <TrainerConnectionsTab
-          orgId={orgId}
-          trainers={dashboard.trainers}
-          connections={trainerConnections}
-          trainerMap={trainerMap}
-          onRefresh={fetchTrainers}
-        />
-      )}
     </div>
   );
 }
@@ -208,16 +181,14 @@ function ConnectionTab({
 
   const handleConnect = async () => {
     try {
-      // Redirect to Google OAuth consent URL (stubbed for now)
-      const authUrl = await getGoogleAuthUrl(orgId);
-      showToast("Opening Google OAuth...", "success");
-      window.open(authUrl, "_blank");
-      // Store placeholder config
-      await saveCalendarConfig(orgId, {
-        syncEnabled: true,
-        syncClasses: true,
-      });
-      await onRefresh();
+      const result = await getGoogleAuthUrl(orgId);
+      if (result.status === "error" || !result.authUrl) {
+        showToast(result.message, "error");
+        return;
+      }
+
+      showToast(result.message, "success");
+      window.open(result.authUrl, "_blank");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to connect.", "error");
     }
@@ -264,7 +235,7 @@ function ConnectionTab({
               <div className="rounded-lg border border-dashed border-border bg-surface-muted p-6 text-center">
                 <Plug className="mx-auto size-8 text-muted-foreground" />
                 <p className="mt-3 text-sm font-semibold">Not connected</p>
-                <p className="mt-1 text-xs text-muted-foreground">Connect your Google Calendar to auto-sync class schedules.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Connect your organization Google Calendar to auto-sync class schedules. Trainer personal calendars are not part of this phase.</p>
                 <Button className="mt-4" onClick={handleConnect}>
                   <ExternalLink className="mr-2 size-4" /> Connect Google Calendar
                 </Button>
@@ -522,107 +493,6 @@ function LogsTab({
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function TrainerConnectionsTab({
-  orgId,
-  trainers,
-  connections,
-  trainerMap,
-  onRefresh,
-}: {
-  orgId: string;
-  trainers: Array<{ id: string; display_name?: string; full_name?: string }>;
-  connections: TrainerCalendarConnection[];
-  trainerMap: Map<string, string>;
-  onRefresh: () => Promise<void>;
-}) {
-  const handleConnect = async (trainerId: string) => {
-    try {
-      await connectTrainerCalendar(orgId, trainerId);
-      showToast("Trainer calendar connected.", "success");
-      await onRefresh();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to connect.", "error");
-    }
-  };
-
-  const handleDisconnect = async (trainerId: string) => {
-    try {
-      await disconnectTrainerCalendar(orgId, trainerId);
-      showToast("Trainer calendar disconnected.", "success");
-      await onRefresh();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to disconnect.", "error");
-    }
-  };
-
-  const connectionByTrainer = new Map(connections.map((c) => [c.trainer_id, c]));
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <h3 className="text-lg font-black">Trainer Calendar Connections</h3>
-          <p className="text-sm text-muted-foreground">Manage individual trainer Google Calendar connections for personal schedule sync</p>
-        </CardHeader>
-        <CardContent>
-          {trainers.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-surface-muted p-6 text-center">
-              <UserRound className="mx-auto size-8 text-muted-foreground" />
-              <p className="mt-3 text-sm font-semibold text-muted-foreground">No trainers</p>
-              <p className="mt-1 text-xs text-muted-foreground">Add trainers to manage their calendar connections.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-surface-muted">
-                  <tr>
-                    <th className="px-4 py-3 text-xs font-bold text-muted-foreground">Trainer</th>
-                    <th className="px-4 py-3 text-xs font-bold text-muted-foreground">Status</th>
-                    <th className="px-4 py-3 text-xs font-bold text-muted-foreground">Calendar ID</th>
-                    <th className="px-4 py-3 text-xs font-bold text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trainers.map((trainer) => {
-                    const conn = connectionByTrainer.get(trainer.id);
-                    const isConnected = conn?.sync_enabled ?? false;
-                    return (
-                      <tr key={trainer.id} className="border-t border-border hover:bg-surface">
-                        <td className="px-4 py-2.5 text-xs font-medium">
-                          {trainerMap.get(trainer.id) ?? "Unknown"}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <Badge variant={isConnected ? "success" : "neutral"}>
-                            {isConnected ? "Connected" : "Disconnected"}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
-                          {conn?.calendar_id ?? "—"}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {isConnected ? (
-                            <Button variant="ghost" size="sm" onClick={() => handleDisconnect(trainer.id)} className="text-red-600 hover:text-red-700">
-                              <Trash2 className="mr-1 size-3" /> Disconnect
-                            </Button>
-                          ) : (
-                            <Button variant="secondary" size="sm" onClick={() => handleConnect(trainer.id)}>
-                              <Link2 className="mr-1 size-3" /> Connect
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

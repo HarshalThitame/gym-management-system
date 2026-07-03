@@ -3,10 +3,12 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrganizationFeatureAccess, hasFeatureAccess } from "@/features/entitlement";
 import type { Database } from "@/types/database";
+import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import {
   createGoogleCalendarEvent,
   deleteGoogleCalendarEvent as deleteGoogleCalendarProviderEvent,
   exchangeGoogleCodeForTokens,
+  getGoogleOAuthConfigurationStatus,
   getGoogleCalendarAuthUrl,
   type CalendarIntegrationRow,
   testGoogleCalendarConnection,
@@ -53,6 +55,12 @@ export type TrainerCalendarConnection = {
   updated_at: string;
 };
 
+export type GoogleCalendarAuthResult = {
+  status: "success" | "error";
+  message: string;
+  authUrl?: string;
+};
+
 type CalendarConfigInput = {
   calendarId?: string;
   syncEnabled?: boolean;
@@ -74,6 +82,15 @@ type CalendarIntegrationUpdate = Database["public"]["Tables"]["calendar_integrat
 
 async function createCalendarDb(): Promise<CalendarDb> {
   return createSupabaseServerClient();
+}
+
+async function requireCalendarOwnerContext(organizationId: string, nextPath = "/organization/settings") {
+  const context = await requireOrganizationOwner(nextPath);
+  if (context.organizationId !== organizationId) {
+    throw new Error("You do not have access to manage this organization calendar.");
+  }
+
+  return context;
 }
 
 // ─── Integration management ─────────────────────────────────────────────────
@@ -103,6 +120,7 @@ export async function saveCalendarConfig(
   organizationId: string,
   data: CalendarConfigInput,
 ): Promise<CalendarIntegration> {
+  await requireCalendarOwnerContext(organizationId);
   await requireOrganizationFeatureAccess({
     organizationId,
     featureKey: "google_calendar_sync",
@@ -155,6 +173,7 @@ export async function saveCalendarConfig(
 }
 
 export async function disconnectCalendar(organizationId: string): Promise<void> {
+  await requireCalendarOwnerContext(organizationId);
   await requireOrganizationFeatureAccess({
     organizationId,
     featureKey: "google_calendar_sync",
@@ -363,6 +382,7 @@ export async function deleteCalendarEvent(
 export async function syncAllUpcomingClasses(
   organizationId: string,
 ): Promise<{ synced: number; failed: number; errors: string[] }> {
+  await requireCalendarOwnerContext(organizationId);
   await requireOrganizationFeatureAccess({
     organizationId,
     featureKey: "google_calendar_sync",
@@ -436,6 +456,7 @@ export async function getSyncLogs(
   organizationId: string,
   filters?: SyncLogFilters,
 ): Promise<{ logs: CalendarSyncLog[]; total: number }> {
+  await requireCalendarOwnerContext(organizationId);
   await requireOrganizationFeatureAccess({
     organizationId,
     featureKey: "google_calendar_sync",
@@ -473,22 +494,34 @@ export async function getSyncLogs(
 
 export async function getGoogleAuthUrl(
   organizationId: string,
-): Promise<string> {
+): Promise<GoogleCalendarAuthResult> {
+  const context = await requireCalendarOwnerContext(organizationId);
   await requireOrganizationFeatureAccess({
     organizationId,
     featureKey: "google_calendar_sync",
     actionName: "calendar.get_auth_url",
   });
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error("You must be signed in to connect Google Calendar.");
+  const oauthStatus = getGoogleOAuthConfigurationStatus();
+  if (!oauthStatus.configured) {
+    return {
+      status: "error",
+      message: oauthStatus.message ?? "Google Calendar OAuth is not configured.",
+    };
   }
 
-  return getGoogleCalendarAuthUrl({ organizationId, userId: user.id });
+  if (!context.userId) {
+    return {
+      status: "error",
+      message: "Unable to resolve the current organization owner identity for Google OAuth.",
+    };
+  }
+
+  return {
+    status: "success",
+    message: "Opening Google OAuth...",
+    authUrl: getGoogleCalendarAuthUrl({ organizationId, userId: context.userId }),
+  };
 }
 
 export async function handleGoogleCallback(

@@ -18,6 +18,13 @@ type GoogleCalendarEvent = {
   htmlLink?: string;
 };
 
+export type GoogleOAuthConfigurationStatus = {
+  configured: boolean;
+  callbackUrl: string | null;
+  missing: string[];
+  message: string | null;
+};
+
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_BASE_URL = "https://www.googleapis.com/calendar/v3";
@@ -53,9 +60,41 @@ function getStateSigningSecret() {
   );
 }
 
+export function getGoogleOAuthConfigurationStatus(): GoogleOAuthConfigurationStatus {
+  const missing: string[] = [];
+
+  if (!getGoogleClientId()) {
+    missing.push("GOOGLE_CLIENT_ID");
+  }
+
+  if (!getGoogleClientSecret()) {
+    missing.push("GOOGLE_CLIENT_SECRET");
+  }
+
+  if (!getAppBaseUrl()) {
+    missing.push("NEXT_PUBLIC_SITE_URL or APP_URL");
+  }
+
+  if (!getStateSigningSecret()) {
+    missing.push("GOOGLE_OAUTH_STATE_SECRET");
+  }
+
+  const callbackUrl = getAppBaseUrl() ? getCallbackUrl() : null;
+
+  return {
+    configured: missing.length === 0,
+    callbackUrl,
+    missing,
+    message: missing.length > 0
+      ? `Google Calendar OAuth is not configured. Missing: ${missing.join(", ")}.`
+      : null,
+  };
+}
+
 function ensureGoogleOAuthConfigured() {
-  if (!getGoogleClientId() || !getGoogleClientSecret() || !getCallbackUrl()) {
-    throw new Error("Google Calendar OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and app base URL env vars.");
+  const status = getGoogleOAuthConfigurationStatus();
+  if (!status.configured) {
+    throw new Error(status.message ?? "Google Calendar OAuth is not configured.");
   }
 }
 

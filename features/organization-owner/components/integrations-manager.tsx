@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import {
@@ -13,27 +12,29 @@ import {
   MessageSquare,
   RefreshCw,
   ShieldAlert,
-  Wrench,
+  UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { showToast } from "@/components/ui/toast";
-import type { IntegrationDashboardData } from "../actions/integrations-actions";
-import type { IntegrationProviderId } from "../services/integrations-service";
+import type { IntegrationDashboardData } from "../actions/integration-actions";
+import type { IntegrationProviderId } from "@/features/integrations/services/integrations-service";
 import {
-  disconnectGoogleCalendarIntegrationAction,
-  disconnectProviderIntegrationAction,
-  getGoogleCalendarAuthUrlAction,
-  saveGoogleCalendarConfigAction,
-  saveMsg91SmsIntegrationAction,
-  saveMsg91WhatsAppIntegrationAction,
-  testGoogleCalendarIntegrationAction,
-  testMsg91SmsIntegrationAction,
-  testMsg91WhatsAppIntegrationAction,
-  testRazorpayIntegrationAction,
-} from "../actions/integrations-actions";
+  disconnectOrgGoogleCalendarIntegrationAction,
+  disconnectOrgProviderIntegrationAction,
+  getOrgGoogleCalendarAuthUrlAction,
+  saveOrgGoogleCalendarConfigAction,
+  saveOrgMsg91SmsIntegrationAction,
+  saveOrgMsg91WhatsAppIntegrationAction,
+  saveOrgRazorpayIntegrationAction,
+  testOrgGoogleCalendarIntegrationAction,
+  testOrgMsg91SmsIntegrationAction,
+  testOrgMsg91WhatsAppIntegrationAction,
+  testOrgRazorpayIntegrationAction,
+  disconnectOrgRazorpayIntegrationAction,
+} from "../actions/integration-actions";
 
 type Props = {
   dashboard: IntegrationDashboardData;
@@ -51,56 +52,55 @@ type ProviderFormState = {
   calendarId?: string;
   syncClasses?: boolean;
   syncPtSessions?: boolean;
+  keyId?: string;
+  keySecret?: string;
+  webhookSecret?: string;
+  label?: string;
 };
 
-const ICON_MAP = {
+const ICON_MAP: Record<IntegrationProviderId, ReactNode> = {
   razorpay: <CreditCard className="size-5" />,
   google_calendar: <CalendarDays className="size-5" />,
   msg91_whatsapp: <MessageSquare className="size-5" />,
   msg91_sms: <MessageCircle className="size-5" />,
-} satisfies Record<IntegrationProviderId, ReactNode>;
+};
 
-export function IntegrationsGrid({ dashboard }: Props) {
+export function IntegrationsManager({ dashboard }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
-  const initialForms = useMemo<Record<IntegrationProviderId, ProviderFormState>>(() => ({
-    razorpay: {},
+
+  const initialForms = useMemo<Record<string, ProviderFormState>>(() => ({
+    razorpay: {
+      label: String(dashboard.items.find((i) => i.provider === "razorpay")?.configSummary.label ?? "Razorpay"),
+    },
     google_calendar: {
-      calendarId: String(dashboard.items.find((item) => item.provider === "google_calendar")?.configSummary.calendarId ?? "primary"),
-      syncClasses: dashboard.items.find((item) => item.provider === "google_calendar")?.configSummary.syncClasses !== false,
-      syncPtSessions: dashboard.items.find((item) => item.provider === "google_calendar")?.configSummary.syncPtSessions === true,
+      calendarId: String(dashboard.items.find((i) => i.provider === "google_calendar")?.configSummary.calendarId ?? "primary"),
+      syncClasses: dashboard.items.find((i) => i.provider === "google_calendar")?.configSummary.syncClasses !== false,
+      syncPtSessions: dashboard.items.find((i) => i.provider === "google_calendar")?.configSummary.syncPtSessions === true,
     },
     msg91_sms: {
-      flowId: String(dashboard.items.find((item) => item.provider === "msg91_sms")?.configSummary.flowId ?? ""),
-      senderId: String(dashboard.items.find((item) => item.provider === "msg91_sms")?.configSummary.senderId ?? ""),
-      testMobile: String(dashboard.items.find((item) => item.provider === "msg91_sms")?.configSummary.testMobile ?? ""),
+      flowId: String(dashboard.items.find((i) => i.provider === "msg91_sms")?.configSummary.flowId ?? ""),
+      senderId: String(dashboard.items.find((i) => i.provider === "msg91_sms")?.configSummary.senderId ?? ""),
+      testMobile: String(dashboard.items.find((i) => i.provider === "msg91_sms")?.configSummary.testMobile ?? ""),
     },
     msg91_whatsapp: {
-      integratedNumber: String(dashboard.items.find((item) => item.provider === "msg91_whatsapp")?.configSummary.integratedNumber ?? ""),
-      templateName: String(dashboard.items.find((item) => item.provider === "msg91_whatsapp")?.configSummary.templateName ?? ""),
+      integratedNumber: String(dashboard.items.find((i) => i.provider === "msg91_whatsapp")?.configSummary.integratedNumber ?? ""),
+      templateName: String(dashboard.items.find((i) => i.provider === "msg91_whatsapp")?.configSummary.templateName ?? ""),
       namespace: "",
       languageCode: "en",
-      testMobile: String(dashboard.items.find((item) => item.provider === "msg91_whatsapp")?.configSummary.testMobile ?? ""),
+      testMobile: String(dashboard.items.find((i) => i.provider === "msg91_whatsapp")?.configSummary.testMobile ?? ""),
     },
   }), [dashboard.items]);
-  const [forms, setForms] = useState<Record<IntegrationProviderId, ProviderFormState>>(initialForms);
 
-  const setField = <K extends IntegrationProviderId>(provider: K, patch: Partial<ProviderFormState>) => {
-    setForms((prev) => ({
-      ...prev,
-      [provider]: {
-        ...prev[provider],
-        ...patch,
-      },
-    }));
+  type FormState = Record<IntegrationProviderId, ProviderFormState>;
+  const [forms, setForms] = useState<FormState>(initialForms as FormState);
+
+  const setField = (provider: IntegrationProviderId, patch: Partial<ProviderFormState>) => {
+    setForms((prev) => ({ ...prev, [provider]: { ...prev[provider], ...patch } }));
   };
 
-  const refresh = () => {
-    startTransition(() => {
-      router.refresh();
-    });
-  };
+  const refresh = () => startTransition(() => router.refresh());
 
   const runAction = async (provider: string, fn: () => Promise<{ status: "success" | "error"; message: string }>) => {
     setBusyProvider(provider);
@@ -115,7 +115,7 @@ export function IntegrationsGrid({ dashboard }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         {dashboard.items.map((item) => (
           <Card key={item.provider} variant="elevated" className="overflow-hidden border-border/70">
             <CardHeader className="border-b border-border/60 bg-gradient-to-r from-surface to-surface-muted/70">
@@ -134,12 +134,22 @@ export function IntegrationsGrid({ dashboard }: Props) {
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
                   </div>
                 </div>
-                <Badge variant="neutral">{item.managedBy === "env" ? "Environment" : "Admin Hub"}</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-5 p-5">
+              {item.provider === "razorpay" && item.configSummary && Object.keys(item.configSummary).length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {Object.entries(item.configSummary).map(([key, value]) => (
+                    <div key={key} className="rounded-2xl border border-border/60 bg-background/80 p-3">
+                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">{formatLabel(key)}</p>
+                      <p className="mt-2 text-sm font-bold text-foreground">{formatValue(value)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="grid gap-3 sm:grid-cols-2">
-                {Object.entries(item.configSummary).map(([key, value]) => (
+                {Object.entries(item.configSummary).filter(([k]) => item.provider !== "razorpay" || k === "").map(([key, value]) => (
                   <div key={key} className="rounded-2xl border border-border/60 bg-background/80 p-3">
                     <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">{formatLabel(key)}</p>
                     <p className="mt-2 text-sm font-bold text-foreground">{formatValue(value)}</p>
@@ -160,10 +170,11 @@ export function IntegrationsGrid({ dashboard }: Props) {
                     <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Last activity</p>
                     <p className="mt-1 text-sm font-semibold text-foreground">{item.lastActivityAt ? new Date(item.lastActivityAt).toLocaleString("en-IN") : "No activity yet"}</p>
                   </div>
-                  {item.deepLink ? (
-                    <Link href={item.deepLink} className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
-                      Open module <ExternalLink className="size-4" />
-                    </Link>
+                  {item.whoConnected ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <UserRound className="size-3" />
+                      <span>Connected by {item.whoConnected}</span>
+                    </div>
                   ) : null}
                 </div>
                 {item.latestLogMessage ? (
@@ -172,6 +183,24 @@ export function IntegrationsGrid({ dashboard }: Props) {
                   </p>
                 ) : null}
               </div>
+
+              {item.provider === "razorpay" ? (
+                <RazorpayConfigForm
+                  state={forms.razorpay}
+                  onChange={(patch) => setField("razorpay", patch)}
+                  onSave={() => runAction("razorpay:save", async () => {
+                    const form = new FormData();
+                    form.set("keyId", forms.razorpay.keyId ?? "");
+                    form.set("keySecret", forms.razorpay.keySecret ?? "");
+                    form.set("webhookSecret", forms.razorpay.webhookSecret ?? "");
+                    form.set("label", forms.razorpay.label ?? "Razorpay");
+                    return saveOrgRazorpayIntegrationAction(form);
+                  })}
+                  onTest={() => runAction("razorpay:test", testOrgRazorpayIntegrationAction)}
+                  onDisconnect={item.status !== "disconnected" ? () => runAction("razorpay:disconnect", disconnectOrgRazorpayIntegrationAction) : null}
+                  loading={busyProvider?.startsWith("razorpay:") || isPending}
+                />
+              ) : null}
 
               {item.provider === "msg91_sms" ? (
                 <SmsConfigForm
@@ -183,7 +212,7 @@ export function IntegrationsGrid({ dashboard }: Props) {
                     form.set("flowId", forms.msg91_sms.flowId ?? "");
                     form.set("senderId", forms.msg91_sms.senderId ?? "");
                     form.set("testMobile", forms.msg91_sms.testMobile ?? "");
-                    return saveMsg91SmsIntegrationAction(form);
+                    return saveOrgMsg91SmsIntegrationAction(form);
                   })}
                   onTest={() => runAction("msg91_sms:test", async () => {
                     const form = new FormData();
@@ -191,10 +220,10 @@ export function IntegrationsGrid({ dashboard }: Props) {
                     form.set("flowId", forms.msg91_sms.flowId ?? "");
                     form.set("senderId", forms.msg91_sms.senderId ?? "");
                     form.set("testMobile", forms.msg91_sms.testMobile ?? "");
-                    return testMsg91SmsIntegrationAction(form);
+                    return testOrgMsg91SmsIntegrationAction(form);
                   })}
-                  onDisconnect={item.status !== "disconnected" ? () => runAction("msg91_sms:disconnect", () => disconnectProviderIntegrationAction("msg91_sms")) : null}
-                  loading={busyProvider === "msg91_sms:save" || busyProvider === "msg91_sms:test" || busyProvider === "msg91_sms:disconnect" || isPending}
+                  onDisconnect={item.status !== "disconnected" ? () => runAction("msg91_sms:disconnect", () => disconnectOrgProviderIntegrationAction("msg91_sms")) : null}
+                  loading={busyProvider?.startsWith("msg91_sms:") || isPending}
                 />
               ) : null}
 
@@ -210,7 +239,7 @@ export function IntegrationsGrid({ dashboard }: Props) {
                     form.set("templateName", forms.msg91_whatsapp.templateName ?? "");
                     form.set("languageCode", forms.msg91_whatsapp.languageCode ?? "en");
                     form.set("testMobile", forms.msg91_whatsapp.testMobile ?? "");
-                    return saveMsg91WhatsAppIntegrationAction(form);
+                    return saveOrgMsg91WhatsAppIntegrationAction(form);
                   })}
                   onTest={() => runAction("msg91_whatsapp:test", async () => {
                     const form = new FormData();
@@ -220,10 +249,10 @@ export function IntegrationsGrid({ dashboard }: Props) {
                     form.set("templateName", forms.msg91_whatsapp.templateName ?? "");
                     form.set("languageCode", forms.msg91_whatsapp.languageCode ?? "en");
                     form.set("testMobile", forms.msg91_whatsapp.testMobile ?? "");
-                    return testMsg91WhatsAppIntegrationAction(form);
+                    return testOrgMsg91WhatsAppIntegrationAction(form);
                   })}
-                  onDisconnect={item.status !== "disconnected" ? () => runAction("msg91_whatsapp:disconnect", () => disconnectProviderIntegrationAction("msg91_whatsapp")) : null}
-                  loading={busyProvider === "msg91_whatsapp:save" || busyProvider === "msg91_whatsapp:test" || busyProvider === "msg91_whatsapp:disconnect" || isPending}
+                  onDisconnect={item.status !== "disconnected" ? () => runAction("msg91_whatsapp:disconnect", () => disconnectOrgProviderIntegrationAction("msg91_whatsapp")) : null}
+                  loading={busyProvider?.startsWith("msg91_whatsapp:") || isPending}
                 />
               ) : null}
 
@@ -236,17 +265,16 @@ export function IntegrationsGrid({ dashboard }: Props) {
                     form.set("calendarId", forms.google_calendar.calendarId ?? "primary");
                     form.set("syncClasses", String(forms.google_calendar.syncClasses !== false));
                     form.set("syncPtSessions", String(forms.google_calendar.syncPtSessions === true));
-                    return saveGoogleCalendarConfigAction(form);
+                    return saveOrgGoogleCalendarConfigAction(form);
                   })}
                   onConnect={async () => {
                     setBusyProvider("google_calendar:connect");
                     try {
-                      const result = await getGoogleCalendarAuthUrlAction();
+                      const result = await getOrgGoogleCalendarAuthUrlAction();
                       if (result.status === "error" || !result.authUrl) {
                         showToast(result.message, "error");
                         return;
                       }
-
                       window.open(result.authUrl, "_blank", "noopener,noreferrer");
                       showToast(result.message, "info");
                     } catch (err) {
@@ -255,56 +283,57 @@ export function IntegrationsGrid({ dashboard }: Props) {
                       setBusyProvider(null);
                     }
                   }}
-                  onTest={() => runAction("google_calendar:test", testGoogleCalendarIntegrationAction)}
-                  onDisconnect={item.status !== "disconnected" ? () => runAction("google_calendar:disconnect", disconnectGoogleCalendarIntegrationAction) : null}
+                  onTest={() => runAction("google_calendar:test", testOrgGoogleCalendarIntegrationAction)}
+                  onDisconnect={item.status !== "disconnected" ? () => runAction("google_calendar:disconnect", disconnectOrgGoogleCalendarIntegrationAction) : null}
                   loading={busyProvider?.startsWith("google_calendar:") || isPending}
-                  blockedReason={item.actionBlockedReason ?? null}
+                  blockedReason={item.status === "error" && item.errorMessage?.includes("OAuth") ? item.errorMessage : null}
                 />
-              ) : null}
-
-              {item.provider === "razorpay" ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    loading={busyProvider === "razorpay:test" || isPending}
-                    size="sm"
-                    variant="accent"
-                    onClick={() => runAction("razorpay:test", testRazorpayIntegrationAction)}
-                  >
-                    <CheckCircle2 className="size-4" />
-                    Validate Razorpay
-                  </Button>
-                  <p className="text-xs text-muted-foreground">Razorpay is environment-managed in this deployment. Use this card to verify live readiness.</p>
-                </div>
               ) : null}
             </CardContent>
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
 
-      <div className="rounded-3xl border border-border/70 bg-gradient-to-r from-surface to-surface-muted/70 p-5">
-        <div className="flex items-start gap-3">
-          <div className="rounded-2xl bg-primary/10 p-3 text-primary">
-            <Wrench className="size-5" />
-          </div>
-          <div>
-            <h3 className="text-lg font-black">Operational Notes</h3>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              SMS and WhatsApp are template-driven providers. Keep approved MSG91 flow/template setup aligned with campaign message variables. Google Calendar requires OAuth completion in the popup window before test and sync actions can succeed.
-            </p>
-          </div>
-        </div>
+function RazorpayConfigForm({
+  state, onChange, onSave, onTest, onDisconnect, loading,
+}: {
+  state: ProviderFormState;
+  onChange: (patch: Partial<ProviderFormState>) => void;
+  onSave: () => void;
+  onTest: () => void;
+  onDisconnect: (() => void) | null;
+  loading: boolean;
+}) {
+  return (
+    <div className="space-y-3 rounded-2xl border border-border/60 bg-background/75 p-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input placeholder="Razorpay Key ID" value={state.keyId ?? ""} onChange={(e) => onChange({ keyId: e.target.value })} />
+        <Input placeholder="Razorpay Key Secret" type="password" value={state.keySecret ?? ""} onChange={(e) => onChange({ keySecret: e.target.value })} />
+        <Input placeholder="Webhook Secret (optional)" type="password" value={state.webhookSecret ?? ""} onChange={(e) => onChange({ webhookSecret: e.target.value })} />
+        <Input placeholder="Account label (optional)" value={state.label ?? "Razorpay"} onChange={(e) => onChange({ label: e.target.value })} />
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <Button loading={loading} size="sm" variant="secondary" onClick={onSave}>Save credentials</Button>
+        <Button loading={loading} size="sm" variant="accent" onClick={onTest}>
+          <CheckCircle2 className="size-4" />
+          Test connection
+        </Button>
+        {onDisconnect ? (
+          <Button loading={loading} size="sm" variant="ghost" onClick={onDisconnect}>
+            <Link2Off className="size-4" />
+            Disconnect
+          </Button>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function SmsConfigForm({
-  state,
-  onChange,
-  onSave,
-  onTest,
-  onDisconnect,
-  loading,
+  state, onChange, onSave, onTest, onDisconnect, loading,
 }: {
   state: ProviderFormState;
   onChange: (patch: Partial<ProviderFormState>) => void;
@@ -336,12 +365,7 @@ function SmsConfigForm({
 }
 
 function WhatsAppConfigForm({
-  state,
-  onChange,
-  onSave,
-  onTest,
-  onDisconnect,
-  loading,
+  state, onChange, onSave, onTest, onDisconnect, loading,
 }: {
   state: ProviderFormState;
   onChange: (patch: Partial<ProviderFormState>) => void;
@@ -375,14 +399,7 @@ function WhatsAppConfigForm({
 }
 
 function GoogleCalendarForm({
-  state,
-  onChange,
-  onSave,
-  onConnect,
-  onTest,
-  onDisconnect,
-  loading,
-  blockedReason,
+  state, onChange, onSave, onConnect, onTest, onDisconnect, loading, blockedReason,
 }: {
   state: ProviderFormState;
   onChange: (patch: Partial<ProviderFormState>) => void;
@@ -401,28 +418,28 @@ function GoogleCalendarForm({
         </div>
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input disabled={Boolean(blockedReason)} placeholder="Calendar ID" value={state.calendarId ?? "primary"} onChange={(e) => onChange({ calendarId: e.target.value })} />
+        <Input placeholder="Calendar ID" value={state.calendarId ?? "primary"} onChange={(e) => onChange({ calendarId: e.target.value })} />
         <label className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-semibold">
-          <input disabled={Boolean(blockedReason)} checked={state.syncClasses !== false} type="checkbox" onChange={(e) => onChange({ syncClasses: e.target.checked })} />
+          <input checked={state.syncClasses !== false} type="checkbox" onChange={(e) => onChange({ syncClasses: e.target.checked })} />
           Sync classes
         </label>
         <label className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-semibold">
-          <input disabled={Boolean(blockedReason)} checked={state.syncPtSessions === true} type="checkbox" onChange={(e) => onChange({ syncPtSessions: e.target.checked })} />
+          <input checked={state.syncPtSessions === true} type="checkbox" onChange={(e) => onChange({ syncPtSessions: e.target.checked })} />
           Sync PT sessions
         </label>
       </div>
       <div className="flex flex-wrap gap-3">
-        <Button disabled={Boolean(blockedReason)} loading={loading} size="sm" variant="secondary" onClick={onSave}>Save config</Button>
-        <Button disabled={Boolean(blockedReason)} loading={loading} size="sm" variant="accent" onClick={onConnect}>
+        <Button loading={loading} size="sm" variant="secondary" onClick={onSave}>Save config</Button>
+        <Button loading={loading} size="sm" variant="accent" onClick={onConnect}>
           <ExternalLink className="size-4" />
           Connect Google
         </Button>
-        <Button disabled={Boolean(blockedReason)} loading={loading} size="sm" variant="secondary" onClick={onTest}>
+        <Button loading={loading} size="sm" variant="secondary" onClick={onTest}>
           <RefreshCw className="size-4" />
           Test calendar
         </Button>
         {onDisconnect ? (
-          <Button disabled={Boolean(blockedReason)} loading={loading} size="sm" variant="ghost" onClick={onDisconnect}>
+          <Button loading={loading} size="sm" variant="ghost" onClick={onDisconnect}>
             <Link2Off className="size-4" />
             Disconnect
           </Button>
@@ -433,10 +450,7 @@ function GoogleCalendarForm({
 }
 
 function formatLabel(value: string) {
-  return value
-    .replace(/([A-Z])/g, " $1")
-    .replace(/_/g, " ")
-    .trim();
+  return value.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim();
 }
 
 function formatValue(value: string | boolean | null) {

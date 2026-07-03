@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { writeAuditLog } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
@@ -15,28 +14,28 @@ import {
   type IntegrationConnectionStatus,
   type IntegrationProviderId,
   upsertProviderIntegration,
-} from "../services/integrations-service";
+} from "@/features/integrations/services/integrations-service";
 import {
   getGoogleOAuthConfigurationStatus,
   getGoogleCalendarAuthUrl,
   type CalendarIntegrationRow,
   testGoogleCalendarConnection,
-} from "../services/google-calendar-service";
+} from "@/features/integrations/services/google-calendar-service";
 import {
   testMsg91Sms,
   testMsg91WhatsApp,
   validateMsg91SmsConfig,
   validateMsg91WhatsAppConfig,
-} from "../services/msg91-service";
-import {
-  getRazorpayHealthStatus,
-  validateRazorpayEnvironmentConfig,
-} from "@/features/billing/razorpay/razorpay-health";
-import { getRazorpayConfig } from "@/features/billing/razorpay/razorpay-config";
+} from "@/features/integrations/services/msg91-service";
+import { getOrgOwnerContext } from "./action-utils";
+
+type DbClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 export type IntegrationActionResult = {
   status: "success" | "error";
   message: string;
+  fieldErrors?: Record<string, string>;
+  redirectUrl?: string;
 };
 
 export type IntegrationDashboardItem = {
@@ -44,7 +43,6 @@ export type IntegrationDashboardItem = {
   title: string;
   description: string;
   category: "payments" | "calendar" | "whatsapp" | "sms";
-  managedBy: "admin_hub" | "env";
   status: IntegrationConnectionStatus;
   statusLabel: string;
   actionLabel: string;
@@ -54,8 +52,7 @@ export type IntegrationDashboardItem = {
   latestLogMessage: string | null;
   latestLogStatus: string | null;
   latestLogAt: string | null;
-  deepLink: string | null;
-  actionBlockedReason?: string | null;
+  whoConnected: string | null;
 };
 
 export type IntegrationDashboardData = {
@@ -79,8 +76,6 @@ type CalendarIntegrationRecord = {
   updated_at: string | null;
 };
 
-type IntegrationDb = Awaited<ReturnType<typeof createSupabaseServerClient>>;
-
 function mapStatusLabel(status: IntegrationConnectionStatus) {
   switch (status) {
     case "connected":
@@ -94,35 +89,25 @@ function mapStatusLabel(status: IntegrationConnectionStatus) {
   }
 }
 
-async function getSupabaseDb(): Promise<IntegrationDb> {
+async function getSupabaseDb(): Promise<DbClient> {
   return createSupabaseServerClient();
 }
 
-async function getAdminIntegrationContext() {
-  const scope = await requireGymAdminScope("/admin/integrations");
-  const organizationId = scope.scopedOrganizationId ?? scope.organizationId;
-  if (!organizationId || !scope.userId) {
-    throw new Error("Admin integration context is incomplete.");
-  }
+type OrgActionContext = {
+  organizationId: string;
+  userId: string;
+};
 
+async function getOrgIntegrationContext(nextPath: string): Promise<OrgActionContext> {
+  const ctx = await getOrgOwnerContext(nextPath);
+  if (!ctx.userId) {
+    throw new Error("User not authenticated.");
+  }
   return {
-    organizationId,
-    userId: scope.userId,
-    roles: scope.roles,
+    organizationId: ctx.organizationId,
+    userId: ctx.userId,
   };
 }
-
-function canManageGoogleCalendar(roles: string[]) {
-  return roles.includes("organization_owner");
-}
-
-function getGoogleCalendarOwnerOnlyMessage() {
-  return "Only the organization owner can connect, reconnect, or change the organization Google Calendar.";
-}
-
-export type GoogleCalendarAuthUrlActionResult = IntegrationActionResult & {
-  authUrl?: string;
-};
 
 async function getCalendarIntegrationRecord(organizationId: string) {
   const supabase = await getSupabaseDb();
@@ -164,28 +149,9 @@ async function syncGoogleCalendarIntegrationRecord(organizationId: string, userI
   return record;
 }
 
-async function syncRazorpayIntegrationRecord(organizationId: string, userId: string, status: IntegrationConnectionStatus, message: string | null) {
-  return upsertProviderIntegration({
-    organizationId,
-    provider: "razorpay",
-    label: "Razorpay",
-    createdBy: userId,
-    config: {
-      environment: getRazorpayHealthStatus().environment,
-    },
-    status,
-    errorMessage: message,
-    lastSyncAt: new Date().toISOString(),
-  });
-}
-
 async function buildLatestLog(integrationId: string | null) {
   if (!integrationId) {
-    return {
-      latestLogMessage: null,
-      latestLogStatus: null,
-      latestLogAt: null,
-    };
+    return { latestLogMessage: null, latestLogStatus: null, latestLogAt: null };
   }
 
   const latestLog = await getLatestIntegrationLog(integrationId);
@@ -200,43 +166,31 @@ function toDashboardItem(
   base: Omit<IntegrationDashboardItem, "latestLogMessage" | "latestLogStatus" | "latestLogAt">,
   log: { latestLogMessage: string | null; latestLogStatus: string | null; latestLogAt: string | null },
 ): IntegrationDashboardItem {
-  return {
-    ...base,
-    ...log,
-  };
+  return { ...base, ...log };
 }
 
-export async function getIntegrationsAction() {
-  const { organizationId } = await getAdminIntegrationContext();
-  return getIntegrations(organizationId);
-}
-
-export async function getIntegrationDashboardAction(): Promise<IntegrationDashboardData> {
-  const { organizationId, userId, roles } = await getAdminIntegrationContext();
+export async function getOrgIntegrationsAction(): Promise<IntegrationDashboardData> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const integrations = await getIntegrations(organizationId);
   const byProvider = new Map(integrations.map((row) => [row.provider, row] as const));
 
   const smsStatus = getMaskedIntegrationStatus(byProvider.get("msg91_sms") ?? null);
   const whatsappStatus = getMaskedIntegrationStatus(byProvider.get("msg91_whatsapp") ?? null);
+  const razorpayRecord = byProvider.get("razorpay");
+  const razorpayStatus = getMaskedIntegrationStatus(razorpayRecord ?? null);
   const calendarMirror = await syncGoogleCalendarIntegrationRecord(organizationId, userId);
   const calendarStatus = getMaskedIntegrationStatus(calendarMirror);
   const googleOauthStatus = getGoogleOAuthConfigurationStatus();
-  const googleManagementBlockedReason = !googleOauthStatus.configured
-    ? googleOauthStatus.message
-    : !canManageGoogleCalendar(roles)
-      ? getGoogleCalendarOwnerOnlyMessage()
-      : null;
 
-  const razorpayHealth = getRazorpayHealthStatus();
-  const razorpayValidation = validateRazorpayEnvironmentConfig();
-  const razorpayStatusValue: IntegrationConnectionStatus = razorpayValidation.valid ? "connected" : "error";
-  const razorpayRecord = await syncRazorpayIntegrationRecord(
-    organizationId,
-    userId,
-    razorpayStatusValue,
-    razorpayValidation.errors[0] ?? null,
-  );
-  const razorpayStatus = getMaskedIntegrationStatus(razorpayRecord);
+  let razorpayConnectionInfo: { whoConnected: string | null } = { whoConnected: null };
+  if (razorpayRecord) {
+    const { data: profile } = await (await getSupabaseDb())
+      .from("profiles")
+      .select("full_name")
+      .eq("id", razorpayRecord.created_by)
+      .maybeSingle();
+    razorpayConnectionInfo = { whoConnected: (profile as { full_name?: string } | null)?.full_name ?? razorpayRecord.created_by };
+  }
 
   const [smsLog, whatsappLog, calendarLog, razorpayLog] = await Promise.all([
     buildLatestLog(smsStatus?.record?.id ?? null),
@@ -251,76 +205,209 @@ export async function getIntegrationDashboardAction(): Promise<IntegrationDashbo
       toDashboardItem({
         provider: "razorpay",
         title: "Razorpay",
-        description: "Local payment gateway health and webhook readiness.",
+        description: "Your organization's payment gateway for collecting member payments, subscriptions, and fees.",
         category: "payments",
-        managedBy: "env",
-        status: razorpayStatus?.status ?? "error",
-        statusLabel: razorpayValidation.valid
-          ? `Connected (${razorpayHealth.environment ?? "configured"})`
-          : "Needs attention",
-        actionLabel: "Validate",
-        errorMessage: razorpayValidation.errors[0] ?? null,
+        status: razorpayStatus?.status ?? "disconnected",
+        statusLabel: mapStatusLabel(razorpayStatus?.status ?? "disconnected"),
+        actionLabel: razorpayStatus?.status === "connected" ? "Validate" : "Connect Razorpay",
+        errorMessage: razorpayStatus?.errorMessage ?? null,
         lastActivityAt: razorpayStatus?.lastActivityAt ?? null,
-        configSummary: {
-          environment: razorpayHealth.environment,
-          publicKey: razorpayHealth.hasKeyId ? "Configured" : "Missing",
-          webhookSecret: razorpayHealth.hasWebhookSecret,
-        },
-        deepLink: "/admin/payments",
+        configSummary: razorpayStatus?.maskedConfig ?? {},
+        whoConnected: razorpayConnectionInfo.whoConnected,
       }, razorpayLog),
       toDashboardItem({
         provider: "google_calendar",
         title: "Google Calendar",
-        description: "OAuth-based calendar sync for class scheduling.",
+        description: "OAuth-based calendar sync for class scheduling across your organization.",
         category: "calendar",
-        managedBy: "admin_hub",
         status: !googleOauthStatus.configured ? "error" : calendarStatus?.status ?? "disconnected",
         statusLabel: !googleOauthStatus.configured
           ? "Platform setup required"
           : mapStatusLabel(calendarStatus?.status ?? "disconnected"),
-        actionLabel: googleManagementBlockedReason
-          ? "Read only"
+        actionLabel: !googleOauthStatus.configured
+          ? "Platform blocked"
           : calendarStatus?.status === "connected" ? "Test calendar" : "Connect Google",
         errorMessage: calendarStatus?.errorMessage ?? googleOauthStatus.message ?? null,
         lastActivityAt: calendarStatus?.lastActivityAt ?? null,
         configSummary: calendarStatus?.maskedConfig ?? {},
-        deepLink: null,
-        actionBlockedReason: googleManagementBlockedReason,
+        whoConnected: null,
       }, calendarLog),
       toDashboardItem({
         provider: "msg91_whatsapp",
         title: "MSG91 WhatsApp",
-        description: "Template-based WhatsApp delivery using your approved MSG91 setup.",
+        description: "Template-based WhatsApp delivery for campaigns, reminders, and member updates.",
         category: "whatsapp",
-        managedBy: "admin_hub",
         status: whatsappStatus?.status ?? "disconnected",
         statusLabel: mapStatusLabel(whatsappStatus?.status ?? "disconnected"),
         actionLabel: "Save and test",
         errorMessage: whatsappStatus?.errorMessage ?? null,
         lastActivityAt: whatsappStatus?.lastActivityAt ?? null,
         configSummary: whatsappStatus?.maskedConfig ?? {},
-        deepLink: "/admin/communications",
+        whoConnected: null,
       }, whatsappLog),
       toDashboardItem({
         provider: "msg91_sms",
         title: "MSG91 SMS",
-        description: "DLT/flow-based SMS delivery for campaigns and operational alerts.",
+        description: "India-first SMS delivery using approved MSG91 flow templates and DLT-aware routing.",
         category: "sms",
-        managedBy: "admin_hub",
         status: smsStatus?.status ?? "disconnected",
         statusLabel: mapStatusLabel(smsStatus?.status ?? "disconnected"),
         actionLabel: "Save and test",
         errorMessage: smsStatus?.errorMessage ?? null,
         lastActivityAt: smsStatus?.lastActivityAt ?? null,
         configSummary: smsStatus?.maskedConfig ?? {},
-        deepLink: "/admin/communications",
+        whoConnected: null,
       }, smsLog),
     ],
   };
 }
 
-export async function saveMsg91SmsIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
-  const { organizationId, userId } = await getAdminIntegrationContext();
+export async function saveOrgRazorpayIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
+
+  const keyId = String(formData.get("keyId") ?? "").trim();
+  const keySecret = String(formData.get("keySecret") ?? "").trim();
+  const webhookSecret = String(formData.get("webhookSecret") ?? "").trim();
+  const label = String(formData.get("label") ?? "Razorpay").trim() || "Razorpay";
+
+  const fieldErrors: Record<string, string> = {};
+  if (!keyId) fieldErrors.keyId = "Razorpay Key ID is required.";
+  if (!keySecret) fieldErrors.keySecret = "Razorpay Key Secret is required.";
+  if (Object.keys(fieldErrors).length > 0) {
+    return { status: "error", message: "Please fill in all required fields.", fieldErrors };
+  }
+
+  const env = keyId.startsWith("rzp_live_") ? "live" : "test";
+  const expectedPrefix = env === "live" ? "rzp_live_" : "rzp_test_";
+  if (!keyId.startsWith(expectedPrefix)) {
+    return { status: "error", message: `Key ID does not look like a ${env} mode key. Expected prefix: ${expectedPrefix}`, fieldErrors: { keyId: `Must start with ${expectedPrefix}` } };
+  }
+
+  await upsertProviderIntegration({
+    organizationId,
+    provider: "razorpay",
+    label,
+    createdBy: userId,
+    credentials: { keyId, keySecret, webhookSecret },
+    config: { environment: env },
+    status: "disconnected",
+    errorMessage: null,
+  });
+
+  await writeAuditLog({
+    actorId: userId,
+    action: "organization_owner.integration.razorpay.saved",
+    entityType: "integration",
+    metadata: { provider: "razorpay" },
+  });
+
+  revalidatePath("/organization/integrations");
+  return { status: "success", message: "Razorpay credentials saved." };
+}
+
+export async function testOrgRazorpayIntegrationAction(): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
+
+  const integration = await getIntegrationByProvider(organizationId, "razorpay");
+  if (!integration) {
+    return { status: "error", message: "Razorpay is not configured. Save your credentials first." };
+  }
+
+  const credentials = integration.credentials as Record<string, unknown> | null;
+  const keyId = typeof credentials?.keyId === "string" ? credentials.keyId : "";
+  const keySecret = typeof credentials?.keySecret === "string" ? credentials.keySecret : "";
+
+  if (!keyId || !keySecret) {
+    return { status: "error", message: "Razorpay credentials are incomplete. Please reconfigure." };
+  }
+
+  try {
+    const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+    const response = await fetch("https://api.razorpay.com/v1/payments?count=1", {
+      headers: { authorization: `Basic ${auth}` },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Razorpay validation failed with status ${response.status}.`);
+    }
+
+    await upsertProviderIntegration({
+      organizationId,
+      provider: "razorpay",
+      label: integration.label ?? "Razorpay",
+      createdBy: userId,
+      credentials: integration.credentials as Record<string, unknown>,
+      config: integration.config as Record<string, unknown>,
+      status: "connected",
+      errorMessage: null,
+      lastSyncAt: new Date().toISOString(),
+    });
+
+    const record = await getIntegrationByProvider(organizationId, "razorpay");
+    if (record) {
+      await createIntegrationLog({
+        integration_id: record.id,
+        action: "razorpay.test",
+        status: "success",
+      });
+    }
+
+    revalidatePath("/organization/integrations");
+    return { status: "success", message: "Razorpay credentials validated successfully." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay validation failed.";
+
+    await upsertProviderIntegration({
+      organizationId,
+      provider: "razorpay",
+      label: integration.label ?? "Razorpay",
+      createdBy: userId,
+      credentials: integration.credentials as Record<string, unknown>,
+      config: integration.config as Record<string, unknown>,
+      status: "error",
+      errorMessage: message,
+      lastSyncAt: new Date().toISOString(),
+    });
+
+    const record = await getIntegrationByProvider(organizationId, "razorpay");
+    if (record) {
+      await createIntegrationLog({
+        integration_id: record.id,
+        action: "razorpay.test",
+        status: "error",
+        error_message: message,
+      });
+    }
+
+    revalidatePath("/organization/integrations");
+    return { status: "error", message };
+  }
+}
+
+export async function disconnectOrgRazorpayIntegrationAction(): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
+
+  const integration = await getIntegrationByProvider(organizationId, "razorpay");
+  if (!integration) {
+    return { status: "error", message: "Razorpay integration not found." };
+  }
+
+  await disconnectIntegration(integration.id);
+  await writeAuditLog({
+    actorId: userId,
+    action: "organization_owner.integration.razorpay.disconnected",
+    entityType: "integration",
+    entityId: integration.id,
+    metadata: { provider: "razorpay" },
+  });
+
+  revalidatePath("/organization/integrations");
+  return { status: "success", message: "Razorpay disconnected." };
+}
+
+export async function saveOrgMsg91SmsIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const authKey = String(formData.get("authKey") ?? "").trim();
   const flowId = String(formData.get("flowId") ?? "").trim();
   const senderId = String(formData.get("senderId") ?? "").trim();
@@ -328,7 +415,7 @@ export async function saveMsg91SmsIntegrationAction(formData: FormData): Promise
 
   const validation = await validateMsg91SmsConfig({ authKey, flowId, senderId });
   if (!validation.valid) {
-    return { status: "error", message: validation.errors[0] ?? "Invalid MSG91 SMS configuration." };
+    return { status: "error", message: validation.errors[0] ?? "Invalid MSG91 SMS configuration.", fieldErrors: { authKey: !authKey.trim() ? "Required" : "", flowId: !flowId.trim() ? "Required" : "" } };
   }
 
   await upsertProviderIntegration({
@@ -336,32 +423,25 @@ export async function saveMsg91SmsIntegrationAction(formData: FormData): Promise
     provider: "msg91_sms",
     label: "MSG91 SMS",
     createdBy: userId,
-    credentials: {
-      authKey,
-    },
-    config: {
-      flowId,
-      senderId,
-      shortUrl: "0",
-      testMobile,
-    },
+    credentials: { authKey },
+    config: { flowId, senderId, shortUrl: "0", testMobile },
     status: "disconnected",
     errorMessage: null,
   });
 
   await writeAuditLog({
     actorId: userId,
-    action: "integration.msg91_sms.saved",
+    action: "organization_owner.integration.msg91_sms.saved",
     entityType: "integration",
     metadata: { provider: "msg91_sms" },
   });
 
-  revalidatePath("/admin/integrations");
+  revalidatePath("/organization/integrations");
   return { status: "success", message: "MSG91 SMS configuration saved." };
 }
 
-export async function testMsg91SmsIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
-  const { organizationId, userId } = await getAdminIntegrationContext();
+export async function testOrgMsg91SmsIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const authKey = String(formData.get("authKey") ?? "").trim();
   const flowId = String(formData.get("flowId") ?? "").trim();
   const senderId = String(formData.get("senderId") ?? "").trim();
@@ -377,9 +457,7 @@ export async function testMsg91SmsIntegrationAction(formData: FormData): Promise
     flowId,
     senderId,
     mobile: testMobile,
-    variables: {
-      VAR1: "Apex MSG91 SMS integration test",
-    },
+    variables: { VAR1: "Org MSG91 SMS integration test" },
   });
 
   const record = await upsertProviderIntegration({
@@ -403,15 +481,15 @@ export async function testMsg91SmsIntegrationAction(formData: FormData): Promise
     error_message: result.ok ? null : result.message,
   });
 
-  revalidatePath("/admin/integrations");
+  revalidatePath("/organization/integrations");
   return {
     status: result.ok ? "success" : "error",
     message: result.ok ? "MSG91 SMS test sent successfully." : result.message,
   };
 }
 
-export async function saveMsg91WhatsAppIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
-  const { organizationId, userId } = await getAdminIntegrationContext();
+export async function saveOrgMsg91WhatsAppIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const authKey = String(formData.get("authKey") ?? "").trim();
   const integratedNumber = String(formData.get("integratedNumber") ?? "").trim();
   const namespace = String(formData.get("namespace") ?? "").trim();
@@ -420,11 +498,7 @@ export async function saveMsg91WhatsAppIntegrationAction(formData: FormData): Pr
   const testMobile = String(formData.get("testMobile") ?? "").trim();
 
   const validation = await validateMsg91WhatsAppConfig({
-    authKey,
-    integratedNumber,
-    namespace,
-    templateName,
-    languageCode,
+    authKey, integratedNumber, namespace, templateName, languageCode,
   });
 
   if (!validation.valid) {
@@ -437,30 +511,24 @@ export async function saveMsg91WhatsAppIntegrationAction(formData: FormData): Pr
     label: "MSG91 WhatsApp",
     createdBy: userId,
     credentials: { authKey },
-    config: {
-      integratedNumber,
-      namespace,
-      templateName,
-      languageCode,
-      testMobile,
-    },
+    config: { integratedNumber, namespace, templateName, languageCode, testMobile },
     status: "disconnected",
     errorMessage: null,
   });
 
   await writeAuditLog({
     actorId: userId,
-    action: "integration.msg91_whatsapp.saved",
+    action: "organization_owner.integration.msg91_whatsapp.saved",
     entityType: "integration",
     metadata: { provider: "msg91_whatsapp" },
   });
 
-  revalidatePath("/admin/integrations");
+  revalidatePath("/organization/integrations");
   return { status: "success", message: "MSG91 WhatsApp configuration saved." };
 }
 
-export async function testMsg91WhatsAppIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
-  const { organizationId, userId } = await getAdminIntegrationContext();
+export async function testOrgMsg91WhatsAppIntegrationAction(formData: FormData): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const authKey = String(formData.get("authKey") ?? "").trim();
   const integratedNumber = String(formData.get("integratedNumber") ?? "").trim();
   const namespace = String(formData.get("namespace") ?? "").trim();
@@ -469,11 +537,7 @@ export async function testMsg91WhatsAppIntegrationAction(formData: FormData): Pr
   const testMobile = String(formData.get("testMobile") ?? "").trim();
 
   const validation = await validateMsg91WhatsAppConfig({
-    authKey,
-    integratedNumber,
-    namespace,
-    templateName,
-    languageCode,
+    authKey, integratedNumber, namespace, templateName, languageCode,
   });
 
   if (!validation.valid || !testMobile) {
@@ -487,9 +551,7 @@ export async function testMsg91WhatsAppIntegrationAction(formData: FormData): Pr
     namespace,
     templateName,
     languageCode,
-    bodyVariables: {
-      body_1: "Apex MSG91 WhatsApp integration test",
-    },
+    bodyVariables: { body_1: "Org MSG91 WhatsApp integration test" },
   });
 
   const record = await upsertProviderIntegration({
@@ -498,13 +560,7 @@ export async function testMsg91WhatsAppIntegrationAction(formData: FormData): Pr
     label: "MSG91 WhatsApp",
     createdBy: userId,
     credentials: { authKey },
-    config: {
-      integratedNumber,
-      namespace,
-      templateName,
-      languageCode,
-      testMobile,
-    },
+    config: { integratedNumber, namespace, templateName, languageCode, testMobile },
     status: result.ok ? "connected" : "error",
     errorMessage: result.ok ? null : result.message,
     lastSyncAt: new Date().toISOString(),
@@ -519,15 +575,15 @@ export async function testMsg91WhatsAppIntegrationAction(formData: FormData): Pr
     error_message: result.ok ? null : result.message,
   });
 
-  revalidatePath("/admin/integrations");
+  revalidatePath("/organization/integrations");
   return {
     status: result.ok ? "success" : "error",
     message: result.ok ? "MSG91 WhatsApp test sent successfully." : result.message,
   };
 }
 
-export async function disconnectProviderIntegrationAction(provider: IntegrationProviderId): Promise<IntegrationActionResult> {
-  const { organizationId, userId } = await getAdminIntegrationContext();
+export async function disconnectOrgProviderIntegrationAction(provider: IntegrationProviderId): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const integration = await getIntegrationByProvider(organizationId, provider);
 
   if (!integration) {
@@ -537,22 +593,18 @@ export async function disconnectProviderIntegrationAction(provider: IntegrationP
   await disconnectIntegration(integration.id);
   await writeAuditLog({
     actorId: userId,
-    action: "integration.disconnected",
+    action: "organization_owner.integration.disconnected",
     entityType: "integration",
     entityId: integration.id,
     metadata: { provider },
   });
 
-  revalidatePath("/admin/integrations");
+  revalidatePath("/organization/integrations");
   return { status: "success", message: "Integration disconnected." };
 }
 
-export async function getGoogleCalendarAuthUrlAction(): Promise<GoogleCalendarAuthUrlActionResult> {
-  const { organizationId, userId, roles } = await getAdminIntegrationContext();
-
-  if (!canManageGoogleCalendar(roles)) {
-    return { status: "error", message: getGoogleCalendarOwnerOnlyMessage() };
-  }
+export async function getOrgGoogleCalendarAuthUrlAction(): Promise<IntegrationActionResult & { authUrl?: string }> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
 
   const oauthStatus = getGoogleOAuthConfigurationStatus();
   if (!oauthStatus.configured) {
@@ -566,11 +618,8 @@ export async function getGoogleCalendarAuthUrlAction(): Promise<GoogleCalendarAu
   };
 }
 
-export async function saveGoogleCalendarConfigAction(formData: FormData): Promise<IntegrationActionResult> {
-  const { organizationId, userId, roles } = await getAdminIntegrationContext();
-  if (!canManageGoogleCalendar(roles)) {
-    return { status: "error", message: getGoogleCalendarOwnerOnlyMessage() };
-  }
+export async function saveOrgGoogleCalendarConfigAction(formData: FormData): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const calendarId = String(formData.get("calendarId") ?? "primary").trim() || "primary";
   const syncClasses = String(formData.get("syncClasses") ?? "true") === "true";
   const syncPtSessions = String(formData.get("syncPtSessions") ?? "false") === "true";
@@ -589,9 +638,7 @@ export async function saveGoogleCalendarConfigAction(formData: FormData): Promis
       })
       .eq("id", existing.id);
 
-    if (error) {
-      return { status: "error", message: error.message };
-    }
+    if (error) return { status: "error", message: error.message };
   } else {
     const { error } = await supabase
       .from("calendar_integrations")
@@ -605,21 +652,16 @@ export async function saveGoogleCalendarConfigAction(formData: FormData): Promis
         connected_by: userId,
       });
 
-    if (error) {
-      return { status: "error", message: error.message };
-    }
+    if (error) return { status: "error", message: error.message };
   }
 
   await syncGoogleCalendarIntegrationRecord(organizationId, userId);
-  revalidatePath("/admin/integrations");
+  revalidatePath("/organization/integrations");
   return { status: "success", message: "Google Calendar configuration saved." };
 }
 
-export async function disconnectGoogleCalendarIntegrationAction(): Promise<IntegrationActionResult> {
-  const { organizationId, userId, roles } = await getAdminIntegrationContext();
-  if (!canManageGoogleCalendar(roles)) {
-    return { status: "error", message: getGoogleCalendarOwnerOnlyMessage() };
-  }
+export async function disconnectOrgGoogleCalendarIntegrationAction(): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const supabase = await getSupabaseDb();
   const existing = await getCalendarIntegrationRecord(organizationId);
 
@@ -638,9 +680,7 @@ export async function disconnectGoogleCalendarIntegrationAction(): Promise<Integ
     })
     .eq("id", existing.id);
 
-  if (error) {
-    return { status: "error", message: error.message };
-  }
+  if (error) return { status: "error", message: error.message };
 
   const record = await syncGoogleCalendarIntegrationRecord(organizationId, userId);
   await createIntegrationLog({
@@ -649,15 +689,12 @@ export async function disconnectGoogleCalendarIntegrationAction(): Promise<Integ
     status: "success",
   });
 
-  revalidatePath("/admin/integrations");
+  revalidatePath("/organization/integrations");
   return { status: "success", message: "Google Calendar disconnected." };
 }
 
-export async function testGoogleCalendarIntegrationAction(): Promise<IntegrationActionResult> {
-  const { organizationId, userId, roles } = await getAdminIntegrationContext();
-  if (!canManageGoogleCalendar(roles)) {
-    return { status: "error", message: getGoogleCalendarOwnerOnlyMessage() };
-  }
+export async function testOrgGoogleCalendarIntegrationAction(): Promise<IntegrationActionResult> {
+  const { organizationId, userId } = await getOrgIntegrationContext("/organization/integrations");
   const calendarIntegration = await getCalendarIntegrationRecord(organizationId);
 
   if (!calendarIntegration) {
@@ -671,12 +708,10 @@ export async function testGoogleCalendarIntegrationAction(): Promise<Integration
       integration_id: record.id,
       action: "google_calendar.test",
       status: "success",
-      request_data: {
-        calendarId: calendarIntegration.calendar_id ?? "primary",
-      },
+      request_data: { calendarId: calendarIntegration.calendar_id ?? "primary" },
     });
 
-    revalidatePath("/admin/integrations");
+    revalidatePath("/organization/integrations");
     return { status: "success", message: "Google Calendar connection verified." };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Google Calendar test failed.";
@@ -699,46 +734,7 @@ export async function testGoogleCalendarIntegrationAction(): Promise<Integration
       status: "error",
       error_message: message,
     });
-    revalidatePath("/admin/integrations");
-    return { status: "error", message };
-  }
-}
-
-export async function testRazorpayIntegrationAction(): Promise<IntegrationActionResult> {
-  const { organizationId, userId } = await getAdminIntegrationContext();
-
-  try {
-    const config = getRazorpayConfig();
-    const auth = Buffer.from(`${config.keyId}:${config.keySecret}`).toString("base64");
-    const response = await fetch("https://api.razorpay.com/v1/payments?count=1", {
-      headers: {
-        authorization: `Basic ${auth}`,
-      },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Razorpay validation failed with status ${response.status}.`);
-    }
-
-    const record = await syncRazorpayIntegrationRecord(organizationId, userId, "connected", null);
-    await createIntegrationLog({
-      integration_id: record.id,
-      action: "razorpay.test",
-      status: "success",
-    });
-    revalidatePath("/admin/integrations");
-    return { status: "success", message: "Razorpay credentials validated successfully." };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay validation failed.";
-    const record = await syncRazorpayIntegrationRecord(organizationId, userId, "error", message);
-    await createIntegrationLog({
-      integration_id: record.id,
-      action: "razorpay.test",
-      status: "error",
-      error_message: message,
-    });
-    revalidatePath("/admin/integrations");
+    revalidatePath("/organization/integrations");
     return { status: "error", message };
   }
 }

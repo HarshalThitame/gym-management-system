@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarCheck,
   CalendarDays,
+  Cpu,
   CreditCard,
   Dumbbell,
   Gauge,
@@ -242,6 +243,15 @@ export const organizationOwnerModules = [
     icon: <Wrench className="size-5" />,
     iconKey: "settings",
     featureKey: "equipment_inventory_maintenance" as FeatureKey,
+  },
+  {
+    slug: "integrations",
+    href: "/organization/integrations",
+    label: "Integrations",
+    title: "Integrations Hub",
+    description: "Manage payment gateway, calendar sync, SMS, and WhatsApp integrations for your organization.",
+    icon: <Cpu className="size-5" />,
+    iconKey: "settings",
   }
 ] satisfies OrganizationOwnerModule[];
 
