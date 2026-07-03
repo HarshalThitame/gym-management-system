@@ -1,3 +1,4 @@
+import { Suspense, type ReactNode } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { OrganizationOwnerWorkspace } from "@/features/organization-owner/components/organization-owner-workspace";
@@ -10,6 +11,8 @@ import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { MODULE_FEATURE_MAP, isEntitlementError } from "@/features/entitlement";
 import { requireOrganizationFeatureAccess } from "@/features/entitlement";
+import type { ScopedOrganizationOwnerContext } from "@/features/organization-owner/services/organization-owner-service";
+import type { OrganizationOwnerModule } from "@/features/organization-owner/lib/organization-owner-modules";
 
 type OrgOwnerModuleRouteProps = {
   params: Promise<{ module: string }>;
@@ -42,7 +45,60 @@ function parseSearchParams(raw?: Record<string, string | string[] | undefined>):
   };
 }
 
-export const revalidate = 120; // ISR: revalidate module pages every 2 minutes
+export const revalidate = 120;
+
+function ModulePageSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <section className="rounded-lg border border-border bg-surface p-5 md:p-7">
+        <div className="h-4 w-48 rounded bg-muted/60" />
+        <div className="mt-3 h-8 w-72 rounded bg-muted/60" />
+        <div className="mt-2 h-4 w-96 rounded bg-muted/60" />
+      </section>
+      <div className="rounded-lg border border-border bg-surface p-5">
+        <div className="h-6 w-40 rounded bg-muted/60" />
+        <div className="mt-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex gap-4">
+              <div className="h-12 w-12 rounded-full bg-muted/60" />
+              <div className="flex-1 space-y-2 py-1">
+                <div className="h-4 w-3/4 rounded bg-muted/60" />
+                <div className="h-3 w-1/2 rounded bg-muted/60" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function ModuleContentLoader({
+  context,
+  module,
+  filters,
+  moduleData
+}: {
+  context: ScopedOrganizationOwnerContext;
+  module: OrganizationOwnerModule;
+  filters: ModuleSearchParams;
+  moduleData: unknown;
+}) {
+  const [dashboard, planContext] = await Promise.all([
+    getOrganizationOwnerDashboard(context),
+    getOrgPlanContext(context.organizationId),
+  ]);
+
+  return (
+    <OrganizationOwnerWorkspace
+      dashboard={dashboard}
+      module={module}
+      moduleData={moduleData}
+      moduleFilters={filters}
+      planContext={planContext}
+    />
+  );
+}
 
 export default async function OrganizationOwnerModuleRoute({ params, searchParams }: OrgOwnerModuleRouteProps) {
   const { module: slug } = await params;
@@ -71,16 +127,20 @@ export default async function OrganizationOwnerModuleRoute({ params, searchParam
     }
   }
 
-  const [dashboard, planContext, moduleResult] = await Promise.all([
-    getOrganizationOwnerDashboard(context),
-    getOrgPlanContext(context.organizationId),
-    resolveModuleData(slug, context, filters)
-  ]);
+  // Fetch module data immediately, stream dashboard + plan context
+  const moduleResult = await resolveModuleData(slug, context, filters);
 
   return (
     <div className="space-y-6">
       <Breadcrumbs items={[{ href: "/organization", label: "Dashboard" }, { href: selectedModule.href, label: selectedModule.label }]} />
-      <OrganizationOwnerWorkspace dashboard={dashboard} module={selectedModule} moduleData={moduleResult.moduleData} moduleFilters={filters} planContext={planContext} />
+      <Suspense fallback={<ModulePageSkeleton />}>
+        <ModuleContentLoader
+          context={context}
+          module={selectedModule}
+          filters={filters}
+          moduleData={moduleResult.moduleData}
+        />
+      </Suspense>
     </div>
   );
 }

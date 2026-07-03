@@ -98,25 +98,23 @@ export async function getOrganizationOwnerDashboard(context: ScopedOrganizationO
     subscriptionsResult,
     activityEventsResult,
     securityEventsResult,
-    complianceRequestsResult,
-    healthChecksResult
+    complianceRequestsResult
   ] = await Promise.all([
     supabase.from("organizations").select("*").eq("id", organizationId).maybeSingle(),
-    supabase.from("gyms").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("branches").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("branch_settings").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(200),
-    supabase.from("branch_users").select("*").eq("organization_id", organizationId).in("role_name", ["gym_admin", "reception_staff", "trainer"]).order("updated_at", { ascending: false }).limit(500),
-    supabase.from("branch_metrics").select("*").eq("organization_id", organizationId).order("metric_date", { ascending: false }).limit(1000),
+    supabase.from("gyms").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("branches").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("branch_settings").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(50),
+    supabase.from("branch_users").select("*").eq("organization_id", organizationId).in("role_name", ["gym_admin", "reception_staff", "trainer"]).order("updated_at", { ascending: false }).limit(200),
+    supabase.from("branch_metrics").select("*").eq("organization_id", organizationId).order("metric_date", { ascending: false }).limit(200),
     supabase.from("tenant_configs").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(50),
-    supabase.from("tenant_domains").select("*").eq("organization_id", organizationId).order("is_primary", { ascending: false }).order("updated_at", { ascending: false }).limit(100),
-    supabase.from("tenant_domain_checks").select("*").eq("organization_id", organizationId).order("checked_at", { ascending: false }).limit(100),
-    supabase.from("tenant_domain_provider_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("feature_flags").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(100),
-    supabase.from("platform_subscriptions").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(20),
-    supabase.from("activity_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("security_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("compliance_requests").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("system_health_checks").select("*").eq("organization_id", organizationId).order("checked_at", { ascending: false }).limit(100)
+    supabase.from("tenant_domains").select("*").eq("organization_id", organizationId).order("is_primary", { ascending: false }).order("updated_at", { ascending: false }).limit(50),
+    supabase.from("tenant_domain_checks").select("*").eq("organization_id", organizationId).order("checked_at", { ascending: false }).limit(50),
+    supabase.from("tenant_domain_provider_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("feature_flags").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(50),
+    supabase.from("platform_subscriptions").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(10),
+    supabase.from("activity_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("security_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("compliance_requests").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50)
   ]);
 
   const firstOrganizationError = [
@@ -134,8 +132,7 @@ export async function getOrganizationOwnerDashboard(context: ScopedOrganizationO
     subscriptionsResult,
     activityEventsResult,
     securityEventsResult,
-    complianceRequestsResult,
-    healthChecksResult
+    complianceRequestsResult
   ].find((result) => result.error)?.error;
 
   if (firstOrganizationError) {
@@ -173,7 +170,7 @@ export async function getOrganizationOwnerDashboard(context: ScopedOrganizationO
     activityEvents: activityEventsResult.data ?? [],
     securityEvents: securityEventsResult.data ?? [],
     complianceRequests: complianceRequestsResult.data ?? [],
-    healthChecks: healthChecksResult.data ?? [],
+    healthChecks: [],
     ...gymScoped,
     gymIds,
     branchIds,
@@ -220,16 +217,16 @@ async function loadGymScopedData(supabase: SupabaseClient<Database>, gymIds: str
     notificationsResult,
     campaignsResult
   ] = await Promise.all([
-    supabase.from("members").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(300),
-    supabase.from("membership_plans").select("*").in("gym_id", gymIds).order("display_order", { ascending: true }).limit(200),
-    supabase.from("memberships").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(300),
-    supabase.from("payments").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(300),
-    supabase.from("trainers").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(200),
-    supabase.from("classes").select("*").in("gym_id", gymIds).order("name", { ascending: true }).limit(500),
-    supabase.from("attendance_logs").select("*").in("gym_id", gymIds).order("occurred_at", { ascending: false }).limit(300),
-    supabase.from("class_sessions").select("*").in("gym_id", gymIds).order("starts_at", { ascending: false }).limit(300),
-    supabase.from("notifications").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(200),
-    supabase.from("campaigns").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(100)
+    supabase.from("members").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(100),
+    supabase.from("membership_plans").select("*").in("gym_id", gymIds).order("display_order", { ascending: true }).limit(50),
+    supabase.from("memberships").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(100),
+    supabase.from("payments").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(100),
+    supabase.from("trainers").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(100),
+    supabase.from("classes").select("*").in("gym_id", gymIds).order("name", { ascending: true }).limit(100),
+    supabase.from("attendance_logs").select("*").in("gym_id", gymIds).order("occurred_at", { ascending: false }).limit(100),
+    supabase.from("class_sessions").select("*").in("gym_id", gymIds).order("starts_at", { ascending: false }).limit(100),
+    supabase.from("notifications").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(50),
+    supabase.from("campaigns").select("*").in("gym_id", gymIds).order("created_at", { ascending: false }).limit(50)
   ]);
 
   const firstError = [

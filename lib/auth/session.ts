@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { unstable_noStore as noStore } from "next/cache";
 import { getPrimaryRole } from "@/lib/rbac";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -16,7 +17,7 @@ const anonymousContext: AuthContext = {
   isActive: false
 };
 
-export async function getAuthContext(): Promise<AuthContext> {
+export const getAuthContext: () => Promise<AuthContext> = cache(async () => {
   noStore();
 
   if (!hasSupabasePublicEnv()) {
@@ -69,7 +70,7 @@ export async function getAuthContext(): Promise<AuthContext> {
     isAuthenticated: true,
     isActive
   };
-}
+});
 
 function toAuthProfile(profile: Omit<AuthProfile, "status"> & { status: string }): AuthProfile {
   return {
