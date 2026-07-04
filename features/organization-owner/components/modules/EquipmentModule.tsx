@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { OrgOwnerDrawer, DrawerField } from "@/features/organization-owner/components/org-owner-drawer";
 import { showToast } from "@/components/ui/toast";
 import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
+import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
 import { formatEnterpriseLabel, formatCurrency } from "@/features/enterprise/lib/business-rules";
 import type {
   EquipmentRow,
@@ -112,6 +113,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
   }>({ warrantyExpiring: [], serviceOverdue: [], amcExpiring: [] });
 
   const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Filters
   const [filterBranch, setFilterBranch] = useState("all");
@@ -242,12 +244,19 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     }
   };
 
-  const handleDelete = async (equipmentId: string) => {
+  const handleDelete = (equipmentId: string, equipmentName: string) => {
+    setPendingDelete({ id: equipmentId, name: equipmentName });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+
     try {
-      await deleteEquipment(dashboard.organization.id, equipmentId);
-      setSuccessAction({ action: "deleted", title: "Equipment Deleted!", itemName: equipment.find((e) => e.id === equipmentId)?.name ?? "Equipment" });
+      await deleteEquipment(dashboard.organization.id, pendingDelete.id);
+      setSuccessAction({ action: "deleted", title: "Equipment Deleted!", itemName: pendingDelete.name });
+      setPendingDelete(null);
       await loadEquipment();
-      if (selectedEq?.id === equipmentId) setSelectedEq(null);
+      if (selectedEq?.id === pendingDelete.id) setSelectedEq(null);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Failed to delete", "error");
     }
@@ -323,7 +332,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     actions: [
       { label: "Details", onClick: () => openDetail(eq), variant: "secondary" as const, icon: <Eye className="size-3.5" /> },
       { label: "Edit", onClick: () => openEdit(eq), variant: "secondary" as const, icon: <Edit3 className="size-3.5" /> },
-      { label: "Delete", onClick: () => handleDelete(eq.id), variant: "destructive" as const, icon: <Trash2 className="size-3.5" /> },
+      { label: "Delete", onClick: () => handleDelete(eq.id, eq.name), variant: "destructive" as const, icon: <Trash2 className="size-3.5" /> },
     ],
   }));
 
@@ -759,6 +768,17 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
         onClose={() => setSuccessAction(null)}
         open={successAction !== null}
         title={successAction?.title ?? ""}
+      />
+      <GenericConfirmDialog
+        danger
+        confirmLabel="Delete"
+        itemName={pendingDelete?.name ?? ""}
+        loading={false}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { void handleConfirmDelete(); }}
+        open={pendingDelete !== null}
+        title="Delete Equipment?"
+        warning="This action cannot be undone. Equipment history and service logs may remain linked to your organization."
       />
     </div>
   );
