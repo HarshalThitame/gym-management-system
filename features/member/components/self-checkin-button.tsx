@@ -30,7 +30,7 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
   if (checkedIn) {
     return (
       <motion.div
-        className="flex items-center justify-center gap-3 rounded-2xl border border-green-200 bg-green-50 p-6"
+        className="flex items-center justify-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 200 }}
@@ -40,11 +40,11 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
           animate={{ scale: 1 }}
           transition={{ type: "spring", stiffness: 300, delay: 0.2 }}
         >
-          <CheckCircle2 className="size-8 text-green-500" />
+          <CheckCircle2 className="size-8 text-emerald-400" />
         </motion.div>
         <div>
-          <p className="font-black text-green-800">Checked In!</p>
-          <p className="text-sm font-semibold text-green-600">Have a great workout</p>
+          <p className="font-black text-emerald-300">Checked In!</p>
+          <p className="text-sm font-semibold text-emerald-400/80">Have a great workout</p>
         </div>
       </motion.div>
     );
@@ -56,7 +56,7 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
       disabled={loading}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-accent to-purple-600 p-6 text-white shadow-glow hover:shadow-glow-lg transition-all disabled:opacity-70 btn-ripple"
+      className="relative w-full overflow-hidden rounded-2xl gradient-accent-bpp-bg p-6 text-white shadow-[0_12px_40px_rgba(30,136,255,0.2)] hover:shadow-[0_12px_40px_rgba(30,136,255,0.35)] transition-all disabled:opacity-70 btn-ripple"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}

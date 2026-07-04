@@ -65,7 +65,7 @@ export default async function MemberFitnessPage() {
                     <FitnessStatusBadge status={goal.status} />
                   </div>
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface">
-                    <div className="h-full rounded-full bg-gradient-to-r from-accent to-purple-600" style={{ width: `${calculateGoalProgress(goal)}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" style={{ width: `${calculateGoalProgress(goal)}%` }} />
                   </div>
                   <div className="mt-4"><GoalStatusForm goal={goal} /></div>
                 </div>

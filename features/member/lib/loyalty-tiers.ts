@@ -13,9 +13,9 @@ export const LOYALTY_TIERS: Record<LoyaltyTier, {
   platinum: {
     name: "Platinum",
     color: "from-purple-500 to-pink-500",
-    bgColor: "bg-purple-50",
-    borderColor: "border-purple-200",
-    textColor: "text-purple-800",
+    bgColor: "bg-accent/10",
+    borderColor: "border-accent/20",
+    textColor: "text-accent",
     icon: "💎",
     minPoints: 5000,
     perks: ["Priority class booking", "2 free guest passes/month", "20% off PT packages", "Exclusive events", "Free locker rental"]
@@ -23,9 +23,9 @@ export const LOYALTY_TIERS: Record<LoyaltyTier, {
   gold: {
     name: "Gold",
     color: "from-amber-400 to-amber-600",
-    bgColor: "bg-amber-50",
-    borderColor: "border-amber-200",
-    textColor: "text-amber-800",
+    bgColor: "bg-warning/10",
+    borderColor: "border-warning/20",
+    textColor: "text-warning",
     icon: "🥇",
     minPoints: 2000,
     perks: ["Priority class booking", "1 free guest pass/month", "10% off PT packages", "Exclusive events"]
@@ -33,9 +33,9 @@ export const LOYALTY_TIERS: Record<LoyaltyTier, {
   silver: {
     name: "Silver",
     color: "from-slate-300 to-slate-500",
-    bgColor: "bg-slate-50",
-    borderColor: "border-slate-200",
-    textColor: "text-slate-700",
+    bgColor: "bg-surface-muted",
+    borderColor: "border-border",
+    textColor: "text-muted-foreground",
     icon: "🥈",
     minPoints: 500,
     perks: ["Priority class booking", "5% off PT packages"]
@@ -43,9 +43,9 @@ export const LOYALTY_TIERS: Record<LoyaltyTier, {
   bronze: {
     name: "Bronze",
     color: "from-amber-600 to-amber-800",
-    bgColor: "bg-amber-50",
-    borderColor: "border-amber-100",
-    textColor: "text-amber-700",
+    bgColor: "bg-warning/10",
+    borderColor: "border-warning/20",
+    textColor: "text-warning/80",
     icon: "🥉",
     minPoints: 0,
     perks: ["Standard class booking"]
@@ -53,9 +53,9 @@ export const LOYALTY_TIERS: Record<LoyaltyTier, {
   none: {
     name: "No Tier",
     color: "from-gray-300 to-gray-400",
-    bgColor: "bg-gray-50",
-    borderColor: "border-gray-200",
-    textColor: "text-gray-600",
+    bgColor: "bg-surface-muted",
+    borderColor: "border-border",
+    textColor: "text-muted-foreground/60",
     icon: "",
     minPoints: -1,
     perks: []

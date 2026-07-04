@@ -1075,6 +1075,13 @@ details.gym-expand > :not(summary) {
   background-clip: text;
 }
 
+.member-theme .gradient-text-warm {
+  background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 /* Member theme monospace numbers for stats */
 .member-theme .counter-value {
   font-family: var(--font-mono-member), 'IBM Plex Mono', monospace;

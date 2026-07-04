@@ -34,7 +34,7 @@ export function LoyaltyWidget({ balance, config }: LoyaltyWidgetProps) {
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
       <div className="absolute -right-6 -top-6 size-24 rounded-full bg-accent/5 blur-2xl" />
-      <div className="absolute -left-4 -bottom-4 size-20 rounded-full bg-amber-500/5 blur-2xl" />
+      <div className="absolute -left-4 -bottom-4 size-20 rounded-full bg-accent/5 blur-2xl" />
 
       <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -116,7 +116,7 @@ export function LeaderboardWidget({ leaderboard, currentMemberId }: LeaderboardW
       transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
     >
       <div className="flex items-center gap-2 mb-4">
-        <TrophyBadge className="size-4 text-amber-500" />
+        <TrophyBadge className="size-4 text-warning" />
         <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Gym Leaderboard</p>
       </div>
 
@@ -125,7 +125,7 @@ export function LeaderboardWidget({ leaderboard, currentMemberId }: LeaderboardW
           {top3.map((entry, index) => (
             <AnimatedItem key={entry.member_id} index={index}>
               <div className={`flex items-center gap-3 rounded-lg p-2.5 ${entry.member_id === currentMemberId ? "bg-accent/5 border border-accent/20" : "hover:bg-surface-muted/50"}`}>
-                <span className={`w-6 text-center text-sm font-black ${index === 0 ? "text-amber-500" : index === 1 ? "text-slate-400" : index === 2 ? "text-amber-700" : "text-muted-foreground"}`}>
+                <span className={`w-6 text-center text-sm font-black ${index === 0 ? "text-warning" : index === 1 ? "text-muted-foreground" : index === 2 ? "text-warning/60" : "text-muted-foreground/60"}`}>
                   {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}`}
                 </span>
                 <span className="flex-1 text-sm font-semibold truncate">{entry.full_name}</span>
