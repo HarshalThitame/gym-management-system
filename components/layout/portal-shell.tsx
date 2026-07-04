@@ -44,18 +44,18 @@ const NavItem = memo(function NavItem({ item, isActive, index, onClick }: { item
       style={{ animationDelay: `${index * 50}ms` }}
     >
       {isActive && (
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent to-purple-600 rounded-r-full animate-pulse-glow" />
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 via-purple-500 to-pink-500 rounded-r-full animate-pulse-glow" />
       )}
       <span className={cn(
         "transition-all duration-300",
-        isActive ? "scale-110 text-accent" : "group-hover:scale-110 group-hover:text-accent"
+        isActive ? "scale-110 text-blue-400" : "group-hover:scale-110 group-hover:text-accent"
       )}>
         {item.icon}
       </span>
       <span className="relative">
         {item.label}
         {isActive && (
-          <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-purple-600 rounded-full" />
+          <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 rounded-full" />
         )}
       </span>
     </Link>
@@ -85,6 +85,7 @@ type PortalShellProps = {
   planManageHref?: string | null;
   showPlanIndicator?: boolean;
   headerActions?: ReactNode;
+  theme?: "default" | "member-dark";
   children: ReactNode;
 };
 
@@ -108,6 +109,7 @@ export function PortalShell({
   planManageHref,
   showPlanIndicator = false,
   headerActions,
+  theme = "default",
   children
 }: PortalShellProps) {
   const displayName = context.profile?.full_name || context.email || `${tenantShortName} User`;
@@ -139,7 +141,7 @@ export function PortalShell({
   }, [sidebarOpen]);
 
   return (
-    <main className="min-h-screen bg-background text-foreground bg-gradient-mesh">
+    <main className={cn("min-h-screen bg-background text-foreground bg-gradient-mesh", theme === "member-dark" && "member-theme")}>
       <ProtectedPageCacheGuard />
 
       {/* Mobile sidebar overlay */}
@@ -271,17 +273,17 @@ function PlanIndicator({
   const canManage = planContext.status === "active" && !planContext.isTrialing && !planContext.isSuspended && Boolean(planManageHref);
 
   return (
-    <div className="rounded-md border border-border bg-background p-3">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Current Plan</p>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+    <div className="rounded-xl border border-border bg-surface/60 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Current Plan</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <PackageBadge packageName={planContext.packageName} />
-        <Badge variant={planContext.isSuspended ? "error" : planContext.isTrialing ? "info" : "neutral"}>
+        <Badge variant={planContext.isSuspended ? "error" : planContext.isTrialing ? "warning" : "success"}>
           {planContext.status.replace(/_/g, " ")}
         </Badge>
       </div>
       {canManage && planManageHref ? (
-        <Link className="mt-3 inline-flex text-xs font-black text-primary underline-offset-4 hover:underline" href={planManageHref}>
-          Manage Plan
+        <Link className="mt-3 inline-flex text-xs font-semibold text-accent underline-offset-4 hover:underline transition-colors" href={planManageHref}>
+          Manage Plan →
         </Link>
       ) : null}
     </div>

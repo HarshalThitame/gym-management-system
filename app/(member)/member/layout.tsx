@@ -31,6 +31,7 @@ export default async function MemberLayout({ children }: { children: ReactNode }
       tenantInitial={tenantSite.brandInitial}
       tenantName={tenantSite.name}
       tenantShortName={tenantSite.shortName}
+      theme="member-dark"
       title="Member Dashboard"
     >
       <MemberPageWrapper>{children}</MemberPageWrapper>
