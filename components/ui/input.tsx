@@ -10,7 +10,8 @@ const inputVariants = cva(
         default: "h-11 border-border px-3 focus:border-accent focus:ring-2 focus:ring-accent/30 focus:shadow-glow-sm hover:border-accent/50",
         cinematic: "h-11 border-white/10 bg-white/5 backdrop-blur-xl px-4 py-2 text-white placeholder:text-white/40 focus:border-purple-500/60 focus:bg-white/10 focus:shadow-[0_0_20px_rgba(102,126,234,0.3)] hover:border-white/20",
         glass: "h-11 glass border-border/50 px-3 focus:border-accent focus:ring-2 focus:ring-accent/30 focus:shadow-glow hover:border-accent/50",
-        gradient: "h-11 border-transparent bg-gradient-to-r from-surface to-surface-muted px-3 focus:ring-2 focus:ring-accent/30 focus:shadow-glow focus:border-accent/50"
+        gradient: "h-11 border-transparent bg-gradient-to-r from-surface to-surface-muted px-3 focus:ring-2 focus:ring-accent/30 focus:shadow-glow focus:border-accent/50",
+        "member-dark": "h-11 border-white/15 bg-white/[0.03] px-4 text-white placeholder:text-slate/60 italic focus:border-blue-400/60 focus:shadow-[0_0_16px_rgba(30,136,255,0.15)] hover:border-white/25 transition-all duration-300"
       }
     },
     defaultVariants: {
@@ -27,7 +28,8 @@ const textareaVariants = cva(
         default: "min-h-32 border-border px-3 py-3 focus:border-accent focus:ring-2 focus:ring-accent/30 focus:shadow-glow-sm hover:border-accent/50",
         cinematic: "min-h-32 border-white/10 bg-white/5 backdrop-blur-xl px-4 py-3 text-white placeholder:text-white/40 focus:border-purple-500/60 focus:bg-white/10 focus:shadow-[0_0_20px_rgba(102,126,234,0.3)] hover:border-white/20",
         glass: "min-h-32 glass border-border/50 px-3 py-3 focus:border-accent focus:ring-2 focus:ring-accent/30 focus:shadow-glow hover:border-accent/50",
-        gradient: "min-h-32 border-transparent bg-gradient-to-r from-surface to-surface-muted px-3 py-3 focus:ring-2 focus:ring-accent/30 focus:shadow-glow focus:border-accent/50"
+        gradient: "min-h-32 border-transparent bg-gradient-to-r from-surface to-surface-muted px-3 py-3 focus:ring-2 focus:ring-accent/30 focus:shadow-glow focus:border-accent/50",
+        "member-dark": "min-h-32 border-white/15 bg-white/[0.03] px-4 py-3 text-white placeholder:text-slate/60 italic focus:border-blue-400/60 focus:shadow-[0_0_16px_rgba(30,136,255,0.15)] hover:border-white/25 transition-all duration-300"
       }
     },
     defaultVariants: {

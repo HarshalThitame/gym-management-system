@@ -20,7 +20,13 @@ const badgeVariants = cva("inline-flex items-center rounded-full border px-2.5 p
       "danger-glow": "border-red-500/40 bg-gradient-to-r from-red-500/10 to-rose-500/10 backdrop-blur-xl text-red-300 shadow-[0_0_20px_rgba(239,68,68,0.2)] hover:shadow-[0_0_30px_rgba(239,68,68,0.4)] hover:scale-105 badge-glow",
       "cinematic": "border-accent/40 bg-gradient-to-r from-accent/10 via-purple-600/10 to-pink-500/10 backdrop-blur-xl text-white shadow-glow-sm hover:shadow-glow hover:scale-110 badge-glow",
       "status-active": "border-green-500/50 bg-green-500/10 text-green-400 animate-pulse-glow",
-      "status-inactive": "border-gray-500/50 bg-gray-500/10 text-gray-400"
+      "status-inactive": "border-gray-500/50 bg-gray-500/10 text-gray-400",
+      /* Dark theme badge variants */
+      "member-gradient": "bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 border-blue-400/30 text-blue-200 backdrop-blur-sm hover:scale-105",
+      "member-success": "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)] hover:shadow-[0_0_20px_rgba(16,185,129,0.25)] hover:scale-105",
+      "member-warning": "border-amber-500/30 bg-amber-500/10 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)] hover:shadow-[0_0_20px_rgba(245,158,11,0.25)] hover:scale-105",
+      "member-error": "border-red-500/30 bg-red-500/10 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.15)] hover:shadow-[0_0_20px_rgba(239,68,68,0.25)] hover:scale-105",
+      "member-info": "border-blue-500/30 bg-blue-500/10 text-blue-300 shadow-[0_0_12px_rgba(30,136,255,0.15)] hover:shadow-[0_0_20px_rgba(30,136,255,0.25)] hover:scale-105"
     }
   },
   defaultVariants: {

@@ -1038,6 +1038,12 @@ details.gym-expand > :not(summary) {
     radial-gradient(at 40% 80%, rgba(236, 72, 153, 0.12) 0px, transparent 50%);
 }
 
+/* Member theme monospace numbers for stats */
+.member-theme .counter-value {
+  font-family: var(--font-mono-member), 'IBM Plex Mono', monospace;
+  letter-spacing: -0.02em;
+}
+
 .member-theme .bg-gradient-mesh-member-animated {
   background: 
     radial-gradient(at 20% 30%, rgba(30, 136, 255, 0.15) 0px, transparent 50%),

@@ -19,7 +19,11 @@ const buttonVariants = cva(
         "outline-cinematic": "border-2 border-purple-500/40 bg-white/5 backdrop-blur-xl text-white hover:bg-white/10 hover:border-purple-500/60 hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:scale-105 focus-visible:outline-purple-400",
         glow: "bg-gradient-to-r from-accent to-purple-600 text-white shadow-glow hover:shadow-glow-lg hover:scale-105 animate-pulse-glow",
         success: "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] hover:scale-105",
-        warning: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] hover:scale-105"
+        warning: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] hover:scale-105",
+        /* Design System 3-Tier */
+        "primary-gradient": "bg-gradient-to-r from-blue-500 via-purple-600 to-pink-500 text-white shadow-[0_12px_40px_rgba(30,136,255,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(30,136,255,0.35)] hover:scale-[1.02] focus-visible:outline-purple-400",
+        "secondary-gradient": "border-2 border-transparent bg-clip-padding bg-white/5 backdrop-blur-sm text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text hover:bg-white/[0.08] hover:scale-[1.02] focus-visible:outline-purple-400 relative",
+        "ghost-member": "text-white/80 hover:text-white transition-colors duration-200"
       },
       size: {
         sm: "min-h-11 px-3 text-xs",

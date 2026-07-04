@@ -11,7 +11,8 @@ const cardVariants = cva(
         glass: "glass border-border/50 shadow-premium hover:shadow-premium-lg hover-lift",
         elevated: "border-border bg-surface shadow-premium hover:shadow-premium-lg hover-lift",
         gradient: "border-transparent bg-gradient-to-br from-surface to-surface-muted shadow-premium hover:shadow-glow",
-        glow: "border-accent/20 bg-surface shadow-glow-sm hover:shadow-glow hover:border-accent/40"
+        glow: "border-accent/20 bg-surface shadow-glow-sm hover:shadow-glow hover:border-accent/40",
+        "glass-dark": "glass-dark-premium hover-lift-dark shadow-member-card hover:shadow-[0_8px_32px_rgba(30,136,255,0.15)]"
       }
     },
     defaultVariants: {
@@ -52,9 +53,9 @@ const cinematicCardVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-white/5 border-white/20 hover:bg-white/10 hover:border-purple-500/40",
+        default: "border-white/10 bg-white/5 hover:bg-white/10 hover:border-blue-400/40",
         "gradient-border": "bg-white/5 border-transparent bg-gradient-to-br from-white/10 to-white/5 hover:from-white/15 hover:to-white/10",
-        glow: "bg-white/5 border-white/20 shadow-[0_0_30px_rgba(168,85,247,0.2)] hover:shadow-[0_0_40px_rgba(168,85,247,0.4)] hover:border-purple-500/60"
+        glow: "bg-white/5 border-white/10 shadow-[0_0_30px_rgba(30,136,255,0.15)] hover:shadow-[0_0_40px_rgba(30,136,255,0.3)] hover:border-blue-400/60"
       }
     },
     defaultVariants: {
