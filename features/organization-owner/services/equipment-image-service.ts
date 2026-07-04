@@ -9,7 +9,7 @@ export const EQUIPMENT_IMAGE_BUCKET = "equipment-images";
 export const equipmentImageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 export const MAX_EQUIPMENT_IMAGE_BYTES = 4 * 1024 * 1024;
 const DEFAULT_IMAGE_MODEL = "gpt-image-2";
-const AI_IMAGE_TIMEOUT_MS = 20_000;
+const AI_IMAGE_TIMEOUT_MS = 120_000;
 
 export type EquipmentImageSource = "upload" | "ai";
 

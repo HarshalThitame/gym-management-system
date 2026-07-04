@@ -121,61 +121,52 @@ export async function getActiveJobForUser(
   return { id: data.id, status: data.status as EquipmentImageJobStatus };
 }
 
+const BACKOFF_MS = [1_000, 4_000, 10_000];
+
 export async function processJob(jobId: string): Promise<void> {
   const client = createAdminClient();
 
-  const { data: jobData, error: fetchError } = await client
-    .from("equipment_image_generation_jobs")
-    .select("*")
-    .eq("id", jobId)
-    .single();
+  for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+    const { data: jobData, error: fetchError } = await client
+      .from("equipment_image_generation_jobs")
+      .select("*")
+      .eq("id", jobId)
+      .single();
 
-  if (fetchError || !jobData) {
-    console.error(`[JobProcessor] Job ${jobId} not found:`, fetchError?.message);
-    return;
-  }
+    if (fetchError || !jobData) {
+      console.error(`[JobProcessor] Job ${jobId} not found:`, fetchError?.message);
+      return;
+    }
 
-  const job = jobData as unknown as EquipmentImageJobRow;
+    const job = jobData as unknown as EquipmentImageJobRow;
 
-  if (job.status !== "queued") {
-    return;
-  }
+    if (job.status !== "queued") {
+      return;
+    }
 
-  if (new Date(job.expires_at) <= new Date()) {
-    await updateJobStatus(jobId, "expired", { last_error: "Job expired before processing." });
+    if (new Date(job.expires_at) <= new Date()) {
+      await updateJobStatus(jobId, "expired", { last_error: "Job expired before processing." });
+      await writeAuditLog({
+        actorId: job.requested_by,
+        action: "organization_owner.equipment_image_job_expired",
+        entityType: "equipment_image_generation_job",
+        entityId: jobId,
+        metadata: { organizationId: job.organization_id },
+      });
+      return;
+    }
+
+    await updateJobStatus(jobId, "processing", { started_at: new Date().toISOString() });
+
     await writeAuditLog({
       actorId: job.requested_by,
-      action: "organization_owner.equipment_image_job_expired",
+      action: "organization_owner.equipment_image_job_processing",
       entityType: "equipment_image_generation_job",
       entityId: jobId,
       metadata: { organizationId: job.organization_id },
     });
-    return;
-  }
 
-  await updateJobStatus(jobId, "processing", { started_at: new Date().toISOString() });
-
-  await writeAuditLog({
-    actorId: job.requested_by,
-    action: "organization_owner.equipment_image_job_processing",
-    entityType: "equipment_image_generation_job",
-    entityId: jobId,
-    metadata: { organizationId: job.organization_id },
-  });
-
-  const prompt = buildEquipmentImagePrompt({
-    name: job.equipment_name,
-    equipmentType: job.equipment_type,
-    brand: job.brand,
-    model: job.model,
-    customPrompt: job.custom_prompt,
-  });
-
-  const startTime = Date.now();
-
-  try {
-    const preview = await generateEquipmentImagePreview({
-      organizationId: job.organization_id,
+    const prompt = buildEquipmentImagePrompt({
       name: job.equipment_name,
       equipmentType: job.equipment_type,
       brand: job.brand,
@@ -183,70 +174,91 @@ export async function processJob(jobId: string): Promise<void> {
       customPrompt: job.custom_prompt,
     });
 
-    const latencyMs = Date.now() - startTime;
-    const previewExpiry = new Date(Date.now() + PREVIEW_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+    const startTime = Date.now();
 
-    await updateJobStatus(jobId, "completed", {
-      resolved_prompt: prompt,
-      preview_data_url: preview.dataUrl,
-      provider_latency_ms: latencyMs,
-      completed_at: new Date().toISOString(),
-      expires_at: previewExpiry,
-      attempt_count: job.attempt_count + 1,
-    });
-
-    await writeAuditLog({
-      actorId: job.requested_by,
-      action: "organization_owner.equipment_image_job_completed",
-      entityType: "equipment_image_generation_job",
-      entityId: jobId,
-      metadata: {
+    try {
+      const preview = await generateEquipmentImagePreview({
         organizationId: job.organization_id,
-        latencyMs,
-        providerModel: preview.model,
-      },
-    });
-  } catch (error) {
-    const latencyMs = Date.now() - startTime;
-    const message = error instanceof Error ? error.message : "Unknown error";
-    let errorCategory: ErrorCategory = "unknown";
+        name: job.equipment_name,
+        equipmentType: job.equipment_type,
+        brand: job.brand,
+        model: job.model,
+        customPrompt: job.custom_prompt,
+      });
 
-    if (message.includes("API key") || message.includes("401") || message.includes("403")) {
-      errorCategory = "auth";
-    } else if (message.includes("rate limit") || message.includes("429")) {
-      errorCategory = "rate_limit";
-    } else if (message.includes("timed out") || message.includes("Timeout") || message.includes("Abort")) {
-      errorCategory = "timeout";
-    } else if (message.includes("prompt")) {
-      errorCategory = "invalid_prompt";
+      const latencyMs = Date.now() - startTime;
+      const previewExpiry = new Date(Date.now() + PREVIEW_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+      await updateJobStatus(jobId, "completed", {
+        resolved_prompt: prompt,
+        preview_data_url: preview.dataUrl,
+        provider_latency_ms: latencyMs,
+        completed_at: new Date().toISOString(),
+        expires_at: previewExpiry,
+        attempt_count: attempt + 1,
+      });
+
+      await writeAuditLog({
+        actorId: job.requested_by,
+        action: "organization_owner.equipment_image_job_completed",
+        entityType: "equipment_image_generation_job",
+        entityId: jobId,
+        metadata: {
+          organizationId: job.organization_id,
+          latencyMs,
+          providerModel: preview.model,
+        },
+      });
+
+      return;
+    } catch (error) {
+      const latencyMs = Date.now() - startTime;
+      const message = error instanceof Error ? error.message : "Unknown error";
+      let errorCategory: ErrorCategory = "unknown";
+
+      if (message.includes("API key") || message.includes("401") || message.includes("403")) {
+        errorCategory = "auth";
+      } else if (message.includes("rate limit") || message.includes("429")) {
+        errorCategory = "rate_limit";
+      } else if (message.includes("timed out") || message.includes("Timeout") || message.includes("Abort")) {
+        errorCategory = "timeout";
+      } else if (message.includes("prompt")) {
+        errorCategory = "invalid_prompt";
+      }
+
+      const isTerminal = errorCategory === "auth" || errorCategory === "invalid_prompt";
+      const isLastAttempt = attempt + 1 >= MAX_RETRY_ATTEMPTS;
+      const willRetry = !isTerminal && !isLastAttempt;
+
+      await updateJobStatus(jobId, willRetry ? "queued" : "failed", {
+        last_error: message,
+        error_category: errorCategory,
+        attempt_count: attempt + 1,
+        provider_latency_ms: latencyMs,
+        completed_at: willRetry ? null : new Date().toISOString(),
+      });
+
+      await writeAuditLog({
+        actorId: job.requested_by,
+        action: isTerminal || isLastAttempt
+          ? "organization_owner.equipment_image_job_failed"
+          : "organization_owner.equipment_image_job_retrying",
+        entityType: "equipment_image_generation_job",
+        entityId: jobId,
+        metadata: {
+          organizationId: job.organization_id,
+          errorCategory,
+          errorMessage: message,
+          attemptCount: attempt + 1,
+          willRetry,
+        },
+      });
+
+      if (!willRetry) return;
+
+      const delay = BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
-
-    const newAttemptCount = job.attempt_count + 1;
-    const shouldRetry = newAttemptCount < MAX_RETRY_ATTEMPTS && errorCategory !== "auth" && errorCategory !== "invalid_prompt";
-
-    await updateJobStatus(jobId, shouldRetry ? "queued" : "failed", {
-      last_error: message,
-      error_category: errorCategory,
-      attempt_count: newAttemptCount,
-      provider_latency_ms: latencyMs,
-      completed_at: shouldRetry ? null : new Date().toISOString(),
-    });
-
-    await writeAuditLog({
-      actorId: job.requested_by,
-      action: shouldRetry
-        ? "organization_owner.equipment_image_job_retrying"
-        : "organization_owner.equipment_image_job_failed",
-      entityType: "equipment_image_generation_job",
-      entityId: jobId,
-      metadata: {
-        organizationId: job.organization_id,
-        errorCategory,
-        errorMessage: message,
-        attemptCount: newAttemptCount,
-        willRetry: shouldRetry,
-      },
-    });
   }
 }
 
