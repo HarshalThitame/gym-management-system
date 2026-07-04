@@ -16,36 +16,14 @@ vi.mock("@/lib/security/file-validation", () => ({
   validateAllowedFile: validateAllowedFileMock,
 }));
 
-import {
-  buildEquipmentImagePrompt,
-  generateEquipmentImagePreview,
-  persistGeneratedEquipmentImage,
-} from "@/features/organization-owner/services/equipment-image-service";
+import { persistUploadedEquipmentImage } from "@/features/organization-owner/services/equipment-image-service";
 
 describe("equipment image service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.unstubAllEnvs();
   });
 
-  it("builds a realistic product prompt from equipment metadata", () => {
-    const prompt = buildEquipmentImagePrompt({
-      name: "Elite Runner",
-      equipmentType: "cardio",
-      brand: "Life Fitness",
-      model: "T5",
-      customPrompt: "side angle with matte black frame",
-    });
-
-    expect(prompt).toContain("photorealistic commercial product photo");
-    expect(prompt).toContain("Elite Runner");
-    expect(prompt).toContain("Life Fitness");
-    expect(prompt).toContain("T5");
-    expect(prompt).toContain("Do not include any people");
-    expect(prompt).toContain("watermarks");
-  });
-
-  it("persists an AI preview into storage and returns normalized metadata", async () => {
+  it("persists an uploaded image into storage and returns normalized metadata", async () => {
     const uploadMock = vi.fn().mockResolvedValue({ error: null });
     const getPublicUrlMock = vi.fn().mockReturnValue({ data: { publicUrl: "https://cdn.example.com/equipment/test.jpg" } });
 
@@ -63,28 +41,31 @@ describe("equipment image service", () => {
       mimeType: "image/jpeg",
     });
 
-    const result = await persistGeneratedEquipmentImage({
+    const file = new File(["fake-image-data"], "photo.jpg", { type: "image/jpeg" });
+
+    const result = await persistUploadedEquipmentImage({
       organizationId: "org-1",
-      dataUrl: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/",
-      prompt: "A realistic treadmill in a studio",
+      file,
+      source: "upload",
     });
 
     expect(uploadMock).toHaveBeenCalled();
     expect(result).toMatchObject({
       imageUrl: "https://cdn.example.com/equipment/test.jpg",
-      imageSource: "ai",
-      imagePrompt: "A realistic treadmill in a studio",
+      imageSource: "upload",
+      imagePrompt: null,
     });
     expect(result.imageStoragePath).toContain("organizations/org-1/equipment/");
   });
 
-  it("rejects non-OpenAI style API keys with a clear configuration error", async () => {
-    vi.stubEnv("OPENAI_API_KEY", "vcp_invalid_token");
+  it("rejects oversized files", async () => {
+    const blob = new Blob(["x".repeat(5 * 1024 * 1024)]);
+    const file = new File([blob], "large.jpg", { type: "image/jpeg" });
 
-    await expect(generateEquipmentImagePreview({
+    await expect(persistUploadedEquipmentImage({
       organizationId: "org-1",
-      name: "Bike",
-      equipmentType: "cardio",
-    })).rejects.toThrow("OPENAI_API_KEY is invalid");
+      file,
+      source: "upload",
+    })).rejects.toThrow("Image must be under 4 MB");
   });
 });

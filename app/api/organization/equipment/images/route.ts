@@ -3,11 +3,7 @@ import { requireApiPrimaryRole, getApiTenantOrganizationId } from "@/lib/auth/ap
 import { requireApiFeatureAccess } from "@/features/entitlement";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { writeAuditLog } from "@/lib/audit";
-import {
-  persistUploadedEquipmentImage,
-  persistGeneratedEquipmentImage,
-} from "@/features/organization-owner/services/equipment-image-service";
-import { acceptEquipmentImageJob } from "@/features/organization-owner/services/equipment-image-job-service";
+import { persistUploadedEquipmentImage } from "@/features/organization-owner/services/equipment-image-service";
 
 export async function POST(request: Request) {
   const auth = await requireApiPrimaryRole(["organization_owner"], {
@@ -33,71 +29,21 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const requestedOrgId = String(formData.get("organizationId") ?? "");
-    const source = String(formData.get("source") ?? "");
+    const file = formData.get("file");
 
     if (requestedOrgId !== organizationId) {
       return NextResponse.json({ error: "Organization scope mismatch." }, { status: 403 });
     }
 
-    if (source === "job") {
-      const jobId = String(formData.get("jobId") ?? "");
-      if (!jobId) {
-        return NextResponse.json({ error: "Job ID is required." }, { status: 400 });
-      }
-
-      const asset = await acceptEquipmentImageJob(jobId, organizationId, auth.context.userId);
-
-      await writeAuditLog({
-        actorId: auth.context.userId,
-        action: "organization_owner.equipment_image_uploaded",
-        entityType: "equipment_image",
-        entityId: null,
-        metadata: {
-          organizationId,
-          source: "ai",
-          storagePath: asset.imageStoragePath,
-          jobId,
-        },
-      });
-
-      return NextResponse.json({
-        ok: true,
-        imageUrl: asset.imageUrl,
-        imageStoragePath: asset.imageStoragePath,
-        imageSource: "ai" as const,
-        imagePrompt: asset.imagePrompt,
-      });
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "An image file is required." }, { status: 400 });
     }
 
-    if (source !== "upload" && source !== "ai") {
-      return NextResponse.json({ error: "Invalid image source." }, { status: 400 });
-    }
-
-    const file = formData.get("file");
-    const generatedDataUrl = formData.get("generatedDataUrl");
-    const prompt = String(formData.get("prompt") ?? "");
-
-    if (prompt.length > 500) {
-      return NextResponse.json({ error: "Stored AI prompt must be 500 characters or fewer." }, { status: 400 });
-    }
-
-    const result = file instanceof File
-      ? await persistUploadedEquipmentImage({
-          organizationId,
-          file,
-          source: "upload",
-        })
-      : typeof generatedDataUrl === "string" && generatedDataUrl
-      ? await persistGeneratedEquipmentImage({
-          organizationId,
-          dataUrl: generatedDataUrl,
-          prompt,
-        })
-      : null;
-
-    if (!result) {
-      return NextResponse.json({ error: "Either file, generatedDataUrl, or jobId is required." }, { status: 400 });
-    }
+    const result = await persistUploadedEquipmentImage({
+      organizationId,
+      file,
+      source: "upload",
+    });
 
     await writeAuditLog({
       actorId: auth.context.userId,
