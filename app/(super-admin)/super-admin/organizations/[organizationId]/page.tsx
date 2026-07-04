@@ -20,7 +20,7 @@ import { OrgUsageTab } from "@/features/super-admin/components/organizations/Org
 import { OrganizationApprovalReviewPanel } from "@/features/super-admin/components/organizations/OrganizationApprovalReviewPanel";
 import { OrganizationGovernanceControlPanel } from "@/features/super-admin/components/organizations/OrganizationGovernanceControlPanel";
 import { PackageBadge } from "@/features/super-admin/components/subscriptions/PackageBadge";
-import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
+import { getOptionalCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import { getOrganizationDetailData, normalizeAuditFilters, normalizeDetailListFilters } from "@/features/super-admin/services/organization-management-service";
 import { requireRole } from "@/lib/auth/guards";
 import type { Json } from "@/types/database";
@@ -56,7 +56,7 @@ export default async function SuperAdminOrganizationDetailPage({ params, searchP
     securityPageSize: Number(stringParam(query.securityPageSize) ?? 25)
   });
   const data = await getOrganizationDetailData(organizationId, auditFilters, listFilters);
-  const criticalSuperAdminEmail = getCriticalSuperAdminEmail();
+  const criticalSuperAdminEmail = getOptionalCriticalSuperAdminEmail() ?? "";
 
   if (!data) {
     notFound();

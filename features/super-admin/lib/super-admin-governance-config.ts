@@ -4,6 +4,12 @@ export function getCriticalSuperAdminEmail(): string {
   return email.trim().toLowerCase();
 }
 
+export function getOptionalCriticalSuperAdminEmail(): string | null {
+  const email = process.env.SUPER_ADMIN_CRITICAL_EMAIL;
+  if (!email) return null;
+  return email.trim().toLowerCase();
+}
+
 export async function verifyCriticalEmailServerSide(email: string): Promise<boolean> {
   const criticalEmail = process.env.SUPER_ADMIN_CRITICAL_EMAIL;
   if (!criticalEmail) return false;

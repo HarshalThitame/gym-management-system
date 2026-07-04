@@ -10,6 +10,10 @@ vi.mock("@/lib/auth/session", () => ({
   getAuthContext: getAuthContextMock,
 }));
 
+vi.mock("@/features/entitlement/entitlement-service", () => ({
+  requireFeatureAccess: vi.fn().mockResolvedValue(undefined),
+}));
+
 import {
   assertUserBelongsToOrganization,
 } from "@/features/entitlement/auth-context";
@@ -17,7 +21,7 @@ import {
   EntitlementError,
   mapEntitlementErrorToHttpResponse,
 } from "@/features/entitlement/entitlement-errors";
-import { entitlementActionCatch } from "@/features/entitlement/action-guards";
+import { entitlementActionCatch, requireOrgFeatureAccess } from "@/features/entitlement/action-guards";
 import {
   evaluateEffectiveSubscription,
   evaluateFeatureAccess,
@@ -53,7 +57,7 @@ const effective = {
   message: null,
 };
 
-function authContext(roles: Array<"super_admin" | "organization_owner">, organizationId: string | null) {
+function authContext(roles: string[], organizationId: string | null) {
   return {
     userId: "user-1",
     email: "owner@example.com",
@@ -88,6 +92,20 @@ describe("Phase 4 backend entitlement protection", () => {
       userId: "user-1",
       organizationId: "org-b",
       isSuperAdmin: true,
+    });
+  });
+
+  it("rejects non-owner tenant users from organization-owner backend actions", async () => {
+    getAuthContextMock.mockResolvedValue({
+      ...authContext([], "org-a"),
+      roles: ["gym_admin"],
+      primaryRole: "gym_admin",
+    });
+
+    await expect(requireOrgFeatureAccess("org-a", "member_management")).rejects.toMatchObject({
+      reason: "UNAUTHORIZED_ORG_ACCESS",
+      organizationId: "org-a",
+      statusCode: 403,
     });
   });
 

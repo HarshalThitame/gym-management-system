@@ -2,7 +2,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrgOwnerContext } from "./action-utils";
-import { requireOrganizationFeatureAccess, hasFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
+import { requireOrganizationFeatureAccess, requireOrgFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 
 export type CalendarGym = {
@@ -57,9 +57,10 @@ export async function getNetworkCalendar(
   year: number,
   month: number
 ): Promise<NetworkCalendarData> {
-  const hasAccess = await hasFeatureAccess(organizationId, "network_wide_class_calendar");
-  if (!hasAccess) {
-    throw new Error("Network calendar is not available on your current plan.");
+  const ctx = await getOrgOwnerContext("/organization/classes");
+  const scoped = await requireOrgFeatureAccess(ctx.organizationId, "network_wide_class_calendar");
+  if (organizationId !== scoped.organizationId) {
+    throw new Error("Organization scope mismatch.");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -67,7 +68,7 @@ export async function getNetworkCalendar(
   const { data: gyms } = await supabase
     .from("gyms")
     .select("id, name")
-    .eq("organization_id", organizationId)
+    .eq("organization_id", scoped.organizationId)
     .order("name");
 
   const allGyms = (gyms ?? []).filter((g) => g.id != null);

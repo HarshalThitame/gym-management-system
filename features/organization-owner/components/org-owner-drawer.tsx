@@ -25,9 +25,14 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tab
 export function OrgOwnerDrawer({ open, onClose, title, description, children, size = "lg" }: OrgOwnerDrawerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<Element | null>(null);
+  const onCloseRef = useRef(onClose);
 
   // Track whether we've focused for the current open session
   const hasFocusedRef = useRef(false);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // Store the element that triggered the drawer open
   useEffect(() => {
@@ -58,7 +63,7 @@ export function OrgOwnerDrawer({ open, onClose, title, description, children, si
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -95,11 +100,11 @@ export function OrgOwnerDrawer({ open, onClose, title, description, children, si
         triggerRef.current.focus();
       }
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
-  }, [onClose]);
+    if (e.target === e.currentTarget) onCloseRef.current();
+  }, []);
 
   if (!open) return null;
 
@@ -122,11 +127,11 @@ export function OrgOwnerDrawer({ open, onClose, title, description, children, si
             {description ? <p id="drawer-desc" className="mt-0.5 text-xs text-muted-foreground md:mt-1 md:text-sm">{description}</p> : null}
           </div>
           <button
-            className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:size-auto md:bg-transparent"
-            onClick={onClose}
-            aria-label="Close drawer"
-            type="button"
-          >
+          className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:size-auto md:bg-transparent"
+          onClick={() => onCloseRef.current()}
+          aria-label="Close drawer"
+          type="button"
+        >
             <X className="size-5" aria-hidden="true" />
           </button>
         </div>

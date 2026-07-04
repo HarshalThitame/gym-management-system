@@ -98,6 +98,9 @@ export async function requireOrgFeatureAccess(
     featureKey,
     actionName: "organization_action",
   });
+  if (!authCtx.isSuperAdmin && !authCtx.roles.includes("organization_owner")) {
+    throw new EntitlementError("UNAUTHORIZED_ORG_ACCESS", organizationId, featureKey);
+  }
   return { organizationId: authCtx.organizationId, userId: authCtx.userId };
 }
 
@@ -115,6 +118,9 @@ export async function requireOrgFeatureAccessAll(
     featureKey: featureKeys,
     actionName: "organization_action",
   });
+  if (!authCtx.isSuperAdmin && !authCtx.roles.includes("organization_owner")) {
+    throw new EntitlementError("UNAUTHORIZED_ORG_ACCESS", organizationId, featureKeys[0] ?? null);
+  }
   return { organizationId: authCtx.organizationId, userId: authCtx.userId };
 }
 

@@ -3,7 +3,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
-import { requireOrganizationFeatureAccess, hasFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
+import { requireOrganizationFeatureAccess, requireOrgFeatureAccess, entitlementActionCatch } from "@/features/entitlement";
 
 export type TrainerGymAssignment = {
   gym_id: string;
@@ -17,6 +17,17 @@ export type TrainerWithGyms = {
   primary_gym_id: string | null;
   assigned_gym_ids: string[];
 };
+
+async function requireTrainerSharingAccess(organizationId: string) {
+  const ctx = await getOrgOwnerContext("/organization/trainers");
+  const scoped = await requireOrgFeatureAccess(ctx.organizationId, "trainer_sharing_across_branches");
+
+  if (organizationId !== scoped.organizationId) {
+    throw new Error("Organization scope mismatch.");
+  }
+
+  return scoped.organizationId;
+}
 
 function getGymNameFromJoin(row: Record<string, unknown>): string {
   const gyms = row.gyms;
@@ -33,10 +44,7 @@ export async function getTrainerGymAssignments(
   organizationId: string,
   trainerId: string
 ): Promise<TrainerGymAssignment[]> {
-  const hasAccess = await hasFeatureAccess(organizationId, "trainer_sharing_across_branches");
-  if (!hasAccess) {
-    throw new Error("Trainer sharing is not available on your current plan.");
-  }
+  const scopedOrganizationId = await requireTrainerSharingAccess(organizationId);
 
   const supabase = await createSupabaseServerClient();
 
@@ -44,7 +52,7 @@ export async function getTrainerGymAssignments(
     .from("trainer_gym_assignments")
     .select("gym_id, is_primary, gyms!inner(name)")
     .eq("trainer_id", trainerId)
-    .eq("organization_id", organizationId);
+    .eq("organization_id", scopedOrganizationId);
 
   if (error) throw new Error(error.message);
 
@@ -176,12 +184,13 @@ export async function removeTrainerFromGymAction(
 }
 
 export async function getAllTrainersWithGyms(organizationId: string): Promise<TrainerWithGyms[]> {
+  const scopedOrganizationId = await requireTrainerSharingAccess(organizationId);
   const supabase = await createSupabaseServerClient();
 
   const { data: gyms } = await supabase
     .from("gyms")
     .select("id")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", scopedOrganizationId);
 
   const gymIds = (gyms ?? []).map((g) => g.id);
 
@@ -202,7 +211,7 @@ export async function getAllTrainersWithGyms(organizationId: string): Promise<Tr
       .from("trainer_gym_assignments")
       .select("trainer_id, gym_id")
       .in("trainer_id", trainerIds)
-      .eq("organization_id", organizationId);
+      .eq("organization_id", scopedOrganizationId);
 
     for (const a of (assignments ?? [])) {
       const existing = assignmentMap.get(a.trainer_id) ?? [];
@@ -223,13 +232,14 @@ export async function getTrainerAssignedGymIds(
   trainerId: string,
   organizationId: string
 ): Promise<string[]> {
+  const scopedOrganizationId = await requireTrainerSharingAccess(organizationId);
   const supabase = await createSupabaseServerClient();
 
   const { data: assignments } = await supabase
     .from("trainer_gym_assignments")
     .select("gym_id")
     .eq("trainer_id", trainerId)
-    .eq("organization_id", organizationId);
+    .eq("organization_id", scopedOrganizationId);
 
   return (assignments ?? []).map((a) => a.gym_id);
 }

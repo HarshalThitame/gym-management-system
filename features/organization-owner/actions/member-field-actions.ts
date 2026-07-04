@@ -44,7 +44,10 @@ function toCustomField(row: unknown): CustomField {
 
 export async function getCustomFields(organizationId: string): Promise<CustomField[]> {
   const ctx = await getOrgOwnerContext("/organization/members");
-  await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+  const { organizationId: scopedOrganizationId } = await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+  if (organizationId !== scopedOrganizationId) {
+    throw new Error("Organization scope mismatch.");
+  }
 
   const supabase = await createSupabaseServerClient();
   const query = supabase.from("custom_member_fields" as never) as unknown as {
@@ -52,7 +55,7 @@ export async function getCustomFields(organizationId: string): Promise<CustomFie
       eq(k: string, v: string): { eq(k2: string, v2: boolean): { order(c: string, o: { ascending: boolean }): Promise<{ data: unknown[] | null; error: Error | null }> } };
     };
   };
-  const { data, error } = await query.select("*").eq("organization_id", organizationId).eq("is_active", true).order("sort_order", { ascending: true });
+  const { data, error } = await query.select("*").eq("organization_id", scopedOrganizationId).eq("is_active", true).order("sort_order", { ascending: true });
 
   if (error) throw new Error(error.message);
   return (data ?? []).map(toCustomField);
@@ -64,7 +67,10 @@ export async function createCustomField(
 ): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/members");
-    await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+    const { organizationId: scopedOrganizationId } = await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+    if (organizationId !== scopedOrganizationId) {
+      return { status: "error", message: "Organization scope mismatch." };
+    }
 
     if (!data.field_name || !data.field_type) {
       return { status: "error", message: "Field name and type are required." };
@@ -75,7 +81,7 @@ export async function createCustomField(
       insert(obj: Record<string, unknown>): { select(s: string): { single(): Promise<{ data: { id: string } | null; error: Error | null }> } };
     };
     const { data: created, error } = await query.insert({
-      organization_id: organizationId,
+      organization_id: scopedOrganizationId,
       field_name: data.field_name,
       field_type: data.field_type,
       options: data.options ?? [],
@@ -100,7 +106,10 @@ export async function updateCustomField(
 ): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/members");
-    await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+    const { organizationId: scopedOrganizationId } = await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+    if (organizationId !== scopedOrganizationId) {
+      return { status: "error", message: "Organization scope mismatch." };
+    }
 
     const supabase = await createSupabaseServerClient();
     const updateObj: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -114,7 +123,7 @@ export async function updateCustomField(
     const query = supabase.from("custom_member_fields" as never) as unknown as {
       update(obj: Record<string, unknown>): { eq(k: string, v: string): { eq(k2: string, v2: string): Promise<{ error: Error | null }> } };
     };
-    const { error } = await query.update(updateObj).eq("id", fieldId).eq("organization_id", organizationId);
+    const { error } = await query.update(updateObj).eq("id", fieldId).eq("organization_id", scopedOrganizationId);
 
     if (error) throw new Error(error.message);
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_custom_field", entityType: "custom_member_field", entityId: fieldId });
@@ -131,13 +140,16 @@ export async function deleteCustomField(
 ): Promise<AuthActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/members");
-    await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+    const { organizationId: scopedOrganizationId } = await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
+    if (organizationId !== scopedOrganizationId) {
+      return { status: "error", message: "Organization scope mismatch." };
+    }
 
     const supabase = await createSupabaseServerClient();
     const query = supabase.from("custom_member_fields" as never) as unknown as {
       delete(): { eq(k: string, v: string): { eq(k2: string, v2: string): Promise<{ error: Error | null }> } };
     };
-    const { error } = await query.delete().eq("id", fieldId).eq("organization_id", organizationId);
+    const { error } = await query.delete().eq("id", fieldId).eq("organization_id", scopedOrganizationId);
 
     if (error) throw new Error(error.message);
     await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.delete_custom_field", entityType: "custom_member_field", entityId: fieldId });
@@ -149,7 +161,10 @@ export async function deleteCustomField(
 }
 
 export async function getMemberCustomFieldValues(memberId: string): Promise<MemberCustomFieldValue[]> {
+  const ctx = await getOrgOwnerContext("/organization/members");
+  const { organizationId } = await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
   const supabase = await createSupabaseServerClient();
+  await assertMemberBelongsToOrganization(supabase, memberId, organizationId);
 
   const valuesQuery = supabase.from("member_custom_field_values" as never) as unknown as {
     select(s: string): { eq(k: string, v: string): Promise<{ data: { field_id: string; value: string | null }[] | null; error: Error | null }> };
@@ -186,7 +201,11 @@ export async function saveMemberCustomFieldValues(
   memberId: string,
   values: { fieldId: string; value: string }[],
 ): Promise<void> {
+  const ctx = await getOrgOwnerContext("/organization/members");
+  const { organizationId } = await requireOrgFeatureAccess(ctx.organizationId, "custom_member_fields");
   const supabase = await createSupabaseServerClient();
+  await assertMemberBelongsToOrganization(supabase, memberId, organizationId);
+  await assertFieldsBelongToOrganization(supabase, values.map((value) => value.fieldId), organizationId);
   const query = supabase.from("member_custom_field_values" as never) as unknown as {
     upsert(objs: { member_id: string; field_id: string; value: string; updated_at: string }[], opts: { onConflict: string }): Promise<{ error: Error | null }>;
   };
@@ -200,4 +219,39 @@ export async function saveMemberCustomFieldValues(
 
   const { error } = await query.upsert(rows, { onConflict: "member_id, field_id" });
   if (error) throw new Error(error.message);
+}
+
+async function assertMemberBelongsToOrganization(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  memberId: string,
+  organizationId: string,
+) {
+  const { data, error } = await supabase
+    .from("members")
+    .select("id, gyms!inner(organization_id)")
+    .eq("id", memberId)
+    .eq("gyms.organization_id", organizationId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Member is not available in your organization.");
+}
+
+async function assertFieldsBelongToOrganization(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  fieldIds: string[],
+  organizationId: string,
+) {
+  const uniqueFieldIds = Array.from(new Set(fieldIds.filter((fieldId) => fieldId.length > 0)));
+  if (uniqueFieldIds.length === 0) return;
+
+  const fieldsQuery = supabase.from("custom_member_fields" as never) as unknown as {
+    select(s: string): { in(k: string, vals: string[]): { eq(k2: string, v2: string): Promise<{ data: Array<{ id: string }> | null; error: Error | null }> } };
+  };
+  const { data, error } = await fieldsQuery.select("id").in("id", uniqueFieldIds).eq("organization_id", organizationId);
+
+  if (error) throw new Error(error.message);
+  if ((data ?? []).length !== uniqueFieldIds.length) {
+    throw new Error("One or more custom fields are outside your organization scope.");
+  }
 }

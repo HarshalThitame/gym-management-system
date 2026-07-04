@@ -5,7 +5,7 @@ import { SuperAdminModuleWorkspace } from "@/features/super-admin/components/sup
 import { getSuperAdminModule, superAdminModules } from "@/features/super-admin/lib/super-admin-modules";
 import { getGymBranchManagementData, normalizeGymBranchFilters } from "@/features/super-admin/services/gym-branch-management-service";
 import { getOrganizationManagementData, normalizeOrganizationFilters, type OrganizationSortOption } from "@/features/super-admin/services/organization-management-service";
-import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
+import { getOptionalCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
 import { createMetadata } from "@/lib/seo/metadata";
 
 type SuperAdminModuleRouteProps = {
@@ -69,7 +69,7 @@ export default async function SuperAdminModuleRoute({ params, searchParams }: Su
 
   return (
     <SuperAdminModuleWorkspace
-      criticalSuperAdminEmail={getCriticalSuperAdminEmail()}
+      criticalSuperAdminEmail={getOptionalCriticalSuperAdminEmail() ?? ""}
       dashboard={dashboard}
       filters={filters}
       gymBranchManagement={gymBranchManagement}
