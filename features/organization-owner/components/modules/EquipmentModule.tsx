@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Wrench,
@@ -16,6 +16,7 @@ import {
   Sparkles,
   ImagePlus,
   Loader2,
+  RefreshCw,
   XCircle,
 } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
@@ -118,6 +119,13 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
   const [imageStatusMessage, setImageStatusMessage] = useState<string | null>(null);
   const [imageErrorMessage, setImageErrorMessage] = useState<string | null>(null);
 
+  // Async job state
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobPollStatus, setJobPollStatus] = useState<"idle" | "submitting" | "queued" | "processing" | "ready" | "failed" | null>(null);
+  const [jobErrorMsg, setJobErrorMsg] = useState<string | null>(null);
+  const [pendingAiPreview, setPendingAiPreview] = useState<{ previewUrl: string; prompt: string | null } | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Service log form
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().slice(0, 10));
@@ -179,9 +187,65 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboard.organization.id]);
 
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback((activeJobId: string) => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/organization/equipment/generate-image/${activeJobId}`);
+        if (!response.ok) {
+          setJobPollStatus("failed");
+          setJobErrorMsg("Failed to check generation status.");
+          stopPolling();
+          return;
+        }
+        const data = await response.json();
+        const status = data.status;
+        if (status === "completed") {
+          setPendingAiPreview({ previewUrl: data.previewDataUrl, prompt: data.resolvedPrompt });
+          setJobPollStatus("ready");
+          stopPolling();
+        } else if (status === "failed") {
+          setJobPollStatus("failed");
+          setJobErrorMsg(data.lastError || "Image generation failed.");
+          stopPolling();
+        } else if (status === "expired" || status === "cancelled") {
+          setJobPollStatus("failed");
+          setJobErrorMsg(`Job was ${status}. Try again.`);
+          stopPolling();
+        } else {
+          setJobPollStatus(status);
+        }
+      } catch {
+        setJobPollStatus("failed");
+        setJobErrorMsg("Lost connection while checking generation status.");
+        stopPolling();
+      }
+    }, 3000);
+  }, [stopPolling]);
+
+  useEffect(() => {
+    if (jobId && (jobPollStatus === "queued" || jobPollStatus === "processing" || jobPollStatus === "submitting")) {
+      startPolling(jobId);
+    }
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [jobId, jobPollStatus, startPolling]);
+
   useEffect(() => () => {
     clearObjectUrl(equipmentImage?.previewUrl);
-  }, [equipmentImage?.previewUrl]);
+    stopPolling();
+  }, [equipmentImage?.previewUrl, stopPolling]);
 
   const loadAlerts = async () => {
     try {
@@ -230,6 +294,11 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     setImageLoading(false);
     setImageStatusMessage(null);
     setImageErrorMessage(null);
+    setJobId(null);
+    setJobPollStatus(null);
+    setJobErrorMsg(null);
+    setPendingAiPreview(null);
+    stopPolling();
     setEditingId(null);
   };
 
@@ -299,9 +368,14 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
       return;
     }
 
-    setImageLoading(true);
+    stopPolling();
+    setImageMode("ai");
+    setPendingUploadFile(null);
+    setJobErrorMsg(null);
     setImageErrorMessage(null);
-    setImageStatusMessage("Generating a realistic preview. This can take up to 20 seconds.");
+    setPendingAiPreview(null);
+
+    setJobPollStatus("submitting");
     try {
       const response = await fetch("/api/organization/equipment/generate-image", {
         method: "POST",
@@ -318,46 +392,42 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
 
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload?.error || "Image generation failed");
+        throw new Error(payload?.error || "Image generation request failed");
       }
 
-      setImageMode("ai");
-      setPendingUploadFile(null);
-      replaceEquipmentImage({
-        previewUrl: payload.imageDataUrl,
-        storagePath: null,
-        source: "ai",
-        prompt: payload.imagePrompt ?? null,
-        needsPersist: true,
-        generatedDataUrl: payload.imageDataUrl,
-      });
-      setImageStatusMessage("AI preview ready. Review it, regenerate if needed, then save the equipment.");
-      showToast("AI image ready to review", "success");
+      setJobId(payload.jobId);
+      setImageStatusMessage("Image generation queued. This typically takes a few seconds.");
+      setJobPollStatus(payload.status === "queued" || payload.status === "processing" ? payload.status : "queued");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to generate image";
+      setJobPollStatus("failed");
+      setJobErrorMsg(message);
       setImageErrorMessage(message);
-      setImageStatusMessage(null);
       showToast(message, "error");
-    } finally {
-      setImageLoading(false);
     }
   };
 
   const persistPendingImage = async () => {
     if (!equipmentImage?.needsPersist) {
+      if (jobId && jobPollStatus === "ready" && !equipmentImage) {
+        return acceptJobImage();
+      }
       return equipmentImage;
     }
 
     const formData = new FormData();
     formData.set("organizationId", dashboard.organization.id);
-    formData.set("source", equipmentImage.source);
 
     if (equipmentImage.source === "upload") {
+      formData.set("source", "upload");
       if (!pendingUploadFile) {
         throw new Error("Select an image file before saving.");
       }
       formData.set("file", pendingUploadFile);
+    } else if (jobId && jobPollStatus === "ready") {
+      return acceptJobImage();
     } else {
+      formData.set("source", "ai");
       if (!equipmentImage.generatedDataUrl) {
         throw new Error("Generate an AI image before saving.");
       }
@@ -388,6 +458,46 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     setImageErrorMessage(null);
     setImageStatusMessage("Equipment image saved and linked to this equipment record.");
     replaceEquipmentImage(persistedImage);
+    return persistedImage;
+  };
+
+  const acceptJobImage = async () => {
+    if (!jobId) throw new Error("No job to accept.");
+
+    const formData = new FormData();
+    formData.set("organizationId", dashboard.organization.id);
+    formData.set("source", "job");
+    formData.set("jobId", jobId);
+
+    const response = await fetch("/api/organization/equipment/images", {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload?.error || "Failed to accept generated image");
+    }
+
+    const persistedImage: EquipmentImageState = {
+      previewUrl: payload.imageUrl,
+      storagePath: payload.imageStoragePath,
+      source: "ai",
+      prompt: payload.imagePrompt ?? null,
+      needsPersist: false,
+      generatedDataUrl: null,
+    };
+
+    stopPolling();
+    setJobId(null);
+    setJobPollStatus(null);
+    setJobErrorMsg(null);
+    setPendingAiPreview(null);
+    setPendingUploadFile(null);
+    setImageErrorMessage(null);
+    setImageStatusMessage("AI image accepted and saved to equipment.");
+    replaceEquipmentImage(persistedImage);
+    showToast("AI image accepted", "success");
     return persistedImage;
   };
 
@@ -915,7 +1025,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
       {/* Drawer for Add/Edit */}
       <OrgOwnerDrawer
         open={drawerOpen}
-        onClose={() => { resetForm(); setDrawerOpen(false); }}
+        onClose={() => { stopPolling(); resetForm(); setDrawerOpen(false); }}
         title={editingId ? "Edit Equipment" : "Add Equipment"}
         description="Track gym equipment, maintenance schedules, and warranties."
       >
@@ -986,10 +1096,11 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
             <div className="flex flex-wrap gap-2">
               <button
                 className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${imageMode === "upload" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
-                disabled={imageLoading}
+                disabled={jobPollStatus === "submitting" || jobPollStatus === "queued" || jobPollStatus === "processing"}
                 onClick={() => {
                   setImageMode("upload");
                   setImageErrorMessage(null);
+                  stopPolling();
                 }}
                 type="button"
               >
@@ -998,7 +1109,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
               </button>
               <button
                 className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${imageMode === "ai" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
-                disabled={imageLoading}
+                disabled={jobPollStatus === "submitting" || jobPollStatus === "queued" || jobPollStatus === "processing"}
                 onClick={() => {
                   setImageMode("ai");
                   setImageErrorMessage(null);
@@ -1010,7 +1121,77 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
               </button>
             </div>
 
-            {equipmentImage ? (
+            {/* Completed AI job preview (ready to accept) */}
+            {jobPollStatus === "ready" && pendingAiPreview ? (
+              <div className="space-y-3">
+                <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                  <Image
+                    alt={`${formName || "Equipment"} AI preview`}
+                    className="h-52 w-full object-cover"
+                    height={208}
+                    src={pendingAiPreview.previewUrl}
+                    unoptimized
+                    width={896}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => { void acceptJobImage(); }} size="sm" variant="secondary">
+                    <ImagePlus className="size-3.5" /> Use this image
+                  </Button>
+                  <Button onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
+                    <RefreshCw className="size-3.5" /> Generate again
+                  </Button>
+                </div>
+                {pendingAiPreview.prompt ? (
+                  <p className="text-xs text-muted-foreground">AI prompt: {pendingAiPreview.prompt}</p>
+                ) : null}
+                {imageStatusMessage ? (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900">
+                    {imageStatusMessage}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* Job in progress (queued / processing) */}
+            {jobPollStatus === "submitting" || jobPollStatus === "queued" || jobPollStatus === "processing" ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-6">
+                  <Loader2 className="size-6 animate-spin text-blue-600" />
+                  <div>
+                    <p className="text-sm font-bold text-blue-900">
+                      {jobPollStatus === "submitting" ? "Submitting request..."
+                      : jobPollStatus === "queued" ? "Queued — waiting to process..."
+                      : "Generating image with AI..."}
+                    </p>
+                    <p className="text-xs text-blue-700">This typically takes a few seconds.</p>
+                  </div>
+                </div>
+                {imageStatusMessage ? (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900">
+                    {imageStatusMessage}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* Failed job state */}
+            {jobPollStatus === "failed" ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-bold text-red-800">Image generation failed</p>
+                  <p className="mt-1 text-xs text-red-700">{jobErrorMsg || "An unknown error occurred."}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
+                    <RefreshCw className="size-3.5" /> Retry
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Existing equipment image (persisted) */}
+            {equipmentImage && jobPollStatus !== "ready" && jobPollStatus !== "submitting" && jobPollStatus !== "queued" && jobPollStatus !== "processing" && jobPollStatus !== "failed" ? (
               <div className="space-y-3">
                 <div className="overflow-hidden rounded-xl border border-border bg-surface">
                   <Image
@@ -1024,8 +1205,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {equipmentImage.source === "ai" ? (
-                    <Button disabled={imageLoading} onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
-                      {imageLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                    <Button disabled={jobPollStatus === "submitting" || jobPollStatus === "queued" || jobPollStatus === "processing"} onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
+                      <RefreshCw className="size-3.5" />
                       Regenerate
                     </Button>
                   ) : null}
@@ -1039,19 +1220,20 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
               </div>
             ) : null}
 
-            {imageStatusMessage ? (
+            {imageStatusMessage && jobPollStatus !== "ready" && jobPollStatus !== "submitting" && jobPollStatus !== "queued" && jobPollStatus !== "processing" && jobPollStatus !== "failed" && !(equipmentImage && jobPollStatus !== "ready") ? (
               <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900">
                 {imageStatusMessage}
               </div>
             ) : null}
 
-            {imageErrorMessage ? (
+            {imageErrorMessage && jobPollStatus !== "failed" ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
                 {imageErrorMessage}
               </div>
             ) : null}
 
-            {imageMode === "upload" ? (
+            {/* Upload file input */}
+            {imageMode === "upload" && !equipmentImage ? (
               <DrawerField label="Upload Image">
                 <input
                   accept="image/png,image/jpeg,image/webp"
@@ -1060,7 +1242,10 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
                   type="file"
                 />
               </DrawerField>
-            ) : (
+            ) : null}
+
+            {/* AI prompt + generate button (visible when no active job and no equipment image) */}
+            {imageMode === "ai" && !jobPollStatus && !pendingAiPreview && !equipmentImage ? (
               <div className="space-y-3">
                 <DrawerField label="AI Prompt Refinement">
                   <textarea
@@ -1071,16 +1256,16 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
                     value={imagePrompt}
                   />
                 </DrawerField>
-                <Button disabled={imageLoading} onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
-                  {imageLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                <Button onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
+                  <Sparkles className="size-3.5" />
                   Generate Realistic Image
                 </Button>
               </div>
-            )}
+            ) : null}
           </div>
           <div className="flex gap-2 pt-2">
-            <Button disabled={imageLoading} onClick={handleSave} size="sm">{editingId ? "Update" : "Create"}</Button>
-            <Button onClick={() => { resetForm(); setDrawerOpen(false); }} size="sm" variant="secondary">Cancel</Button>
+            <Button disabled={imageLoading || jobPollStatus === "submitting" || jobPollStatus === "queued" || jobPollStatus === "processing"} onClick={handleSave} size="sm">{editingId ? "Update" : "Create"}</Button>
+            <Button disabled={jobPollStatus === "submitting"} onClick={() => { resetForm(); setDrawerOpen(false); }} size="sm" variant="secondary">Cancel</Button>
           </div>
         </div>
       </OrgOwnerDrawer>

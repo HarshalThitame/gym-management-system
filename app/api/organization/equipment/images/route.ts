@@ -4,9 +4,10 @@ import { requireApiFeatureAccess } from "@/features/entitlement";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { writeAuditLog } from "@/lib/audit";
 import {
-  persistGeneratedEquipmentImage,
   persistUploadedEquipmentImage,
+  persistGeneratedEquipmentImage,
 } from "@/features/organization-owner/services/equipment-image-service";
+import { acceptEquipmentImageJob } from "@/features/organization-owner/services/equipment-image-job-service";
 
 export async function POST(request: Request) {
   const auth = await requireApiPrimaryRole(["organization_owner"], {
@@ -38,6 +39,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Organization scope mismatch." }, { status: 403 });
     }
 
+    if (source === "job") {
+      const jobId = String(formData.get("jobId") ?? "");
+      if (!jobId) {
+        return NextResponse.json({ error: "Job ID is required." }, { status: 400 });
+      }
+
+      const asset = await acceptEquipmentImageJob(jobId, organizationId, auth.context.userId);
+
+      await writeAuditLog({
+        actorId: auth.context.userId,
+        action: "organization_owner.equipment_image_uploaded",
+        entityType: "equipment_image",
+        entityId: null,
+        metadata: {
+          organizationId,
+          source: "ai",
+          storagePath: asset.imageStoragePath,
+          jobId,
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        imageUrl: asset.imageUrl,
+        imageStoragePath: asset.imageStoragePath,
+        imageSource: "ai" as const,
+        imagePrompt: asset.imagePrompt,
+      });
+    }
+
     if (source !== "upload" && source !== "ai") {
       return NextResponse.json({ error: "Invalid image source." }, { status: 400 });
     }
@@ -65,7 +96,7 @@ export async function POST(request: Request) {
       : null;
 
     if (!result) {
-      return NextResponse.json({ error: "Either file or generatedDataUrl is required." }, { status: 400 });
+      return NextResponse.json({ error: "Either file, generatedDataUrl, or jobId is required." }, { status: 400 });
     }
 
     await writeAuditLog({

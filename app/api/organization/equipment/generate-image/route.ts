@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { requireApiPrimaryRole, getApiTenantOrganizationId } from "@/lib/auth/api-guards";
 import { requireApiFeatureAccess } from "@/features/entitlement";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { writeAuditLog } from "@/lib/audit";
 import { assertFeature } from "@/lib/tenant";
-import { generateEquipmentImagePreview } from "@/features/organization-owner/services/equipment-image-service";
+import {
+  createEquipmentImageJob,
+  getActiveJobForUser,
+  processJob,
+} from "@/features/organization-owner/services/equipment-image-job-service";
 
 export async function POST(request: Request) {
   const auth = await requireApiPrimaryRole(["organization_owner"], {
@@ -31,9 +34,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimit = await checkRateLimit(`equipment-image-generate:${auth.context.userId}`, 6, 60_000);
+  const rateLimit = await checkRateLimit(`equipment-image-generate:${auth.context.userId}`, 12, 60_000);
   if (!rateLimit.allowed) {
-    return NextResponse.json({ error: "Too many image generations. Try again shortly." }, { status: 429 });
+    return NextResponse.json({ error: "Too many image generation requests. Try again shortly." }, { status: 429 });
   }
 
   try {
@@ -58,38 +61,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "AI prompt refinement must be 300 characters or fewer." }, { status: 400 });
     }
 
-    const preview = await generateEquipmentImagePreview({
+    const existingJob = await getActiveJobForUser(
       organizationId,
-      name: body.name,
-      equipmentType: body.equipmentType,
-      brand: body.brand,
-      model: body.model,
-      customPrompt: body.customPrompt,
+      auth.context.userId,
+      body.name.trim(),
+      body.equipmentType.trim(),
+      body.brand || null,
+      body.model || null,
+      body.customPrompt || null,
+    );
+
+    if (existingJob) {
+      processJob(existingJob.id).catch((err) =>
+        console.error("[GenerateImage] Background processing failed:", err)
+      );
+
+      return NextResponse.json({
+        jobId: existingJob.id,
+        status: existingJob.status,
+      });
+    }
+
+    const job = await createEquipmentImageJob({
+      organizationId,
+      requestedBy: auth.context.userId,
+      equipmentName: body.name.trim(),
+      equipmentType: body.equipmentType.trim(),
+      brand: body.brand || null,
+      model: body.model || null,
+      customPrompt: body.customPrompt || null,
     });
 
-    await writeAuditLog({
-      actorId: auth.context.userId,
-      action: "organization_owner.equipment_image_generated",
-      entityType: "equipment_image",
-      entityId: null,
-      metadata: {
-        organizationId,
-        equipmentName: body.name,
-        equipmentType: body.equipmentType,
-        model: preview.model,
-      },
-    });
+    processJob(job.jobId).catch((err) =>
+      console.error("[GenerateImage] Background processing failed:", err)
+    );
 
     return NextResponse.json({
-      ok: true,
-      imageDataUrl: preview.dataUrl,
-      imagePrompt: preview.prompt,
-      mimeType: preview.mimeType,
-      model: preview.model,
+      jobId: job.jobId,
+      status: job.status,
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Image generation failed." },
+      { error: error instanceof Error ? error.message : "Image generation request failed." },
       { status: 400 }
     );
   }
