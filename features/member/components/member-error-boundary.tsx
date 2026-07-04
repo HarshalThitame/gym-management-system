@@ -20,12 +20,12 @@ export function MemberErrorBoundary({ error, reset, featureName }: MemberErrorBo
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
       <motion.div
-        className="rounded-full bg-red-100/80 p-5"
+        className="rounded-full bg-red-500/15 p-5"
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
       >
-        <AlertTriangle aria-hidden="true" className="size-8 text-red-600" />
+        <AlertTriangle aria-hidden="true" className="size-8 text-red-400" />
       </motion.div>
       <h1 className="text-2xl font-black">
         {featureName ? `${featureName} failed to load` : "Something went wrong"}
@@ -34,7 +34,7 @@ export function MemberErrorBoundary({ error, reset, featureName }: MemberErrorBo
         {error.message || "An unexpected error occurred while loading this page. Please try again."}
       </p>
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-        <Button onClick={reset} variant="primary" size="lg">
+        <Button onClick={reset} variant="primary-gradient" size="lg">
           <RefreshCw className="size-4" />
           Try Again
         </Button>
