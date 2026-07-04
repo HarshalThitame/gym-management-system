@@ -227,7 +227,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
         setJobErrorMsg("Lost connection while checking generation status.");
         stopPolling();
       }
-    }, 3000);
+    }, 1500);
   }, [stopPolling]);
 
   useEffect(() => {

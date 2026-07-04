@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireApiPrimaryRole, getApiTenantOrganizationId } from "@/lib/auth/api-guards";
 import { requireApiFeatureAccess } from "@/features/entitlement";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -9,7 +9,7 @@ import {
   processJob,
 } from "@/features/organization-owner/services/equipment-image-job-service";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const auth = await requireApiPrimaryRole(["organization_owner"], {
     unauthenticatedMessage: "Sign in to generate equipment images.",
     forbiddenMessage: "Only organization owners can generate equipment images.",
@@ -72,9 +72,7 @@ export async function POST(request: Request) {
     );
 
     if (existingJob) {
-      processJob(existingJob.id).catch((err) =>
-        console.error("[GenerateImage] Background processing failed:", err)
-      );
+      request.waitUntil(processJob(existingJob.id));
 
       return NextResponse.json({
         jobId: existingJob.id,
@@ -92,9 +90,7 @@ export async function POST(request: Request) {
       customPrompt: body.customPrompt || null,
     });
 
-    processJob(job.jobId).catch((err) =>
-      console.error("[GenerateImage] Background processing failed:", err)
-    );
+    request.waitUntil(processJob(job.jobId));
 
     return NextResponse.json({
       jobId: job.jobId,

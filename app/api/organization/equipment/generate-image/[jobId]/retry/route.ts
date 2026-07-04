@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireApiPrimaryRole, getApiTenantOrganizationId } from "@/lib/auth/api-guards";
 import {
   retryEquipmentImageJob,
@@ -6,7 +6,7 @@ import {
 } from "@/features/organization-owner/services/equipment-image-job-service";
 
 export async function POST(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> },
 ) {
   const auth = await requireApiPrimaryRole(["organization_owner"], {
@@ -30,9 +30,7 @@ export async function POST(
   try {
     const result = await retryEquipmentImageJob(jobId, organizationId, auth.context.userId);
 
-    processJob(jobId).catch((err) =>
-      console.error("[RetryImage] Background processing failed:", err)
-    );
+    request.waitUntil(processJob(jobId));
 
     return NextResponse.json(result);
   } catch (error) {
