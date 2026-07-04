@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrgFeatureAccess } from "@/features/entitlement";
+import { getOrgOwnerContext, auditOrgAction } from "./action-utils";
+import { removeEquipmentImageAsset, type EquipmentImageSource } from "@/features/organization-owner/services/equipment-image-service";
 
 export type EquipmentRow = {
   id: string;
@@ -24,6 +26,10 @@ export type EquipmentRow = {
   status: "operational" | "under_maintenance" | "out_of_order" | "retired";
   location: string | null;
   notes: string | null;
+  image_url: string | null;
+  image_storage_path: string | null;
+  image_source: EquipmentImageSource | null;
+  image_prompt: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -68,7 +74,19 @@ export type SaveEquipmentInput = {
   status?: EquipmentRow["status"];
   location?: string | null;
   notes?: string | null;
+  imageUrl?: string | null;
+  imageStoragePath?: string | null;
+  imageSource?: EquipmentImageSource | null;
+  imagePrompt?: string | null;
 };
+
+async function getScopedEquipmentContext(organizationId: string) {
+  const ctx = await getOrgOwnerContext("/organization/equipment");
+  if (ctx.organizationId !== organizationId) {
+    throw new Error("Organization scope mismatch.");
+  }
+  return ctx;
+}
 
 export type LogServiceInput = {
   serviceDate: string;
@@ -87,6 +105,7 @@ export async function getEquipment(
   total: number;
   alerts: { warrantyExpiring: number; serviceOverdue: number; amcExpiring: number };
 }> {
+  await getScopedEquipmentContext(organizationId);
   await requireOrgFeatureAccess(organizationId, "equipment_inventory_maintenance");
 
   const supabase = await createSupabaseServerClient();
@@ -145,9 +164,26 @@ export async function saveEquipment(
   organizationId: string,
   input: SaveEquipmentInput
 ): Promise<EquipmentRow> {
+  const ctx = await getScopedEquipmentContext(organizationId);
   await requireOrgFeatureAccess(organizationId, "equipment_inventory_maintenance");
 
   const supabase = await createSupabaseServerClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+  let previousImagePath: string | null = null;
+
+  if (input.equipmentId) {
+    const { data: existing, error: existingError } = await client
+      .from("equipment")
+      .select("id, image_storage_path")
+      .eq("id", input.equipmentId)
+      .eq("organization_id", organizationId)
+      .single();
+
+    if (existingError) throw new Error(existingError.message);
+    previousImagePath = (existing as { image_storage_path?: string | null } | null)?.image_storage_path ?? null;
+  }
+
   const row = {
     organization_id: organizationId,
     name: input.name,
@@ -166,10 +202,11 @@ export async function saveEquipment(
     status: input.status ?? "operational",
     location: input.location ?? null,
     notes: input.notes ?? null,
+    image_url: input.imageUrl ?? null,
+    image_storage_path: input.imageStoragePath ?? null,
+    image_source: input.imageSource ?? null,
+    image_prompt: input.imagePrompt ?? null,
   };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   if (input.equipmentId) {
     const { data, error } = await client
@@ -181,6 +218,14 @@ export async function saveEquipment(
       .single();
 
     if (error) throw new Error(error.message);
+    if (previousImagePath && previousImagePath !== (data as EquipmentRow).image_storage_path) {
+      await removeEquipmentImageAsset(previousImagePath);
+    }
+    await auditOrgAction(ctx.userId, "save_equipment", "equipment", input.equipmentId, {
+      organizationId,
+      operation: "update",
+      imageSource: row.image_source,
+    });
     revalidatePath("/organization/equipment");
     return data as EquipmentRow;
   }
@@ -192,6 +237,11 @@ export async function saveEquipment(
     .single();
 
   if (error) throw new Error(error.message);
+  await auditOrgAction(ctx.userId, "save_equipment", "equipment", (data as EquipmentRow).id, {
+    organizationId,
+    operation: "create",
+    imageSource: row.image_source,
+  });
   revalidatePath("/organization/equipment");
   return data as EquipmentRow;
 }
@@ -200,17 +250,28 @@ export async function deleteEquipment(
   organizationId: string,
   equipmentId: string
 ): Promise<void> {
+  const ctx = await getScopedEquipmentContext(organizationId);
   await requireOrgFeatureAccess(organizationId, "equipment_inventory_maintenance");
 
   const supabase = await createSupabaseServerClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const client = supabase as any;
+  const { data: existing } = await client
+    .from("equipment")
+    .select("id, image_storage_path")
+    .eq("id", equipmentId)
+    .eq("organization_id", organizationId)
+    .single();
+
+  const { error } = await client
     .from("equipment")
     .delete()
     .eq("id", equipmentId)
     .eq("organization_id", organizationId);
 
   if (error) throw new Error(error.message);
+  await removeEquipmentImageAsset((existing as { image_storage_path?: string | null } | null)?.image_storage_path ?? null);
+  await auditOrgAction(ctx.userId, "delete_equipment", "equipment", equipmentId, { organizationId });
   revalidatePath("/organization/equipment");
 }
 
@@ -219,6 +280,7 @@ export async function logService(
   equipmentId: string,
   input: LogServiceInput
 ): Promise<ServiceLogRow> {
+  await getScopedEquipmentContext(organizationId);
   await requireOrgFeatureAccess(organizationId, "equipment_inventory_maintenance");
 
   const supabase = await createSupabaseServerClient();
@@ -274,6 +336,7 @@ export async function getServiceHistory(
   organizationId: string,
   equipmentId: string
 ): Promise<ServiceLogRow[]> {
+  await getScopedEquipmentContext(organizationId);
   await requireOrgFeatureAccess(organizationId, "equipment_inventory_maintenance");
 
   const supabase = await createSupabaseServerClient();
@@ -294,6 +357,7 @@ export async function getEquipmentAlerts(organizationId: string): Promise<{
   serviceOverdue: Partial<EquipmentRow>[];
   amcExpiring: Partial<EquipmentRow>[];
 }> {
+  await getScopedEquipmentContext(organizationId);
   await requireOrgFeatureAccess(organizationId, "equipment_inventory_maintenance");
 
   const supabase = await createSupabaseServerClient();

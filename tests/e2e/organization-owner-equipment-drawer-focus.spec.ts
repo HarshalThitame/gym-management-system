@@ -113,6 +113,26 @@ async function serviceInsert(table: string, data: Record<string, unknown>) {
 }
 
 test.describe("Organization Owner Equipment Drawer", () => {
+  test("shows upload and AI image options in the equipment drawer", async ({ page }) => {
+    test.setTimeout(90_000);
+
+    await ensureEnterprisePlan(await getOrganizationIdForAccount(email));
+    await loginAs(page);
+    await page.goto("/organization/equipment", { waitUntil: "domcontentloaded" });
+
+    const currentPath = new URL(page.url()).pathname;
+    expect(["/organization", "/organization/equipment"]).toContain(currentPath);
+
+    if (currentPath !== "/organization/equipment") {
+      test.skip(true, "Equipment module is not enabled for this organization in the current environment.");
+    }
+
+    await page.getByRole("button", { name: /add equipment/i }).click();
+    await expect(page.getByText("Equipment Image")).toBeVisible();
+    await expect(page.getByRole("button", { name: /upload from device/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /generate with ai/i })).toBeVisible();
+  });
+
   test("keeps focus while typing into the add equipment drawer", async ({ page }) => {
     test.setTimeout(90_000);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import {
   Wrench,
   Plus,
@@ -11,6 +12,11 @@ import {
   Eye,
   Edit3,
   Search,
+  Upload,
+  Sparkles,
+  ImagePlus,
+  Loader2,
+  XCircle,
 } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
@@ -66,6 +72,15 @@ const typeBadgeClass: Record<string, string> = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
+type EquipmentImageState = {
+  previewUrl: string;
+  storagePath: string | null;
+  source: "upload" | "ai";
+  prompt: string | null;
+  needsPersist: boolean;
+  generatedDataUrl: string | null;
+};
+
 export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps) {
   const [equipment, setEquipment] = useState<EquipmentRow[]>(moduleData?.items ?? []);
   const [total, setTotal] = useState(0);
@@ -95,6 +110,11 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
   const [formStatus, setFormStatus] = useState<EquipmentRow["status"]>("operational");
   const [formLocation, setFormLocation] = useState("");
   const [formNotes, setFormNotes] = useState("");
+  const [imageMode, setImageMode] = useState<"upload" | "ai">("upload");
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [equipmentImage, setEquipmentImage] = useState<EquipmentImageState | null>(null);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
 
   // Service log form
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -140,6 +160,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
         );
       }
       setEquipment(filtered);
+      setSelectedEq((current) => current ? filtered.find((eq) => eq.id === current.id) ?? null : current);
       setTotal(filtered.length);
       setAlerts(result.alerts);
     } catch {
@@ -156,6 +177,10 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboard.organization.id]);
 
+  useEffect(() => () => {
+    clearObjectUrl(equipmentImage?.previewUrl);
+  }, [equipmentImage?.previewUrl]);
+
   const loadAlerts = async () => {
     try {
       const data = await getEquipmentAlerts(dashboard.organization.id);
@@ -163,6 +188,21 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     } catch {
       // ignore
     }
+  };
+
+  const clearObjectUrl = (value?: string | null) => {
+    if (value?.startsWith("blob:")) {
+      URL.revokeObjectURL(value);
+    }
+  };
+
+  const replaceEquipmentImage = (next: EquipmentImageState | null) => {
+    setEquipmentImage((current) => {
+      if (current?.previewUrl && current.previewUrl !== next?.previewUrl) {
+        clearObjectUrl(current.previewUrl);
+      }
+      return next;
+    });
   };
 
   const resetForm = () => {
@@ -181,6 +221,11 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     setFormStatus("operational");
     setFormLocation("");
     setFormNotes("");
+    setImageMode("upload");
+    setImagePrompt("");
+    replaceEquipmentImage(null);
+    setPendingUploadFile(null);
+    setImageLoading(false);
     setEditingId(null);
   };
 
@@ -206,7 +251,128 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     setFormStatus(eq.status);
     setFormLocation(eq.location ?? "");
     setFormNotes(eq.notes ?? "");
+    setImageMode(eq.image_source ?? "upload");
+    setImagePrompt(eq.image_prompt ?? "");
+    replaceEquipmentImage(eq.image_url && eq.image_source ? {
+      previewUrl: eq.image_url,
+      storagePath: eq.image_storage_path,
+      source: eq.image_source,
+      prompt: eq.image_prompt,
+      needsPersist: false,
+      generatedDataUrl: null,
+    } : null);
+    setPendingUploadFile(null);
     setDrawerOpen(true);
+  };
+
+  const handleUploadSelection = (file: File | null) => {
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setImageMode("upload");
+    setPendingUploadFile(file);
+    replaceEquipmentImage({
+      previewUrl,
+      storagePath: null,
+      source: "upload",
+      prompt: null,
+      needsPersist: true,
+      generatedDataUrl: null,
+    });
+  };
+
+  const handleRemoveImage = () => {
+    setPendingUploadFile(null);
+    replaceEquipmentImage(null);
+  };
+
+  const handleGenerateImage = async () => {
+    if (!formName.trim()) {
+      showToast("Enter equipment name before generating an image", "error");
+      return;
+    }
+
+    setImageLoading(true);
+    try {
+      const response = await fetch("/api/organization/equipment/generate-image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          organizationId: dashboard.organization.id,
+          name: formName.trim(),
+          equipmentType: formType,
+          brand: formBrand || null,
+          model: formModel || null,
+          customPrompt: imagePrompt || null,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "Image generation failed");
+      }
+
+      setImageMode("ai");
+      setPendingUploadFile(null);
+      replaceEquipmentImage({
+        previewUrl: payload.imageDataUrl,
+        storagePath: null,
+        source: "ai",
+        prompt: payload.imagePrompt ?? null,
+        needsPersist: true,
+        generatedDataUrl: payload.imageDataUrl,
+      });
+      showToast("AI image ready to review", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Failed to generate image", "error");
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
+  const persistPendingImage = async () => {
+    if (!equipmentImage?.needsPersist) {
+      return equipmentImage;
+    }
+
+    const formData = new FormData();
+    formData.set("organizationId", dashboard.organization.id);
+    formData.set("source", equipmentImage.source);
+
+    if (equipmentImage.source === "upload") {
+      if (!pendingUploadFile) {
+        throw new Error("Select an image file before saving.");
+      }
+      formData.set("file", pendingUploadFile);
+    } else {
+      if (!equipmentImage.generatedDataUrl) {
+        throw new Error("Generate an AI image before saving.");
+      }
+      formData.set("generatedDataUrl", equipmentImage.generatedDataUrl);
+      formData.set("prompt", equipmentImage.prompt ?? imagePrompt.trim());
+    }
+
+    const response = await fetch("/api/organization/equipment/images", {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload?.error || "Failed to save equipment image");
+    }
+
+    const persistedImage: EquipmentImageState = {
+      previewUrl: payload.imageUrl,
+      storagePath: payload.imageStoragePath,
+      source: payload.imageSource,
+      prompt: payload.imagePrompt ?? null,
+      needsPersist: false,
+      generatedDataUrl: null,
+    };
+
+    setPendingUploadFile(null);
+    replaceEquipmentImage(persistedImage);
+    return persistedImage;
   };
 
   const handleSave = async () => {
@@ -216,6 +382,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     }
 
     try {
+      const persistedImage = await persistPendingImage();
       const saveInput: Parameters<typeof saveEquipment>[1] = {
         name: formName.trim(),
         equipmentType: formType,
@@ -232,6 +399,10 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
         status: formStatus,
         location: formLocation || null,
         notes: formNotes || null,
+        imageUrl: persistedImage?.previewUrl ?? null,
+        imageStoragePath: persistedImage?.storagePath ?? null,
+        imageSource: persistedImage?.source ?? null,
+        imagePrompt: persistedImage?.prompt ?? null,
       };
       if (editingId) saveInput.equipmentId = editingId;
       await saveEquipment(dashboard.organization.id, saveInput);
@@ -329,6 +500,20 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
       { label: "Next Service", value: eq.next_service_date ?? "N/A" },
       { label: "Warranty", value: eq.warranty_expiry ?? "N/A" },
     ],
+    avatar: eq.image_url ? (
+      <Image
+        alt={`${eq.name} equipment`}
+        className="size-14 rounded-lg border border-border object-cover"
+        height={56}
+        src={eq.image_url}
+        unoptimized
+        width={56}
+      />
+    ) : (
+      <div className="flex size-14 items-center justify-center rounded-lg border border-dashed border-border bg-surface-muted text-muted-foreground">
+        <ImagePlus className="size-5" />
+      </div>
+    ),
     actions: [
       { label: "Details", onClick: () => openDetail(eq), variant: "secondary" as const, icon: <Eye className="size-3.5" /> },
       { label: "Edit", onClick: () => openEdit(eq), variant: "secondary" as const, icon: <Edit3 className="size-3.5" /> },
@@ -563,6 +748,23 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="overflow-hidden rounded-xl border border-border bg-background">
+              {selectedEq.image_url ? (
+                <Image
+                  alt={`${selectedEq.name} equipment`}
+                  className="h-56 w-full object-cover"
+                  height={224}
+                  src={selectedEq.image_url}
+                  unoptimized
+                  width={896}
+                />
+              ) : (
+                <div className="flex h-56 w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <ImagePlus className="size-8" />
+                  <p className="text-sm font-semibold">No equipment image added yet</p>
+                </div>
+              )}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="text-xs text-muted-foreground">Type</p>
@@ -756,8 +958,94 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
           <DrawerField label="Notes">
             <input className={selectClass} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Any additional notes" />
           </DrawerField>
+          <div className="space-y-4 rounded-xl border border-border bg-background p-4">
+            <div className="flex items-center gap-2">
+              <ImagePlus className="size-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-black">Equipment Image</p>
+                <p className="text-xs text-muted-foreground">Upload a real photo or generate a realistic AI preview before saving.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${imageMode === "upload" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
+                disabled={imageLoading}
+                onClick={() => setImageMode("upload")}
+                type="button"
+              >
+                <Upload className="size-4" />
+                Upload from device
+              </button>
+              <button
+                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${imageMode === "ai" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
+                disabled={imageLoading}
+                onClick={() => setImageMode("ai")}
+                type="button"
+              >
+                <Sparkles className="size-4" />
+                Generate with AI
+              </button>
+            </div>
+
+            {equipmentImage ? (
+              <div className="space-y-3">
+                <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                  <Image
+                    alt={`${formName || "Equipment"} preview`}
+                    className="h-52 w-full object-cover"
+                    height={208}
+                    src={equipmentImage.previewUrl}
+                    unoptimized
+                    width={896}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {equipmentImage.source === "ai" ? (
+                    <Button disabled={imageLoading} onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
+                      {imageLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                      Regenerate
+                    </Button>
+                  ) : null}
+                  <Button onClick={handleRemoveImage} size="sm" variant="secondary">
+                    <XCircle className="size-3.5" /> Remove Image
+                  </Button>
+                </div>
+                {equipmentImage.source === "ai" && equipmentImage.prompt ? (
+                  <p className="text-xs text-muted-foreground">AI prompt: {equipmentImage.prompt}</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {imageMode === "upload" ? (
+              <DrawerField label="Upload Image">
+                <input
+                  accept="image/png,image/jpeg,image/webp"
+                  className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary-foreground"
+                  onChange={(e) => handleUploadSelection(e.target.files?.[0] ?? null)}
+                  type="file"
+                />
+              </DrawerField>
+            ) : (
+              <div className="space-y-3">
+                <DrawerField label="AI Prompt Refinement">
+                  <textarea
+                    className="min-h-24 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    maxLength={300}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    placeholder="Optional: matte black frame, premium studio lighting, side angle..."
+                    value={imagePrompt}
+                  />
+                </DrawerField>
+                <Button disabled={imageLoading} onClick={() => { void handleGenerateImage(); }} size="sm" variant="secondary">
+                  {imageLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                  Generate Realistic Image
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="flex gap-2 pt-2">
-            <Button onClick={handleSave} size="sm">{editingId ? "Update" : "Create"}</Button>
+            <Button disabled={imageLoading} onClick={handleSave} size="sm">{editingId ? "Update" : "Create"}</Button>
             <Button onClick={() => { resetForm(); setDrawerOpen(false); }} size="sm" variant="secondary">Cancel</Button>
           </div>
         </div>

@@ -12872,6 +12872,10 @@ export type Database = {
           brand: string | null
           created_at: string
           equipment_type: string
+          image_prompt: string | null
+          image_source: string | null
+          image_storage_path: string | null
+          image_url: string | null
           id: string
           last_service_date: string | null
           location: string | null
@@ -12895,6 +12899,10 @@ export type Database = {
           brand?: string | null
           created_at?: string
           equipment_type: string
+          image_prompt?: string | null
+          image_source?: string | null
+          image_storage_path?: string | null
+          image_url?: string | null
           id?: string
           last_service_date?: string | null
           location?: string | null
@@ -12918,6 +12926,10 @@ export type Database = {
           brand?: string | null
           created_at?: string
           equipment_type?: string
+          image_prompt?: string | null
+          image_source?: string | null
+          image_storage_path?: string | null
+          image_url?: string | null
           id?: string
           last_service_date?: string | null
           location?: string | null
