@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { LazyPwaProvider } from "@/components/pwa/lazy-pwa-provider";
 import { getTenantContext } from "@/lib/tenant/context";
@@ -16,6 +16,27 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap"
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["700"]
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600"]
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400"]
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -73,7 +94,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <link rel="preconnect" href="https://bobqiyhljubfrzmhqnqq.supabase.co" />
         <link rel="dns-prefetch" href="https://bobqiyhljubfrzmhqnqq.supabase.co" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`} style={tenantThemeStyle}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${inter.variable} ${ibmPlexMono.variable}`} style={tenantThemeStyle}>
         <a className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-accent focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-accent-foreground focus:shadow-lg focus:outline-none" href="#main-content" id="skip-link">
           Skip to content
         </a>
