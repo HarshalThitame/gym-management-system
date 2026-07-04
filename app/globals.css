@@ -199,6 +199,30 @@
   --font-mono-member: 'IBM Plex Mono', monospace;
 }
 
+/* Non-prefixed variable overrides (body uses these directly) */
+.member-theme {
+  --background: #0a0e27;
+  --foreground: #f8f9fa;
+  --surface: #0f1535;
+  --surface-muted: #141a3a;
+  --surface-strong: #1a2350;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-light: rgba(255, 255, 255, 0.05);
+  --muted: #64748b;
+  --ring: #1e88ff;
+  --bg-primary: #0f1535;
+  --bg-secondary: #141a3a;
+  --bg-tertiary: #1a2350;
+}
+
+/* Override body gradient mesh with member theme palette */
+.member-theme .bg-gradient-mesh {
+  background:
+    radial-gradient(at 20% 30%, rgba(30, 136, 255, 0.12) 0px, transparent 50%),
+    radial-gradient(at 80% 20%, rgba(124, 58, 237, 0.12) 0px, transparent 50%),
+    radial-gradient(at 40% 80%, rgba(236, 72, 153, 0.12) 0px, transparent 50%);
+}
+
 /* Member theme utility classes */
 .member-theme .glass-dark-premium {
   background: rgba(15, 21, 53, 0.6);
@@ -1080,6 +1104,23 @@ details.gym-expand > :not(summary) {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Package badge overrides for member theme sidebar */
+.member-theme .border-slate-200.bg-slate-50.text-slate-700 {
+  border-color: rgba(148, 163, 184, 0.2);
+  background-color: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+}
+.member-theme .border-indigo-200.bg-indigo-50.text-indigo-700 {
+  border-color: rgba(99, 102, 241, 0.2);
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #818cf8;
+}
+.member-theme .border-amber-200.bg-amber-50.text-amber-800 {
+  border-color: rgba(245, 158, 11, 0.2);
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
 }
 
 /* Member theme monospace numbers for stats */

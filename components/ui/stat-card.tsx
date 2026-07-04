@@ -28,10 +28,10 @@ const glowColors: Record<string, string> = {
 };
 
 const iconGradients: Record<string, string> = {
-  good: "from-green-500 to-emerald-600",
+  good: "from-emerald-500 to-emerald-600",
   watch: "from-amber-500 to-orange-600",
   risk: "from-red-500 to-rose-600",
-  default: "from-accent to-purple-600"
+  default: "from-blue-500 via-purple-500 to-pink-500"
 };
 
 function useCountUp(target: string, duration: number = 1000, animate: boolean = true) {
