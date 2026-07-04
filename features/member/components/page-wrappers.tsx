@@ -21,9 +21,9 @@ export function PageHeader({
       transition={{ duration: 0.5, delay, ease: "easeOut" }}
     >
       {eyebrow && (
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate font-sans">{eyebrow}</p>
       )}
-      <h2 className={`${eyebrow ? "mt-2" : ""} text-3xl font-black gradient-text`}>{title}</h2>
+      <h2 className={`${eyebrow ? "mt-2" : ""} text-4xl font-bold text-display`}>{title}</h2>
       {description && (
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
       )}
@@ -34,11 +34,11 @@ export function PageHeader({
 export function AnimatedCardSection({
   children,
   delay = 0,
-  variant = "glass"
+  variant = "glass-dark"
 }: {
   children: ReactNode;
   delay?: number;
-  variant?: "default" | "glass" | "glow";
+  variant?: "default" | "glass" | "glow" | "glass-dark";
 }) {
   return (
     <motion.div

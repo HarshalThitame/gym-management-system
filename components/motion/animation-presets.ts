@@ -360,3 +360,48 @@ export const notificationPulse: Variants = {
     },
   },
 };
+
+/**
+ * Cinematic dark stagger - for member dark theme entrance animations
+ * Staggered by 50ms, 600ms duration
+ */
+export const cinematicDarkStagger: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+/**
+ * Cinematic dark item - fade + slide up with bouncy ease
+ */
+export const cinematicDarkItem: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 16,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.6,
+      ease: [0.34, 1.56, 0.64, 1],
+    },
+  },
+};
+
+/**
+ * Card hover for dark theme - subtle lift + blue glow
+ */
+export const cardHoverDark: TargetAndTransition = {
+  y: -2,
+  boxShadow: "0 8px 32px rgba(30, 136, 255, 0.15)",
+};
+
+export const cardHoverDarkTransition = {
+  duration: 0.2,
+  ease: "easeOut",
+} as const;
