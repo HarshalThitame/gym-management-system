@@ -197,15 +197,15 @@ export default async function MemberDashboardPage() {
 
       <DashboardSection title="Quick Actions" delay={0.25} variant="glass">
         <div className="flex flex-wrap gap-3">
-          <ButtonLink href="/member/profile" variant="primary" size="lg">Complete Profile</ButtonLink>
-          <ButtonLink href="/member/membership" variant="secondary" size="lg">View Membership</ButtonLink>
-          <ButtonLink href="/member/payments" variant="secondary" size="lg">Payments & Invoices</ButtonLink>
-          <ButtonLink href="/member/attendance" variant="secondary" size="lg">Attendance QR</ButtonLink>
-          <ButtonLink href="/member/classes" variant="secondary" size="lg">Book Classes</ButtonLink>
-          <ButtonLink href="/member/workouts" variant="secondary" size="lg">View Workouts</ButtonLink>
-          <ButtonLink href="/member/fitness" variant="secondary" size="lg">Track Fitness</ButtonLink>
-          <ButtonLink href="/member/ai-coach" variant="secondary" size="lg">AI Coach</ButtonLink>
-          <ButtonLink href="/membership-plans" variant="accent" size="lg">Renew Membership</ButtonLink>
+          <ButtonLink href="/member/profile" variant="primary-gradient" size="lg">Complete Profile</ButtonLink>
+          <ButtonLink href="/member/membership" size="lg" variant="outline-cinematic">View Membership</ButtonLink>
+          <ButtonLink href="/member/payments" size="lg" variant="outline-cinematic">Payments & Invoices</ButtonLink>
+          <ButtonLink href="/member/attendance" size="lg" variant="outline-cinematic">Attendance QR</ButtonLink>
+          <ButtonLink href="/member/classes" size="lg" variant="outline-cinematic">Book Classes</ButtonLink>
+          <ButtonLink href="/member/workouts" size="lg" variant="outline-cinematic">View Workouts</ButtonLink>
+          <ButtonLink href="/member/fitness" size="lg" variant="outline-cinematic">Track Fitness</ButtonLink>
+          <ButtonLink href="/member/ai-coach" size="lg" variant="outline-cinematic">AI Coach</ButtonLink>
+          <ButtonLink href="/membership-plans" variant="primary-gradient" size="lg">Renew Membership</ButtonLink>
         </div>
       </DashboardSection>
     </div>

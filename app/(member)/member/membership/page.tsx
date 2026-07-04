@@ -75,12 +75,12 @@ export default async function MemberMembershipPage() {
                 <MemberField label="Payment Status" value={membership.payment_status.replace(/_/g, " ")} />
               </div>
             ) : (
-              <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">No active membership record is connected yet.</div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm font-semibold text-slate">No active membership record is connected yet.</div>
             )}
             {pendingPayment ? (
-              <div className="rounded-lg border border-border bg-surface-muted p-5">
-                <p className="text-sm font-black">Pending online payment</p>
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">Complete this payment to settle your current membership invoice.</p>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+                <p className="text-sm font-bold text-amber-300">Pending online payment</p>
+                <p className="mt-1 text-xs text-slate">Complete this payment to settle your current membership invoice.</p>
                 <div className="mt-4">
                   <PaymentCheckoutButton
                     amount={pendingPayment.amount}
@@ -93,8 +93,8 @@ export default async function MemberMembershipPage() {
               </div>
             ) : null}
             <div className="flex flex-wrap gap-3">
-              <ButtonLink href="/member/payments" variant="secondary">View Payment History</ButtonLink>
-              <ButtonLink href="/contact?interest=membership-renewal" variant="accent">Request Renewal</ButtonLink>
+              <ButtonLink href="/member/payments" variant="outline-cinematic">View Payment History</ButtonLink>
+              <ButtonLink href="/contact?interest=membership-renewal" variant="primary-gradient">Request Renewal</ButtonLink>
             </div>
           </CardContent>
         </Card>
@@ -105,9 +105,9 @@ export default async function MemberMembershipPage() {
 
 function MemberField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-muted p-4 card-hover">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-2 font-black capitalize">{value}</p>
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] transition-all duration-300">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate">{label}</p>
+      <p className="mt-1.5 font-bold text-mono-member text-white capitalize">{value}</p>
     </div>
   );
 }

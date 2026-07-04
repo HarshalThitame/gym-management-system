@@ -183,21 +183,21 @@ function RefundRowItem({ refund }: { refund: RefundRow }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (["paid", "processed", "approved"].includes(status)) return <Badge variant="success">{status.replace(/_/g, " ")}</Badge>;
-  if (["failed", "cancelled", "refunded"].includes(status)) return <Badge variant="error">{status.replace(/_/g, " ")}</Badge>;
-  if (["pending", "processing", "partially_paid", "partially_refunded", "requested"].includes(status)) return <Badge variant="warning">{status.replace(/_/g, " ")}</Badge>;
-  return <Badge variant="neutral">{status.replace(/_/g, " ")}</Badge>;
+  if (["paid", "processed", "approved"].includes(status)) return <Badge variant="member-success">{status.replace(/_/g, " ")}</Badge>;
+  if (["failed", "cancelled", "refunded"].includes(status)) return <Badge variant="member-error">{status.replace(/_/g, " ")}</Badge>;
+  if (["pending", "processing", "partially_paid", "partially_refunded", "requested"].includes(status)) return <Badge variant="member-warning">{status.replace(/_/g, " ")}</Badge>;
+  return <Badge variant="member-info">{status.replace(/_/g, " ")}</Badge>;
 }
 
 function Amount({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
-      <p className="mt-1 font-black">{value}</p>
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate">{label}</p>
+      <p className="mt-1 font-bold text-mono-member">{value}</p>
     </div>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-border bg-surface-muted p-5 text-sm font-semibold text-muted-foreground">{text}</div>;
+  return <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm font-semibold text-slate">{text}</div>;
 }

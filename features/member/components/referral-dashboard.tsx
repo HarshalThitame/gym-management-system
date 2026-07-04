@@ -7,10 +7,10 @@ import type { MemberReferralData } from "@/features/member/services/referral-ser
 import { cn } from "@/lib/utils";
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "border-amber-200 bg-amber-50 text-amber-700",
-  earned: "border-green-200 bg-green-50 text-green-700",
+  pending: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  earned: "border-green-500/30 bg-green-500/10 text-green-300",
   paid: "border-accent/30 bg-accent/10 text-accent",
-  expired: "border-red-200 bg-red-50 text-red-700"
+  expired: "border-red-500/30 bg-red-500/10 text-red-300"
 };
 
 export function ReferralDashboard({ data }: { data: MemberReferralData }) {
@@ -40,12 +40,12 @@ export function ReferralDashboard({ data }: { data: MemberReferralData }) {
   return (
     <div className="space-y-6">
       <motion.div
-        className="relative overflow-hidden rounded-2xl border border-accent/20 bg-gradient-to-br from-surface via-surface to-accent/5 p-6 md:p-8 shadow-premium"
+        className="relative overflow-hidden rounded-2xl border border-blue-400/20 glass-dark-premium p-6 md:p-8"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <div className="absolute -right-10 -top-10 size-40 rounded-full bg-accent/10 blur-3xl" />
+        <div className="absolute -right-10 -top-10 size-40 rounded-full bg-blue-500/10 blur-3xl" />
         <div className="absolute -left-8 -bottom-8 size-32 rounded-full bg-purple-500/10 blur-3xl" />
 
         <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">

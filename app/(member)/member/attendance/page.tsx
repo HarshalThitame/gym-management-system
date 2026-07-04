@@ -67,12 +67,12 @@ export default async function MemberAttendancePage() {
               <p className="text-sm leading-6 text-muted-foreground">This QR is scoped to attendance, expires automatically, and can be regenerated if shared accidentally.</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-center rounded-xl border border-border bg-white p-5 shadow-glow-sm">
-                {portal.qrSvg ? <div aria-label="Attendance QR code" dangerouslySetInnerHTML={{ __html: portal.qrSvg }} /> : <p className="text-sm font-semibold text-muted-foreground">QR unavailable.</p>}
+              <div className="flex justify-center rounded-xl border border-white/10 bg-surface/80 p-5 shadow-member-card">
+                {portal.qrSvg ? <div aria-label="Attendance QR code" dangerouslySetInnerHTML={{ __html: portal.qrSvg }} /> : <p className="text-sm font-semibold text-slate">QR unavailable.</p>}
               </div>
-              <div className="rounded-lg border border-border bg-surface-muted p-4">
-                <p className="font-bold">Expires</p>
-                <p className="mt-1 text-muted-foreground">{portal.qrToken ? new Date(portal.qrToken.expires_at).toLocaleString("en-IN") : "No active token"}</p>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="font-bold text-white">Expires</p>
+                <p className="mt-1 text-slate">{portal.qrToken ? new Date(portal.qrToken.expires_at).toLocaleString("en-IN") : "No active token"}</p>
               </div>
               <RegenerateQrForm memberId={portal.member.id} />
             </CardContent>
