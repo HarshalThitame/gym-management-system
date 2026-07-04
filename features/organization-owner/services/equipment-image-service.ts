@@ -9,6 +9,7 @@ export const EQUIPMENT_IMAGE_BUCKET = "equipment-images";
 export const equipmentImageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 export const MAX_EQUIPMENT_IMAGE_BYTES = 4 * 1024 * 1024;
 const DEFAULT_IMAGE_MODEL = "gpt-image-2";
+const AI_IMAGE_TIMEOUT_MS = 20_000;
 
 export type EquipmentImageSource = "upload" | "ai";
 
@@ -48,6 +49,11 @@ type OpenAiImageResponse = {
   data?: Array<{
     b64_json?: string;
   }>;
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string;
+  };
 };
 
 function cleanPromptPart(value?: string | null) {
@@ -77,49 +83,80 @@ export function buildEquipmentImagePrompt(input: BuildEquipmentImagePromptInput)
 }
 
 export async function generateEquipmentImagePreview(input: GenerateEquipmentImagePreviewInput) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured.");
   }
+  if (!apiKey.startsWith("sk-")) {
+    throw new Error("OPENAI_API_KEY is invalid. Configure a real OpenAI API key that starts with 'sk-'.");
+  }
 
   const prompt = buildEquipmentImagePrompt(input);
-  const response = await fetch(OPENAI_IMAGE_URL, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    signal: AbortSignal.timeout(45_000),
-    body: JSON.stringify({
-      model: DEFAULT_IMAGE_MODEL,
+  try {
+    const response = await fetch(OPENAI_IMAGE_URL, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      signal: AbortSignal.timeout(AI_IMAGE_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: DEFAULT_IMAGE_MODEL,
+        prompt,
+        size: "1024x1024",
+        quality: "medium",
+        output_format: "jpeg",
+        background: "opaque",
+        moderation: "auto",
+        n: 1,
+        user: input.organizationId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      let parsed: OpenAiImageResponse | null = null;
+      try {
+        parsed = errorText ? JSON.parse(errorText) as OpenAiImageResponse : null;
+      } catch {
+        parsed = null;
+      }
+
+      const providerMessage = parsed?.error?.message?.trim();
+      if (response.status === 401) {
+        throw new Error(providerMessage || "OpenAI rejected the API key. Update OPENAI_API_KEY and redeploy/restart.");
+      }
+      if (response.status === 403) {
+        throw new Error(providerMessage || "This OpenAI project does not have access to image generation.");
+      }
+      if (response.status === 429) {
+        throw new Error(providerMessage || "OpenAI rate limit reached. Wait a moment and try again.");
+      }
+
+      throw new Error(providerMessage || `Image generation failed (${response.status}). Please retry.`);
+    }
+
+    const body = await response.json() as OpenAiImageResponse;
+    const base64 = body.data?.[0]?.b64_json;
+    if (!base64) {
+      throw new Error("Image generation completed but did not return preview data.");
+    }
+
+    return {
       prompt,
-      size: "1536x1024",
-      quality: "high",
-      output_format: "jpeg",
-      background: "opaque",
-      moderation: "auto",
-      n: 1,
-      user: input.organizationId,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => "");
-    throw new Error(`Image generation failed (${response.status}). ${errorBody || "Please retry."}`.trim());
+      dataUrl: `data:image/jpeg;base64,${base64}`,
+      mimeType: "image/jpeg",
+      model: DEFAULT_IMAGE_MODEL,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error("AI image generation timed out after 20 seconds. Try again or simplify the prompt.");
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("AI image generation timed out after 20 seconds. Try again or simplify the prompt.");
+    }
+    throw error;
   }
-
-  const body = await response.json() as OpenAiImageResponse;
-  const base64 = body.data?.[0]?.b64_json;
-  if (!base64) {
-    throw new Error("Image generation did not return image data.");
-  }
-
-  return {
-    prompt,
-    dataUrl: `data:image/jpeg;base64,${base64}`,
-    mimeType: "image/jpeg",
-    model: DEFAULT_IMAGE_MODEL,
-  };
 }
 
 export async function persistUploadedEquipmentImage(input: PersistUploadedEquipmentImageInput): Promise<EquipmentImageAsset> {

@@ -9,6 +9,7 @@ import { RtlToggleClient } from "@/features/organization-owner/components/rtl-to
 import { EntitlementProvider } from "@/features/organization-owner/entitlements/entitlement-provider";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import type { FeatureKey } from "@/features/entitlement";
+import { ToastContainer } from "@/components/ui/toast";
 
 type OrgOwnerLayoutClientProps = {
   organizationId: string;
@@ -34,6 +35,7 @@ export function OrgOwnerLayoutClient({ organizationId, children, planContext, ac
       <EntitlementProvider organizationId={organizationId} initialPlanContext={planContext} activeFeatureKeys={activeFeatureKeys}>
         <LayoutToolbar orgId={organizationId} />
         {children}
+        <ToastContainer />
       </EntitlementProvider>
     </RtlProvider>
   );

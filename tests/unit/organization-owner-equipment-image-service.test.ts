@@ -18,12 +18,14 @@ vi.mock("@/lib/security/file-validation", () => ({
 
 import {
   buildEquipmentImagePrompt,
+  generateEquipmentImagePreview,
   persistGeneratedEquipmentImage,
 } from "@/features/organization-owner/services/equipment-image-service";
 
 describe("equipment image service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("builds a realistic product prompt from equipment metadata", () => {
@@ -74,5 +76,15 @@ describe("equipment image service", () => {
       imagePrompt: "A realistic treadmill in a studio",
     });
     expect(result.imageStoragePath).toContain("organizations/org-1/equipment/");
+  });
+
+  it("rejects non-OpenAI style API keys with a clear configuration error", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "vcp_invalid_token");
+
+    await expect(generateEquipmentImagePreview({
+      organizationId: "org-1",
+      name: "Bike",
+      equipmentType: "cardio",
+    })).rejects.toThrow("OPENAI_API_KEY is invalid");
   });
 });

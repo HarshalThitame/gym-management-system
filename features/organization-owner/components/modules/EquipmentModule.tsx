@@ -115,6 +115,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
   const [equipmentImage, setEquipmentImage] = useState<EquipmentImageState | null>(null);
   const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
+  const [imageStatusMessage, setImageStatusMessage] = useState<string | null>(null);
+  const [imageErrorMessage, setImageErrorMessage] = useState<string | null>(null);
 
   // Service log form
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -226,6 +228,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     replaceEquipmentImage(null);
     setPendingUploadFile(null);
     setImageLoading(false);
+    setImageStatusMessage(null);
+    setImageErrorMessage(null);
     setEditingId(null);
   };
 
@@ -270,6 +274,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     const previewUrl = URL.createObjectURL(file);
     setImageMode("upload");
     setPendingUploadFile(file);
+    setImageStatusMessage("Image selected. It will be uploaded when you save the equipment.");
+    setImageErrorMessage(null);
     replaceEquipmentImage({
       previewUrl,
       storagePath: null,
@@ -282,6 +288,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
 
   const handleRemoveImage = () => {
     setPendingUploadFile(null);
+    setImageStatusMessage(null);
+    setImageErrorMessage(null);
     replaceEquipmentImage(null);
   };
 
@@ -292,6 +300,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     }
 
     setImageLoading(true);
+    setImageErrorMessage(null);
+    setImageStatusMessage("Generating a realistic preview. This can take up to 20 seconds.");
     try {
       const response = await fetch("/api/organization/equipment/generate-image", {
         method: "POST",
@@ -321,9 +331,13 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
         needsPersist: true,
         generatedDataUrl: payload.imageDataUrl,
       });
+      setImageStatusMessage("AI preview ready. Review it, regenerate if needed, then save the equipment.");
       showToast("AI image ready to review", "success");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Failed to generate image", "error");
+      const message = e instanceof Error ? e.message : "Failed to generate image";
+      setImageErrorMessage(message);
+      setImageStatusMessage(null);
+      showToast(message, "error");
     } finally {
       setImageLoading(false);
     }
@@ -371,6 +385,8 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     };
 
     setPendingUploadFile(null);
+    setImageErrorMessage(null);
+    setImageStatusMessage("Equipment image saved and linked to this equipment record.");
     replaceEquipmentImage(persistedImage);
     return persistedImage;
   };
@@ -971,7 +987,10 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
               <button
                 className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${imageMode === "upload" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
                 disabled={imageLoading}
-                onClick={() => setImageMode("upload")}
+                onClick={() => {
+                  setImageMode("upload");
+                  setImageErrorMessage(null);
+                }}
                 type="button"
               >
                 <Upload className="size-4" />
@@ -980,7 +999,10 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
               <button
                 className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${imageMode === "ai" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
                 disabled={imageLoading}
-                onClick={() => setImageMode("ai")}
+                onClick={() => {
+                  setImageMode("ai");
+                  setImageErrorMessage(null);
+                }}
                 type="button"
               >
                 <Sparkles className="size-4" />
@@ -1014,6 +1036,18 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
                 {equipmentImage.source === "ai" && equipmentImage.prompt ? (
                   <p className="text-xs text-muted-foreground">AI prompt: {equipmentImage.prompt}</p>
                 ) : null}
+              </div>
+            ) : null}
+
+            {imageStatusMessage ? (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900">
+                {imageStatusMessage}
+              </div>
+            ) : null}
+
+            {imageErrorMessage ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
+                {imageErrorMessage}
               </div>
             ) : null}
 
