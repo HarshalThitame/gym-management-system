@@ -3,6 +3,7 @@ import { CalendarCheck, Clock, Flame, QrCode } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { RegenerateQrForm } from "@/features/attendance/components/attendance-forms";
+import { DynamicAttendanceQr } from "@/features/member/components/dynamic-attendance-qr";
 import { AttendanceStatusBadge } from "@/features/attendance/components/attendance-status-badge";
 import { getMemberAttendancePortal } from "@/features/attendance/services/attendance-service";
 import { requireMemberPortalAccess } from "@/features/member/lib/access";
@@ -64,16 +65,14 @@ export default async function MemberAttendancePage() {
           <Card variant="glass">
             <CardHeader>
               <h3 className="text-2xl font-black">Member QR</h3>
-              <p className="text-sm leading-6 text-muted-foreground">This QR is scoped to attendance, expires automatically, and can be regenerated if shared accidentally.</p>
+              <p className="text-sm leading-6 text-muted-foreground">This QR rotates automatically for live attendance use. The static QR fallback and regeneration flow remain available below.</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-center rounded-xl border border-white/10 bg-surface/80 p-5 shadow-member-card">
-                {portal.qrSvg ? <div aria-label="Attendance QR code" dangerouslySetInnerHTML={{ __html: portal.qrSvg }} /> : <p className="text-sm font-semibold text-slate">QR unavailable.</p>}
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="font-bold text-white">Expires</p>
-                <p className="mt-1 text-slate">{portal.qrToken ? new Date(portal.qrToken.expires_at).toLocaleString("en-IN") : "No active token"}</p>
-              </div>
+              <DynamicAttendanceQr
+                fallbackExpiresAt={portal.qrToken?.expires_at ?? null}
+                fallbackQrSvg={portal.qrSvg}
+                memberId={portal.member.id}
+              />
               <RegenerateQrForm memberId={portal.member.id} />
             </CardContent>
           </Card>

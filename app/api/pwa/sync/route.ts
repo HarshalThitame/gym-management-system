@@ -10,8 +10,8 @@ const allowedOfflineTargets: Record<QueueableOfflineActionType, { methods: Set<s
   workout_log: { methods: new Set(["POST", "PUT", "PATCH"]), prefixes: ["/member/workouts", "/member/fitness"] },
   nutrition_log: { methods: new Set(["POST", "PUT", "PATCH"]), prefixes: ["/member/fitness", "/member/nutrition"] },
   profile_update: { methods: new Set(["POST", "PUT", "PATCH"]), prefixes: ["/member/profile", "/member/settings"] },
-  attendance_check_in: { methods: new Set(["POST"]), prefixes: ["/member/attendance", "/admin/attendance"] },
-  attendance_check_out: { methods: new Set(["POST"]), prefixes: ["/member/attendance", "/admin/attendance"] },
+  attendance_check_in: { methods: new Set(["POST"]), prefixes: ["/member/attendance", "/admin/attendance", "/api/attendance/devices"] },
+  attendance_check_out: { methods: new Set(["POST"]), prefixes: ["/member/attendance", "/admin/attendance", "/api/attendance/devices"] },
   class_booking_request: { methods: new Set(["POST", "DELETE"]), prefixes: ["/member/classes"] }
 };
 

@@ -1,4 +1,207 @@
-import { createClient } from 'redis';
+type RedisDriver = "real" | "memory";
+
+type RedisMessageHandler = (message: string) => void;
+
+interface RedisLikeClient {
+  driver: RedisDriver;
+  connect(): Promise<void>;
+  quit(): Promise<void>;
+  get(key: string): Promise<string | null>;
+  setEx(key: string, ttl: number, value: string): Promise<void>;
+  del(keyOrKeys: string | string[]): Promise<number>;
+  keys(pattern: string): Promise<string[]>;
+  incr(key: string): Promise<number>;
+  expire(key: string, ttl: number): Promise<number>;
+  exists(key: string): Promise<number>;
+  publish(channel: string, message: string): Promise<number>;
+  subscribe(channel: string, handler: RedisMessageHandler): Promise<void>;
+  unsubscribe(channel: string): Promise<void>;
+  duplicate(): RedisLikeClient;
+  on(event: "error" | "connect" | "reconnecting", handler: (err?: unknown) => void): void;
+}
+
+type RedisModule = {
+  createClient: (options: {
+    url: string;
+    socket?: {
+      reconnectStrategy?: (retries: number) => number | Error;
+    };
+  }) => RedisLikeClient;
+};
+
+type RedisStore = {
+  values: Map<string, { value: string; expiresAt: number | null }>;
+  subscribers: Map<string, Set<RedisMessageHandler>>;
+};
+
+const memoryStore: RedisStore = {
+  values: new Map(),
+  subscribers: new Map(),
+};
+
+let redisModuleCache: RedisModule | null | undefined;
+
+function loadRedisModule(): RedisModule | null {
+  if (redisModuleCache !== undefined) {
+    return redisModuleCache;
+  }
+
+  try {
+    const dynamicRequire = eval("require") as NodeRequire;
+    redisModuleCache = dynamicRequire("redis") as RedisModule;
+    return redisModuleCache;
+  } catch {
+    redisModuleCache = null;
+    return null;
+  }
+}
+
+function createMemoryRedisClient(): RedisLikeClient {
+  const listeners = new Map<"error" | "connect" | "reconnecting", Set<(err?: unknown) => void>>();
+
+  const getListeners = (event: "error" | "connect" | "reconnecting") => {
+    let handlers = listeners.get(event);
+    if (!handlers) {
+      handlers = new Set();
+      listeners.set(event, handlers);
+    }
+    return handlers;
+  };
+
+  const isExpired = (entry: { value: string; expiresAt: number | null } | undefined) => {
+    if (!entry) return true;
+    if (entry.expiresAt === null) return false;
+    if (entry.expiresAt > Date.now()) return false;
+    return true;
+  };
+
+  const emit = (event: "error" | "connect" | "reconnecting", err?: unknown) => {
+    for (const handler of getListeners(event)) {
+      handler(err);
+    }
+  };
+
+  const client: RedisLikeClient = {
+    driver: "memory",
+    async connect() {
+      queueMicrotask(() => emit("connect"));
+    },
+    async quit() {
+      return;
+    },
+    async get(key) {
+      const entry = memoryStore.values.get(key);
+      if (isExpired(entry)) {
+        if (entry) memoryStore.values.delete(key);
+        return null;
+      }
+      return entry.value;
+    },
+    async setEx(key, ttl, value) {
+      memoryStore.values.set(key, {
+        value,
+        expiresAt: ttl > 0 ? Date.now() + ttl * 1000 : Date.now(),
+      });
+    },
+    async del(keyOrKeys) {
+      const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
+      let removed = 0;
+      for (const key of keys) {
+        removed += memoryStore.values.delete(key) ? 1 : 0;
+      }
+      return removed;
+    },
+    async keys(pattern) {
+      const escaped = pattern
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, ".*");
+      const regex = new RegExp(`^${escaped}$`);
+      const matches: string[] = [];
+      for (const [key, entry] of memoryStore.values.entries()) {
+        if (isExpired(entry)) {
+          memoryStore.values.delete(key);
+          continue;
+        }
+        if (regex.test(key)) {
+          matches.push(key);
+        }
+      }
+      return matches;
+    },
+    async incr(key) {
+      const existing = memoryStore.values.get(key);
+      const current = Number.parseInt((await client.get(key)) ?? "0", 10);
+      const next = Number.isFinite(current) ? current + 1 : 1;
+      memoryStore.values.set(key, {
+        value: String(next),
+        expiresAt: existing?.expiresAt ?? null,
+      });
+      return next;
+    },
+    async expire(key, ttl) {
+      const entry = memoryStore.values.get(key);
+      if (isExpired(entry)) return 0;
+      memoryStore.values.set(key, {
+        value: entry!.value,
+        expiresAt: Date.now() + ttl * 1000,
+      });
+      return 1;
+    },
+    async exists(key) {
+      return (await client.get(key)) === null ? 0 : 1;
+    },
+    async publish(channel, message) {
+      const subscribers = memoryStore.subscribers.get(channel);
+      if (!subscribers || subscribers.size === 0) return 0;
+      for (const handler of subscribers) {
+        queueMicrotask(() => handler(message));
+      }
+      return subscribers.size;
+    },
+    async subscribe(channel, handler) {
+      let subscribers = memoryStore.subscribers.get(channel);
+      if (!subscribers) {
+        subscribers = new Set();
+        memoryStore.subscribers.set(channel, subscribers);
+      }
+      subscribers.add(handler);
+    },
+    async unsubscribe(channel) {
+      memoryStore.subscribers.delete(channel);
+    },
+    duplicate() {
+      return createMemoryRedisClient();
+    },
+    on(event, handler) {
+      getListeners(event).add(handler);
+    },
+  };
+
+  return client;
+}
+
+function createClient(options: Parameters<NonNullable<RedisModule["createClient"]>>[0]): RedisLikeClient {
+  const redisModule = loadRedisModule();
+  if (redisModule) {
+    return redisModule.createClient(options);
+  }
+
+  return createMemoryRedisClient();
+}
+
+export function createRedisClientFromUrl(redisUrl: string): RedisLikeClient {
+  return createClient({
+    url: redisUrl,
+    socket: {
+      reconnectStrategy: (retries) => {
+        if (retries > 10) {
+          return new Error("Max reconnection attempts reached");
+        }
+        return Math.min(retries * 100, 3000);
+      },
+    },
+  });
+}
 
 // Redis client singleton
 let redisClient: ReturnType<typeof createClient> | null = null;
@@ -18,18 +221,7 @@ export function getRedisClient() {
     return null;
   }
 
-  redisClient = createClient({
-    url: redisUrl,
-    socket: {
-      reconnectStrategy: (retries) => {
-        if (retries > 10) {
-          console.error('[Cache] Max reconnection attempts reached');
-          return new Error('Max reconnection attempts reached');
-        }
-        return Math.min(retries * 100, 3000);
-      },
-    },
-  });
+  redisClient = createRedisClientFromUrl(redisUrl);
 
   redisClient.on('error', (err) => {
     console.error('[Cache] Redis error:', err);

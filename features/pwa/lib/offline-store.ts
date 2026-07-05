@@ -143,6 +143,15 @@ export async function saveDraft<TValue extends Json>(key: string, value: TValue)
   await putRecord(db, DRAFT_STORE, { key, value, updatedAt: new Date().toISOString() });
 }
 
+export async function deleteDraft(key: string) {
+  if (!isIndexedDbAvailable()) {
+    return;
+  }
+
+  const db = await openDatabase();
+  await deleteRecord(db, DRAFT_STORE, key);
+}
+
 export async function getDraft<TValue extends Json>(key: string) {
   if (!isIndexedDbAvailable()) {
     return null;

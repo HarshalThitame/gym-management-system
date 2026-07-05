@@ -2,8 +2,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useMemo, useState } from "react";
-import { Activity, CalendarCheck, Clock, Download, Eye, Percent, TrendingUp, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, CalendarCheck, Clock, Cpu, Download, Eye, Percent, TrendingUp, XCircle } from "lucide-react";
 import { Bar, BarChart, Cell, Line, LineChart as RechartsLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
@@ -11,9 +11,11 @@ import { FilterBar } from "@/features/organization-owner/components/org-owner-fi
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
+import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { StatCard } from "@/components/ui/stat-card";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatCompactNumber, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { DeviceManagementPanel } from "./DeviceManagementPanel";
 
 type AttendanceEnterpriseModuleProps = { dashboard: OrganizationOwnerDashboard; moduleData?: { items: Record<string, unknown>[] }; };
 
@@ -21,6 +23,12 @@ const CHART_COLORS = ["#16a34a", "#dc2626", "#f59e0b", "#0891b2"];
 
 export function AttendanceEnterpriseModule({ dashboard, moduleData }: AttendanceEnterpriseModuleProps) {
   const { filters, navigate, currentPage } = useModuleFilters();
+  const hasDeviceFeature = useHasFeature("attendance_api");
+  const [tab, setTab] = useState<"logs" | "devices">("logs");
+
+  useEffect(() => {
+    if (tab === "devices" && !hasDeviceFeature) setTab("logs");
+  }, [tab, hasDeviceFeature]);
   const [detailLog, setDetailLog] = useState<Record<string, unknown> | null>(null);
   const [chartTab, setChartTab] = useState<"trend" | "hour" | "weekday">("trend");
 
@@ -106,6 +114,22 @@ export function AttendanceEnterpriseModule({ dashboard, moduleData }: Attendance
 
   return (
     <div className="space-y-6">
+      {/* ═══ TAB BAR ═══ */}
+      <div className="flex gap-1 rounded-lg border border-border bg-surface p-0.5 self-start">
+        <button className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${tab === "logs" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setTab("logs")} type="button">
+          <CalendarCheck className="mr-1.5 inline size-3.5" /> Attendance Logs
+        </button>
+        {hasDeviceFeature && (
+          <button className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${tab === "devices" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setTab("devices")} type="button">
+            <Cpu className="mr-1.5 inline size-3.5" /> Devices
+          </button>
+        )}
+      </div>
+
+      {tab === "devices" && hasDeviceFeature ? (
+        <DeviceManagementPanel dashboard={dashboard} />
+      ) : (
+      <>
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Total attendance records" icon={<CalendarCheck className="size-5" />} label="Total Logs" value={formatCompactNumber(logs.length)} />
@@ -212,6 +236,8 @@ export function AttendanceEnterpriseModule({ dashboard, moduleData }: Attendance
 
       {/* ═══ DETAIL PANEL ═══ */}
       {detailLog ? <AttendanceDetailPanel log={detailLog} dashboard={dashboard} onClose={() => setDetailLog(null)} /> : null}
+      </>
+      )}
     </div>
   );
 }

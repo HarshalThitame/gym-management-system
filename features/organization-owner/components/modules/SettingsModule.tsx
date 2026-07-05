@@ -1,18 +1,16 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Calendar, CheckCircle2, Download, ExternalLink, Gauge, Settings as SettingsIcon, ShieldCheck, ToggleLeft, ToggleRight, XCircle } from "lucide-react";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
 import { DataList } from "@/features/organization-owner/components/org-owner-data-list";
-import { FilterBar } from "@/features/organization-owner/components/org-owner-filter-bar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
 import { StatCard } from "@/components/ui/stat-card";
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
 import { formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
-import { toggleFeatureFlagAction } from "@/features/organization-owner/actions/settings-actions";
+import { saveBranchSettingAction, toggleFeatureFlagAction } from "@/features/organization-owner/actions/settings-actions";
 import { useHasFeature } from "@/features/organization-owner/entitlements/entitlement-provider";
 import { GoogleCalendarPanel } from "@/features/organization-owner/components/modules/GoogleCalendarPanel";
 import { WebhookPanel } from "@/features/organization-owner/components/modules/WebhookPanel";
@@ -23,15 +21,16 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
   const { filters, navigate, currentPage } = useModuleFilters();
   const [activeTab, setActiveTab] = useState<"flags" | "branch" | "compliance" | "notifications" | "integrations_calendar" | "integrations_webhooks">("flags");
   const [flagFilter, setFlagFilter] = useState<string>("all");
+  const [geofenceBranchId, setGeofenceBranchId] = useState<string>(dashboard.branches[0]?.id ?? "");
+  const [geofenceEnabled, setGeofenceEnabled] = useState<boolean>(true);
+  const [geofenceRadiusM, setGeofenceRadiusM] = useState<string>("150");
+  const [geofenceSaving, setGeofenceSaving] = useState(false);
   const hasGoogleCalendar = useHasFeature("google_calendar_sync");
   const hasWebhooks = useHasFeature("webhooks");
 
   const flags = (moduleData?.items ?? dashboard.featureFlags) as typeof dashboard.featureFlags;
   const branchSettings = dashboard.branchSettings;
   const complianceRequests = dashboard.complianceRequests;
-  const tenantConfigs = dashboard.tenantConfigs;
-
-  const handleApply = useCallback((f: Record<string, string>) => { navigate({ q: f.q }); }, [navigate]);
 
   const handleToggleFlag = useCallback(async (flagId: string, current: boolean) => {
     const fd = new FormData(); fd.set("flagId", flagId); fd.set("enabled", String(!current));
@@ -39,9 +38,35 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
     showToast(r.message || "Toggled", r.status === "success" ? "success" : "error");
   }, []);
 
+  useEffect(() => {
+    const selected = branchSettings.find((item) => item.branch_id === geofenceBranchId);
+    const attendanceSettings = (selected?.attendance_settings ?? {}) as Record<string, unknown>;
+    if (selected) {
+      setGeofenceEnabled(attendanceSettings.geo_fence_enabled === true || attendanceSettings.geo_fence_enabled === "true");
+      setGeofenceRadiusM(String(attendanceSettings.geo_fence_radius_m ?? 150));
+    }
+  }, [branchSettings, geofenceBranchId]);
+
+  const handleSaveGeofence = useCallback(async () => {
+    if (!geofenceBranchId) return;
+    setGeofenceSaving(true);
+    try {
+      const fd = new FormData();
+      fd.set("branchId", geofenceBranchId);
+      fd.set("settingsKey", "attendance");
+      fd.set("settingsValue", JSON.stringify({
+        geo_fence_enabled: geofenceEnabled,
+        geo_fence_radius_m: Number(geofenceRadiusM) > 0 ? Number(geofenceRadiusM) : 150,
+      }));
+      const r = await saveBranchSettingAction({ status: "idle", message: null } as never, fd);
+      showToast(r.message || "Geofence settings saved.", r.status === "success" ? "success" : "error");
+    } finally {
+      setGeofenceSaving(false);
+    }
+  }, [geofenceBranchId, geofenceEnabled, geofenceRadiusM]);
+
   // ── KPIs ──
   const enabledFlags = flags.filter((f) => f.enabled).length;
-  const activeFlags = flags.filter((f) => f.status === "active").length;
   const openCompliance = complianceRequests.filter((c) => c.status === "open" || c.status === "in_review").length;
 
   // ── Filtered flags ──
@@ -181,6 +206,59 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
       {/* ═══ TAB: BRANCH SETTINGS ═══ */}
       {activeTab === "branch" ? (
         <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <h3 className="text-2xl font-black">Geofence Attendance</h3>
+              <p className="text-sm text-muted-foreground">Configure the branch geofence used by mobile self check-in and auto-checkout.</p>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Branch</span>
+                <select
+                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm"
+                  value={geofenceBranchId}
+                  onChange={(event) => setGeofenceBranchId(event.target.value)}
+                >
+                  {dashboard.branches.map((branch) => (
+                    <option key={branch.id as string} value={branch.id as string}>
+                      {branch.name as string}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Radius (meters)</span>
+                <input
+                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm"
+                  type="number"
+                  min={25}
+                  step={5}
+                  value={geofenceRadiusM}
+                  onChange={(event) => setGeofenceRadiusM(event.target.value)}
+                />
+              </label>
+              <label className="flex items-center gap-3 rounded-md border border-border bg-surface-muted px-3 py-3 md:col-span-2">
+                <input
+                  checked={geofenceEnabled}
+                  className="size-4"
+                  onChange={(event) => setGeofenceEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+                <div>
+                  <p className="text-sm font-bold">Enable geofence enforcement</p>
+                  <p className="text-xs text-muted-foreground">Members must be within the selected radius for mobile self check-in and geofence-based checkout.</p>
+                </div>
+              </label>
+              <button
+                className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm disabled:opacity-50 md:col-span-2"
+                disabled={geofenceSaving || !geofenceBranchId}
+                onClick={() => void handleSaveGeofence()}
+                type="button"
+              >
+                {geofenceSaving ? "Saving..." : "Save geofence settings"}
+              </button>
+            </CardContent>
+          </Card>
           {branchSettings.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border bg-surface-muted p-8 text-center">
               <SettingsIcon className="mx-auto size-8 text-muted-foreground" />

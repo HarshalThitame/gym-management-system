@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { QrCode, CheckCircle2 } from "lucide-react";
+import { CheckCircle2, LocateFixed } from "lucide-react";
 
 type SelfCheckInButtonProps = {
   memberId: string;
@@ -11,17 +11,32 @@ type SelfCheckInButtonProps = {
 export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
   const [checkedIn, setCheckedIn] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   const handleCheckIn = async () => {
     setLoading(true);
+    setMessage(null);
     try {
+      const location = await getCurrentPosition();
       const res = await fetch("/api/attendance/self-checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberId })
+        body: JSON.stringify({
+          memberId,
+          latitude: location?.coords.latitude ?? undefined,
+          longitude: location?.coords.longitude ?? undefined,
+          accuracyM: location?.coords.accuracy ?? undefined,
+        })
       });
-      if (res.ok) setCheckedIn(true);
-    } catch {
+      const json = await res.json().catch(() => null);
+      if (res.ok) {
+        setCheckedIn(true);
+        setMessage("Check-in recorded.");
+        return;
+      }
+      setMessage(json?.error?.message ?? "Check-in failed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Check-in failed.");
     } finally {
       setLoading(false);
     }
@@ -61,19 +76,34 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
-      <div className="absolute inset-0 bg-gradient-mesh opacity-20" />
-      <div className="relative z-10 flex items-center justify-center gap-4">
-        <motion.div
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <QrCode className="size-7" />
-        </motion.div>
-        <div className="text-left">
-          <p className="text-lg font-black">{loading ? "Checking in..." : "Check In Now"}</p>
-          <p className="text-sm font-semibold text-white/80">Tap to record your gym visit</p>
+        <div className="absolute inset-0 bg-gradient-mesh opacity-20" />
+        <div className="relative z-10 flex items-center justify-center gap-4">
+          <motion.div
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <LocateFixed className="size-7" />
+          </motion.div>
+          <div className="text-left">
+            <p className="text-lg font-black">{loading ? "Checking in..." : "Check In Now"}</p>
+            <p className="text-sm font-semibold text-white/80">Tap to record your gym visit with location verification</p>
+          </div>
         </div>
-      </div>
-    </motion.button>
-  );
+        {message ? <p className="relative z-10 mt-4 text-left text-xs font-semibold text-white/85">{message}</p> : null}
+      </motion.button>
+    );
+  }
+
+function getCurrentPosition() {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    return Promise.reject(new Error("Location services are unavailable in this browser."));
+  }
+
+  return new Promise<GeolocationPosition>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 30000,
+    });
+  });
 }

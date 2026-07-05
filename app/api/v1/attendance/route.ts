@@ -1,112 +1,85 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withApiAuth } from "@/features/api/middleware/api-auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { listAttendanceSessionsV1, normalizeV1CheckInResponse, resolveGymScopeIds, checkInMember } from "@/features/attendance/lib/phase1-api";
 
-/**
- * GET /api/v1/attendance
- * List attendance records with pagination and filtering
- */
-export const GET = withApiAuth(
-  async (request: NextRequest, context) => {
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
-    const offset = (page - 1) * limit;
-    const memberId = searchParams.get("member_id");
-    const dateFrom = searchParams.get("date_from");
-    const dateTo = searchParams.get("date_to");
+export const GET = withApiAuth(async (request: NextRequest, context) => {
+  const { searchParams } = new URL(request.url);
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+  const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") || "20")), 100);
+  const memberId = searchParams.get("member_id");
+  const dateFrom = searchParams.get("date_from");
+  const dateTo = searchParams.get("date_to");
+  const status = searchParams.get("status");
+  const branchId = searchParams.get("branch_id");
+  const gymId = searchParams.get("gym_id");
 
-    const supabase = createAdminClient();
+  const gymIds = await resolveGymScopeIds(context.apiKey.organization_id, gymId);
+  if (gymIds.length === 0) {
+    return NextResponse.json(
+      { error: "Gym scope not found", message: "Provide a valid gym_id for this organization." },
+      { status: 400 },
+    );
+  }
 
-    let query = supabase
-      .from("attendance_sessions")
-      .select("*", { count: "exact" })
-      .eq("organization_id", context.apiKey.organization_id)
-      .order("check_in_time", { ascending: false })
-      .range(offset, offset + limit - 1);
+  const result = await listAttendanceSessionsV1({
+    gymIds,
+    gymId,
+    page,
+    limit,
+    memberId,
+    branchId,
+    status,
+    dateFrom,
+    dateTo,
+  });
 
-    if (memberId) {
-      query = query.eq("member_id", memberId);
-    }
+  return NextResponse.json(result);
+}, { requiredScope: "read:attendance", rateLimit: 100 });
 
-    if (dateFrom) {
-      query = query.gte("check_in_time", dateFrom);
-    }
+export const POST = withApiAuth(async (request: NextRequest, context) => {
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  const memberId = typeof body.member_id === "string" ? body.member_id : typeof body.memberId === "string" ? body.memberId : null;
+  const gymId = typeof body.gym_id === "string" ? body.gym_id : typeof body.gymId === "string" ? body.gymId : null;
+  const branchId = typeof body.branch_id === "string" ? body.branch_id : typeof body.branchId === "string" ? body.branchId : null;
+  const notes = typeof body.notes === "string" ? body.notes : null;
 
-    if (dateTo) {
-      query = query.lte("check_in_time", dateTo);
-    }
+  if (!memberId) {
+    return NextResponse.json(
+      { error: "Missing required field", message: "member_id is required" },
+      { status: 400 },
+    );
+  }
 
-    const { data, error, count } = await query;
+  const gymIds = await resolveGymScopeIds(context.apiKey.organization_id, gymId);
+  if (gymIds.length === 0) {
+    return NextResponse.json(
+      { error: "Gym scope not found", message: "Provide a valid gym_id for this organization." },
+      { status: 400 },
+    );
+  }
 
-    if (error) {
-      return NextResponse.json({ error: "Failed to fetch attendance", details: error.message }, { status: 500 });
-    }
+  const result = await checkInMember({
+    actor: {
+      userId: `api:${context.apiKey.id}`,
+      organizationId: context.apiKey.organization_id,
+      profile: null,
+      primaryRole: null,
+      roles: [],
+      gymId: gymIds[0],
+      branchId,
+    },
+    memberId,
+    source: "reception",
+    branchId,
+    notes,
+  });
 
-    return NextResponse.json({
-      data,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit),
-      },
-    });
-  },
-  { requiredScope: "read:attendance", rateLimit: 100 }
-);
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.code, message: result.message },
+      { status: result.status },
+    );
+  }
 
-/**
- * POST /api/v1/attendance/check-in
- * Record a member check-in
- */
-export const POST = withApiAuth(
-  async (request: NextRequest, context) => {
-    const body = await request.json();
-    const { member_id, gym_id, notes } = body;
-
-    if (!member_id) {
-      return NextResponse.json(
-        { error: "Missing required field", message: "member_id is required" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createAdminClient();
-
-    // Check if member has an active session (already checked in)
-    const { data: activeSession } = await supabase
-      .from("attendance_sessions")
-      .select("id")
-      .eq("member_id", member_id)
-      .eq("organization_id", context.apiKey.organization_id)
-      .is("check_out_time", null)
-      .maybeSingle();
-
-    if (activeSession) {
-      return NextResponse.json(
-        { error: "Member already checked in", message: "Member must check out before checking in again" },
-        { status: 409 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("attendance_sessions")
-      .insert({
-        organization_id: context.apiKey.organization_id,
-        member_id,
-        gym_id: gym_id || null,
-        check_in_time: new Date().toISOString(),
-        notes: notes || null,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: "Failed to record check-in", details: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ data }, { status: 201 });
-  },
-  { requiredScope: "write:attendance", rateLimit: 60 }
-);
+  return NextResponse.json({ data: normalizeV1CheckInResponse(result) }, { status: 201 });
+}, { requiredScope: "write:attendance", rateLimit: 60 });

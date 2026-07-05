@@ -41935,6 +41935,227 @@ export type Database = {
           },
         ]
       }
+      occupancy_log: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          day_of_week: number
+          gym_id: string
+          hour_of_day: number
+          id: string
+          members_in_gym: number
+          occupancy_percent: number | null
+          organization_id: string | null
+          timestamp: string
+          total_capacity: number | null
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          day_of_week?: number
+          gym_id: string
+          hour_of_day?: number
+          id?: string
+          members_in_gym?: number
+          occupancy_percent?: number | null
+          organization_id?: string | null
+          timestamp?: string
+          total_capacity?: number | null
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          day_of_week?: number
+          gym_id?: string
+          hour_of_day?: number
+          id?: string
+          members_in_gym?: number
+          occupancy_percent?: number | null
+          organization_id?: string | null
+          timestamp?: string
+          total_capacity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "occupancy_log_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "occupancy_log_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      streaks: {
+        Row: {
+          branch_id: string | null
+          broken_date: string | null
+          current_streak: number
+          days_since_broken: number | null
+          gym_id: string
+          id: string
+          is_broken: boolean
+          last_checkin_date: string | null
+          max_streak: number
+          member_id: string
+          milestones_claimed: number[]
+          milestones_reached: number[]
+          streak_start_date: string | null
+          total_checkins: number
+          total_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          broken_date?: string | null
+          current_streak?: number
+          days_since_broken?: number | null
+          gym_id: string
+          id?: string
+          is_broken?: boolean
+          last_checkin_date?: string | null
+          max_streak?: number
+          member_id: string
+          milestones_claimed?: number[]
+          milestones_reached?: number[]
+          streak_start_date?: string | null
+          total_checkins?: number
+          total_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          broken_date?: string | null
+          current_streak?: number
+          days_since_broken?: number | null
+          gym_id?: string
+          id?: string
+          is_broken?: boolean
+          last_checkin_date?: string | null
+          max_streak?: number
+          member_id?: string
+          milestones_claimed?: number[]
+          milestones_reached?: number[]
+          streak_start_date?: string | null
+          total_checkins?: number
+          total_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "streaks_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "streaks_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "streaks_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_analytics: {
+        Row: {
+          attendance_trend: number | null
+          avg_session_duration: number | null
+          branch_id: string | null
+          checkins_this_month: number
+          checkins_this_week: number
+          churn_risk_score: number
+          confidence_score: number | null
+          created_at: string
+          gym_id: string
+          id: string
+          last_risk_assessment: string | null
+          member_id: string
+          month: number | null
+          organization_id: string | null
+          predicted_checkout_date: string | null
+          updated_at: string
+          week_start_date: string | null
+          year: number | null
+        }
+        Insert: {
+          attendance_trend?: number | null
+          avg_session_duration?: number | null
+          branch_id?: string | null
+          checkins_this_month?: number
+          checkins_this_week?: number
+          churn_risk_score?: number
+          confidence_score?: number | null
+          created_at?: string
+          gym_id: string
+          id?: string
+          last_risk_assessment?: string | null
+          member_id: string
+          month?: number | null
+          organization_id?: string | null
+          predicted_checkout_date?: string | null
+          updated_at?: string
+          week_start_date?: string | null
+          year?: number | null
+        }
+        Update: {
+          attendance_trend?: number | null
+          avg_session_duration?: number | null
+          branch_id?: string | null
+          checkins_this_month?: number
+          checkins_this_week?: number
+          churn_risk_score?: number
+          confidence_score?: number | null
+          created_at?: string
+          gym_id?: string
+          id?: string
+          last_risk_assessment?: string | null
+          member_id?: string
+          month?: number | null
+          organization_id?: string | null
+          predicted_checkout_date?: string | null
+          updated_at?: string
+          week_start_date?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_analytics_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_analytics_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_analytics_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       agg_attendance_daily: {

@@ -24,6 +24,7 @@ import {
 } from "../lib/business-rules";
 import { AccessDeviceSchema, CheckOutSchema, ManualCheckInSchema, QrCheckInSchema, RegenerateQrSchema } from "../schemas/attendance";
 import { getActiveMembershipForMember } from "../services/attendance-service";
+import { consumeQrTokenUsage } from "../lib/phase1-api";
 import {
   entitlementSimpleCatch,
   requireOrganizationFeatureAccess,
@@ -85,13 +86,13 @@ export async function qrCheckInAction(_previousState: AuthActionState, formData:
     return { status: "error", message: error.message };
   }
 
-  if (!qrToken || qrToken.status !== "active") {
+  if (!qrToken) {
     await logAccessAttempt(supabase, context, {
       gymId: scope.gymId,
-      memberId: qrToken?.member_id ?? null,
+      memberId: null,
       membershipId: null,
       sessionId: null,
-      qrTokenId: qrToken?.id ?? null,
+      qrTokenId: null,
       deviceId: parsed.data.deviceId || null,
       direction: "entry",
       source: "qr",
@@ -150,6 +151,42 @@ export async function qrCheckInAction(_previousState: AuthActionState, formData:
     return { status: "error", message: "QR token has expired. Ask the member to regenerate their QR." };
   }
 
+  if (qrToken.status === "used") {
+    await logAccessAttempt(supabase, context, {
+      gymId: scope.gymId,
+      memberId: qrToken.member_id,
+      membershipId: null,
+      sessionId: null,
+      qrTokenId: qrToken.id,
+      deviceId: parsed.data.deviceId || null,
+      direction: "entry",
+      source: "qr",
+      decision: "denied",
+      reasonCode: "qr_used",
+      message: "QR token was already used.",
+      snapshot: { qrTokenId: qrToken.id } as Json
+    });
+    return { status: "error", message: "QR token was already used." };
+  }
+
+  if (qrToken.status !== "active") {
+    await logAccessAttempt(supabase, context, {
+      gymId: scope.gymId,
+      memberId: qrToken.member_id,
+      membershipId: null,
+      sessionId: null,
+      qrTokenId: qrToken.id,
+      deviceId: parsed.data.deviceId || null,
+      direction: "entry",
+      source: "qr",
+      decision: "denied",
+      reasonCode: "qr_invalid",
+      message: "QR token is invalid or revoked.",
+      snapshot: { qrTokenId: qrToken.id } as Json
+    });
+    return { status: "error", message: "QR token is invalid or revoked." };
+  }
+
   const result = await processCheckIn({
     context,
     memberId: qrToken.member_id,
@@ -160,7 +197,7 @@ export async function qrCheckInAction(_previousState: AuthActionState, formData:
   });
 
   if (result.status === "success") {
-    await supabase.from("qr_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", qrToken.id);
+    await consumeQrTokenUsage(supabase, qrToken.id).catch(() => {});
   }
 
   revalidateAttendancePaths(qrToken.member_id);
