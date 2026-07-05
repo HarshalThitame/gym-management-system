@@ -1,7 +1,6 @@
 import "server-only";
 
 import { Server as SocketIOServer, type DefaultEventsMap, type Socket } from "socket.io";
-import { createAdapter } from "@socket.io/redis-adapter";
 import type { Server as HTTPServer } from "http";
 import { createRedisClientFromUrl } from "@/lib/cache/redis";
 import { subscribeToEvents } from "./event-bus";
@@ -74,8 +73,7 @@ export async function initSocketServer(server: HTTPServer): Promise<SocketIOServ
       await Promise.all([pubClient.connect(), subClient.connect()]);
 
       if (pubClient.driver === "real" && subClient.driver === "real") {
-        io.adapter(createAdapter(pubClient as never, subClient as never));
-        console.log("[Socket] Redis adapter connected");
+        console.warn("[Socket] Redis clients connected, but redis adapter package is not bundled; running without socket adapter");
       } else {
         console.warn("[Socket] Redis package unavailable, running without socket adapter");
       }

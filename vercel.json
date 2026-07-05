@@ -14,11 +14,11 @@
     },
     {
       "path": "/api/cron/occupancy-snapshot",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/auto-checkout",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/cron/churn-risk-calculation",

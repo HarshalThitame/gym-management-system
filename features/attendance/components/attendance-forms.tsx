@@ -2,12 +2,13 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Camera, Search, Square } from "lucide-react";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
+import { QrCameraScanner } from "./qr-camera-scanner";
 import type { AccessDeviceRow, AttendanceSessionRow } from "@/types/attendance";
 import type { MemberRow } from "@/types/membership";
 import {
@@ -20,22 +21,6 @@ import {
 } from "../actions/attendance-actions";
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm";
-
-type BarcodeDetectorResult = {
-  rawValue?: string;
-};
-
-type BrowserBarcodeDetector = {
-  detect: (source: HTMLVideoElement) => Promise<BarcodeDetectorResult[]>;
-};
-
-type BrowserBarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BrowserBarcodeDetector;
-
-declare global {
-  interface Window {
-    BarcodeDetector?: BrowserBarcodeDetectorConstructor;
-  }
-}
 
 export function ManualCheckInForm({ members, devices }: { members: MemberRow[]; devices: AccessDeviceRow[] }) {
   const [state, formAction] = useActionState(manualCheckInAction, initialAuthActionState);
@@ -54,141 +39,24 @@ export function ManualCheckInForm({ members, devices }: { members: MemberRow[]; 
 export function QrScanForm({ devices, defaultToken = "" }: { devices: AccessDeviceRow[]; defaultToken?: string }) {
   const [state, formAction] = useActionState(qrCheckInAction, initialAuthActionState);
   const [token, setToken] = useState(defaultToken);
-  const [scannerStatus, setScannerStatus] = useState<"idle" | "starting" | "active" | "unsupported" | "error">("idle");
-  const [scannerMessage, setScannerMessage] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const detectorRef = useRef<BrowserBarcodeDetector | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     setToken(defaultToken);
   }, [defaultToken]);
 
-  useEffect(() => {
-    return () => {
-      cleanupScanner();
-    };
-  }, []);
-
-  async function startScanner() {
-    if (!("mediaDevices" in navigator) || !navigator.mediaDevices.getUserMedia) {
-      setScannerStatus("unsupported");
-      setScannerMessage("Camera scanning is not available in this browser. Use the manual scan field.");
-      return;
-    }
-
-    if (!window.BarcodeDetector) {
-      setScannerStatus("unsupported");
-      setScannerMessage("This browser does not support camera QR detection. Use a USB scanner or paste the token.");
-      return;
-    }
-
-    setScannerStatus("starting");
-    setScannerMessage("Opening camera...");
-
-    try {
-      detectorRef.current = new window.BarcodeDetector({ formats: ["qr_code"] });
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-      });
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-
-      setScannerStatus("active");
-      setScannerMessage("Point the camera at the member QR code.");
-      scanFrame();
-    } catch {
-      setScannerStatus("error");
-      setScannerMessage("Camera permission was denied or the camera could not be opened.");
-      stopScanner();
-    }
-  }
-
-  function stopScanner() {
-    cleanupScanner();
-    setScannerStatus((current) => (current === "active" || current === "starting" ? "idle" : current));
-  }
-
-  function cleanupScanner() {
-    if (animationFrameRef.current !== null) {
-      window.cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    detectorRef.current = null;
-  }
-
-  function scanFrame() {
-    animationFrameRef.current = window.requestAnimationFrame(() => {
-      void detectBarcode();
-    });
-  }
-
-  async function detectBarcode() {
-    const detector = detectorRef.current;
-    const video = videoRef.current;
-
-    if (!detector || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      scanFrame();
-      return;
-    }
-
-    try {
-      const results = await detector.detect(video);
-      const rawValue = results[0]?.rawValue?.trim();
-
-      if (rawValue) {
-        setToken(rawValue);
-        setScannerMessage("QR captured. Review the access point, then submit check-in.");
-        stopScanner();
-        return;
-      }
-    } catch {
-      setScannerStatus("error");
-      setScannerMessage("Camera scan failed. Use the manual scan field.");
-      stopScanner();
-      return;
-    }
-
-    scanFrame();
-  }
-
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-4" ref={formRef}>
       <FormMessage state={state} />
-      <div className="space-y-3 rounded-md border border-border bg-surface-muted p-3">
-        <video
-          aria-label="QR scanner camera preview"
-          className="aspect-video w-full rounded-md border border-border bg-ink object-cover"
-          muted
-          playsInline
-          ref={videoRef}
-        />
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={scannerStatus === "starting" || scannerStatus === "active"} onClick={startScanner} size="sm" type="button" variant="secondary">
-            <Camera className="size-4" />
-            {scannerStatus === "starting" ? "Opening..." : "Open Camera"}
-          </Button>
-          <Button disabled={scannerStatus !== "active" && scannerStatus !== "starting"} onClick={stopScanner} size="sm" type="button" variant="ghost">
-            <Square className="size-4" />
-            Stop
-          </Button>
-        </div>
-        {scannerMessage ? <p className="text-xs font-semibold text-muted-foreground" role="status">{scannerMessage}</p> : null}
-      </div>
+      <QrCameraScanner
+        captureMessage="Point the camera at the member QR code."
+        errorMessage="Camera scan failed. Use the manual scan field."
+        onCapture={(value) => {
+          setToken(value);
+          window.setTimeout(() => formRef.current?.requestSubmit(), 0);
+        }}
+        unsupportedMessage="Camera scanning is not available in this browser. Use the manual scan field."
+      />
       <div className="space-y-2">
         <label className="text-sm font-bold" htmlFor="tokenValue">QR token or scan URL</label>
         <Input id="tokenValue" name="tokenValue" onChange={(event) => setToken(event.target.value)} placeholder="Paste scanned QR payload" value={token} />

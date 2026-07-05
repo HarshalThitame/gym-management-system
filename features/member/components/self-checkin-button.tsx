@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, LocateFixed } from "lucide-react";
+import { CheckCircle2, ScanLine } from "lucide-react";
 
 type SelfCheckInButtonProps = {
   memberId: string;
@@ -17,15 +17,11 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
     setLoading(true);
     setMessage(null);
     try {
-      const location = await getCurrentPosition();
       const res = await fetch("/api/attendance/self-checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           memberId,
-          latitude: location?.coords.latitude ?? undefined,
-          longitude: location?.coords.longitude ?? undefined,
-          accuracyM: location?.coords.accuracy ?? undefined,
         })
       });
       const json = await res.json().catch(() => null);
@@ -82,28 +78,14 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
             animate={{ scale: [1, 1.1, 1] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           >
-            <LocateFixed className="size-7" />
+            <ScanLine className="size-7" />
           </motion.div>
           <div className="text-left">
             <p className="text-lg font-black">{loading ? "Checking in..." : "Check In Now"}</p>
-            <p className="text-sm font-semibold text-white/80">Tap to record your gym visit with location verification</p>
+            <p className="text-sm font-semibold text-white/80">Tap to open the gate and record your gym visit</p>
           </div>
         </div>
         {message ? <p className="relative z-10 mt-4 text-left text-xs font-semibold text-white/85">{message}</p> : null}
       </motion.button>
     );
   }
-
-function getCurrentPosition() {
-  if (typeof navigator === "undefined" || !navigator.geolocation) {
-    return Promise.reject(new Error("Location services are unavailable in this browser."));
-  }
-
-  return new Promise<GeolocationPosition>((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 30000,
-    });
-  });
-}

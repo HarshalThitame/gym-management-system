@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireApiPrimaryRole, getApiTenantGymId } from "@/lib/auth/api-guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkInMember } from "@/features/attendance/lib/phase1-api";
-import { evaluateBranchGeofence } from "@/features/attendance/lib/geofence";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,9 +12,6 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
     const requestedMemberId = typeof body.memberId === "string" ? body.memberId : null;
-    const latitude = Number(body.latitude ?? body.lat);
-    const longitude = Number(body.longitude ?? body.lng);
-    const accuracyM = body.accuracyM ?? body.accuracy_m;
     const gymId = getApiTenantGymId(auth.context, auth.tenant);
     if (!gymId) {
       return NextResponse.json(
@@ -50,45 +46,6 @@ export async function POST(request: NextRequest) {
         { ok: false, error: { code: "FORBIDDEN", message: "You can only self check in using your own member profile." } },
         { status: 403 },
       );
-    }
-
-    const resolvedBranchId = auth.tenant.resolved ? auth.tenant.branch.id : auth.context.profile?.branch_id ?? member.branch_id ?? null;
-    if (Number.isFinite(latitude) && Number.isFinite(longitude) && resolvedBranchId) {
-      const geofence = await evaluateBranchGeofence(resolvedBranchId, { latitude, longitude });
-      const occurredAt = new Date().toISOString();
-
-      await supabase.from("attendance_location_events").insert({
-        gym_id: gymId,
-        branch_id: resolvedBranchId,
-        member_id: member.id,
-        attendance_session_id: null,
-        latitude,
-        longitude,
-        accuracy_m: Number.isFinite(Number(accuracyM)) ? Number(accuracyM) : null,
-        inside_geofence: geofence.insideFence,
-        geofence_radius_m: geofence.radiusMeters || null,
-        source: "member_app",
-        metadata: {
-          flow: "self_checkin",
-          branchName: geofence.branchName,
-          distanceMeters: geofence.distanceMeters,
-          evaluatedAt: occurredAt,
-        },
-        occurred_at: occurredAt,
-      });
-
-      if (geofence.enabled && !geofence.insideFence) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: {
-              code: "GEOFENCE_DENIED",
-              message: "You need to be inside your branch geofence to self check in.",
-            },
-          },
-          { status: 403 },
-        );
-      }
     }
 
     const result = await checkInMember({

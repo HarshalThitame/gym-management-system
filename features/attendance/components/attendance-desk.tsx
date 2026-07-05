@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import { CheckCircle2, QrCode, Search, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/input";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { FormMessage } from "@/features/auth/components/form-message";
 import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
+import { QrCameraScanner } from "./qr-camera-scanner";
 import { MemberProfileCard } from "./member-profile-card";
 import { AttendanceSearch } from "./attendance-search";
 import { OccupancyMeter } from "./occupancy-meter";
@@ -341,15 +342,25 @@ function QrCheckInSection({
   qrAction: (fd: FormData) => void;
 }) {
   const [token, setToken] = useState("");
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   return (
-    <form action={qrAction} className="space-y-4 rounded-xl border border-border bg-surface p-5">
+    <form action={qrAction} className="space-y-4 rounded-xl border border-border bg-surface p-5" ref={formRef}>
       <div className="flex items-center gap-2">
         <QrCode className="size-5 text-muted-foreground" />
         <p className="font-bold">QR Attendance</p>
       </div>
-      <p className="text-sm text-muted-foreground">Scan or paste the member QR code token to validate and check in.</p>
+      <p className="text-sm text-muted-foreground">Scan the member QR code with a camera or USB scanner. Paste the token only as fallback.</p>
       <FormMessage state={qrState} />
+      <QrCameraScanner
+        captureMessage="Point the camera at the member QR code."
+        errorMessage="Camera scan failed. Use the manual scan field."
+        onCapture={(value) => {
+          setToken(value);
+          window.setTimeout(() => formRef.current?.requestSubmit(), 0);
+        }}
+        unsupportedMessage="Camera scanning is not available in this browser. Use a USB scanner or paste the token."
+      />
       <div className="space-y-2">
         <label className="text-sm font-bold" htmlFor="qr-token">QR Token</label>
         <Input
