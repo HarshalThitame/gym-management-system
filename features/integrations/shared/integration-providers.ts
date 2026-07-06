@@ -5,7 +5,7 @@ export type IntegrationProvider = {
   label: string;
   description: string;
   icon: string;
-  category: "payments" | "calendar" | "whatsapp" | "sms";
+  category: "payments" | "calendar" | "whatsapp" | "sms" | "crm";
 };
 
 export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
@@ -36,5 +36,19 @@ export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
     description: "India-first SMS delivery using approved MSG91 flow templates and DLT-aware routing.",
     icon: "message-circle",
     category: "sms",
+  },
+  {
+    id: "hubspot",
+    label: "HubSpot CRM",
+    description: "Private-app based CRM sync for leads, pipeline status, and contact updates.",
+    icon: "briefcase-business",
+    category: "crm",
+  },
+  {
+    id: "zoho_crm",
+    label: "Zoho CRM",
+    description: "OAuth-backed CRM sync for leads with refresh-token recovery and durable mapping.",
+    icon: "briefcase-business",
+    category: "crm",
   },
 ];

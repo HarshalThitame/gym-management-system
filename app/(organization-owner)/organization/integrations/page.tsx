@@ -25,7 +25,7 @@ export default async function OrgIntegrationsPage() {
               Integration Hub
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Manage your payment gateway, calendar sync, SMS, and WhatsApp providers. All integration management is organization-owner only.
+              Manage your payment gateway, calendar sync, CRM connectors, SMS, and WhatsApp providers. All integration management is organization-owner only.
             </p>
           </div>
         </div>
@@ -51,6 +51,7 @@ export default async function OrgIntegrationsPage() {
           <h3 className="text-lg font-black text-foreground">About Organization Integrations</h3>
           <p>Razorpay credentials are stored per organization. Each organization manages its own payment gateway for collecting member payments.</p>
           <p>Google Calendar uses platform-managed OAuth credentials with organization-scoped tokens. Only one calendar connection per organization.</p>
+          <p>HubSpot and Zoho CRM use durable sync jobs and external-ID mappings so lead updates can be retried safely without creating duplicates.</p>
           <p>MSG91 SMS and WhatsApp are configured per organization with provider-specific credentials and templates.</p>
         </div>
       </div>

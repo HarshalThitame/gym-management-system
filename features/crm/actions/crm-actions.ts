@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
+import { enqueueCrmLeadSyncForOrganization } from "@/features/integrations/services/crm-sync-service";
 import {
   LeadSchema,
   LeadStatusSchema,
@@ -72,10 +73,14 @@ export async function saveLeadAction(_previousState: AuthActionState, formData: 
     const { error } = await supabase.from("crm_leads").update(payload).eq("id", leadId);
     if (error) return { status: "error", message: error.message };
     await writeAuditLog({ gymId: scope.gymId, actorId: scope.userId, action: "update", entityType: "crm_leads", entityId: leadId, metadata: payload });
+    await enqueueCrmLeadSyncForOrganization({ organizationId: scope.organizationId, leadId, eventType: "lead.updated" });
   } else {
     const { data, error } = await supabase.from("crm_leads").insert(payload).select("id").maybeSingle();
     if (error) return { status: "error", message: error.message };
     await writeAuditLog({ gymId: scope.gymId, actorId: scope.userId, action: "create", entityType: "crm_leads", entityId: data?.id ?? null, metadata: payload });
+    if (data?.id) {
+      await enqueueCrmLeadSyncForOrganization({ organizationId: scope.organizationId, leadId: data.id, eventType: "lead.created" });
+    }
   }
 
   revalidatePath("/admin/crm");
@@ -176,6 +181,7 @@ export async function updateLeadStatusAction(_previousState: AuthActionState, fo
   }
 
   await writeAuditLog({ gymId: scope.gymId, actorId: scope.userId, action: "update_status", entityType: "crm_leads", entityId: leadId, metadata: { statusId } });
+  await enqueueCrmLeadSyncForOrganization({ organizationId: scope.organizationId, leadId, eventType: "lead.updated" });
   revalidatePath("/admin/crm");
   return { status: "success", message: "Lead status updated." };
 }
@@ -275,6 +281,7 @@ export async function convertLeadAction(_previousState: AuthActionState, formDat
   }
 
   await writeAuditLog({ gymId: scope.gymId, actorId: scope.userId, action: "convert_lead", entityType: "crm_leads", entityId: parsed.data.leadId, metadata: { memberId: member.id, planId: parsed.data.planId } });
+  await enqueueCrmLeadSyncForOrganization({ organizationId: scope.organizationId, leadId: parsed.data.leadId, eventType: "lead.converted" });
   revalidatePath("/admin/crm");
   revalidatePath("/admin/members");
   return { status: "success", message: "Lead converted to member." };
@@ -304,6 +311,7 @@ export async function markLeadLostAction(_previousState: AuthActionState, formDa
   }
 
   await writeAuditLog({ gymId: scope.gymId, actorId: scope.userId, action: "mark_lost", entityType: "crm_leads", entityId: leadId, metadata: { reason: reason?.toString() } });
+  await enqueueCrmLeadSyncForOrganization({ organizationId: scope.organizationId, leadId, eventType: "lead.lost" });
   revalidatePath("/admin/crm");
   return { status: "success", message: "Lead marked as lost." };
 }

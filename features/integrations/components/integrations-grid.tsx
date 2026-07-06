@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import {
+  BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
   CreditCard,
@@ -51,6 +52,15 @@ type ProviderFormState = {
   calendarId?: string;
   syncClasses?: boolean;
   syncPtSessions?: boolean;
+  label?: string;
+  accessToken?: string;
+  portalId?: string;
+  syncLeads?: boolean;
+  syncContacts?: boolean;
+  clientId?: string;
+  clientSecret?: string;
+  refreshToken?: string;
+  accountsDomain?: string;
 };
 
 const ICON_MAP = {
@@ -58,6 +68,8 @@ const ICON_MAP = {
   google_calendar: <CalendarDays className="size-5" />,
   msg91_whatsapp: <MessageSquare className="size-5" />,
   msg91_sms: <MessageCircle className="size-5" />,
+  hubspot: <BriefcaseBusiness className="size-5" />,
+  zoho_crm: <BriefcaseBusiness className="size-5" />,
 } satisfies Record<IntegrationProviderId, ReactNode>;
 
 export function IntegrationsGrid({ dashboard }: Props) {
@@ -82,6 +94,25 @@ export function IntegrationsGrid({ dashboard }: Props) {
       namespace: "",
       languageCode: "en",
       testMobile: String(dashboard.items.find((item) => item.provider === "msg91_whatsapp")?.configSummary.testMobile ?? ""),
+    },
+    hubspot: {
+      label: String(dashboard.items.find((item) => item.provider === "hubspot")?.configSummary.label ?? "HubSpot CRM"),
+      portalId: String(dashboard.items.find((item) => item.provider === "hubspot")?.configSummary.portalId ?? ""),
+      accessToken: "",
+      syncLeads: dashboard.items.find((item) => item.provider === "hubspot")?.configSummary.syncLeads !== false,
+      syncContacts: dashboard.items.find((item) => item.provider === "hubspot")?.configSummary.syncContacts !== false,
+      testEmail: String(dashboard.items.find((item) => item.provider === "hubspot")?.configSummary.testEmail ?? ""),
+    },
+    zoho_crm: {
+      label: String(dashboard.items.find((item) => item.provider === "zoho_crm")?.configSummary.label ?? "Zoho CRM"),
+      accountsDomain: String(dashboard.items.find((item) => item.provider === "zoho_crm")?.configSummary.accountsDomain ?? "accounts.zoho.com"),
+      accessToken: "",
+      clientId: "",
+      clientSecret: "",
+      refreshToken: "",
+      syncLeads: dashboard.items.find((item) => item.provider === "zoho_crm")?.configSummary.syncLeads !== false,
+      syncContacts: dashboard.items.find((item) => item.provider === "zoho_crm")?.configSummary.syncContacts !== false,
+      testEmail: String(dashboard.items.find((item) => item.provider === "zoho_crm")?.configSummary.testEmail ?? ""),
     },
   }), [dashboard.items]);
   const [forms, setForms] = useState<Record<IntegrationProviderId, ProviderFormState>>(initialForms);

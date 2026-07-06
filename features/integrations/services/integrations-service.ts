@@ -14,7 +14,9 @@ export type IntegrationProviderId =
   | "razorpay"
   | "google_calendar"
   | "msg91_sms"
-  | "msg91_whatsapp";
+  | "msg91_whatsapp"
+  | "hubspot"
+  | "zoho_crm";
 
 export type IntegrationConnectionStatus = "connected" | "disconnected" | "error" | "expired";
 
@@ -293,6 +295,42 @@ export function getMaskedIntegrationStatus(record: IntegrationRow | null): Maske
           calendarId: typeof config.calendarId === "string" ? config.calendarId : null,
           syncClasses: typeof config.syncClasses === "boolean" ? config.syncClasses : null,
           syncPtSessions: typeof config.syncPtSessions === "boolean" ? config.syncPtSessions : null,
+        },
+      };
+    case "hubspot":
+      return {
+        provider: "hubspot",
+        record,
+        status: record.status as IntegrationConnectionStatus,
+        label: record.label ?? "HubSpot CRM",
+        errorMessage: record.error_message,
+        lastActivityAt: record.last_sync_at ?? record.updated_at,
+        maskedConfig: {
+          accessToken: maskSecret(typeof credentials.accessToken === "string" ? credentials.accessToken : null),
+          clientSecret: maskSecret(typeof credentials.clientSecret === "string" ? credentials.clientSecret : null, 6),
+          portalId: typeof config.portalId === "string" ? config.portalId : null,
+          syncLeads: typeof config.syncLeads === "boolean" ? config.syncLeads : null,
+          syncContacts: typeof config.syncContacts === "boolean" ? config.syncContacts : null,
+          testEmail: typeof config.testEmail === "string" ? config.testEmail : null,
+        },
+      };
+    case "zoho_crm":
+      return {
+        provider: "zoho_crm",
+        record,
+        status: record.status as IntegrationConnectionStatus,
+        label: record.label ?? "Zoho CRM",
+        errorMessage: record.error_message,
+        lastActivityAt: record.last_sync_at ?? record.updated_at,
+        maskedConfig: {
+          accessToken: maskSecret(typeof credentials.accessToken === "string" ? credentials.accessToken : null),
+          refreshToken: maskSecret(typeof credentials.refreshToken === "string" ? credentials.refreshToken : null),
+          clientId: maskSecret(typeof credentials.clientId === "string" ? credentials.clientId : null, 6),
+          webhookSecret: maskSecret(typeof credentials.webhookSecret === "string" ? credentials.webhookSecret : null, 6),
+          accountsDomain: typeof config.accountsDomain === "string" ? config.accountsDomain : null,
+          syncLeads: typeof config.syncLeads === "boolean" ? config.syncLeads : null,
+          syncContacts: typeof config.syncContacts === "boolean" ? config.syncContacts : null,
+          testEmail: typeof config.testEmail === "string" ? config.testEmail : null,
         },
       };
     default:
