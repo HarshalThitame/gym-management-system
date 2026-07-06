@@ -1,10 +1,11 @@
-export type DeviceHealthLevel = "healthy" | "watch" | "stale" | "critical" | "decommissioned" | "unknown";
+export type DeviceHealthLevel = "healthy" | "watch" | "stale" | "critical" | "decommissioned" | "pending" | "quarantined" | "unknown";
 
 export type DeviceHealthSnapshot = {
   level: DeviceHealthLevel;
   label: string;
   minutesSinceSeen: number | null;
   isStale: boolean;
+  incident?: string | null;
 };
 
 const HEALTH_THRESHOLDS = {
@@ -23,6 +24,26 @@ export function getDeviceHealthSnapshot(device: Record<string, unknown>, now = n
       label: "Decommissioned",
       minutesSinceSeen: null,
       isStale: false,
+    };
+  }
+
+  if (status === "pending") {
+    return {
+      level: "pending",
+      label: "Pending activation",
+      minutesSinceSeen: null,
+      isStale: false,
+      incident: "enrollment_pending",
+    };
+  }
+
+  if (status === "quarantined") {
+    return {
+      level: "quarantined",
+      label: "Quarantined",
+      minutesSinceSeen: minutesSince(lastSeenAt, now),
+      isStale: true,
+      incident: "quarantined",
     };
   }
 
@@ -66,6 +87,8 @@ export function getDeviceHealthSummary(devices: Record<string, unknown>[], now =
     stale: snapshots.filter((snapshot) => snapshot.level === "stale").length,
     critical: snapshots.filter((snapshot) => snapshot.level === "critical").length,
     decommissioned: snapshots.filter((snapshot) => snapshot.level === "decommissioned").length,
+    pending: snapshots.filter((snapshot) => snapshot.level === "pending").length,
+    quarantined: snapshots.filter((snapshot) => snapshot.level === "quarantined").length,
     unknown: snapshots.filter((snapshot) => snapshot.level === "unknown").length,
     totalMonitored: snapshots.filter((snapshot) => snapshot.level !== "decommissioned").length,
   };

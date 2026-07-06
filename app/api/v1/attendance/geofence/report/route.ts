@@ -3,7 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireApiPermission, requireApiTenantGymScope } from "@/lib/auth/api-guards";
 import { publishAttendanceEvent } from "@/lib/realtime/event-bus";
 import { writeAuditLog } from "@/lib/audit";
-import { evaluateBranchGeofence } from "@/features/attendance/lib/geofence";
+import {
+  evaluateBranchGeofence,
+  evaluateGeofenceExitDecision
+} from "@/features/attendance/lib/geofence";
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,26 +66,61 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    await supabase.from("attendance_location_events").insert({
-      gym_id: gymScope.gymId,
-      branch_id: resolvedBranchId,
-      member_id: memberId,
-      attendance_session_id: session?.id ?? sessionId ?? null,
-      latitude,
-      longitude,
-      accuracy_m: Number.isFinite(Number(accuracyM)) ? Number(accuracyM) : null,
-      inside_geofence: evaluation.insideFence,
-      geofence_radius_m: evaluation.radiusMeters || null,
-      source: "member_app",
-      metadata: {
-        branchName: evaluation.branchName,
-        distanceMeters: evaluation.distanceMeters,
-        evaluatedAt: occurredAt,
-      },
-      occurred_at: occurredAt,
+    const { data: settingsRow } = await supabase
+      .from("branch_settings")
+      .select("attendance_settings")
+      .eq("branch_id", resolvedBranchId)
+      .maybeSingle();
+
+    const { data: recentLocationEvents } = session?.id
+      ? await supabase
+          .from("attendance_location_events")
+          .select("id, inside_geofence, occurred_at, accuracy_m, metadata")
+          .eq("attendance_session_id", session.id)
+          .order("occurred_at", { ascending: false })
+          .limit(10)
+      : { data: [], error: null };
+
+    const decision = evaluateGeofenceExitDecision({
+      settings: settingsRow?.attendance_settings ?? {},
+      evaluation,
+      accuracyM: Number.isFinite(Number(accuracyM)) ? Number(accuracyM) : null,
+      occurredAt,
+      recentEvents: Array.isArray(recentLocationEvents) ? recentLocationEvents : [],
+      hasActiveSession: Boolean(session?.id)
     });
 
-    if (!evaluation.insideFence && session?.id) {
+    const responseSessionActive = Boolean(session?.id) && !decision.shouldAutoCheckout;
+    const eventMetadata = {
+      branchName: evaluation.branchName,
+      distanceMeters: evaluation.distanceMeters,
+      evaluatedAt: occurredAt,
+      geofenceDecision: decision.status,
+      geofenceReasonCode: decision.reasonCode,
+      consecutiveOutsideSamples: decision.consecutiveOutsideSamples,
+      outsideSampleThreshold: decision.outsideSampleThreshold,
+      minimumAccuracyMeters: decision.minimumAccuracyMeters,
+      graceWindowSeconds: decision.graceWindowSeconds
+    };
+
+    if (session?.id) {
+      await supabase.from("attendance_location_events").insert({
+        gym_id: gymScope.gymId,
+        branch_id: resolvedBranchId,
+        member_id: memberId,
+        attendance_session_id: session.id,
+        latitude,
+        longitude,
+        accuracy_m: Number.isFinite(Number(accuracyM)) ? Number(accuracyM) : null,
+        inside_geofence: decision.shouldAutoCheckout ? false : true,
+        geofence_radius_m: evaluation.radiusMeters || null,
+        source: "member_app",
+        metadata: eventMetadata,
+        occurred_at: occurredAt,
+      });
+    }
+
+    if (decision.shouldAutoCheckout && session?.id) {
       const checkOutAt = occurredAt;
       const durationMinutes = Math.round((new Date(checkOutAt).getTime() - new Date(session.check_in_at).getTime()) / 60000);
 
@@ -103,8 +141,8 @@ export async function POST(request: NextRequest) {
         action: "auto_check_out",
         source: "system",
         result: "success",
-        reason_code: "geo_fence_exit",
-        message: "Member auto-checked out after leaving the branch geofence.",
+        reason_code: decision.reasonCode,
+        message: "Member auto-checked out after a confirmed geofence exit.",
         actor_id: auth.context.userId,
         occurred_at: occurredAt,
         metadata: {
@@ -112,6 +150,8 @@ export async function POST(request: NextRequest) {
           longitude,
           distanceMeters: evaluation.distanceMeters,
           radiusMeters: evaluation.radiusMeters,
+          geofenceDecision: decision.status,
+          consecutiveOutsideSamples: decision.consecutiveOutsideSamples,
         },
       });
 
@@ -138,6 +178,8 @@ export async function POST(request: NextRequest) {
           longitude,
           distanceMeters: evaluation.distanceMeters,
           radiusMeters: evaluation.radiusMeters,
+          geofenceDecision: decision.status,
+          consecutiveOutsideSamples: decision.consecutiveOutsideSamples,
         },
       });
     }
@@ -146,10 +188,18 @@ export async function POST(request: NextRequest) {
       ok: true,
       data: {
         insideGeofence: evaluation.insideFence,
+        autoCheckedOut: decision.shouldAutoCheckout && Boolean(session?.id),
+        sessionActive: responseSessionActive,
         geofenceEnabled: evaluation.enabled,
         branchId: resolvedBranchId,
         sessionId: session?.id ?? sessionId ?? null,
-        message: evaluation.message,
+        message: decision.message,
+        exitStatus: decision.status,
+        reasonCode: decision.reasonCode,
+        consecutiveOutsideSamples: decision.consecutiveOutsideSamples,
+        outsideSampleThreshold: decision.outsideSampleThreshold,
+        minimumAccuracyMeters: decision.minimumAccuracyMeters,
+        graceWindowSeconds: decision.graceWindowSeconds
       },
     });
   } catch (e) {

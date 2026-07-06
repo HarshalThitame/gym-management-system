@@ -3,11 +3,20 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const API_KEY_PREFIX = "dev_";
+const ENROLLMENT_CODE_PREFIX = "enr_";
 const API_KEY_BYTES = 32;
+const ENROLLMENT_CODE_BYTES = 24;
 
 export function generateDeviceApiKey(): { plaintext: string; hash: string } {
   const raw = crypto.randomBytes(API_KEY_BYTES);
   const plaintext = API_KEY_PREFIX + raw.toString("base64url");
+  const hash = crypto.createHash("sha256").update(plaintext).digest("hex");
+  return { plaintext, hash };
+}
+
+export function generateDeviceEnrollmentCode(): { plaintext: string; hash: string } {
+  const raw = crypto.randomBytes(ENROLLMENT_CODE_BYTES);
+  const plaintext = ENROLLMENT_CODE_PREFIX + raw.toString("base64url");
   const hash = crypto.createHash("sha256").update(plaintext).digest("hex");
   return { plaintext, hash };
 }
@@ -66,7 +75,21 @@ export async function authenticateDeviceRequest(request: Request): Promise<Devic
     return {
       ok: false,
       response: NextResponse.json(
-        { ok: false, error: { code: "DEVICE_INACTIVE", message: "Device is deactivated." } },
+        {
+          ok: false,
+          error: {
+            code: device.status === "quarantined"
+              ? "DEVICE_QUARANTINED"
+              : device.status === "pending"
+                ? "DEVICE_PENDING_ACTIVATION"
+                : "DEVICE_INACTIVE",
+            message: device.status === "quarantined"
+              ? "Device is quarantined."
+              : device.status === "pending"
+                ? "Device is pending enrollment activation."
+                : "Device is deactivated.",
+          },
+        },
         { status: 403 }
       ),
     };

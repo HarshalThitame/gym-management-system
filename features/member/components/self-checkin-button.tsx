@@ -6,9 +6,10 @@ import { CheckCircle2, ScanLine } from "lucide-react";
 
 type SelfCheckInButtonProps = {
   memberId: string;
+  onSuccess?: (result: { sessionId: string; checkedInAt: string }) => void;
 };
 
-export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
+export function SelfCheckInButton({ memberId, onSuccess }: SelfCheckInButtonProps) {
   const [checkedIn, setCheckedIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -28,6 +29,11 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
       if (res.ok) {
         setCheckedIn(true);
         setMessage("Check-in recorded.");
+        const sessionId = typeof json?.data?.sessionId === "string" ? json.data.sessionId : null;
+        const checkedInAt = typeof json?.data?.checkedInAt === "string" ? json.data.checkedInAt : new Date().toISOString();
+        if (sessionId) {
+          onSuccess?.({ sessionId, checkedInAt });
+        }
         return;
       }
       setMessage(json?.error?.message ?? "Check-in failed.");
@@ -82,7 +88,7 @@ export function SelfCheckInButton({ memberId }: SelfCheckInButtonProps) {
           </motion.div>
           <div className="text-left">
             <p className="text-lg font-black">{loading ? "Checking in..." : "Check In Now"}</p>
-            <p className="text-sm font-semibold text-white/80">Tap to open the gate and record your gym visit</p>
+            <p className="text-sm font-semibold text-white/80">Tap to record your gym visit at the gate</p>
           </div>
         </div>
         {message ? <p className="relative z-10 mt-4 text-left text-xs font-semibold text-white/85">{message}</p> : null}

@@ -57,6 +57,15 @@ export type MemberAttendancePortal = {
   qrToken: QrTokenRow | null;
   qrSvg: string;
   qrPayload: string;
+  activeSession: AttendanceSessionRow | null;
+  locationTracking: {
+    activeSessionId: string | null;
+    branchId: string | null;
+    branchName: string | null;
+    enabled: boolean;
+    radiusMeters: number;
+    coordinatesConfigured: boolean;
+  };
   metrics: {
     attendanceCount: number;
     lastVisitAt: string | null;

@@ -6,7 +6,7 @@ import {
   requireApiTenantGymScope,
 } from "@/lib/auth/api-guards";
 import { writeAuditLog } from "@/lib/audit";
-import { generateDeviceApiKey } from "@/lib/security/device-auth";
+import { generateDeviceApiKey, generateDeviceEnrollmentCode } from "@/lib/security/device-auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (!gymScope.ok) return gymScope.response;
 
     const body = await request.json() as Record<string, unknown>;
-    const { device_name, device_type_id, branch_id, location, ip_address, serial_number } = body;
+    const { device_name, device_type_id, branch_id, location, ip_address, serial_number, provision_mode } = body;
 
     if (!device_name || typeof device_name !== "string") {
       return NextResponse.json(
@@ -115,7 +115,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { plaintext, hash } = generateDeviceApiKey();
+    const enrollLater = provision_mode === "pending" || provision_mode === "enrollment";
+    const apiKey = enrollLater ? null : generateDeviceApiKey();
+    const enrollment = enrollLater ? generateDeviceEnrollmentCode() : null;
+    const now = new Date().toISOString();
+    const metadata = enrollLater
+      ? {
+          enrollment: {
+            state: "pending",
+            claim_code_hash: enrollment?.hash,
+            issued_at: now,
+            expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+            issued_by: auth.context.userId,
+            branch_id: (branch_id as string) || null,
+          }
+        }
+      : null;
 
     const { data: device, error: insertError } = await supabase
       .from("attendance_devices")
@@ -125,12 +140,13 @@ export async function POST(request: NextRequest) {
         organization_id: organizationId,
         gym_id: gymScope.gymId,
         branch_id: (branch_id as string) || null,
-        api_key: hash,
+        api_key: apiKey?.hash ?? null,
         ip_address: (ip_address as string) || null,
         serial_number: (serial_number as string) || null,
         location: (location as string) || null,
-        is_active: true,
-        status: "offline",
+        is_active: !enrollLater,
+        status: enrollLater ? "pending" : "offline",
+        metadata,
       })
       .select()
       .single();
@@ -165,7 +181,8 @@ export async function POST(request: NextRequest) {
         ok: true,
         data: {
           ...device,
-          api_key: plaintext,
+          api_key: apiKey?.plaintext ?? null,
+          enrollment_code: enrollment?.plaintext ?? null,
         },
       },
       { status: 201 }

@@ -38,6 +38,7 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
   const [showDecommissionConfirm, setShowDecommissionConfirm] = useState<string | null>(null);
   const [deviceTypes, setDeviceTypes] = useState<DeviceItem[]>([]);
   const [apiKeyResult, setApiKeyResult] = useState<string | null>(null);
+  const [registrationSecretType, setRegistrationSecretType] = useState<"api-key" | "enrollment-code" | null>(null);
 
   const pageSize = filters.pageSize ?? 12;
 
@@ -99,7 +100,7 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
   const assignedCount = devices.filter((d) => Boolean(d.branch_id)).length;
   const issueDevices = useMemo(() => devices
     .map((device) => ({ device, health: getDeviceHealthSnapshot(device) }))
-    .filter(({ device, health }) => health.level === "critical" || health.level === "stale" || device.status === "error" || device.is_active !== true)
+    .filter(({ device, health }) => health.level === "critical" || health.level === "stale" || health.level === "pending" || health.level === "quarantined" || device.status === "error" || device.is_active !== true)
     .slice(0, 5), [devices]);
 
   const items = useMemo(() => devices.map((d) => {
@@ -160,6 +161,8 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
                 key: "status", label: "Status", options: [
                   { value: "online", label: "Online" },
                   { value: "offline", label: "Offline" },
+                  { value: "pending", label: "Pending" },
+                  { value: "quarantined", label: "Quarantined" },
                   { value: "error", label: "Error" },
                   { value: "decommissioned", label: "Decommissioned" },
                 ],
@@ -188,6 +191,8 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
           <LifecycleRow label="Branch assigned" value={`${assignedCount}/${devices.length}`} />
           <LifecycleRow label="Healthy" value={String(healthSummary.healthy)} />
           <LifecycleRow label="Needs review" value={String(healthSummary.watch + healthSummary.stale + healthSummary.critical)} />
+          <LifecycleRow label="Pending enrollment" value={String(healthSummary.pending)} />
+          <LifecycleRow label="Quarantined" value={String(healthSummary.quarantined)} />
           <LifecycleRow label="Offline / inactive" value={String(devices.filter((d) => d.status !== "online").length)} />
           <div className="md:col-span-4 space-y-2">
             {issueDevices.length === 0 ? (
@@ -258,8 +263,10 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
           branches={branches}
           deviceTypes={deviceTypes}
           apiKeyResult={apiKeyResult}
+          secretType={registrationSecretType}
           onApiKeyResult={setApiKeyResult}
-          onClose={() => { setShowRegisterDrawer(false); setApiKeyResult(null); }}
+          onSecretTypeChange={setRegistrationSecretType}
+          onClose={() => { setShowRegisterDrawer(false); setApiKeyResult(null); setRegistrationSecretType(null); }}
           onRegistered={() => { fetchDevices(); }}
         />
       )}
@@ -306,6 +313,14 @@ function DeviceDetailDrawer({
   const [mappingDeviceUserName, setMappingDeviceUserName] = useState("");
   const [pinging, setPinging] = useState(false);
   const [pingMessage, setPingMessage] = useState("");
+  const [deviceHealth, setDeviceHealth] = useState<Record<string, unknown> | null>(null);
+  const [healthLogs, setHealthLogs] = useState<DeviceItem[]>([]);
+  const [healthIncidents, setHealthIncidents] = useState<DeviceItem[]>([]);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthMessage, setHealthMessage] = useState("");
+  const [healthActionSubmitting, setHealthActionSubmitting] = useState(false);
+  const [enrollmentState, setEnrollmentState] = useState<Record<string, unknown> | null>(null);
+  const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const branch = branches.find((item) => item.id === device.branch_id) as DeviceItem | undefined;
 
   useEffect(() => {
@@ -342,6 +357,72 @@ function DeviceDetailDrawer({
     }
 
     void loadMappings();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [device.id]);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    async function loadHealth() {
+      setHealthLoading(true);
+      try {
+        const response = await fetch(`/api/attendance/devices/${device.id}/health`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json?.error?.message ?? "Failed to load device health.");
+        }
+        if (!active) return;
+        setDeviceHealth(json.data?.snapshot ?? null);
+        setHealthLogs(json.data?.health_logs ?? []);
+        setHealthIncidents(json.data?.incidents ?? []);
+      } catch (error) {
+        if (!active || controller.signal.aborted) return;
+        setHealthMessage(error instanceof Error ? error.message : "Failed to load device health.");
+      } finally {
+        if (active) setHealthLoading(false);
+      }
+    }
+
+    void loadHealth();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [device.id]);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    async function loadEnrollment() {
+      setEnrollmentLoading(true);
+      try {
+        const response = await fetch(`/api/attendance/devices/${device.id}/enrollment`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json?.error?.message ?? "Failed to load enrollment state.");
+        }
+        if (!active) return;
+        setEnrollmentState(json.data?.enrollment ?? null);
+      } catch {
+        if (!active || controller.signal.aborted) return;
+        setEnrollmentState(null);
+      } finally {
+        if (active) setEnrollmentLoading(false);
+      }
+    }
+
+    void loadEnrollment();
     return () => {
       active = false;
       controller.abort();
@@ -421,6 +502,80 @@ function DeviceDetailDrawer({
     }
   };
 
+  const handleHealthAction = async (action: "acknowledge" | "quarantine" | "reissue_claim" | "resolve") => {
+    setHealthActionSubmitting(true);
+    setHealthMessage("");
+    try {
+      const response = await fetch(`/api/attendance/devices/${device.id}/health`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          note: action === "quarantine" ? "Operator quarantine" : undefined,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json?.error?.message ?? "Failed to update device health.");
+      }
+      if (action === "reissue_claim") {
+        setHealthMessage(`Enrollment claim reissued. Save it: ${json.data?.claim_code ?? ""}`);
+      } else if (action === "resolve") {
+        setHealthMessage("Incidents resolved.");
+      } else {
+        setHealthMessage(action === "quarantine" ? "Device quarantined." : "Health acknowledged.");
+      }
+      onRefreshed();
+      if (action === "reissue_claim") {
+        setEnrollmentState({
+          state: "pending",
+          branch_id: device.branch_id ?? null,
+          issued_at: new Date().toISOString(),
+          note: "Reissued from admin panel",
+        });
+      }
+      // refresh local health snapshot
+      const fresh = await fetch(`/api/attendance/devices/${device.id}/health`, { cache: "no-store" });
+      const freshJson = await fresh.json().catch(() => null);
+      if (freshJson?.ok) {
+        setDeviceHealth(freshJson.data?.snapshot ?? null);
+        setHealthLogs(freshJson.data?.health_logs ?? []);
+      }
+    } catch (error) {
+      setHealthMessage(error instanceof Error ? error.message : "Failed to update device health.");
+    } finally {
+      setHealthActionSubmitting(false);
+    }
+  };
+
+  const handleIssueEnrollmentClaim = async () => {
+    setHealthActionSubmitting(true);
+    setHealthMessage("");
+    try {
+      const response = await fetch(`/api/attendance/devices/${device.id}/enrollment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ validMinutes: 30, branchId: device.branch_id ?? undefined }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json?.error?.message ?? "Failed to issue enrollment claim.");
+      }
+      setEnrollmentState({
+        state: "pending",
+        branch_id: device.branch_id ?? null,
+        issued_at: new Date().toISOString(),
+        expires_at: json.data?.expires_at ?? null,
+      });
+      setHealthMessage(`Enrollment code issued. Save it: ${json.data?.claim_code ?? ""}`);
+      onRefreshed();
+    } catch (error) {
+      setHealthMessage(error instanceof Error ? error.message : "Failed to issue enrollment claim.");
+    } finally {
+      setHealthActionSubmitting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-sm" onClick={onClose}>
       <div className="flex h-full w-full max-w-lg flex-col overflow-hidden bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Device details">
@@ -463,6 +618,14 @@ function DeviceDetailDrawer({
                 <LifecycleRow label="Branch assigned" value={branch?.name ? branch.name : "Not assigned"} />
                 <LifecycleRow label="Heartbeat" value={device.last_seen_at ? new Date(device.last_seen_at as string).toLocaleString("en-IN") : "No heartbeat yet"} />
                 <LifecycleRow label="API key" value={device.is_active ? "Active" : "Revoked / inactive"} />
+                <LifecycleRow label="Enrollment" value={String((device.metadata as Record<string, unknown> | null)?.enrollment?.state ?? (device.status as string))} />
+                <LifecycleRow label="Enrollment fetch" value={enrollmentLoading ? "Loading..." : enrollmentState?.state ? String(enrollmentState.state) : "Unknown"} />
+                {enrollmentState?.issued_at ? (
+                  <LifecycleRow label="Claim issued" value={new Date(String(enrollmentState.issued_at)).toLocaleString("en-IN")} />
+                ) : null}
+                {enrollmentState?.expires_at ? (
+                  <LifecycleRow label="Claim expires" value={new Date(String(enrollmentState.expires_at)).toLocaleString("en-IN")} />
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
                 <button
@@ -480,8 +643,17 @@ function DeviceDetailDrawer({
                 >
                   Assign branch / rotate key
                 </button>
+                <button
+                  className="rounded-md border border-border bg-surface-muted px-3 py-2 text-sm font-bold hover:bg-surface disabled:opacity-50"
+                  disabled={healthActionSubmitting}
+                  onClick={() => void handleIssueEnrollmentClaim()}
+                  type="button"
+                >
+                  Issue enrollment claim
+                </button>
               </div>
               {pingMessage ? <p className="text-xs text-muted-foreground">{pingMessage}</p> : null}
+              {healthMessage ? <p className="text-xs text-muted-foreground">{healthMessage}</p> : null}
             </CardContent>
           </Card>
           <Card>
@@ -489,13 +661,89 @@ function DeviceDetailDrawer({
             <CardContent className="space-y-3">
               <div className="grid gap-2 text-sm">
                 <LifecycleRow label="Health state" value={health.label} />
+                <LifecycleRow label="Stored health" value={String(deviceHealth?.label ?? health.label)} />
                 <LifecycleRow label="Stale threshold" value="30m" />
                 <LifecycleRow label="Critical threshold" value="2h" />
                 <LifecycleRow label="Freshness" value={formatDeviceFreshness(health)} />
               </div>
+              {healthLoading ? <p className="text-xs text-muted-foreground">Loading health feed...</p> : null}
+              {healthLogs.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Recent health samples</p>
+                  {healthLogs.slice(0, 3).map((log) => (
+                    <div key={log.id as string} className="rounded-lg border border-border bg-surface-muted px-3 py-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold">{String(log.status ?? "unknown")}</span>
+                        <span className="text-muted-foreground">{new Date(log.checked_at as string).toLocaleString("en-IN")}</span>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">
+                        Battery {log.battery_level ?? "—"} · Signal {log.signal_strength ?? "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="rounded-lg border border-border bg-surface-muted px-3 py-2 text-xs text-muted-foreground">
-                Health status is computed locally from device heartbeat data. Ping failures, offline states, and devices older than 30 minutes surface as alerts in this panel.
+                Health status is computed locally from device heartbeat data and persisted health samples. Ping failures, offline states, pending activations, and quarantined devices surface as alerts in this panel.
               </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  className="rounded-md border border-border bg-surface-muted px-3 py-2 text-sm font-bold hover:bg-surface disabled:opacity-50"
+                  disabled={healthActionSubmitting}
+                  onClick={() => void handleHealthAction("acknowledge")}
+                  type="button"
+                >
+                  Acknowledge health
+                </button>
+                <button
+                  className="rounded-md border border-border bg-surface-muted px-3 py-2 text-sm font-bold hover:bg-surface disabled:opacity-50"
+                  disabled={healthActionSubmitting}
+                  onClick={() => void handleHealthAction("quarantine")}
+                  type="button"
+                >
+                  Quarantine
+                </button>
+                {device.status === "pending" ? (
+                  <button
+                    className="rounded-md border border-border bg-surface-muted px-3 py-2 text-sm font-bold hover:bg-surface disabled:opacity-50"
+                    disabled={healthActionSubmitting}
+                    onClick={() => void handleHealthAction("reissue_claim")}
+                    type="button"
+                  >
+                    Reissue enrollment
+                  </button>
+                ) : null}
+                <button
+                  className="rounded-md border border-border bg-surface-muted px-3 py-2 text-sm font-bold hover:bg-surface disabled:opacity-50"
+                  disabled={healthActionSubmitting}
+                  onClick={() => void handleHealthAction("resolve")}
+                  type="button"
+                >
+                  Resolve incidents
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-black">Open Incidents</h3>
+              <p className="text-sm text-muted-foreground">Durable incident history for pending, stale, quarantined, and recovery actions.</p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {healthIncidents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active incidents.</p>
+              ) : healthIncidents.map((incident) => (
+                <div key={incident.id as string} className="rounded-lg border border-border bg-surface-muted px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold">{incident.title as string}</p>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{incident.status as string}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{incident.description as string ?? "No description"}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {incident.incident_type as string} · {incident.severity as string} · {new Date(incident.detected_at as string).toLocaleString("en-IN")}
+                  </p>
+                </div>
+              ))}
             </CardContent>
           </Card>
           <Card>
@@ -617,9 +865,9 @@ function DeviceDetailDrawer({
 }
 
 function DeviceRegisterDrawer({
-  deviceTypes, branches, apiKeyResult, onApiKeyResult, onClose, onRegistered,
+  deviceTypes, branches, apiKeyResult, secretType, onApiKeyResult, onSecretTypeChange, onClose, onRegistered,
 }: {
-  deviceTypes: DeviceItem[]; branches: DeviceItem[]; apiKeyResult: string | null; onApiKeyResult: (k: string | null) => void;
+  deviceTypes: DeviceItem[]; branches: DeviceItem[]; apiKeyResult: string | null; secretType: "api-key" | "enrollment-code" | null; onApiKeyResult: (k: string | null) => void; onSecretTypeChange: (k: "api-key" | "enrollment-code" | null) => void;
   onClose: () => void; onRegistered: () => void;
 }) {
   const [deviceName, setDeviceName] = useState("");
@@ -628,6 +876,7 @@ function DeviceRegisterDrawer({
   const [location, setLocation] = useState("");
   const [ipAddress, setIpAddress] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
+  const [provisionMode, setProvisionMode] = useState<"active" | "pending">("active");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -639,11 +888,21 @@ function DeviceRegisterDrawer({
       const res = await fetch("/api/attendance/devices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_name: deviceName, device_type_id: deviceTypeId, branch_id: branchId || undefined, location, ip_address: ipAddress, serial_number: serialNumber }),
+        body: JSON.stringify({
+          device_name: deviceName,
+          device_type_id: deviceTypeId,
+          branch_id: branchId || undefined,
+          location,
+          ip_address: ipAddress,
+          serial_number: serialNumber,
+          provision_mode: provisionMode === "pending" ? "pending" : "active",
+        }),
       });
       const json = await res.json();
       if (json.ok) {
-        onApiKeyResult(json.data.api_key);
+        const nextSecret = json.data.enrollment_code ?? json.data.api_key ?? null;
+        onApiKeyResult(nextSecret);
+        onSecretTypeChange(json.data.enrollment_code ? "enrollment-code" : "api-key");
         onRegistered();
       } else {
         setError(json.error?.message ?? "Failed to register device.");
@@ -666,12 +925,18 @@ function DeviceRegisterDrawer({
           {apiKeyResult ? (
             <div className="space-y-4">
               <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="text-sm font-bold text-green-800">Device Registered Successfully</p>
+                <p className="text-sm font-bold text-green-800">
+                  {secretType === "enrollment-code" ? "Enrollment claim issued successfully" : "Device registered successfully"}
+                </p>
               </div>
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Save this API key</p>
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+                  {secretType === "enrollment-code" ? "Save this enrollment code" : "Save this API key"}
+                </p>
                 <p className="mt-1 break-all font-mono text-sm text-amber-900">{apiKeyResult}</p>
-                <p className="mt-2 text-xs text-amber-700">This key will not be shown again. Store it securely.</p>
+                <p className="mt-2 text-xs text-amber-700">
+                  This value will not be shown again. Store it securely.
+                </p>
               </div>
               <button className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90" onClick={onClose} type="button">Done</button>
             </div>
@@ -688,6 +953,14 @@ function DeviceRegisterDrawer({
                   <option value="">Select type...</option>
                   {deviceTypes.map((t) => <option key={t.id as string} value={t.id as string}>{t.name as string}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Provisioning Mode</label>
+                <select className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm" value={provisionMode} onChange={(e) => setProvisionMode(e.target.value as "active" | "pending")}>
+                  <option value="active">Activate immediately</option>
+                  <option value="pending">Issue enrollment claim</option>
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">Pending mode creates a one-time enrollment claim for the device to activate itself later.</p>
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Branch</label>

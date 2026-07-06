@@ -14,6 +14,7 @@ import {
   hashQrToken,
   isVisitInCurrentMonth
 } from "../lib/business-rules";
+import { getGeofenceRadiusMeters, isGeofenceEnabled } from "../lib/geofence";
 
 type AttendanceReportFilter = {
   gymId: string | null;
@@ -181,16 +182,33 @@ export async function getMemberAttendancePortal(userId: string): Promise<MemberA
     return null;
   }
 
-  const [token, visitsResult] = await Promise.all([
+  const [token, visitsResult, activeSessionResult] = await Promise.all([
     ensureActiveQrToken(member, userId),
-    supabase.from("attendance_sessions").select("*").eq("member_id", member.id).order("check_in_at", { ascending: false }).limit(80)
+    supabase.from("attendance_sessions").select("*").eq("member_id", member.id).order("check_in_at", { ascending: false }).limit(80),
+    supabase.from("attendance_sessions").select("*").eq("member_id", member.id).eq("status", "inside").order("check_in_at", { ascending: false }).limit(1).maybeSingle()
   ]);
 
   if (visitsResult.error) {
     throw new Error(visitsResult.error.message);
   }
 
+  if (activeSessionResult.error) {
+    throw new Error(activeSessionResult.error.message);
+  }
+
   const visits = visitsResult.data ?? [];
+  const activeSession = activeSessionResult.data ?? null;
+  const resolvedBranchId = member.branch_id ?? activeSession?.branch_id ?? null;
+  const locationTracking = resolvedBranchId
+    ? await getMemberLocationTracking(resolvedBranchId)
+    : {
+        activeSessionId: activeSession?.id ?? null,
+        branchId: null,
+        branchName: null,
+        enabled: false,
+        radiusMeters: 150,
+        coordinatesConfigured: false
+      };
   const durations = visits.map((visit) => visit.duration_minutes).filter((value): value is number => typeof value === "number");
   const qrPayload = token ? buildQrPayload(token.token_value) : "";
   const qrSvg = qrPayload ? await QRCode.toString(qrPayload, { type: "svg", margin: 2, width: 240, color: { dark: "#111315", light: "#ffffff" } }) : "";
@@ -200,6 +218,11 @@ export async function getMemberAttendancePortal(userId: string): Promise<MemberA
     qrToken: token,
     qrSvg,
     qrPayload,
+    activeSession,
+    locationTracking: {
+      ...locationTracking,
+      activeSessionId: activeSession?.id ?? null
+    },
     metrics: {
       attendanceCount: visits.length,
       lastVisitAt: visits[0]?.check_in_at ?? null,
@@ -208,6 +231,27 @@ export async function getMemberAttendancePortal(userId: string): Promise<MemberA
       averageDuration: durations.length > 0 ? Math.round(durations.reduce((total, duration) => total + duration, 0) / durations.length) : 0
     },
     visits
+  };
+}
+
+async function getMemberLocationTracking(branchId: string) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: branch }, { data: settingsRow }] = await Promise.all([
+    supabase.from("branches").select("id, name, latitude, longitude").eq("id", branchId).maybeSingle(),
+    supabase.from("branch_settings").select("attendance_settings").eq("branch_id", branchId).maybeSingle()
+  ]);
+
+  const attendanceSettings = settingsRow?.attendance_settings ?? {};
+  const enabled = isGeofenceEnabled(attendanceSettings);
+  const radiusMeters = getGeofenceRadiusMeters(attendanceSettings);
+  const coordinatesConfigured = branch?.latitude !== null && branch?.longitude !== null;
+
+  return {
+    branchId: branch?.id ?? branchId,
+    branchName: branch?.name ?? null,
+    enabled: enabled && coordinatesConfigured,
+    radiusMeters,
+    coordinatesConfigured
   };
 }
 

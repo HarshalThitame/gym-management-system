@@ -1,37 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CloudOff, RefreshCw, LogIn, LogOut, MonitorSmartphone, ShieldAlert, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Textarea } from "@/components/ui/input";
+import { useKioskReader } from "@/features/attendance/hooks/use-kiosk-reader";
 import { deleteDraft, flushOfflineActions, getDraft, queueOfflineAction, saveDraft } from "@/features/pwa/lib/offline-store";
 import { getNetworkStatusMessage } from "@/features/pwa/lib/business-rules";
-
-type NdefRecordLike = {
-  recordType?: string;
-  mediaType?: string;
-  data?: {
-    text?: () => Promise<string>;
-    toString?: () => string;
-  };
-};
-
-type NdefReadingEventLike = {
-  serialNumber?: string;
-  message?: {
-    records?: NdefRecordLike[];
-  };
-};
-
-type NdefReaderLike = {
-  scan: () => Promise<void>;
-  addEventListener: (eventName: "reading" | "error", handler: (event: NdefReadingEventLike) => void) => void;
-  removeEventListener: (eventName: "reading" | "error", handler: (event: NdefReadingEventLike) => void) => void;
-  abort?: () => void;
-};
-
-type NdefReaderConstructor = new () => NdefReaderLike;
 
 type KioskDevice = {
   id: string;
@@ -87,17 +63,15 @@ export function KioskTerminal({ devices }: { devices: KioskDevice[] }) {
   const [queuedActions, setQueuedActions] = useState<KioskQueuedAction[]>([]);
   const [syncingQueuedActions, setSyncingQueuedActions] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
-  const [readerMode, setReaderMode] = useState<"manual" | "keyboard_wedge" | "web_nfc">("keyboard_wedge");
-  const [readerStatus, setReaderStatus] = useState<"idle" | "listening" | "active" | "unsupported" | "error">("idle");
-  const [readerMessage, setReaderMessage] = useState<string | null>(null);
-  const [lastScanAt, setLastScanAt] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<KioskResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const keyboardBufferRef = useRef("");
-  const keyboardTimerRef = useRef<number | null>(null);
-  const nfcReaderRef = useRef<NdefReaderLike | null>(null);
-  const keyboardCaptureEnabled = readerMode === "keyboard_wedge";
+
+  const { lastScanAt, readerMessage, readerMode, readerStatus, setReaderMode } = useKioskReader({
+    onScan: ({ value }) => {
+      setDeviceUserId(value);
+    }
+  });
 
   const selectedDevice = useMemo(() => devices.find((device) => device.id === deviceId) ?? null, [deviceId, devices]);
   const queuedCount = queuedActions.length;
@@ -131,75 +105,6 @@ export function KioskTerminal({ devices }: { devices: KioskDevice[] }) {
   useEffect(() => {
     void hydrateKioskSession();
   }, []);
-
-  useEffect(() => {
-    stopReaderCapture();
-
-    if (readerMode === "manual") {
-      setReaderStatus("idle");
-      setReaderMessage("Manual mode selected. Enter the card UID or member ID yourself.");
-      return stopReaderCapture;
-    }
-
-    if (readerMode === "keyboard_wedge") {
-      setReaderStatus("listening");
-      setReaderMessage("Keyboard wedge mode is active. Scan an RFID/NFC card and press Enter if your reader does not auto-submit.");
-      return stopReaderCapture;
-    }
-
-    if (readerMode === "web_nfc") {
-      setReaderMessage("Web NFC mode is active. Tap a supported NFC card to the browser device.");
-      setReaderStatus("idle");
-      startNfcCapture().catch((nfcError) => {
-        setReaderStatus("error");
-        setReaderMessage(nfcError instanceof Error ? nfcError.message : "Web NFC could not start.");
-      });
-    }
-
-    return stopReaderCapture;
-  }, [readerMode, stopReaderCapture, startNfcCapture]);
-
-  useEffect(() => {
-    if (!keyboardCaptureEnabled) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (readerMode !== "keyboard_wedge") {
-        return;
-      }
-
-      const target = event.target;
-      const tagName = target && typeof target === "object" && "tagName" in target ? String((target as HTMLElement).tagName).toLowerCase() : "";
-      const isTypingField = tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean((target as HTMLElement | null)?.isContentEditable);
-
-      if (isTypingField && target !== document.body) {
-        return;
-      }
-
-      if (event.key === "Enter") {
-        commitKeyboardScan();
-        return;
-      }
-
-      if (event.key.length !== 1 || event.altKey || event.ctrlKey || event.metaKey) {
-        return;
-      }
-
-      keyboardBufferRef.current += event.key;
-
-      if (keyboardTimerRef.current) {
-        window.clearTimeout(keyboardTimerRef.current);
-      }
-
-      keyboardTimerRef.current = window.setTimeout(() => {
-        commitKeyboardScan();
-      }, 180);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [commitKeyboardScan, keyboardCaptureEnabled, readerMode]);
 
   useEffect(() => {
     if (isOnline && apiKey.trim() && queuedActions.length > 0 && !syncingQueuedActions) {
@@ -337,91 +242,6 @@ export function KioskTerminal({ devices }: { devices: KioskDevice[] }) {
       setSyncingQueuedActions(false);
     }
   }
-
-  const handleNfcReading = useCallback((event: NdefReadingEventLike) => {
-    const scannedValue = normalizeReaderPayload(event.serialNumber ?? extractNfcPayload(event));
-    if (!scannedValue) {
-      setReaderStatus("error");
-      setReaderMessage("NFC card was detected, but no usable identifier was found.");
-      return;
-    }
-
-    setDeviceUserId(scannedValue);
-    setLastScanAt(new Date().toISOString());
-    setReaderStatus("active");
-    setReaderMessage(`NFC card captured: ${scannedValue}`);
-  }, []);
-
-  const handleNfcError = useCallback(() => {
-    setReaderStatus("error");
-    setReaderMessage("Web NFC scan failed. Use keyboard wedge mode or manual entry.");
-  }, []);
-
-  const stopNfcCapture = useCallback(() => {
-    const reader = nfcReaderRef.current;
-
-    if (reader) {
-      reader.removeEventListener("reading", handleNfcReading);
-      reader.removeEventListener("error", handleNfcError);
-      reader.abort?.();
-      nfcReaderRef.current = null;
-    }
-  }, [handleNfcError, handleNfcReading]);
-
-  const commitKeyboardScan = useCallback(() => {
-    const value = normalizeReaderPayload(keyboardBufferRef.current);
-    if (!value) {
-      keyboardBufferRef.current = "";
-      return;
-    }
-
-    setDeviceUserId(value);
-    setLastScanAt(new Date().toISOString());
-    setReaderStatus("active");
-    setReaderMessage(`RFID / barcode payload captured: ${value}`);
-    keyboardBufferRef.current = "";
-    if (keyboardTimerRef.current) {
-      window.clearTimeout(keyboardTimerRef.current);
-      keyboardTimerRef.current = null;
-    }
-  }, []);
-
-  const stopReaderCapture = useCallback(() => {
-    if (keyboardTimerRef.current) {
-      window.clearTimeout(keyboardTimerRef.current);
-      keyboardTimerRef.current = null;
-    }
-
-    keyboardBufferRef.current = "";
-    stopNfcCapture();
-  }, [stopNfcCapture]);
-
-  const startNfcCapture = useCallback(async () => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const readerCtor = (window as Window & { NDEFReader?: NdefReaderConstructor }).NDEFReader;
-    if (!readerCtor) {
-      setReaderStatus("unsupported");
-      setReaderMessage("Web NFC is not available in this browser. Use keyboard wedge mode or manual entry.");
-      return;
-    }
-
-    try {
-      stopNfcCapture();
-      const reader = new readerCtor();
-      nfcReaderRef.current = reader;
-      reader.addEventListener("reading", handleNfcReading);
-      reader.addEventListener("error", handleNfcError);
-      await reader.scan();
-      setReaderStatus("active");
-      setReaderMessage("Web NFC reader is active. Tap an NFC card to continue.");
-    } catch (readerError) {
-      stopNfcCapture();
-      throw readerError;
-    }
-  }, [handleNfcError, handleNfcReading, stopNfcCapture]);
 
   async function submit() {
     if (!deviceId || !apiKey.trim()) {
@@ -865,34 +685,6 @@ function getErrorCode(json: unknown) {
 function getErrorMessage(json: unknown) {
   const error = json && typeof json === "object" && "error" in json ? (json as { error?: Record<string, unknown> }).error : undefined;
   return typeof error?.message === "string" ? error.message : null;
-}
-
-function extractNfcPayload(event: NdefReadingEventLike) {
-  const record = event.message?.records?.[0];
-  const data = record?.data;
-
-  if (!data) {
-    return "";
-  }
-
-  if (typeof data.toString === "function") {
-    const value = data.toString();
-    if (value && value !== "[object Object]") {
-      return value;
-    }
-  }
-
-  return "";
-}
-
-function normalizeReaderPayload(value: string) {
-  const normalized = value.trim();
-
-  if (!normalized) {
-    return "";
-  }
-
-  return normalized.replace(/^https?:\/\/[^/]+\//, "");
 }
 
 function readSessionValue(key: string) {

@@ -1,46 +1,60 @@
 # Phase 2 Completion Plan: Attendance Premium Features
 
 ## Summary
-Finish Phase 2 by closing the remaining premium gaps in a pragmatic order: dynamic QR, attendance analytics APIs, batch/class attendance APIs, and attendance automation APIs. Keep the current `attendance_sessions` model and existing automation/integration stack, and add roadmap-compatible interfaces on top of it.
+Phase 2 is complete in the codebase. The premium attendance surface now exists on top of the current `attendance_sessions` model and the roadmap-compatible APIs are implemented.
 
-Assumptions:
-- keep `MSG91` as the active SMS/WhatsApp provider
-- do not start Phase 3 hardware or geo-fence work
-- treat existing class booking/attendance as the base for batch attendance instead of introducing a second parallel attendance system
+Current execution state:
+- Overall Phase 2 completion: `100%`
+- Sprint 1 dynamic QR foundation: `completed`
+- Sprint 2 analytics APIs: `completed`
+- Sprint 3 batch attendance: `completed`
+- Sprint 4 automation APIs: `completed`
+- Sprint 5 dashboard parity and hardening: `completed`
 
-## Implementation Changes
+## Phase 2 Completion Table
 
-### 1. Dynamic QR
-- Add `POST /api/v1/qr/dynamic/[memberId]` on top of `qr_tokens`.
-- Generate short-lived tokens with 12 second expiry, a 10 second refresh hint, and one-time-use semantics.
-- Keep the current static QR flow unchanged for Phase 1 compatibility.
-- Update validation so dynamic tokens fail cleanly for `expired`, `used`, `invalid`, and `wrong_gym` cases.
-- Add a member-facing rotating QR display with countdown and auto-refresh.
+| Area | Status | Notes |
+|---|---|---|
+| Dynamic QR | Done | Rotating QR flow, issuance route, validation states, and one-time-use semantics are implemented. |
+| Analytics APIs | Done | Attendance, churn-risk, member-insights, and occupancy analytics routes exist. |
+| Batch attendance | Done | Batch check-in and checkout routes return per-member failures and reuse the existing attendance service. |
+| Automation APIs | Done | Automation config and alert-send routes exist on the current provider stack. |
+| Occupancy and dashboard parity | Done | Premium analytics data is surfaced through the existing dashboard and analytics layer. |
 
-### 2. Analytics APIs
+## Sprint Plan
+
+### Sprint 1: Dynamic QR Foundation
+- Deliver the member-facing rotating QR flow with countdown, refresh, and static fallback.
+- Add the staff-facing dynamic QR issuance route on the existing API surface.
+- Make QR validation understand `invalid`, `used`, `expired`, and `wrong_gym` states.
+- Consume dynamic tokens as one-time-use records when the QR is actually used for check-in.
+
+### Sprint 2: Analytics APIs
 - Add `GET /api/v1/analytics/attendance`.
 - Add `GET /api/v1/analytics/churn-risk`.
 - Add `GET /api/v1/analytics/member-insights/[memberId]`.
 - Use existing sources of truth: `attendance_sessions`, `attendance_analytics`, `occupancy_log`, and `streaks`.
-- Return attendance totals, active/inactive split, trend direction, churn risk, and member engagement metrics.
 
-### 3. Batch Attendance
+### Sprint 3: Batch Attendance
 - Add `POST /api/v1/attendance/batch-checkin`.
 - Add `POST /api/v1/attendance/batch-checkout`.
 - Reuse the current attendance service so duplicate prevention, alerts, logging, and realtime behavior stay consistent.
-- Support `sessionType`, `sessionName`, `memberIds`, and `branchId`.
 - Return per-member failures instead of aborting the whole request on the first bad record.
 
-### 4. Automation APIs
+### Sprint 4: Automation APIs
 - Add `GET /api/v1/automation/config`.
 - Add `POST /api/v1/automation/send-alert`.
 - Keep the current `MSG91` provider stack and adapt it to attendance alert use cases.
-- Support at minimum `streak_alert` and `churn_warning` over `sms` and `whatsapp`.
 - Log every send attempt in the automation logs.
 
-### 5. Occupancy and Dashboard Parity
+### Sprint 5: Occupancy and Dashboard Parity
 - Extend the existing occupancy and analytics responses to cover the premium roadmap use cases.
 - Keep the current admin attendance dashboard working and surface derived heatmap-friendly data through the analytics layer.
+
+## Assumptions
+- keep `MSG91` as the active SMS/WhatsApp provider
+- do not start Phase 3 hardware or geo-fence work
+- treat existing class booking/attendance as the base for batch attendance instead of introducing a second parallel attendance system
 
 ## Public APIs
 - `POST /api/v1/qr/dynamic/[memberId]`
@@ -85,4 +99,4 @@ The kiosk work is adjacent to Phase 2, but the current repo state is:
 | Geo-fence auto-checkout | Missing | Still not implemented. |
 | Enterprise kiosk ops dashboard | Partial | Admin/device panel exists, but not a full kiosk operations console. |
 
-Bottom line: kiosk reader capture is now usable in a browser-based enterprise flow, but it is not a fully enterprise-complete hardware product yet.
+Bottom line: kiosk reader capture is now usable in a browser-based enterprise flow, but it is not a fully enterprise-complete hardware product yet. This is adjacent to Phase 2 and should be tracked as a separate enterprise-hardening stream.

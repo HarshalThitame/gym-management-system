@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { AttendanceDesk } from "@/features/attendance/components/attendance-desk";
 import { ErrorBoundary } from "@/features/attendance/components/error-boundary";
+import { GeofenceMonitoringPanel } from "@/features/attendance/components/geofence-monitoring-panel";
 import { Phase2AttendanceHub } from "@/features/attendance/components/phase2-attendance-hub";
 import { OccupancyDashboard } from "@/features/attendance/components/occupancy-dashboard";
 import { SyncInactivityAlertsForm } from "@/features/attendance/components/attendance-forms";
@@ -105,6 +106,12 @@ export default async function AdminAttendancePage() {
               peakHour: dashboard.metrics.peakHour,
             }}
           />
+        </Suspense>
+      </ErrorBoundary>
+
+      <ErrorBoundary>
+        <Suspense fallback={<div className="animate-pulse rounded-xl bg-surface-muted p-20" />}>
+          <GeofenceMonitoringPanel gymId={gymId} branchId={scope.branchId} />
         </Suspense>
       </ErrorBoundary>
 

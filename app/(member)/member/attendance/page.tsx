@@ -9,7 +9,7 @@ import { getMemberAttendancePortal } from "@/features/attendance/services/attend
 import { requireMemberPortalAccess } from "@/features/member/lib/access";
 import { PageHeader, AnimatedCardSection, AnimatedListSection, AnimatedListItem } from "@/features/member/components/page-wrappers";
 import { StreakHeatmap } from "@/features/member/components/streak-heatmap";
-import { SelfCheckInButton } from "@/features/member/components/self-checkin-button";
+import { MemberAttendanceControls } from "@/features/member/components/member-attendance-controls";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -38,7 +38,7 @@ export default async function MemberAttendancePage() {
       <PageHeader eyebrow="Attendance" title="Check-in QR and visit history" description="Use your QR at reception and track visit count, streak, monthly activity, and workout duration." />
 
       <AnimatedCardSection>
-        <SelfCheckInButton memberId={portal.member.id} />
+        <MemberAttendanceControls portal={portal} />
       </AnimatedCardSection>
 
       <AnimatedCardSection delay={0.05}>

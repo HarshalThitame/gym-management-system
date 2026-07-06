@@ -48,6 +48,10 @@ function createDeviceClient() {
     insert: vi.fn().mockReturnThis()
   };
 
+  const healthInsert = {
+    insert: vi.fn().mockReturnThis()
+  };
+
   const updateResult = {
     select: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({
@@ -81,6 +85,7 @@ function createDeviceClient() {
       if (table === "attendance_devices") return attendanceDevices;
       if (table === "device_types") return deviceTypes;
       if (table === "device_event_logs") return logInsert;
+      if (table === "device_health_logs") return healthInsert;
       throw new Error(`Unexpected table ${table}`);
     })
   };
@@ -121,6 +126,41 @@ describe("device lifecycle routes", () => {
         device_name: "Front Desk Reader",
         branch_id: "branch-1",
         api_key: "plain-key"
+      }
+    });
+  });
+
+  it("registers a device in pending enrollment mode and returns the enrollment code", async () => {
+    mockAuth();
+    vi.doMock("@/lib/security/device-auth", () => ({
+      generateDeviceApiKey: vi.fn().mockReturnValue({ plaintext: "plain-key", hash: "hashed-key" }),
+      generateDeviceEnrollmentCode: vi.fn().mockReturnValue({ plaintext: "claim-code", hash: "claim-hash" })
+    }));
+    vi.doMock("@/lib/supabase/admin", () => ({
+      createAdminClient: vi.fn().mockReturnValue(createDeviceClient())
+    }));
+
+    const { POST } = await import("@/app/api/attendance/devices/route");
+    const response = await POST(
+      new Request("http://localhost/api/attendance/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          device_name: "Front Desk Reader",
+          device_type_id: "type-1",
+          branch_id: "branch-1",
+          provision_mode: "pending",
+        })
+      }) as never
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      data: {
+        device_name: "Front Desk Reader",
+        branch_id: "branch-1",
+        enrollment_code: "claim-code"
       }
     });
   });
@@ -196,16 +236,32 @@ describe("device lifecycle routes", () => {
     }));
     const updateSpy = vi.fn().mockReturnThis();
     const insert = vi.fn().mockReturnThis();
+    const healthInsert = vi.fn().mockReturnThis();
+    const incidents = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis()
+    };
     vi.doMock("@/lib/supabase/admin", () => ({
       createAdminClient: vi.fn().mockReturnValue({
         from: vi.fn().mockImplementation((table: string) => {
           if (table === "attendance_devices") {
             return {
+              select: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { id: "device-1", status: "offline", last_seen_at: null, metadata: null },
+                error: null
+              }),
               update: updateSpy,
               eq: vi.fn().mockReturnThis()
             };
           }
           if (table === "device_event_logs") return { insert };
+          if (table === "device_health_logs") return { insert: healthInsert };
+          if (table === "device_health_incidents") return incidents;
           throw new Error(`Unexpected table ${table}`);
         })
       })
@@ -220,5 +276,6 @@ describe("device lifecycle routes", () => {
     expect(response.status).toBe(200);
     expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ status: "online" }));
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ event_type: "ping" }));
+    expect(healthInsert).toHaveBeenCalledWith(expect.objectContaining({ device_id: "device-1" }));
   });
 });

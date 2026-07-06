@@ -24,6 +24,10 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
   const [geofenceBranchId, setGeofenceBranchId] = useState<string>(dashboard.branches[0]?.id ?? "");
   const [geofenceEnabled, setGeofenceEnabled] = useState<boolean>(true);
   const [geofenceRadiusM, setGeofenceRadiusM] = useState<string>("150");
+  const [geofenceOutsideSampleThreshold, setGeofenceOutsideSampleThreshold] = useState<string>("2");
+  const [geofenceMinAccuracyM, setGeofenceMinAccuracyM] = useState<string>("50");
+  const [geofenceExitGraceSeconds, setGeofenceExitGraceSeconds] = useState<string>("120");
+  const [geofenceStaleTimeoutMinutes, setGeofenceStaleTimeoutMinutes] = useState<string>("5");
   const [geofenceSaving, setGeofenceSaving] = useState(false);
   const hasGoogleCalendar = useHasFeature("google_calendar_sync");
   const hasWebhooks = useHasFeature("webhooks");
@@ -44,6 +48,10 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
     if (selected) {
       setGeofenceEnabled(attendanceSettings.geo_fence_enabled === true || attendanceSettings.geo_fence_enabled === "true");
       setGeofenceRadiusM(String(attendanceSettings.geo_fence_radius_m ?? 150));
+      setGeofenceOutsideSampleThreshold(String(attendanceSettings.geo_fence_outside_sample_threshold ?? 2));
+      setGeofenceMinAccuracyM(String(attendanceSettings.geo_fence_min_accuracy_m ?? 50));
+      setGeofenceExitGraceSeconds(String(attendanceSettings.geo_fence_exit_grace_seconds ?? 120));
+      setGeofenceStaleTimeoutMinutes(String(attendanceSettings.geo_fence_stale_timeout_minutes ?? 5));
     }
   }, [branchSettings, geofenceBranchId]);
 
@@ -57,13 +65,17 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
       fd.set("settingsValue", JSON.stringify({
         geo_fence_enabled: geofenceEnabled,
         geo_fence_radius_m: Number(geofenceRadiusM) > 0 ? Number(geofenceRadiusM) : 150,
+        geo_fence_outside_sample_threshold: Number(geofenceOutsideSampleThreshold) >= 1 ? Number(geofenceOutsideSampleThreshold) : 2,
+        geo_fence_min_accuracy_m: Number(geofenceMinAccuracyM) > 0 ? Number(geofenceMinAccuracyM) : 50,
+        geo_fence_exit_grace_seconds: Number(geofenceExitGraceSeconds) > 0 ? Number(geofenceExitGraceSeconds) : 120,
+        geo_fence_stale_timeout_minutes: Number(geofenceStaleTimeoutMinutes) > 0 ? Number(geofenceStaleTimeoutMinutes) : 5,
       }));
       const r = await saveBranchSettingAction({ status: "idle", message: null } as never, fd);
       showToast(r.message || "Geofence settings saved.", r.status === "success" ? "success" : "error");
     } finally {
       setGeofenceSaving(false);
     }
-  }, [geofenceBranchId, geofenceEnabled, geofenceRadiusM]);
+  }, [geofenceBranchId, geofenceEnabled, geofenceRadiusM, geofenceExitGraceSeconds, geofenceMinAccuracyM, geofenceOutsideSampleThreshold, geofenceStaleTimeoutMinutes]);
 
   // ── KPIs ──
   const enabledFlags = flags.filter((f) => f.enabled).length;
@@ -209,7 +221,7 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
           <Card>
             <CardHeader>
               <h3 className="text-2xl font-black">Geofence Attendance</h3>
-              <p className="text-sm text-muted-foreground">Configure the branch geofence used by mobile self check-in and auto-checkout.</p>
+              <p className="text-sm text-muted-foreground">Configure the branch geofence used for location reporting and checkout-only auto-checkout.</p>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <label className="space-y-1">
@@ -237,6 +249,50 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
                   onChange={(event) => setGeofenceRadiusM(event.target.value)}
                 />
               </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Outside samples before checkout</span>
+                <input
+                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={geofenceOutsideSampleThreshold}
+                  onChange={(event) => setGeofenceOutsideSampleThreshold(event.target.value)}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Minimum accuracy (meters)</span>
+                <input
+                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={geofenceMinAccuracyM}
+                  onChange={(event) => setGeofenceMinAccuracyM(event.target.value)}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Exit grace window (seconds)</span>
+                <input
+                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={geofenceExitGraceSeconds}
+                  onChange={(event) => setGeofenceExitGraceSeconds(event.target.value)}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Stale tracker timeout (minutes)</span>
+                <input
+                  className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={geofenceStaleTimeoutMinutes}
+                  onChange={(event) => setGeofenceStaleTimeoutMinutes(event.target.value)}
+                />
+              </label>
               <label className="flex items-center gap-3 rounded-md border border-border bg-surface-muted px-3 py-3 md:col-span-2">
                 <input
                   checked={geofenceEnabled}
@@ -245,8 +301,8 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
                   type="checkbox"
                 />
                 <div>
-                  <p className="text-sm font-bold">Enable geofence enforcement</p>
-                  <p className="text-xs text-muted-foreground">Members must be within the selected radius for mobile self check-in and geofence-based checkout.</p>
+                  <p className="text-sm font-bold">Enable checkout geofence</p>
+                  <p className="text-xs text-muted-foreground">Members are checked out automatically when they leave the selected radius. Check-in remains button- or reader-driven.</p>
                 </div>
               </label>
               <button

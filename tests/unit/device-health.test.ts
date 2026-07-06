@@ -30,6 +30,8 @@ describe("device health helpers", () => {
     const now = new Date("2026-07-05T10:00:00.000Z");
     const summary = getDeviceHealthSummary([
       { status: "online", last_seen_at: "2026-07-05T09:58:00.000Z" },
+      { status: "pending", last_seen_at: null },
+      { status: "quarantined", last_seen_at: "2026-07-05T09:40:00.000Z" },
       { status: "offline", last_seen_at: "2026-07-05T09:40:00.000Z" },
       { status: "error", last_seen_at: "2026-07-05T08:00:00.000Z" },
       { status: "decommissioned", last_seen_at: null },
@@ -39,6 +41,8 @@ describe("device health helpers", () => {
     expect(summary.watch).toBe(1);
     expect(summary.critical).toBe(1);
     expect(summary.decommissioned).toBe(1);
-    expect(summary.totalMonitored).toBe(3);
+    expect(summary.pending).toBe(1);
+    expect(summary.quarantined).toBe(1);
+    expect(summary.totalMonitored).toBe(5);
   });
 });
