@@ -3,11 +3,12 @@ import { IntegrationsManager } from "@/features/organization-owner/components/in
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ButtonLink } from "@/components/ui/button";
 
 export const metadata = { title: "Integrations", description: "Manage your organization's third-party integrations" };
 
 export default async function OrgIntegrationsPage() {
-  const context = await requireOrganizationOwner("/organization/integrations");
+  await requireOrganizationOwner("/organization/integrations");
   let dashboard: Awaited<ReturnType<typeof getOrgIntegrationsAction>> | null = null;
   try {
     dashboard = await getOrgIntegrationsAction();
@@ -27,6 +28,14 @@ export default async function OrgIntegrationsPage() {
             <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
               Manage your payment gateway, calendar sync, CRM connectors, SMS, and WhatsApp providers. All integration management is organization-owner only.
             </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <ButtonLink href="/organization/integrations/msg91" variant="accent">
+              Open MSG91 console
+            </ButtonLink>
+            <ButtonLink href="/admin/communications" variant="secondary">
+              Open communications hub
+            </ButtonLink>
           </div>
         </div>
       </section>

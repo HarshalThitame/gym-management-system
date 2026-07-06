@@ -38,19 +38,20 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   ai_retention_analysis:    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   ai_revenue_insights:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
 
-  // Attendance — core module (attendance_reports) is fully implemented; sub-features are partial
-  manual_attendance:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
-  qr_attendance:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
-  dynamic_qr_attendance:     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  trainer_attendance:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
-  staff_attendance:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
-  branch_attendance:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
+  // Attendance — core module is fully implemented in the current web/device stack.
+  // Hardware-native biometric/fingerprint support remains the only configuration-only surface.
+  manual_attendance:         { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  qr_attendance:             { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  dynamic_qr_attendance:     { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  trainer_attendance:        { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  staff_attendance:          { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  branch_attendance:         { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   biometric_attendance:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   fingerprint_attendance:    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  rfid_attendance:           { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  nfc_attendance:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  geo_fencing_attendance:    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  attendance_api:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
+  rfid_attendance:           { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  nfc_attendance:            { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  geo_fencing_attendance:    { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  attendance_api:            { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   attendance_reports:        { hasSidebar: true,  sidebarModule: "attendance", hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
 
   // Billing — core module (billing_invoices) is fully implemented; sub-features are partial or not implemented
@@ -141,7 +142,7 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   data_export_csv_download:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   custom_dashboards_kpis:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
 
-  // Trainer — core module is fully implemented; sub-features are partial
+  // Trainer — core module is fully implemented; some operational extras remain partial/configured-only
   trainer_management:               { hasSidebar: true,  sidebarModule: "trainers", hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   workout_assignment:               { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   nutrition_plans:                  { hasSidebar: true,  sidebarModule: "nutrition", hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
@@ -150,8 +151,8 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   waitlist_management:              { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   cross_branch_class_booking:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   trainer_commissions_payroll:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  staff_attendance_leave:           { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  class_attendance_tracking:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
+  staff_attendance_leave:           { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  class_attendance_tracking:        { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   payroll_export:                   { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   network_wide_class_calendar:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   trainer_sharing_across_branches:  { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
