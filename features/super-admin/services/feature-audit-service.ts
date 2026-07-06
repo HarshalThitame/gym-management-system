@@ -1,8 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { FEATURE_CATEGORIES, MODULE_FEATURE_MAP, isFeatureKey } from "@/features/entitlement/feature-registry";
-import type { FeatureKey, FeatureCategoryCode } from "@/features/entitlement/feature-registry";
+import { MODULE_FEATURE_MAP, isFeatureKey } from "@/features/entitlement/feature-registry";
 import { organizationOwnerModules } from "@/features/organization-owner/lib/organization-owner-modules";
 import type { ImplementationStatus, GapSeverity, FeatureAuditRow, PlanAudit, FeatureAuditReport } from "./feature-audit-types";
 
@@ -96,12 +95,12 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   api_access:                         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
   webhooks:                           { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
   audit_logs:                         { hasSidebar: true,  sidebarModule: "security",  hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
-  advanced_rbac:                      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: true,  hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
+  advanced_rbac:                      { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   priority_support:                   { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
   staff_management:                   { hasSidebar: true,  sidebarModule: "staff",    hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   tally_zoho_books_integration:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   rest_api_access:                    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "SERVICE_OR_INFRA", gapSeverity: "N/A" },
-  role_based_permissions:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: true,  hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
+  role_based_permissions:             { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   multi_branch_staff_assignment:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   hr_document_storage:                { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   custom_roles_granular_permissions:  { hasSidebar: true,  sidebarModule: "custom-roles", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
@@ -322,8 +321,6 @@ export async function buildFeatureAuditReport(): Promise<FeatureAuditReport> {
     return { plans: [], summary: { totalFeatures: 0, implemented: 0, partial: 0, configured: 0, notImplemented: 0, serviceInfra: 0, implementationRate: 0 } };
   }
 
-  // Build sidebar module set for checking
-  const sidebarModuleCodes = new Set(organizationOwnerModules.map((m) => m.featureKey));
   const sidebarModuleLabels: Record<string, string> = {};
   for (const mod of organizationOwnerModules) {
     if (mod.featureKey) {

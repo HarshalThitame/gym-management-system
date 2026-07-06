@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/guards";
 import { searchAuditLogs, getAuditStats } from "@/features/security/services/security-audit-service";
 import { SecurityAuditLog } from "@/features/security/components/security-audit-log";
+import { AttendanceAuditDrilldown } from "@/features/security/components/attendance-audit-drilldown";
 
 async function AuditContent() {
   await requireRole(["super_admin"], "/super-admin");
@@ -21,6 +22,7 @@ async function AuditContent() {
         </div>
       </div>
       <SecurityAuditLog logs={result.logs as Array<Record<string, unknown>>} total={result.total} />
+      <AttendanceAuditDrilldown />
     </div>
   );
 }

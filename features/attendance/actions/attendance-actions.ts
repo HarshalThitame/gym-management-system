@@ -3,7 +3,6 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { writeAuditLog } from "@/lib/audit";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { requireGymFrontDeskScope } from "@/features/reception/lib/access";
 import { requireRole } from "@/lib/auth/guards";
@@ -25,6 +24,7 @@ import {
 import { AccessDeviceSchema, CheckOutSchema, ManualCheckInSchema, QrCheckInSchema, RegenerateQrSchema } from "../schemas/attendance";
 import { getActiveMembershipForMember } from "../services/attendance-service";
 import { consumeQrTokenUsage } from "../lib/phase1-api";
+import { writeAttendanceAuditLog } from "../lib/attendance-audit";
 import {
   entitlementSimpleCatch,
   requireOrganizationFeatureAccess,
@@ -968,12 +968,16 @@ function normalizeQrToken(value: string) {
 }
 
 async function writeAttendanceAudit(context: AuthContext, action: string, entityType: string, entityId: string, metadata: Json = {}) {
-  await writeAuditLog({
+  await writeAttendanceAuditLog({
     actorId: context.userId,
     gymId: getContextGymId(context),
+    branchId: getContextBranchId(context),
     action,
     entityType,
     entityId,
+    workflow: action.startsWith("attendance.") ? "check_in" : "reconciliation",
+    source: typeof (metadata as Record<string, unknown>).source === "string" ? String((metadata as Record<string, unknown>).source) : null,
+    reasonCode: typeof (metadata as Record<string, unknown>).reasonCode === "string" ? String((metadata as Record<string, unknown>).reasonCode) : null,
     metadata
   });
 }

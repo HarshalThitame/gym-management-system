@@ -6,7 +6,6 @@ import { useFormStatus } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
-  ChevronDown,
   ClipboardCopy,
   Download,
   Loader2,
@@ -39,6 +38,7 @@ import {
   cloneRoleAction
 } from "../../actions/role-management-actions";
 import type { RoleManagementData, RoleManagementRecord, RoleDetailData, RoleManagementFilters } from "../../services/role-management-service";
+import type { RoleAccessPreview } from "../../lib/role-access-preview";
 
 type DrawerState =
   | { type: "closed" }
@@ -511,6 +511,9 @@ function PermissionsForm({ role, onClose, criticalSuperAdminEmail }: { role: Rol
   const [originalPerms, setOriginalPerms] = useState<Record<string, string[]>>({});
   const [perms, setPerms] = useState<Record<string, string[]>>({});
   const [permSearch, setPermSearch] = useState("");
+  const [preview, setPreview] = useState<RoleAccessPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/super-admin/roles/${role.id}`)
@@ -551,6 +554,42 @@ function PermissionsForm({ role, onClose, criticalSuperAdminEmail }: { role: Rol
       .map(([resource, actions]) => ({ resource, actions }))
   );
 
+  useEffect(() => {
+    if (!detail) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        const res = await fetch(`/api/super-admin/roles/${role.id}/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ permissions: JSON.parse(resourcesJson) }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data = (await res.json()) as RoleAccessPreview;
+        setPreview(data);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setPreviewError(error instanceof Error ? error.message : "Preview failed.");
+          setPreview(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setPreviewLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [detail, resourcesJson, role.id]);
+
   const filteredResources = authResources.filter(
     (r) => !permSearch || r.includes(permSearch.toLowerCase()) || formatEnterpriseLabel(r).toLowerCase().includes(permSearch.toLowerCase())
   );
@@ -573,6 +612,13 @@ function PermissionsForm({ role, onClose, criticalSuperAdminEmail }: { role: Rol
 
   const hasChanges = diffEntries.added > 0 || diffEntries.removed > 0;
   const affectedUserCount = detail?.users.length ?? 0;
+  const previewMatrix = preview?.matrix.filter((row) => {
+    if (!permSearch) return true;
+    const q = permSearch.toLowerCase();
+    return row.resource.toLowerCase().includes(q) || row.label.toLowerCase().includes(q);
+  }) ?? [];
+  const previewChangedRows = previewMatrix.filter((row) => row.addedActions.length > 0 || row.removedActions.length > 0);
+  const netResourceChange = (preview?.summary.addedResourceCount ?? 0) - (preview?.summary.removedResourceCount ?? 0);
 
   if (loading) {
     return <div className="flex items-center justify-center py-12" role="status" aria-live="polite"><Loader2 className="size-6 animate-spin" aria-hidden="true" /><span className="sr-only">Loading permissions...</span></div>;
@@ -636,6 +682,71 @@ function PermissionsForm({ role, onClose, criticalSuperAdminEmail }: { role: Rol
           </details>
         </div>
       )}
+
+      <div className="rounded-md border border-border bg-surface-muted/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Effective Access Preview</p>
+            <p className="text-sm font-semibold text-muted-foreground">Shows what this role can do before the permission change is saved.</p>
+          </div>
+          {previewLoading && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />}
+        </div>
+        {previewError ? (
+          <p className="mt-3 text-sm font-semibold text-red-600">{previewError}</p>
+        ) : preview ? (
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <PreviewMetric label="Resources now" value={preview.summary.currentResourceCount} />
+              <PreviewMetric label="Resources proposed" value={preview.summary.proposedResourceCount} />
+              <PreviewMetric label="Actions added" value={preview.summary.addedActionCount} />
+              <PreviewMetric label="Actions removed" value={preview.summary.removedActionCount} />
+            </div>
+            {preview.warnings.length > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                {preview.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <PreviewMetric label="Current access" value={`${preview.summary.currentResourceCount} resources / ${preview.summary.currentActionCount} actions`} />
+              <PreviewMetric label="Proposed access" value={`${preview.summary.proposedResourceCount} resources / ${preview.summary.proposedActionCount} actions`} />
+              <PreviewMetric label="Net change" value={`${netResourceChange >= 0 ? "+" : ""}${netResourceChange} resources`} />
+            </div>
+            <div className="overflow-hidden rounded-lg border border-border bg-background">
+              <div className="max-h-72 overflow-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-surface-muted text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Resource</th>
+                      <th className="px-3 py-2">Current</th>
+                      <th className="px-3 py-2">Proposed</th>
+                      <th className="px-3 py-2">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(previewChangedRows.length > 0 ? previewChangedRows : previewMatrix).map((row) => (
+                      <tr key={row.resource} className="border-t border-border/60">
+                        <td className="px-3 py-2 font-semibold">{row.label}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{row.currentActions.join(", ") || "—"}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{row.proposedActions.join(", ") || "—"}</td>
+                        <td className="px-3 py-2">
+                          {row.addedActions.length > 0 && <span className="font-semibold text-emerald-600">+{row.addedActions.join(", ")}</span>}
+                          {row.addedActions.length > 0 && row.removedActions.length > 0 ? <span className="mx-1 text-muted-foreground">/</span> : null}
+                          {row.removedActions.length > 0 && <span className="font-semibold text-red-600">-{row.removedActions.join(", ")}</span>}
+                          {row.addedActions.length === 0 && row.removedActions.length === 0 && <span className="text-muted-foreground">No change</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">Preview will load after the role details are available.</p>
+        )}
+      </div>
 
       <div className="relative">
         <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -732,6 +843,15 @@ function PermissionsForm({ role, onClose, criticalSuperAdminEmail }: { role: Rol
         <Button onClick={onClose} type="button" variant="secondary">Cancel</Button>
       </div>
     </form>
+  );
+}
+
+function PreviewMetric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-md border border-border bg-background p-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-bold">{value}</p>
+    </div>
   );
 }
 
