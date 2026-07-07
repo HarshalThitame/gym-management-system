@@ -14,7 +14,7 @@ import {
   getRazorpayKeyId,
   verifyRazorpayCheckoutSignature,
   verifyRazorpayWebhookSignature
-} from "../lib/razorpay";
+} from "@/features/billing/razorpay/razorpay-service";
 
 type AppSupabase = SupabaseClient<Database>;
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];

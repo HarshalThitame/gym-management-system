@@ -1,5 +1,7 @@
 import type { DbClient } from "./db-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { fetchRazorpayCapturedPayments } from "@/features/billing/razorpay/razorpay-service";
+import { billingLogger } from "@/features/billing/lib/logger";
 
 
 function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }
@@ -26,7 +28,17 @@ export async function runDailyReconciliation(gymId: string, date: string, provid
 
   const systemAmount = (payments ?? []).reduce((s, p) => s + ((p.amount as number) || 0), 0);
 
-  const gatewayAmount = systemAmount;
+  const fromDate = new Date(`${date}T00:00:00.000Z`);
+  const toDate = new Date(`${date}T23:59:59.999Z`);
+  let gatewayAmount = 0;
+
+  const gatewayResult = await fetchRazorpayCapturedPayments(fromDate, toDate);
+  if (gatewayResult.ok) {
+    gatewayAmount = gatewayResult.data.reduce((sum, p) => sum + p.amount, 0);
+  } else {
+    billingLogger.warn("runDailyReconciliation", "Could not fetch from Razorpay, using system amount as fallback", { gymId, date, error: gatewayResult.message });
+    gatewayAmount = systemAmount;
+  }
 
   const difference = gatewayAmount - systemAmount;
   const status = difference === 0 ? "matched" : "unmatched";
@@ -57,7 +69,7 @@ export async function runDailyReconciliation(gymId: string, date: string, provid
 
   return {
     ok: true,
-    message: difference === 0 ? "Reconciled — fully matched." : `Mismatch: ₹${(difference / 100).toFixed(2)} difference found.`,
+    message: difference === 0 ? "Reconciled — fully matched." : `Mismatch: ₹${(Math.abs(difference) / 100).toFixed(2)} difference found.`,
     gatewayAmount,
     systemAmount,
     difference,

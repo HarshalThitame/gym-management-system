@@ -7,7 +7,7 @@ import { requireGymFrontDeskScope } from "@/features/reception/lib/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { assertFeature, isWithinBranchLimit, isWithinMemberLimit } from "@/lib/tenant";
-import { createRazorpayOrder } from "@/features/billing/lib/razorpay";
+import { createRazorpayOrder } from "@/features/billing/razorpay/razorpay-service";
 import { generateAiText } from "@/features/ai/services/openai-service";
 import { createRazorpayOrderForPayment } from "@/features/billing/services/payment-processing";
 import { saveClassCategoryAction } from "@/features/classes/actions/class-actions";
@@ -69,13 +69,16 @@ vi.mock("@/features/entitlement", () => ({
   }),
 }));
 
-vi.mock("@/features/billing/lib/razorpay", () => ({
+vi.mock("@/features/billing/razorpay/razorpay-service", () => ({
   createRazorpayOrder: vi.fn(),
   createRazorpayRefund: vi.fn(),
   fetchRazorpayPayment: vi.fn(),
+  fetchRazorpayCapturedPayments: vi.fn(),
   getRazorpayKeyId: vi.fn(() => "rzp_test_key"),
   verifyRazorpayCheckoutSignature: vi.fn(() => true),
-  verifyRazorpayWebhookSignature: vi.fn(() => true)
+  verifyRazorpayWebhookSignature: vi.fn(() => true),
+  normalizeRazorpayAmountToPaise: vi.fn((a: number) => Math.round(a * 100)),
+  normalizePaiseToRupees: vi.fn((a: number) => a / 100),
 }));
 
 const organizationId = "00000000-0000-4000-8000-000000000001";

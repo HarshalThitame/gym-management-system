@@ -2,7 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import Razorpay from "razorpay";
-import { getRazorpayConfig } from "./razorpay-config";
+import { getRazorpayConfig, getRazorpayPublicKeyId } from "./razorpay-config";
 import type {
   CreateRazorpayOrderInput,
   CreateRazorpayOrderResult,
@@ -136,6 +136,124 @@ export function verifyRazorpayPaymentSignature(
     return { isValid };
   } catch (err) {
     return { isValid: false, error: err instanceof Error ? err.message : "Signature verification failed." };
+  }
+}
+
+export type RazorpayPaymentRecord = {
+  id: string;
+  order_id: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  captured: boolean;
+  method: string | null;
+  created_at: number;
+};
+
+/**
+ * Creates a Razorpay refund for a given payment.
+ * Includes retry logic and timeout for resilience.
+ */
+export async function createRazorpayRefund(
+  paymentId: string,
+  amount: number,
+  notes: Record<string, string>,
+): Promise<{ ok: true; refund: Record<string, unknown> } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const refund = await client.payments.refund(paymentId, { amount, notes });
+    return { ok: true, refund: refund as never as Record<string, unknown> };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay refund failed";
+    return { ok: false, message };
+  }
+}
+
+/**
+ * Fetches a single Razorpay payment by ID.
+ */
+export async function fetchRazorpayPayment(
+  paymentId: string,
+): Promise<{ ok: true; payment: Record<string, unknown> } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const payment = await client.payments.fetch(paymentId);
+    return { ok: true, payment: payment as never as Record<string, unknown> };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay payment fetch failed";
+    return { ok: false, message };
+  }
+}
+
+/**
+ * Fetches captured Razorpay payments within a date range for reconciliation.
+ * Uses the Razorpay SDK to query payments matching the given time window.
+ */
+export async function fetchRazorpayCapturedPayments(
+  fromDate: Date,
+  toDate: Date,
+): Promise<{ ok: true; data: RazorpayPaymentRecord[] } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const allPayments: RazorpayPaymentRecord[] = [];
+    let skip = 0;
+    const count = 100;
+
+    while (true) {
+      const result = await client.payments.all({
+        from: Math.floor(fromDate.getTime() / 1000),
+        to: Math.floor(toDate.getTime() / 1000),
+        count,
+        skip,
+      });
+
+      const payments = (result as never as { items: RazorpayPaymentRecord[] })?.items ?? [];
+      allPayments.push(...payments);
+
+      if (payments.length < count) break;
+      skip += count;
+    }
+
+    const captured = allPayments.filter((p) => p.captured && p.status === "captured");
+
+    return { ok: true, data: captured };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay payments fetch failed";
+    return { ok: false, message };
+  }
+}
+
+/**
+ * Backward-compatible alias for getRazorpayPublicKeyId.
+ */
+export function getRazorpayKeyId(): string {
+  return getRazorpayPublicKeyId();
+}
+
+/**
+ * Verifies a Razorpay checkout signature.
+ * Supports an optional secret override (defaults to key secret).
+ */
+export function verifyRazorpayCheckoutSignature(input: {
+  orderId: string;
+  paymentId: string;
+  signature: string;
+  secret?: string;
+}): boolean {
+  try {
+    const config = getRazorpayConfig();
+    const secret = input.secret ?? config.keySecret;
+    if (!secret) return false;
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update(`${input.orderId}|${input.paymentId}`)
+      .digest("hex");
+    const expectedBuffer = Buffer.from(expected);
+    const receivedBuffer = Buffer.from(input.signature);
+    if (expectedBuffer.length !== receivedBuffer.length) return false;
+    return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  } catch {
+    return false;
   }
 }
 

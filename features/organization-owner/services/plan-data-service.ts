@@ -1,5 +1,4 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Database } from "@/types/database";
 
 export type InvoicesData = Array<{
   id: string;
@@ -34,16 +33,100 @@ export type PlanServerData = {
 export async function getPlanServerData(organizationId: string): Promise<PlanServerData> {
   const supabase = await createSupabaseServerClient();
 
-  // Fetch subscription with auto-renew
   const { data: sub } = await supabase
     .from("organization_subscriptions")
-    .select("id, auto_renew, started_at")
+    .select("id, auto_renew, started_at, package_id")
     .eq("organization_id", organizationId)
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  // Fetch branch metrics aggregated by month for usage trend
+  const subscriptionId = (sub as Record<string, unknown> | null)?.id as string | undefined;
+  const autoRenew = (sub as Record<string, unknown> | null)?.auto_renew === true;
+
+  const { data: invoices } = await supabase
+    .from("org_subscription_invoices")
+    .select("id, invoice_number, total_amount, currency, status, issued_at, paid_at, razorpay_order_id")
+    .eq("organization_id", organizationId)
+    .order("issued_at", { ascending: false })
+    .limit(12) as never as {
+    data: Array<{
+      id: string; invoice_number: string; total_amount: number; currency: string;
+      status: string; issued_at: string; paid_at: string | null; razorpay_order_id: string | null;
+    }> | null;
+    error: { message: string } | null;
+  };
+
+  const invoicesData: InvoicesData = (invoices ?? []).map((inv) => ({
+    id: inv.id,
+    invoiceNumber: inv.invoice_number,
+    amount: inv.total_amount,
+    currency: inv.currency || "INR",
+    status: inv.status,
+    issuedAt: inv.issued_at,
+    paidAt: inv.paid_at,
+    pdfUrl: null,
+  }));
+
+  const { data: pmtMethods } = await supabase
+    .from("org_payment_methods")
+    .select("id, payment_method_type, last_four_digits, expiry_month, expiry_year, is_default, card_brand, upi_id")
+    .eq("organization_id", organizationId)
+    .order("is_default", { ascending: false })
+    .limit(1) as never as {
+    data: Array<{
+      id: string; payment_method_type: string; last_four_digits: string | null;
+      expiry_month: number | null; expiry_year: number | null; is_default: boolean;
+      card_brand: string | null; upi_id: string | null;
+    }> | null;
+    error: { message: string } | null;
+  };
+
+  const pmt = (pmtMethods ?? [])[0] ?? null;
+  const paymentMethodData: PaymentMethodData = pmt
+    ? {
+        id: pmt.id,
+        type: pmt.payment_method_type,
+        last4: pmt.last_four_digits ?? "0000",
+        expiryMonth: pmt.expiry_month ?? 0,
+        expiryYear: pmt.expiry_year ?? 0,
+        isDefault: pmt.is_default,
+        brand: pmt.card_brand ?? pmt.upi_id ?? pmt.payment_method_type,
+      }
+    : null;
+
+  const { data: addons } = await supabase
+    .from("package_addons")
+    .select("name, description, price_amount, category")
+    .order("name") as never as {
+    data: Array<{ name: string; description: string; price_amount: number; category: string }> | null;
+    error: { message: string } | null;
+  };
+
+  const availableAddons: PlanServerData["availableAddons"] = (addons ?? []).map((a) => ({
+    name: a.name,
+    description: a.description,
+    price: a.price_amount,
+    category: a.category || "general",
+  }));
+
+  let currentAddons: PlanServerData["currentAddons"] = [];
+  if (subscriptionId) {
+    const { data: assignedAddons } = await supabase
+      .from("subscription_addons")
+      .select("id, addon_name, price_amount, assigned_at")
+      .eq("subscription_id", subscriptionId) as never as {
+      data: Array<{ id: string; addon_name: string; price_amount: number; assigned_at: string }> | null;
+      error: { message: string } | null;
+    };
+
+    currentAddons = (assignedAddons ?? []).map((a) => ({
+      name: a.addon_name,
+      assignedAt: a.assigned_at,
+      price: a.price_amount,
+    }));
+  }
+
   const branchMetrics = await supabase
     .from("branch_metrics")
     .select("*")
@@ -52,9 +135,16 @@ export async function getPlanServerData(organizationId: string): Promise<PlanSer
     .limit(6)
     .then((r) => r.data as unknown as Array<Record<string, unknown>> | null);
 
-  // Build usage history from branch metrics (last 6 months)
   const usageHistory: PlanServerData["usageHistory"] = [];
   const seenMonths = new Set<string>();
+
+  const { count: branchCount } = await supabase
+    .from("branches")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId) as never as {
+    count: number | null;
+  };
+
   for (const m of branchMetrics ?? []) {
     const month = (m.metric_date as string)?.slice(0, 7);
     if (!month || seenMonths.has(month)) continue;
@@ -63,33 +153,17 @@ export async function getPlanServerData(organizationId: string): Promise<PlanSer
     usageHistory.push({
       date: month,
       members: Math.max(0, ...monthData.map((bm) => Number((bm as Record<string, unknown>).active_members ?? 0))),
-      branches: 0,
-      storageMb: Math.max(0, ...monthData.map((bm) => Number((bm as Record<string, unknown>).storage_mb ?? 0)))
+      branches: branchCount ?? 0,
+      storageMb: Math.max(0, ...monthData.map((bm) => Number((bm as Record<string, unknown>).storage_mb ?? 0))),
     });
   }
 
-  // Mock invoices (in production, fetch from Razorpay)
-  const invoices: InvoicesData = [];
-
-  // Mock payment method
-  const paymentMethod: PaymentMethodData = null;
-
-  // Available add-ons in the marketplace
-  const availableAddons = [
-    { name: "SMS Credits (1000)", description: "1,000 SMS credits for member communications", price: 499, category: "communications" },
-    { name: "WhatsApp API", description: "WhatsApp Business API integration for campaigns", price: 999, category: "communications" },
-    { name: "Biometric Hardware Support", description: "Fingerprint scanner integration support", price: 1999, category: "attendance" },
-    { name: "Advanced Analytics", description: "Custom reports, cohort analysis, and BI dashboards", price: 2999, category: "analytics" },
-    { name: "Additional Storage (10GB)", description: "10 GB additional cloud storage for media", price: 499, category: "storage" },
-    { name: "Priority Support", description: "24/7 priority support with 1-hour SLA", price: 2999, category: "support" },
-  ];
-
   return {
-    invoices,
-    paymentMethod,
+    invoices: invoicesData,
+    paymentMethod: paymentMethodData,
     usageHistory: usageHistory.reverse(),
     availableAddons,
-    currentAddons: [],
-    autoRenew: (sub as unknown as { auto_renew?: boolean })?.auto_renew ?? true,
+    currentAddons,
+    autoRenew,
   };
 }

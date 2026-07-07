@@ -89,9 +89,9 @@ export async function applyLateFeesToOverdueInvoices(): Promise<{ applied: numbe
     try {
       const result = await calculateLateFee(inv, activePolicies);
       if (result && result.lateFee > 0) {
-        const currentTax = (inv.tax_amount as number) ?? 0;
+        const currentLateFee = (inv.late_fee_amount as number) ?? 0;
         await db.from("org_subscription_invoices").update({
-          tax_amount: currentTax + result.lateFee,
+          late_fee_amount: currentLateFee + result.lateFee,
         }).eq("id", inv.id as string);
         applied++;
       }

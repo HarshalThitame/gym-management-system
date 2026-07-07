@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/services/email/resend";
-import { createRazorpayOrder } from "@/features/billing/lib/razorpay";
+import { createRazorpayOrder } from "@/features/billing/razorpay/razorpay-service";
 import {
   dunningFirstAttempt,
   dunningSecondAttempt,

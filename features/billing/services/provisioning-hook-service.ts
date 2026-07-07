@@ -1,5 +1,7 @@
 import type { DbClient } from "./db-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { sendEmail } from "@/services/email/resend";
+import { billingLogger } from "@/features/billing/lib/logger";
 
 
 function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }
@@ -50,11 +52,52 @@ export async function executeProvisioningHooks(organizationId: string, event: Tr
         succeeded++;
         details.push(`Webhook ${targetUrl}: ${response.status}`);
       } else if (hookType === "email") {
-        details.push(`Email hook ${hookId}: simulated`);
-        succeeded++;
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("billing_email, name, email")
+          .eq("id", organizationId)
+          .maybeSingle() as never as {
+          data: { billing_email: string | null; name: string; email: string | null } | null;
+          error: { message: string } | null;
+        };
+        const recipientEmail = org?.billing_email || org?.email;
+        if (recipientEmail) {
+          const emailResult = await sendEmail({
+            to: recipientEmail,
+            subject: `[Provisioning] ${event} — ${org?.name ?? organizationId}`,
+            html: `<p><strong>Event:</strong> ${event}</p><p><strong>Organization:</strong> ${org?.name ?? organizationId}</p><p><strong>Details:</strong> ${JSON.stringify(payload)}</p>`,
+          });
+          if (emailResult.sent) {
+            await db.from("provisioning_hooks").update({
+              last_invoked_at: new Date().toISOString(),
+              last_response_status: 200,
+            }).eq("id", hookId);
+            succeeded++;
+            details.push(`Email sent to ${recipientEmail}`);
+          } else {
+            details.push(`Email hook ${hookId}: send failed — ${emailResult.reason}`);
+          }
+        } else {
+          details.push(`Email hook ${hookId}: no billing email for org`);
+          billingLogger.warn("executeProvisioningHooks", "No billing email for org email hook", { organizationId, hookId });
+        }
       } else if (hookType === "function" && targetFunction) {
-        details.push(`Function ${targetFunction}: simulated`);
-        succeeded++;
+        const { error: rpcError } = await supabase.rpc(targetFunction, {
+          p_organization_id: organizationId,
+          p_event: event,
+          p_payload: payload,
+        });
+        if (rpcError) {
+          details.push(`Function ${targetFunction}: RPC error — ${rpcError.message}`);
+          billingLogger.error("executeProvisioningHooks", "Function hook RPC failed", { organizationId, hookId, targetFunction, error: rpcError.message });
+        } else {
+          await db.from("provisioning_hooks").update({
+            last_invoked_at: new Date().toISOString(),
+            last_response_status: 200,
+          }).eq("id", hookId);
+          succeeded++;
+          details.push(`Function ${targetFunction}: executed`);
+        }
       }
     } catch (err) {
       details.push(`Hook ${hookId} failed: ${err instanceof Error ? err.message : "Unknown"}`);

@@ -30,66 +30,64 @@ export async function recognizeRevenue(invoiceId: string): Promise<{ ok: boolean
 
   if (!gymId) return { ok: false, message: "Invoice has no gym." };
 
+  let periodStart: string;
+  let periodEnd: string | null;
+  let durationDays: number;
+
   if (membership) {
-    const periodStart = (membership.start_date as string) || (invoice.issued_at as string) || new Date().toISOString();
-    const periodEnd = (membership.end_date as string) || null;
-    const durationDays = periodEnd
+    periodStart = (membership.start_date as string) || (invoice.issued_at as string) || new Date().toISOString();
+    periodEnd = (membership.end_date as string) || null;
+    durationDays = periodEnd
       ? Math.max(1, Math.round((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / 86400000))
       : 30;
+  } else {
+    const invoiceIssuedAt = (invoice.issued_at as string) || new Date().toISOString();
+    const invoiceDueAt = (invoice.due_at as string) || null;
+    periodStart = invoiceIssuedAt;
 
-    const dailyRate = Math.round(totalAmount / durationDays);
-    const today = new Date();
-    const startDate = new Date(periodStart);
-    const endDate = periodEnd ? new Date(periodEnd) : new Date(today.getTime() + durationDays * 86400000);
-
-    const elapsedDays = Math.max(0, Math.round((today.getTime() - startDate.getTime()) / 86400000));
-    const recognizedAmount = Math.min(totalAmount, dailyRate * Math.min(elapsedDays, durationDays));
-    const deferredAmount = totalAmount - recognizedAmount;
-
-    await db.from("revenue_recognition").insert({
-      gym_id: gymId,
-      invoice_id: invoiceId,
-      recognized_amount: recognizedAmount,
-      deferred_amount: deferredAmount,
-      recognized_date: today.toISOString().slice(0, 10),
-      period_start: periodStart.slice(0, 10),
-      period_end: endDate.toISOString().slice(0, 10),
-      status: deferredAmount > 0 ? "deferred" : "recognized",
-    });
-
-    return {
-      ok: true,
-      message: `Revenue recognized: ${recognizedAmount} recognized, ${deferredAmount} deferred over ${durationDays} days.`,
-      schedule: [{
-        periodStart: periodStart.slice(0, 10),
-        periodEnd: endDate.toISOString().slice(0, 10),
-        recognizedAmount,
-        deferredAmount,
-        status: deferredAmount > 0 ? "deferred" : "recognized",
-      }],
-    };
+    if (invoiceDueAt) {
+      const daysBetween = Math.max(1, Math.round((new Date(invoiceDueAt).getTime() - new Date(invoiceIssuedAt).getTime()) / 86400000));
+      durationDays = Math.max(daysBetween, 30);
+      const end = new Date(invoiceIssuedAt);
+      end.setDate(end.getDate() + durationDays);
+      periodEnd = end.toISOString();
+    } else {
+      durationDays = 30;
+      const end = new Date(invoiceIssuedAt);
+      end.setDate(end.getDate() + durationDays);
+      periodEnd = end.toISOString();
+    }
   }
+
+  const dailyRate = Math.round(totalAmount / durationDays);
+  const today = new Date();
+  const startDate = new Date(periodStart);
+  const endDate = periodEnd ? new Date(periodEnd) : new Date(today.getTime() + durationDays * 86400000);
+
+  const elapsedDays = Math.max(0, Math.round((today.getTime() - startDate.getTime()) / 86400000));
+  const recognizedAmount = Math.min(totalAmount, dailyRate * Math.min(elapsedDays, durationDays));
+  const deferredAmount = totalAmount - recognizedAmount;
 
   await db.from("revenue_recognition").insert({
     gym_id: gymId,
     invoice_id: invoiceId,
-    recognized_amount: totalAmount,
-    deferred_amount: 0,
-    recognized_date: new Date().toISOString().slice(0, 10),
-    period_start: (invoice.issued_at as string || new Date().toISOString()).slice(0, 10),
-    period_end: new Date().toISOString().slice(0, 10),
-    status: "recognized",
+    recognized_amount: recognizedAmount,
+    deferred_amount: deferredAmount,
+    recognized_date: today.toISOString().slice(0, 10),
+    period_start: periodStart.slice(0, 10),
+    period_end: endDate.toISOString().slice(0, 10),
+    status: deferredAmount > 0 ? "deferred" : "recognized",
   });
 
   return {
     ok: true,
-    message: `Full revenue recognized: ${totalAmount}.`,
+    message: `Revenue recognized: ${recognizedAmount} recognized, ${deferredAmount} deferred over ${durationDays} days.`,
     schedule: [{
-      periodStart: (invoice.issued_at as string || new Date().toISOString()).slice(0, 10),
-      periodEnd: new Date().toISOString().slice(0, 10),
-      recognizedAmount: totalAmount,
-      deferredAmount: 0,
-      status: "recognized",
+      periodStart: periodStart.slice(0, 10),
+      periodEnd: endDate.toISOString().slice(0, 10),
+      recognizedAmount,
+      deferredAmount,
+      status: deferredAmount > 0 ? "deferred" : "recognized",
     }],
   };
 }

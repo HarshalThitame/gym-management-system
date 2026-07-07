@@ -1,6 +1,7 @@
 import type { DbClient } from "./db-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/services/email/resend";
+import { billingLogger } from "@/features/billing/lib/logger";
 
 
 function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }
@@ -102,12 +103,29 @@ export async function evaluateThresholds(organizationId: string): Promise<Array<
       const channels = t.notification_channels as string[] ?? ["email"];
       if (channels.includes("email")) {
         try {
+          const { data: org } = await supabase
+            .from("organizations")
+            .select("billing_email, name, email")
+            .eq("id", organizationId)
+            .maybeSingle() as never as {
+            data: { billing_email: string | null; name: string; email: string | null } | null;
+            error: { message: string } | null;
+          };
+
+          const recipientEmail = org?.billing_email || org?.email;
+          if (!recipientEmail) {
+            billingLogger.warn("evaluateThresholds", "No billing email for org", { organizationId, thresholdId });
+            continue;
+          }
+
           await sendEmail({
-            to: "", // would need org billing email
-            subject: `Billing threshold triggered: ${thresholdType}`,
-            html: `<p>Threshold triggered for org ${organizationId}: ${description}</p>`,
+            to: recipientEmail,
+            subject: `[${org?.name ?? organizationId}] Billing threshold triggered: ${thresholdType}`,
+            html: `<p>Threshold triggered for ${org?.name ?? organizationId}: ${description}</p><p>Organization ID: ${organizationId}</p>`,
           });
-        } catch {}
+        } catch (err) {
+          billingLogger.error("evaluateThresholds", "Failed to send threshold notification", { organizationId, thresholdId, error: err });
+        }
       }
     }
 
