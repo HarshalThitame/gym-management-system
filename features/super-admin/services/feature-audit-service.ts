@@ -59,11 +59,11 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   receipts:                        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
   payment_tracking:                { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
   online_payment_links:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  renewal_reminders:               { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  auto_billing:                    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P0" },
+  renewal_reminders:               { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P2" },
+  auto_billing:                    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
   discount_promo_codes:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   corporate_bulk_memberships:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  payment_failure_handling:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P0" },
+  payment_failure_handling:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
   partial_payment_dues:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   razorpay_payu_integration:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P0" },
   multi_gstin_support:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
@@ -109,7 +109,7 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
 
   // Membership — core is fully implemented; sub-features partial
   member_management:            { hasSidebar: true,  sidebarModule: "members",     hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
-  membership_renewals:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P0" },
+  membership_renewals:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
   expiry_tracking:              { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   goal_tracking:                { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   progress_photos:              { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },

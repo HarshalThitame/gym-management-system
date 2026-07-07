@@ -3,6 +3,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyRazorpayWebhookSignature } from "@/features/billing/razorpay/razorpay-service";
 import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
 import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
+import { handleMemberPaymentCaptured, handleMemberPaymentFailed } from "@/features/billing/services/member-webhook-handler";
 import { logWebhookEvent } from "@/features/entitlement/audit-service";
 
 const WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000;
@@ -154,8 +155,14 @@ export async function POST(request: Request): Promise<NextResponse> {
           });
 
           if (!result.success) {
-            processingError = result.error || "Payment finalization failed";
-            processingStatus = "failed";
+            // Not a SaaS subscription payment — try member-level payment
+            const memberResult = await handleMemberPaymentCaptured(razorpayOrderId, razorpayPaymentId);
+            if (memberResult.handled) {
+              await logWebhookEvent({ actorId: null, organizationId: null, eventType: "WEBHOOK_CAPTURED", providerOrderId: razorpayOrderId, providerPaymentId: razorpayPaymentId }).catch(() => {});
+            } else {
+              processingError = result.error || "Payment finalization failed";
+              processingStatus = "failed";
+            }
           } else {
             await logWebhookEvent({ actorId: null, organizationId: null, eventType: "WEBHOOK_CAPTURED", providerOrderId: razorpayOrderId, providerPaymentId: razorpayPaymentId }).catch(() => {});
             if (webhookDbId) {
@@ -205,6 +212,9 @@ export async function POST(request: Request): Promise<NextResponse> {
                 reason: `Webhook: payment failed - ${failureReason}`,
                 created_at: new Date().toISOString(),
               });
+            } else {
+              // Try member-level payment
+              await handleMemberPaymentFailed(razorpayOrderId, razorpayPaymentId, failureReason);
             }
           }
           break;
