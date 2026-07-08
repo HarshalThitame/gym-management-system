@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { LazyLeadForm } from "@/features/public/components/lazy-lead-form";
-import { faqs, membershipPlans } from "@/data/site";
+import { faqs } from "@/data/site";
+import { getPublicMembershipPlans } from "@/features/memberships/services/public-plan-service";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -15,7 +16,9 @@ export const metadata: Metadata = createMetadata({
   path: "/membership-plans"
 });
 
-export default function MembershipPlansPage() {
+export default async function MembershipPlansPage() {
+  const membershipPlans = await getPublicMembershipPlans();
+
   return (
     <>
       <section className="bg-obsidian py-20 text-white md:py-28">

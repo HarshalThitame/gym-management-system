@@ -2,7 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 
-import { getSubscriptionWithPackageFeatures, getOrganizationCurrentSubscription } from "./entitlement-repository";
+import { getSubscriptionWithPackageFeatures, getOrganizationCurrentSubscription, type SubscriptionSummary } from "./entitlement-repository";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   evaluateFeatureAccess,
   evaluateEntitlementSnapshot,
@@ -41,6 +42,37 @@ function toSubscriptionInput(
   };
 }
 
+async function getCancelledSubscription(organizationId: string): Promise<SubscriptionSummary | null> {
+  const admin = getSupabaseAdminClient();
+  if (!admin) return null;
+  const { data } = await admin
+    .from("organization_subscriptions")
+    .select("id, organization_id, package_id, status, started_at, expires_at, trial_ends_at, cancelled_at, replaced_at, scheduled_start_date, billing_period, auto_renew")
+    .eq("organization_id", organizationId)
+    .eq("status", "cancelled")
+    .order("updated_at", { ascending: false })
+    .limit(1) as never as {
+    data: Array<Record<string, unknown>> | null;
+    error: unknown;
+  };
+  const row = (data ?? [])[0];
+  if (!row) return null;
+  return {
+    id: String(row.id ?? ""),
+    organizationId: String(row.organization_id ?? ""),
+    packageId: String(row.package_id ?? ""),
+    status: String(row.status ?? "cancelled") as never,
+    startedAt: String(row.started_at ?? ""),
+    expiresAt: row.expires_at ? String(row.expires_at) : null,
+    trialEndsAt: row.trial_ends_at ? String(row.trial_ends_at) : null,
+    cancelledAt: row.cancelled_at ? String(row.cancelled_at) : null,
+    replacedAt: row.replaced_at ? String(row.replaced_at) : null,
+    scheduledStartDate: row.scheduled_start_date ? String(row.scheduled_start_date) : null,
+    billingPeriod: row.billing_period ? String(row.billing_period) : null,
+    autoRenew: Boolean(row.auto_renew),
+  } as SubscriptionSummary;
+}
+
 // ─── Core: getOrganizationEntitlements ─────────────────────────────────────
 
 /**
@@ -55,9 +87,23 @@ export const getOrganizationEntitlements = cache(
     const combined = await getSubscriptionWithPackageFeatures(organizationId);
 
     if (!combined) {
-      // No active/trial subscription — check if any subscription row exists
-      // (for accurate status reporting in the snapshot).
+      // No active/trial subscription — check for cancelled subscription
+      // to preserve billing access during grace period.
       const sub = await getOrganizationCurrentSubscription(organizationId);
+
+      // If no active/trial sub found, look for a cancelled one
+      if (!sub) {
+        const cancelledSub = await getCancelledSubscription(organizationId);
+        if (cancelledSub) {
+          return evaluateEntitlementSnapshot({
+            organizationId,
+            subscription: toSubscriptionInput(cancelledSub),
+            package: null,
+            packageFeatureKeys: [],
+            packageLimits: {},
+          });
+        }
+      }
 
       return evaluateEntitlementSnapshot({
         organizationId,

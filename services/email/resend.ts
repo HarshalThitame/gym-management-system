@@ -1,5 +1,10 @@
 import { Resend } from "resend";
 
+type EmailAttachment = {
+  filename: string;
+  content: string;
+};
+
 type SendEmailInput = {
   to: string;
   subject: string;
@@ -7,6 +12,7 @@ type SendEmailInput = {
   from?: string | undefined;
   replyTo?: string | undefined;
   cc?: string[];
+  attachments?: EmailAttachment[];
 };
 
 let resendClient: Resend | null = null;
@@ -47,6 +53,10 @@ export async function sendEmail({ to, subject, html, from, replyTo, cc }: SendEm
 
   if (cc && cc.length > 0) {
     payload.cc = cc;
+  }
+
+  if (input.attachments && input.attachments.length > 0) {
+    payload.attachments = input.attachments;
   }
 
   const { error } = await resend.emails.send(payload as never);

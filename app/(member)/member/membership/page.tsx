@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
 import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
+import { AutoRenewToggle } from "@/features/billing/components/auto-renew-toggle";
+import { getAutoBillingStatus } from "@/features/billing/services/member-subscription-service";
 import { MembershipStatusBadge } from "@/features/memberships/components/membership-status-badge";
 import type { MembershipStatus } from "@/types/membership";
 import { formatMoney, getRemainingDays } from "@/features/memberships/lib/business-rules";
@@ -37,6 +39,12 @@ export default async function MemberMembershipPage() {
       .order("created_at", { ascending: false })
       .limit(1);
     pendingPayment = payments?.[0] ?? null;
+  }
+
+  let autoBillingStatus = null;
+  if (membership) {
+    const result = await getAutoBillingStatus(context.userId!, membership.id);
+    if (result.ok) autoBillingStatus = result.status;
   }
 
   return (
@@ -99,6 +107,25 @@ export default async function MemberMembershipPage() {
           </CardContent>
         </Card>
       </AnimatedCardSection>
+
+      {membership && plan && autoBillingStatus ? (
+        <AnimatedCardSection>
+          <Card variant="glass">
+            <CardHeader>
+              <h2 className="text-2xl font-black">Billing &amp; Auto-Renewal</h2>
+            </CardHeader>
+            <CardContent>
+              <AutoRenewToggle
+                membershipId={membership.id}
+                planPrice={plan.price_amount}
+                planDurationDays={getPlanDurationDays(plan.plan_type)}
+                initialAutoRenew={membership.auto_renew ?? false}
+                initialStatus={autoBillingStatus}
+              />
+            </CardContent>
+          </Card>
+        </AnimatedCardSection>
+      ) : null}
     </div>
   );
 }

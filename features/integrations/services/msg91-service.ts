@@ -5,6 +5,7 @@ export type Msg91Result = {
   status: number;
   message: string;
   responseData?: unknown;
+  providerMessageId?: string;
 };
 
 export type Msg91SmsSendInput = {
@@ -14,6 +15,7 @@ export type Msg91SmsSendInput = {
   senderId?: string;
   shortUrl?: "0" | "1";
   variables?: Record<string, string>;
+  callbackUrl?: string;
 };
 
 export type Msg91WhatsAppSendInput = {
@@ -109,6 +111,10 @@ export async function sendMsg91Sms(input: Msg91SmsSendInput): Promise<Msg91Resul
     payload.sender = input.senderId.trim();
   }
 
+  if (input.callbackUrl?.trim()) {
+    payload.callback_url = input.callbackUrl.trim();
+  }
+
   for (const [key, value] of Object.entries(input.variables ?? {})) {
     payload[key] = value;
   }
@@ -130,11 +136,16 @@ export async function sendMsg91Sms(input: Msg91SmsSendInput): Promise<Msg91Resul
     };
   }
 
+  const providerMessageId = responseData && typeof responseData === "object" && "request_id" in (responseData as Record<string, unknown>)
+    ? String((responseData as Record<string, unknown>).request_id)
+    : undefined;
+
   return {
     ok: true,
     status: response.status,
     message: "MSG91 SMS request accepted.",
     responseData,
+    providerMessageId,
   };
 }
 

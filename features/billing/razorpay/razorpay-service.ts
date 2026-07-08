@@ -150,10 +150,125 @@ export type RazorpayPaymentRecord = {
   created_at: number;
 };
 
+export type CreatePaymentLinkInput = {
+  amountInRupees: number;
+  currency?: string;
+  description: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  callbackUrl?: string;
+  notes?: Record<string, string>;
+};
+
+export type CreatePaymentLinkResult = {
+  id: string;
+  shortUrl: string;
+  amount: number;
+  currency: string;
+  status: string;
+};
+
 /**
- * Creates a Razorpay refund for a given payment.
- * Includes retry logic and timeout for resilience.
+ * Creates a Razorpay payment link that can be shared with a customer.
+ * The link redirects to the callback URL after payment.
  */
+export async function createRazorpayPaymentLink(
+  input: CreatePaymentLinkInput,
+): Promise<{ ok: true; data: CreatePaymentLinkResult } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const amountInPaise = normalizeRazorpayAmountToPaise(input.amountInRupees);
+    const payload: Record<string, unknown> = {
+      amount: amountInPaise,
+      currency: input.currency || "INR",
+      description: input.description,
+      customer: {
+        name: input.customerName,
+        email: input.customerEmail,
+        contact: input.customerPhone || "",
+      },
+      notify: {
+        sms: !!input.customerPhone,
+        email: true,
+      },
+      reminder_enable: true,
+      notes: input.notes || {},
+      callback_url: input.callbackUrl || "",
+      callback_method: "get",
+    };
+
+    const link = await client.paymentLink.create(payload as never);
+
+    return {
+      ok: true,
+      data: {
+        id: link.id as string,
+        shortUrl: link.short_url as string,
+        amount: link.amount as number,
+        currency: link.currency as string,
+        status: link.status as string,
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay payment link creation failed";
+    return { ok: false, message };
+  }
+}
+
+export type PaymentLinkInfo = {
+  id: string;
+  shortUrl: string;
+  amount: number;
+  currency: string;
+  status: string;
+};
+
+export async function fetchRazorpayPaymentLink(
+  linkId: string,
+): Promise<{ ok: true; data: PaymentLinkInfo } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const link = await client.paymentLink.fetch(linkId);
+    return {
+      ok: true,
+      data: {
+        id: link.id as string,
+        shortUrl: link.short_url as string,
+        amount: link.amount as number,
+        currency: link.currency as string,
+        status: link.status as string,
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to fetch payment link";
+    return { ok: false, message };
+  }
+}
+
+/**
+ * Cancels a Razorpay payment link by its ID.
+ * Only links in "created" or "partially_paid" status can be cancelled.
+ */
+export async function cancelRazorpayPaymentLink(
+  linkId: string,
+): Promise<{ ok: true; data: { id: string; status: string } } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const link = await client.paymentLink.cancel(linkId);
+    return {
+      ok: true,
+      data: {
+        id: link.id as string,
+        status: link.status as string,
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to cancel payment link";
+    return { ok: false, message };
+  }
+}
+
 export async function createRazorpayRefund(
   paymentId: string,
   amount: number,
@@ -219,6 +334,131 @@ export async function fetchRazorpayCapturedPayments(
     return { ok: true, data: captured };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Razorpay payments fetch failed";
+    return { ok: false, message };
+  }
+}
+
+export type RazorpayCustomerData = {
+  id: string;
+  name: string;
+  email: string;
+  contact: string | null;
+};
+
+export async function createRazorpayCustomer(input: {
+  name: string;
+  email: string;
+  contact?: string;
+  notes?: Record<string, string>;
+}): Promise<{ ok: true; data: RazorpayCustomerData } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const customer = await client.customers.create({
+      name: input.name,
+      email: input.email,
+      contact: input.contact || "",
+      notes: input.notes || {},
+    } as never) as never as RazorpayCustomerData;
+    return { ok: true, data: customer };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay customer creation failed";
+    return { ok: false, message };
+  }
+}
+
+export async function fetchRazorpayCustomer(
+  customerId: string,
+): Promise<{ ok: true; data: RazorpayCustomerData } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const customer = await client.customers.fetch(customerId) as never as RazorpayCustomerData;
+    return { ok: true, data: customer };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay customer fetch failed";
+    return { ok: false, message };
+  }
+}
+
+export type RazorpayPlanData = {
+  id: string;
+  period: string;
+  interval: number;
+  item: { name: string; amount: number; currency: string };
+};
+
+export async function createRazorpayPlan(input: {
+  period: "monthly" | "quarterly" | "half_yearly" | "annual";
+  interval?: number;
+  amount: number;
+  currency?: string;
+  name: string;
+  notes?: Record<string, string>;
+}): Promise<{ ok: true; data: RazorpayPlanData } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const period = input.period === "half_yearly" ? "monthly" : input.period;
+    const interval = input.period === "half_yearly" ? 6 : input.interval ?? 1;
+
+    const plan = await client.plans.create({
+      period,
+      interval,
+      item: {
+        name: input.name,
+        amount: normalizeRazorpayAmountToPaise(input.amount),
+        currency: input.currency || "INR",
+      },
+      notes: input.notes || {},
+    } as never) as never as RazorpayPlanData;
+    return { ok: true, data: plan };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay plan creation failed";
+    return { ok: false, message };
+  }
+}
+
+export type RazorpaySubscriptionData = {
+  id: string;
+  plan_id: string;
+  customer_id: string;
+  status: string;
+  current_start: number | null;
+  current_end: number | null;
+  ended_at: number | null;
+  charge_at: number;
+  total_count: number;
+  paid_count: number;
+};
+
+export async function createRazorpaySubscription(input: {
+  planId: string;
+  customerId: string;
+  totalCount?: number;
+  notes?: Record<string, string>;
+}): Promise<{ ok: true; data: RazorpaySubscriptionData } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const subscription = await client.subscriptions.create({
+      plan_id: input.planId,
+      customer_id: input.customerId,
+      total_count: input.totalCount ?? 12,
+      notes: input.notes || {},
+    } as never) as never as RazorpaySubscriptionData;
+    return { ok: true, data: subscription };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay subscription creation failed";
+    return { ok: false, message };
+  }
+}
+
+export async function cancelRazorpaySubscription(
+  subscriptionId: string,
+): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    await client.subscriptions.cancel(subscriptionId);
+    return { ok: true, message: "Subscription cancelled" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay subscription cancellation failed";
     return { ok: false, message };
   }
 }

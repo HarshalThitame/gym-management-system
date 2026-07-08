@@ -3,6 +3,7 @@ import { CreditCard, ReceiptText, RefreshCcw, WalletCards } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import FeatureLocked from "@/components/ui/FeatureLocked";
 import { Badge } from "@/components/ui/badge";
+import { ProviderBadge } from "@/features/billing/components/provider-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
 import { StatCard } from "@/components/ui/stat-card";
@@ -170,6 +171,7 @@ function PaymentRowItem({
             <p className="font-black">{payment.payment_number}</p>
             <PaymentStatusBadge status={payment.status} />
             <Badge variant="neutral">{payment.method}</Badge>
+            <ProviderBadge provider={payment.provider} />
           </div>
           <p className="mt-1 text-xs font-semibold text-muted-foreground">
             {payment.payment_type.replace(/_/g, " ")} · {new Date(payment.created_at).toLocaleString("en-IN")}

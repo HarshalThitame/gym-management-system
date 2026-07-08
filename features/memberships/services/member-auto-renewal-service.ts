@@ -95,6 +95,23 @@ async function processSingleAutoRenewal(
   const member = row.members;
   const plan = row.membership_plans;
 
+  // Skip if member has an active subscription (Razorpay handles charging)
+  const { data: existingSub } = await admin
+    .from("member_subscriptions")
+    .select("id")
+    .eq("membership_id", membership.id)
+    .eq("status", "active")
+    .maybeSingle() as never as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
+
+  if (existingSub) {
+    billingLogger.info("processSingleAutoRenewal", "Membership has active subscription, skipping", { membershipId: membership.id });
+    await admin.from("memberships").update({ last_renewed_by_cron_at: new Date().toISOString() } as never).eq("id", membership.id);
+    return true;
+  }
+
   if (!member.email) {
     billingLogger.warn("processSingleAutoRenewal", "Member has no email, skipping", { memberId: member.id });
     await admin.from("memberships").update({ last_renewed_by_cron_at: new Date().toISOString() } as never).eq("id", membership.id);

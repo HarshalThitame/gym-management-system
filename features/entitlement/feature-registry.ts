@@ -49,9 +49,17 @@ export const PENDING_FUTURE_STATUSES: readonly SubscriptionStatus[] = [
 export const REVOKED_STATUSES: readonly SubscriptionStatus[] = [
   "expired",
   "suspended",
-  "cancelled",
   "replaced",
   "payment_failed",
+];
+
+/** Feature keys that remain accessible during the cancellation grace period. */
+export const CANCELLED_BILLING_FEATURES: readonly FeatureKey[] = [
+  "billing_invoices",
+  "receipts",
+  "online_payment_links",
+  "auto_billing",
+  "payment_failure_handling",
 ];
 
 // ─── Feature categories ────────────────────────────────────────────────────

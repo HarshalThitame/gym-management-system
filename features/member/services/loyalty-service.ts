@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { billingLogger } from "@/features/billing/lib/logger";
 
 export type MemberLoyaltyData = {
   balance: number;
@@ -30,7 +31,7 @@ export async function getMemberLoyaltyData(
 ): Promise<MemberLoyaltyData | null> {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: pointsRows }, { data: configData }, { data: leaderboardData }] = await Promise.all([
+  const [pointsResult, configResult, leaderboardResult] = await Promise.all([
     supabase
       .from("loyalty_points")
       .select("id, points, source_type, description, created_at")
@@ -46,11 +47,28 @@ export async function getMemberLoyaltyData(
       .rpc("get_top_loyalty_members", { org_id: organizationId, limit_count: 10 })
   ]);
 
-  const balance = (pointsRows ?? []).reduce((sum, row) => sum + (row.points ?? 0), 0);
+  if (pointsResult.error) {
+    billingLogger.error("getMemberLoyaltyData", "Failed to fetch points", { memberId, error: pointsResult.error.message });
+    return null;
+  }
+
+  if (configResult.error) {
+    billingLogger.error("getMemberLoyaltyData", "Failed to fetch config", { organizationId, error: configResult.error.message });
+  }
+
+  if (leaderboardResult.error) {
+    billingLogger.error("getMemberLoyaltyData", "Failed to fetch leaderboard", { organizationId, error: leaderboardResult.error.message });
+  }
+
+  const pointsRows = pointsResult.data ?? [];
+  const configData = configResult.data;
+  const leaderboardData = leaderboardResult.data;
+
+  const balance = pointsRows.reduce((sum, row) => sum + (row.points ?? 0), 0);
 
   return {
     balance,
-    recentTransactions: (pointsRows ?? []).map((row) => ({
+    recentTransactions: pointsRows.map((row) => ({
       id: row.id,
       points: row.points ?? 0,
       source_type: row.source_type ?? "adjustment",

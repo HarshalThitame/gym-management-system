@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createElement } from "react";
-import { Activity, BarChart3, Bell, Bot, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, Clock, CreditCard, Dumbbell, Gauge, Gift, Link2, ListChecks, MessageSquare, ReceiptText, Scale, Settings, Shield, Target, TrendingUp, UserRound, UserRoundPlus, UsersRound, Wrench, Zap } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Bell, Bot, Brain, BriefcaseBusiness, CalendarCheck, CalendarDays, Clock, CreditCard, Dumbbell, Gauge, Gift, Link2, ListChecks, MessageSquare, ReceiptText, RefreshCcw, Scale, Settings, Shield, Target, TrendingUp, UserRound, UserRoundPlus, UsersRound, Wrench, Zap } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import type { PortalNavItem } from "@/components/layout/portal-shell";
 import type { FeatureKey } from "./feature-registry";
@@ -31,6 +31,7 @@ function defineGate(definition: PortalGateDefinition): PortalGateDefinition {
 function portalIcon(iconKey: PortalNavItem["iconKey"]) {
   switch (iconKey) {
     case "activity": return createElement(Activity, { className: "size-5" });
+    case "alert-triangle": return createElement(AlertTriangle, { className: "size-5" });
     case "bar-chart": return createElement(BarChart3, { className: "size-5" });
     case "bell": return createElement(Bell, { className: "size-5" });
     case "bot": return createElement(Bot, { className: "size-5" });
@@ -47,6 +48,7 @@ function portalIcon(iconKey: PortalNavItem["iconKey"]) {
     case "link": return createElement(Link2, { className: "size-5" });
     case "message-square": return createElement(MessageSquare, { className: "size-5" });
     case "receipt": return createElement(ReceiptText, { className: "size-5" });
+    case "refresh-ccw": return createElement(RefreshCcw, { className: "size-5" });
     case "scale": return createElement(Scale, { className: "size-5" });
     case "settings": return createElement(Settings, { className: "size-5" });
     case "shield": return createElement(Shield, { className: "size-5" });
@@ -75,8 +77,19 @@ const adminPortalGates = [
   defineGate({ href: "/admin/support", label: "Support", icon: portalIcon("shield"), iconKey: "shield", visibilityMode: "always_on", match: "exact" }),
   defineGate({ href: "/admin/promotions", label: "Promotions", icon: portalIcon("gift"), iconKey: "gift", featureKey: "discount_promo_codes", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/membership-plans", label: "Plans", icon: portalIcon("tags"), iconKey: "tags", featureKey: "member_management", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/renewals", label: "Renewals", icon: portalIcon("refresh-ccw"), iconKey: "refresh-ccw", featureKey: "membership_renewals", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/payments", label: "Payments", icon: portalIcon("credit-card"), iconKey: "credit-card", featureKey: "billing_invoices", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/payment-links", label: "Payment Links", icon: portalIcon("link"), iconKey: "link", featureKey: "online_payment_links", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/payment-failures", label: "Payment Failures", icon: portalIcon("alert-triangle"), iconKey: "alert-triangle", featureKey: "payment_failure_handling", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/payment-tracking", label: "Payment Tracking", icon: portalIcon("bar-chart"), iconKey: "bar-chart", featureKey: "payment_tracking", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/auto-billing", label: "Auto-Billing", icon: portalIcon("refresh-ccw"), iconKey: "refresh-ccw", featureKey: "auto_billing", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/payment-providers", label: "Payment Gateways", icon: portalIcon("shield"), iconKey: "shield", featureKey: "razorpay_payu_integration", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/corporate-accounts", label: "Corporate", icon: portalIcon("briefcase"), iconKey: "briefcase", featureKey: "corporate_bulk_memberships", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/partial-payments", label: "Partial Payments", icon: portalIcon("clock"), iconKey: "clock", featureKey: "partial_payment_dues", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/revenue-split", label: "Revenue Split", icon: portalIcon("trending-up"), iconKey: "trending-up", featureKey: "branch_revenue_split", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/tax-settings", label: "Tax Settings", icon: portalIcon("scale"), iconKey: "scale", featureKey: "multi_gstin_support", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/communications", label: "Communications", icon: portalIcon("message-square"), iconKey: "message-square", featureKey: "whatsapp_integration", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/sms", label: "SMS", icon: portalIcon("message-square"), iconKey: "message-square", featureKey: "sms_integration", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/integrations", label: "Integrations", icon: portalIcon("link"), iconKey: "link", featureKey: "rest_api_access", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/analytics", label: "Analytics", icon: portalIcon("bar-chart"), iconKey: "bar-chart", featureKey: "advanced_reports", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/automation/workflows", label: "Workflows", icon: portalIcon("wrench"), iconKey: "wrench", featureKey: "advanced_rbac", visibilityMode: "hidden_if_locked", match: "exact" }),
@@ -127,6 +140,8 @@ const memberPortalGates = [
   defineGate({ href: "/member", label: "Dashboard", icon: portalIcon("gauge"), iconKey: "gauge", visibilityMode: "always_on", match: "exact" }),
   defineGate({ href: "/member/membership", label: "Membership", icon: portalIcon("credit-card"), iconKey: "credit-card", visibilityMode: "always_on", match: "exact" }),
   defineGate({ href: "/member/payments", label: "Payments", icon: portalIcon("receipt"), iconKey: "receipt", visibilityMode: "always_on", match: "exact" }),
+  defineGate({ href: "/member/billing", label: "Billing", icon: portalIcon("refresh-ccw"), iconKey: "refresh-ccw", visibilityMode: "always_on", match: "exact" }),
+  defineGate({ href: "/member/payment-methods", label: "Payment Methods", icon: portalIcon("credit-card"), iconKey: "credit-card", visibilityMode: "always_on", match: "exact" }),
   defineGate({ href: "/member/attendance", label: "Attendance", icon: portalIcon("calendar-check"), iconKey: "calendar-check", visibilityMode: "always_on", match: "exact" }),
   defineGate({ href: "/member/classes", label: "Classes", icon: portalIcon("calendar-days"), iconKey: "calendar-days", featureKey: "class_booking", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/member/workouts", label: "Workouts", icon: portalIcon("dumbbell"), iconKey: "dumbbell", featureKey: "diet_workout_plans", visibilityMode: "hidden_if_locked", match: "exact" }),

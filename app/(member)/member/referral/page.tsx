@@ -28,7 +28,7 @@ export default async function MemberReferralPage() {
     );
   }
 
-  const referralData = await getMemberReferralData(overview.member.id, context.organizationId);
+  const referralData = await getMemberReferralData(overview.member.id, context.organizationId).catch(() => null);
 
   return (
     <div className="space-y-6">

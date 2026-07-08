@@ -52,6 +52,11 @@ const GROWTH_FEATURES: FeatureKey[] = [
   "advanced_reports",
 ];
 
+const BILLING_ONLY_FEATURES: FeatureKey[] = [
+  ...GROWTH_FEATURES,
+  "receipts",
+];
+
 const NOW = new Date("2026-06-18T12:00:00Z").getTime();
 const FUTURE = "2026-12-31T23:59:59Z";
 const PAST = "2026-01-01T00:00:00Z";
@@ -187,6 +192,27 @@ describe("Entitlement resolver — feature access", () => {
     expect(result.reason).toBe("PLAN_EXPIRED");
   });
 
+  it("allows cancelled subscriptions to keep billing-management features only", () => {
+    const cancelled = evaluateEffectiveSubscription(
+      makeSub({ status: "cancelled", cancelledAt: "2026-06-15T00:00:00Z", expiresAt: FUTURE }),
+      NOW,
+    );
+
+    expect(cancelled.effective).toBe(false);
+    expect(evaluateFeatureAccess("billing_invoices", cancelled, BILLING_ONLY_FEATURES, PKG)).toMatchObject({
+      allowed: true,
+      reason: null,
+    });
+    expect(evaluateFeatureAccess("receipts", cancelled, BILLING_ONLY_FEATURES, PKG)).toMatchObject({
+      allowed: true,
+      reason: null,
+    });
+    expect(evaluateFeatureAccess("member_management", cancelled, BILLING_ONLY_FEATURES, PKG)).toMatchObject({
+      allowed: false,
+      reason: "PLAN_CANCELLED",
+    });
+  });
+
   it("denies unknown feature key → FEATURE_UNKNOWN", () => {
     const result = evaluateFeatureAccess("nonexistent_feature" as FeatureKey, effective, GROWTH_FEATURES, PKG);
     expect(result.allowed).toBe(false);
@@ -258,7 +284,7 @@ describe("Entitlement resolver — snapshot", () => {
     });
     expect(snapshot.isActive).toBe(false);
     expect(snapshot.isCancelled).toBe(true);
-    expect(snapshot.activeFeatureKeys).toEqual([]);
+    expect(snapshot.activeFeatureKeys).toEqual(["billing_invoices"]);
     expect(snapshot.limits).toEqual({});
     expect(snapshot.reason).toBe("PLAN_CANCELLED");
   });

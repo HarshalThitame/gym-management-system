@@ -1,6 +1,6 @@
 import type { DbClient } from "./db-types";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createRazorpayOrder } from "../lib/razorpay";
+import { createRazorpayOrder } from "../razorpay/razorpay-service";
 
 
 function getDb(supabase: unknown): DbClient { return supabase as never as DbClient; }

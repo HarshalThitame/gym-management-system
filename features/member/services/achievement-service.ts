@@ -1,37 +1,39 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { billingLogger } from "@/features/billing/lib/logger";
 
-export type AchievementRecord = {
+type AchievementRecord = {
   id: string;
   title: string;
+  achieved_at: string | null;
+  type: string;
+  member_id: string;
   description: string | null;
-  milestone_type: string;
-  achieved_at: string;
-  badge_key: string | null;
+  icon: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
-export async function getMemberAchievements(memberId: string): Promise<{
-  achievements: AchievementRecord[];
-  totalAchievements: number;
-  latestAchievement: AchievementRecord | null;
-  streakMilestoneCount: number;
-  workoutMilestoneCount: number;
-}> {
+export async function getMemberAchievements(memberId: string) {
   const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("fitness_milestones")
-    .select("id, title, description, milestone_type, achieved_at, badge_key")
+    .select("*")
     .eq("member_id", memberId)
-    .order("achieved_at", { ascending: false })
-    .limit(30);
+    .order("achieved_at", { ascending: false });
+
+  if (error) {
+    billingLogger.error("getMemberAchievements", "Failed to fetch achievements", { memberId, error: error.message });
+    return null;
+  }
 
   const achievements = (data ?? []) as AchievementRecord[];
 
   return {
-    achievements,
-    totalAchievements: achievements.length,
-    latestAchievement: achievements[0] ?? null,
-    streakMilestoneCount: achievements.filter((a) => a.milestone_type === "streak").length,
-    workoutMilestoneCount: achievements.filter((a) => a.milestone_type === "workouts_completed").length
+    all: achievements,
+    count: achievements.length,
+    recent: achievements.slice(0, 5),
+    streakAchievements: achievements.filter((a) => a.type === "streak"),
+    workoutAchievements: achievements.filter((a) => a.type === "workout")
   };
 }

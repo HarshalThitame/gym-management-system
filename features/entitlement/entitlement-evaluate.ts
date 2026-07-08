@@ -4,7 +4,7 @@
  */
 
 import type { FeatureKey, SubscriptionStatus } from "./feature-registry";
-import { FEATURE_KEY_SET } from "./feature-registry";
+import { CANCELLED_BILLING_FEATURES, FEATURE_KEY_SET } from "./feature-registry";
 import type {
   EntitlementDeniedReason,
   EntitlementSnapshot,
@@ -110,7 +110,7 @@ export function evaluateEffectiveSubscription(
     return { effective: true, status, denialReason: null, message: null };
   }
 
-  // ── Cancelled (cancel-immediate per Phase 2) ──
+  // ── Cancelled (grace period: billing features remain accessible) ──
   if (status === "cancelled") {
     return {
       effective: false,
@@ -215,6 +215,12 @@ export function evaluateFeatureAccess(
     };
   }
 
+  // 2a. Cancelled subscriptions keep billing-management features available
+  // during the retention window, even though the plan itself is not active.
+  if (effective.status === "cancelled" && CANCELLED_BILLING_FEATURES.includes(featureKey)) {
+    return { allowed: true, reason: null, message: null };
+  }
+
   // 2. Subscription not effective
   if (!effective.effective) {
     return {
@@ -266,7 +272,11 @@ export function evaluateEntitlementSnapshot(input: EntitlementEvalInput): Entitl
   const isCancelled = subscription?.status === "cancelled";
 
   const activeFeatureKeys: FeatureKey[] =
-    isActive && pkg?.isActive !== false ? packageFeatureKeys : [];
+    isActive && pkg?.isActive !== false
+      ? packageFeatureKeys
+      : isCancelled
+        ? (packageFeatureKeys as FeatureKey[]).filter((k) => CANCELLED_BILLING_FEATURES.includes(k))
+        : [];
 
   return {
     organizationId,

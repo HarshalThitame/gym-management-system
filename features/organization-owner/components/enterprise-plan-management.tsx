@@ -106,6 +106,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   const isActive = planContext.status === "active";
   const isTrialing = planContext.isTrialing;
   const isSuspended = planContext.isSuspended;
+  const isCancelled = planContext.status === "cancelled" || currentSubscription?.status === "cancelled";
   const autoRenew = currentSubscription ? (currentSubscription as unknown as { auto_renew: boolean }).auto_renew : true;
 
   const currentPkg = currentSubscription
@@ -254,6 +255,17 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   return (
     <div className="space-y-8">
       <ToastContainer />
+
+      {isCancelled ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-900">
+          <p className="text-xs font-black uppercase tracking-[0.14em]">Subscription cancelled</p>
+          <h3 className="mt-1 text-lg font-black">Billing access is retained for the cancellation window</h3>
+          <p className="mt-2 text-sm text-amber-900/80">
+            You can still review invoices, payments, and plan history while the retention period is active.
+            Reactivate or choose a new plan to restore full platform access.
+          </p>
+        </div>
+      ) : null}
 
       {/* Trial Banner */}
       {isTrialing && trialDaysRemaining !== null ? (
@@ -724,14 +736,14 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between rounded-md border border-border bg-background p-4">
                 <div><p className="text-sm font-bold">Auto-Renewal</p><p className="text-xs text-muted-foreground">Automatically renew each billing cycle</p></div>
-                <button className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending} onClick={handleToggleAutoRenew} type="button">
+                <button className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${isCancelled ? "cursor-not-allowed bg-muted text-muted-foreground" : autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending || isCancelled} onClick={handleToggleAutoRenew} type="button">
                   {autoRenewPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {autoRenew ? "Enabled" : "Disabled"}
+                  {isCancelled ? "Unavailable" : autoRenew ? "Enabled" : "Disabled"}
                 </button>
               </div>
               <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-4">
                 <div><p className="text-sm font-bold text-red-800">Cancel Subscription</p><p className="text-xs text-red-600">Data retained for 30 days after cancellation</p></div>
-                <button className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 transition-all hover:bg-red-100" onClick={() => setShowCancel(true)} type="button">Cancel</button>
+                <button className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={isCancelled} onClick={() => setShowCancel(true)} type="button">{isCancelled ? "Cancelled" : "Cancel"}</button>
               </div>
             </CardContent>
           </Card>

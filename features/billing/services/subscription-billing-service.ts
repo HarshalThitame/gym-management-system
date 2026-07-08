@@ -1,6 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { absoluteUrl } from "@/lib/utils";
-import { createRazorpayOrder } from "../lib/razorpay";
+import { createRazorpayOrder } from "../razorpay/razorpay-service";
 import { sendEmail } from "@/services/email/resend";
 import {
   subscriptionInvoiceNotification,

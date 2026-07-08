@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { CreditCard, FileText, ReceiptText, RefreshCcw } from "lucide-react";
+import { CreditCard, FileText, ReceiptText, RefreshCcw, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ProviderBadge } from "@/features/billing/components/provider-badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
+import { CouponInput } from "@/features/billing/components/coupon-input";
 import { formatCurrency } from "@/features/billing/lib/money";
 import { getMemberDashboard } from "@/features/memberships/services/membership-service";
 import { requireMemberPortalAccess } from "@/features/member/lib/access";
@@ -62,6 +64,35 @@ export default async function MemberPaymentsPage() {
         </section>
       </AnimatedCardSection>
 
+      {invoiceRows.filter((inv) => inv.status === "issued" || inv.status === "partially_paid").length > 0 ? (
+        <AnimatedCardSection delay={0.08}>
+          <Card variant="glass">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Tag className="size-5 text-slate" />
+                <div>
+                  <h3 className="text-2xl font-black">Promo Codes</h3>
+                  <p className="text-sm text-slate">Apply a discount code to a pending invoice.</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {invoiceRows.filter((inv) => inv.status === "issued" || inv.status === "partially_paid").map((inv) => (
+                <div key={inv.id} className="mb-4 last:mb-0">
+                  <p className="mb-2 text-xs font-semibold text-slate">
+                    {inv.invoice_number} &middot; {formatCurrency(inv.total_amount ?? inv.amount_due, inv.currency)}
+                  </p>
+                  <CouponInput
+                    amount={inv.total_amount ?? inv.amount_due}
+                    invoiceId={inv.id}
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </AnimatedCardSection>
+      ) : null}
+
       <AnimatedCardSection delay={0.1}>
         <Card variant="glass">
           <CardHeader>
@@ -116,6 +147,7 @@ function MemberPaymentRow({ payment, profile }: { payment: PaymentRow; profile: 
           <p className="font-black">{payment.payment_number}</p>
           <StatusBadge status={payment.status} />
           <Badge variant="neutral">{payment.payment_type.replace(/_/g, " ")}</Badge>
+          <ProviderBadge provider={payment.provider} />
         </div>
         <p className="mt-1 text-xs font-semibold text-muted-foreground">
           {payment.method.replace(/_/g, " ")} · {new Date(payment.created_at).toLocaleString("en-IN")}

@@ -111,12 +111,13 @@ export function useFeatureLockReason(key: FeatureKey): string | null {
   const ctx = useContext(EntitlementContext);
   if (!ctx) return "Entitlement system unavailable.";
   if (!ctx.plan) return "No active subscription. Upgrade to a plan to access this feature.";
+  if (ctx.hasFeature(key)) return null;
+  // Feature is locked — determine the reason
   if (ctx.plan.status === "expired") return "Your plan has expired. Renew to regain access.";
-  if (ctx.plan.status === "cancelled") return "Your plan has been cancelled. Choose a new plan.";
+  if (ctx.plan.status === "cancelled") return "Your plan has been cancelled. Choose a new plan to access this feature.";
   if (ctx.plan.status === "suspended") return "Your subscription is suspended. Contact support.";
   if (ctx.plan.status === "pending_activation") return "Your new plan has not started yet.";
-  if (!ctx.hasFeature(key)) return `This feature is not included in your ${ctx.plan.name} plan. Upgrade to access it.`;
-  return null;
+  return `This feature is not included in your ${ctx.plan.name} plan. Upgrade to access it.`;
 }
 
 export function useRefreshEntitlements() {

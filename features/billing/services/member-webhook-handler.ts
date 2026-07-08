@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { billingLogger } from "@/features/billing/lib/logger";
+import { sendPaymentReceipt } from "@/features/billing/services/receipt-service";
 
 type MemberPaymentResult = {
   handled: boolean;
@@ -85,6 +86,24 @@ export async function handleMemberPaymentCaptured(
       razorpay_payment_id: razorpayPaymentId,
     } as never).eq("id", payment.invoice_id);
 
+    // Record coupon usage if a promo code was applied to this invoice
+    const { data: paidInvoice } = await admin
+      .from("invoices")
+      .select("notes")
+      .eq("id", payment.invoice_id)
+      .maybeSingle() as never as {
+      data: { notes: string | null } | null;
+      error: unknown;
+    };
+
+    if (paidInvoice?.notes) {
+      const couponMatch = paidInvoice.notes.match(/\[COUPON:([^\]]+):([^\]]+):(\d+)\]/);
+      if (couponMatch) {
+        const { recordCouponUsage } = await import("@/features/billing/services/coupon-redemption-service");
+        await recordCouponUsage(couponMatch[1], payment.member_id, payment.invoice_id);
+      }
+    }
+
     await admin.from("billing_events").insert({
       gym_id: null,
       event_type: "payment_completed",
@@ -163,6 +182,14 @@ export async function handleMemberPaymentCaptured(
     razorpayPaymentId,
   });
 
+  sendPaymentReceipt({
+    paymentId: payment.id,
+    invoiceId: payment.invoice_id ?? "",
+    memberId: payment.member_id,
+    amount: payment.amount,
+    razorpayPaymentId,
+  });
+
   return { handled: true };
 }
 
@@ -227,6 +254,192 @@ export async function handleMemberPaymentFailed(
     paymentId: payment.id,
     invoiceId: payment.invoice_id,
     razorpayPaymentId,
+    failureReason,
+  });
+
+  return { handled: true };
+}
+
+export async function handleSubscriptionCharged(
+  razorpaySubscriptionId: string,
+  razorpayPaymentId: string,
+  razorpayOrderId: string,
+): Promise<MemberPaymentResult> {
+  const admin = getSupabaseAdminClient();
+  if (!admin) return { handled: false, error: "Supabase admin client not configured" };
+
+  const { data: subscription } = await admin
+    .from("member_subscriptions")
+    .select("*, memberships!inner(*)")
+    .eq("provider_subscription_id", razorpaySubscriptionId)
+    .maybeSingle() as never as {
+    data: {
+      id: string;
+      member_id: string;
+      membership_id: string;
+      gym_id: string;
+      amount: number;
+      currency: string;
+      provider: string;
+      next_charge_at: string | null;
+      current_period_end: string | null;
+      memberships: { status: string; end_date: string; membership_plan_id: string };
+    } | null;
+    error: { message: string } | null;
+  };
+
+  if (!subscription) return { handled: false, error: "No matching subscription found" };
+
+  const now = new Date().toISOString();
+
+  const invoiceNumber = `SUB-INV-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
+  const { data: invoice } = await admin.from("invoices").insert({
+    gym_id: subscription.gym_id,
+    member_id: subscription.member_id,
+    membership_id: subscription.membership_id,
+    invoice_number: invoiceNumber,
+    status: "paid",
+    subtotal_amount: subscription.amount,
+    total_amount: subscription.amount,
+    amount_paid: subscription.amount,
+    issued_at: now,
+    paid_at: now,
+    due_at: now,
+  } as never).select("id").maybeSingle() as never as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
+
+  if (!invoice) return { handled: false, error: "Failed to create invoice" };
+
+  const paymentNumber = `SUB-PAY-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
+  const { data: payment } = await admin.from("payments").insert({
+    gym_id: subscription.gym_id,
+    member_id: subscription.member_id,
+    membership_id: subscription.membership_id,
+    invoice_id: invoice.id,
+    payment_number: paymentNumber,
+    payment_type: "membership_renewal",
+    status: "paid",
+    method: "razorpay",
+    provider: "razorpay",
+    amount: subscription.amount,
+    currency: subscription.currency,
+    provider_order_id: razorpayOrderId,
+    provider_payment_id: razorpayPaymentId,
+    paid_at: now,
+    collected_at: now,
+    metadata: { autoRenewal: true, subscriptionId: subscription.id, source: "subscription_charged" },
+  } as never).select("id").maybeSingle() as never as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
+
+  if (!payment) return { handled: false, error: "Failed to create payment" };
+
+  await admin.from("member_subscriptions").update({
+    last_charged_at: now,
+    current_period_end: subscription.current_period_end,
+    failure_count: 0,
+    last_failure_reason: null,
+  } as never).eq("id", subscription.id);
+
+  const planId = subscription.memberships.membership_plan_id;
+  const { data: plan } = planId
+    ? await admin.from("membership_plans").select("duration_days, name").eq("id", planId).maybeSingle() as never as {
+        data: { duration_days: number; name: string } | null;
+        error: unknown;
+      }
+    : { data: null };
+
+  if (plan) {
+    const currentEnd = new Date(subscription.memberships.end_date);
+    const newEnd = new Date(currentEnd);
+    newEnd.setDate(newEnd.getDate() + plan.duration_days);
+
+    await admin.from("memberships").update({
+      status: "active",
+      end_date: newEnd.toISOString().slice(0, 10),
+      payment_status: "paid",
+    } as never).eq("id", subscription.membership_id);
+
+    await admin.from("member_subscriptions").update({
+      next_charge_at: newEnd.toISOString(),
+    } as never).eq("id", subscription.id);
+
+    await admin.from("billing_events").insert({
+      gym_id: subscription.gym_id,
+      event_type: "membership_renewed",
+      entity_type: "membership",
+      entity_id: subscription.membership_id,
+      status: "recorded",
+      metadata: { subscriptionId: subscription.id, planName: plan.name, source: "subscription_charged" },
+    } as never);
+  }
+
+  billingLogger.info("handleSubscriptionCharged", "Subscription charge processed", {
+    subscriptionId: subscription.id,
+    membershipId: subscription.membership_id,
+    paymentId: payment.id,
+    invoiceId: invoice.id,
+  });
+
+  sendPaymentReceipt({
+    paymentId: payment.id,
+    invoiceId: invoice.id,
+    memberId: subscription.member_id,
+    amount: subscription.amount,
+    razorpayPaymentId,
+    provider: "Razorpay",
+  });
+
+  return { handled: true };
+}
+
+export async function handleSubscriptionChargeFailed(
+  razorpaySubscriptionId: string,
+  failureReason: string,
+): Promise<MemberPaymentResult> {
+  const admin = getSupabaseAdminClient();
+  if (!admin) return { handled: false, error: "Supabase admin client not configured" };
+
+  const { data: subscription } = await admin
+    .from("member_subscriptions")
+    .select("id, member_id, membership_id, failure_count")
+    .eq("provider_subscription_id", razorpaySubscriptionId)
+    .maybeSingle() as never as {
+    data: { id: string; member_id: string; membership_id: string; failure_count: number } | null;
+    error: { message: string } | null;
+  };
+
+  if (!subscription) return { handled: false, error: "No matching subscription found" };
+
+  const newFailureCount = (subscription.failure_count ?? 0) + 1;
+
+  await admin.from("member_subscriptions").update({
+    failure_count: newFailureCount,
+    last_failure_reason: failureReason,
+    status: newFailureCount >= 3 ? "failed" : "active",
+  } as never).eq("id", subscription.id);
+
+  await admin.from("billing_events").insert({
+    gym_id: null,
+    event_type: "subscription_charge_failed",
+    entity_type: "subscription",
+    entity_id: subscription.id,
+    status: "recorded",
+    metadata: { failureCount: newFailureCount, failureReason, membershipId: subscription.membership_id },
+  } as never);
+
+  if (newFailureCount >= 3) {
+    await admin.from("memberships").update({
+      status: "suspended",
+    } as never).eq("id", subscription.membership_id);
+  }
+
+  billingLogger.warn("handleSubscriptionChargeFailed", "Subscription charge failed", {
+    subscriptionId: subscription.id,
+    failureCount: newFailureCount,
     failureReason,
   });
 

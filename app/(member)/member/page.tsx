@@ -10,9 +10,25 @@ import { getMemberAchievements } from "@/features/member/services/achievement-se
 import { LoyaltyWidget, LeaderboardWidget } from "@/features/member/components/loyalty-widgets";
 import { AchievementWall, AchievementStats } from "@/features/member/components/achievement-wall";
 import { requireMemberPortalAccess } from "@/features/member/lib/access";
+import { getOrganizationEntitlements } from "@/features/entitlement/entitlement-repository";
 import { WelcomeBanner } from "@/features/member/components/welcome-banner";
 import { DashboardSection, DashboardStatRow } from "@/features/member/components/dashboard-sections";
 import { createMetadata } from "@/lib/seo/metadata";
+
+const FEATURE_GATED_LINKS: Record<string, { href: string; label: string; variant?: "primary-gradient" | "outline-cinematic" }> = {
+  class_booking: { href: "/member/classes", label: "Book Classes" },
+  diet_workout_plans: { href: "/member/workouts", label: "View Workouts" },
+  goal_tracking: { href: "/member/fitness", label: "Track Fitness" },
+  ai_coach: { href: "/member/ai-coach", label: "AI Coach" },
+};
+
+const ALWAYS_ON_LINKS = [
+  { href: "/member/profile", label: "Complete Profile", variant: "primary-gradient" as const },
+  { href: "/member/membership", label: "View Membership" },
+  { href: "/member/payments", label: "Payments & Invoices" },
+  { href: "/member/attendance", label: "Attendance QR" },
+  { href: "/membership-plans", label: "Renew Membership", variant: "primary-gradient" as const },
+];
 
 export const metadata: Metadata = createMetadata({
   title: "Member Dashboard",
@@ -23,6 +39,11 @@ export const metadata: Metadata = createMetadata({
 export default async function MemberDashboardPage() {
   const context = await requireMemberPortalAccess("/member");
   const overview = context.userId ? await getMemberDashboardOverview(context.userId) : null;
+
+  const entitlements = context.organizationId
+    ? await getOrganizationEntitlements(context.organizationId).catch(() => null)
+    : null;
+  const activeFeatureKeys = new Set(entitlements?.activeFeatureKeys ?? []);
   const membership = overview?.currentMembership ?? null;
   const plan = overview?.currentPlan ?? null;
   const metrics = overview?.metrics;
@@ -124,7 +145,7 @@ export default async function MemberDashboardPage() {
               status={(metrics?.bookedClasses ?? 0) > 0 ? "good" : undefined}
             />
             <StatCard
-              detail={overview?.nextPtSession ? `${overview.nextPtSession.session_date} at ${overview.nextPtSession.starts_at.slice(0, 5)}` : "No upcoming sessions"}
+              detail={overview?.nextPtSession?.starts_at ? `${overview.nextPtSession.session_date} at ${overview.nextPtSession.starts_at.slice(0, 5)}` : "No upcoming sessions"}
               icon={<Dumbbell className="size-5" />}
               label="PT Sessions"
               value={String(metrics?.upcomingPtSessions ?? 0)}
@@ -197,15 +218,14 @@ export default async function MemberDashboardPage() {
 
       <DashboardSection title="Quick Actions" delay={0.25} variant="glass">
         <div className="flex flex-wrap gap-3">
-          <ButtonLink href="/member/profile" variant="primary-gradient" size="lg">Complete Profile</ButtonLink>
-          <ButtonLink href="/member/membership" size="lg" variant="outline-cinematic">View Membership</ButtonLink>
-          <ButtonLink href="/member/payments" size="lg" variant="outline-cinematic">Payments & Invoices</ButtonLink>
-          <ButtonLink href="/member/attendance" size="lg" variant="outline-cinematic">Attendance QR</ButtonLink>
-          <ButtonLink href="/member/classes" size="lg" variant="outline-cinematic">Book Classes</ButtonLink>
-          <ButtonLink href="/member/workouts" size="lg" variant="outline-cinematic">View Workouts</ButtonLink>
-          <ButtonLink href="/member/fitness" size="lg" variant="outline-cinematic">Track Fitness</ButtonLink>
-          <ButtonLink href="/member/ai-coach" size="lg" variant="outline-cinematic">AI Coach</ButtonLink>
-          <ButtonLink href="/membership-plans" variant="primary-gradient" size="lg">Renew Membership</ButtonLink>
+          {ALWAYS_ON_LINKS.map((link) => (
+            <ButtonLink key={link.href} href={link.href} size="lg" variant={link.variant ?? "outline-cinematic"}>{link.label}</ButtonLink>
+          ))}
+          {Object.entries(FEATURE_GATED_LINKS).map(([featureKey, link]) =>
+            activeFeatureKeys.has(featureKey) ? (
+              <ButtonLink key={link.href} href={link.href} size="lg" variant={link.variant ?? "outline-cinematic"}>{link.label}</ButtonLink>
+            ) : null
+          )}
         </div>
       </DashboardSection>
     </div>

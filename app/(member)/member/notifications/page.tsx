@@ -86,7 +86,13 @@ export default async function MemberNotificationsPage() {
               <h3 className="text-2xl font-black">Preferences</h3>
               <p className="text-sm leading-6 text-muted-foreground">Granular opt-in controls are respected before campaigns and automations are queued.</p>
             </CardHeader>
-            <CardContent><NotificationPreferencesForm preferences={center.preferences} /></CardContent>
+            <CardContent>
+                {center.preferences ? (
+                  <NotificationPreferencesForm preferences={center.preferences} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Notification preferences are not available.</p>
+                )}
+              </CardContent>
           </Card>
         </AnimatedCardSection>
       </div>

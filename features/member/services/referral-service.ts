@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { billingLogger } from "@/features/billing/lib/logger";
 
 export type MemberReferralData = {
   referralCode: string | null;
@@ -28,15 +29,20 @@ export async function getMemberReferralData(
 ): Promise<MemberReferralData | null> {
   const supabase = await createSupabaseServerClient();
 
-  const { data: member } = await supabase
+  const { data: member, error: memberError } = await supabase
     .from("members")
     .select("referral_code, full_name")
     .eq("id", memberId)
     .maybeSingle();
 
+  if (memberError) {
+    billingLogger.error("getMemberReferralData", "Failed to fetch member", { memberId, error: memberError.message });
+    return null;
+  }
+
   if (!member?.referral_code) return null;
 
-  const [{ data: rewards }, { data: config }] = await Promise.all([
+  const [{ data: rewards, error: rewardsError }, { data: config, error: configError }] = await Promise.all([
     supabase
       .from("referral_rewards")
       .select("id, reward_type, reward_value, status, earned_at, paid_at, expiry_date, referred_member_id")
@@ -49,6 +55,13 @@ export async function getMemberReferralData(
       .eq("organization_id", organizationId)
       .maybeSingle()
   ]);
+
+  if (rewardsError) {
+    billingLogger.error("getMemberReferralData", "Failed to fetch rewards", { memberId, error: rewardsError.message });
+  }
+  if (configError) {
+    billingLogger.error("getMemberReferralData", "Failed to fetch config", { organizationId, error: configError.message });
+  }
 
   const referredMemberIds = (rewards ?? []).map((r) => r.referred_member_id).filter(Boolean);
   const { data: referredMembers } = referredMemberIds.length > 0

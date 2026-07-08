@@ -31,17 +31,17 @@ export function PaymentRefundForm({ maxRefundableAmount, paymentId }: PaymentRef
 
     const amountInMinorUnits = Math.round(Number(amount) * 100);
 
-    const response = await fetch("/api/billing/razorpay/refunds", {
+    const response = await fetch("/api/billing/payments/refunds", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         paymentId,
         amount: amountInMinorUnits,
-        reason
-      })
+        reason,
+      }),
     });
-    const payload = await response.json() as ApiResponse<{ refundId: string; status: string }>;
 
+    const payload = await response.json() as ApiResponse<{ refundId: string; status: string }>;
     if (!payload.ok) {
       setStatus("error");
       setMessage(payload.error.message);

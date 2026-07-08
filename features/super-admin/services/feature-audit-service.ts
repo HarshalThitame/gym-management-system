@@ -34,7 +34,7 @@ type FeatureImplInfo = {
 const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   // AI features — configured in plan, no direct UI for each
   ai_recommendations:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  ai_coach:                 { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
+  ai_coach:                 { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   ai_retention_analysis:    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   ai_revenue_insights:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
 
@@ -56,28 +56,28 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
 
   // Billing — core module (billing_invoices) is fully implemented; sub-features are partial or not implemented
   billing_invoices:               { hasSidebar: true,  sidebarModule: "revenue",  hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
-  receipts:                        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
-  payment_tracking:                { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
-  online_payment_links:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  renewal_reminders:               { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P2" },
-  auto_billing:                    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
-  discount_promo_codes:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  corporate_bulk_memberships:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  payment_failure_handling:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
-  partial_payment_dues:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  razorpay_payu_integration:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P0" },
-  multi_gstin_support:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  branch_revenue_split:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
+  receipts:                        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  payment_tracking:                { hasSidebar: true,  sidebarModule: "payment-tracking", hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  online_payment_links:            { hasSidebar: true,  sidebarModule: "payment-links", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  renewal_reminders:               { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: false, status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  auto_billing:                    { hasSidebar: true,  sidebarModule: "auto-billing", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  discount_promo_codes:            { hasSidebar: true,  sidebarModule: "promotions", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  corporate_bulk_memberships:      { hasSidebar: true,  sidebarModule: "corporate-accounts", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  payment_failure_handling:        { hasSidebar: true,  sidebarModule: "payment-failures", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  partial_payment_dues:            { hasSidebar: true,  sidebarModule: "partial-payments", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  razorpay_payu_integration:       { hasSidebar: true,  sidebarModule: "payment-providers", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  multi_gstin_support:             { hasSidebar: true,  sidebarModule: "tax-settings", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  branch_revenue_split:            { hasSidebar: true,  sidebarModule: "revenue-split", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
 
   // Communication — core module is implemented; sub-features partial
-  email_notifications:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  in_app_notifications:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  whatsapp_integration:        { hasSidebar: true,  sidebarModule: "communications", hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
-  sms_integration:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  birthday_greetings:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  broadcast_messages:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  email_campaigns:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  whatsapp_business_api:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
+  email_notifications:         { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "PARTIAL", gapSeverity: "P1" },
+  in_app_notifications:        { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  whatsapp_integration:        { hasSidebar: true,  sidebarModule: "communications", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  sms_integration:             { hasSidebar: true,  sidebarModule: "sms", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  birthday_greetings:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "NOT_IMPLEMENTED", gapSeverity: "P2" },
+  broadcast_messages:          { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  email_campaigns:             { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  whatsapp_business_api:       { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   cross_branch_member_access:  { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
 
   // CRM — lead_management is fully implemented; others are partial or not
@@ -86,10 +86,10 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   lead_followup_reminders:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   re_engagement_automation:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   advanced_crm_lead_pipeline:     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  referral_program:               { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  loyalty_points_system:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
+  referral_program:               { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  loyalty_points_system:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P1" },
   network_wide_campaign_manager:  { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  member_nps_surveys:             { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
+  member_nps_surveys:             { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
 
   // Enterprise — some are fully implemented, others are service/infra
   multi_branch_management:            { hasSidebar: true,  sidebarModule: "branches", hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
@@ -109,10 +109,10 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
 
   // Membership — core is fully implemented; sub-features partial
   member_management:            { hasSidebar: true,  sidebarModule: "members",     hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
-  membership_renewals:          { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "PARTIAL", gapSeverity: "P1" },
-  expiry_tracking:              { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  goal_tracking:                { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  progress_photos:              { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
+  membership_renewals:          { hasSidebar: true,  sidebarModule: "renewals", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  expiry_tracking:              { hasSidebar: false, sidebarModule: null,      hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  goal_tracking:                { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  progress_photos:              { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: true,  hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
   membership_pause_freeze:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   member_tagging_segments:      { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
   member_progress_tracking:     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
@@ -120,14 +120,14 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   member_data_import_export:    { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
 
   // Platform — some are implemented, partial, or not
-  member_portal:                { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
+  member_portal:                { hasSidebar: true,  sidebarModule: null, hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   trainer_portal:               { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
   branded_mobile_app:            { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  diet_workout_plans:           { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
+  diet_workout_plans:           { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   google_calendar_sync:         { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  in_app_push_notifications:     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },
-  digital_membership_card:       { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
-  loyalty_rewards_in_app:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P2" },
+  in_app_push_notifications:     { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  digital_membership_card:       { hasSidebar: false, sidebarModule: null, hasRoute: true,  hasActions: false, hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  loyalty_rewards_in_app:        { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: true,  status: "PARTIAL", gapSeverity: "P2" },
 
   // Reports — core modules are fully implemented; sub-features are partial or not
   basic_reports:                     { hasSidebar: false, sidebarModule: null, hasRoute: false, hasActions: false, hasUI: false, status: "CONFIGURED_ONLY", gapSeverity: "P1" },

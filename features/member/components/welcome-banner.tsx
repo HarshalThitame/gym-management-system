@@ -14,16 +14,12 @@ type WelcomeBannerProps = {
   lastVisitAt: string | null;
 };
 
-function getGreeting(): { text: string; icon: typeof Sun; emoji: string } {
+function getGreeting(): { text: string; emoji: string } {
   const hour = new Date().getHours();
-  if (hour < 12) return { text: "Good Morning", icon: Sun, emoji: "🌅" };
-  if (hour < 17) return { text: "Good Afternoon", icon: Sun, emoji: "☀️" };
-  if (hour < 21) return { text: "Good Evening", icon: Sun, emoji: "🌆" };
-  return { text: "Good Night", icon: Sun, emoji: "🌙" };
-}
-
-function Sun() {
-  return null;
+  if (hour < 12) return { text: "Good Morning", emoji: "🌅" };
+  if (hour < 17) return { text: "Good Afternoon", emoji: "☀️" };
+  if (hour < 21) return { text: "Good Evening", emoji: "🌆" };
+  return { text: "Good Night", emoji: "🌙" };
 }
 
 export function WelcomeBanner({

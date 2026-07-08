@@ -11,7 +11,7 @@ import {
 } from "@/features/integrations/services/msg91-service";
 import type { Json } from "@/types/database";
 
-type SendResult = { ok: boolean; error?: string };
+type SendResult = { ok: boolean; error?: string; providerMessageId?: string };
 
 function coerceObject(value: Json | null | undefined): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -75,17 +75,21 @@ export async function sendCampaignSms(params: {
     return { ok: false, error: "MSG91 SMS configuration is incomplete." };
   }
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const result = await sendMsg91Sms({
     authKey,
     flowId,
     senderId,
     mobile: params.to,
+    callbackUrl: `${appUrl}/api/webhooks/sms/msg91`,
     variables: {
       VAR1: stripMarkup(params.message),
     },
   });
 
-  return result.ok ? { ok: true } : { ok: false, error: result.message };
+  return result.ok
+    ? { ok: true, providerMessageId: result.providerMessageId }
+    : { ok: false, error: result.message };
 }
 
 export async function sendCampaignWhatsApp(params: {

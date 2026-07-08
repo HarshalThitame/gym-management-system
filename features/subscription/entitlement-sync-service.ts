@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { CANCELLED_BILLING_FEATURES } from "@/features/entitlement/feature-registry";
 
 type SyncResult = { ok: true; subscriptionId: string } | { ok: false; error: string };
 
@@ -32,12 +33,13 @@ function rawDb(): RawDbClient {
   return db() as unknown as RawDbClient;
 }
 
-async function getActiveSubscription(organizationId: string) {
+async function getActiveSubscription(organizationId: string, includeCancelled = false) {
+  const statuses = includeCancelled ? ["active", "trial", "cancelled"] : ["active", "trial"];
   const { data, error } = await db()
     .from("organization_subscriptions")
-    .select("id, package_id")
+    .select("id, package_id, status")
     .eq("organization_id", organizationId)
-    .in("status", ["active", "trial"])
+    .in("status", statuses)
     .order("updated_at", { ascending: false })
     .limit(1);
 
@@ -45,13 +47,32 @@ async function getActiveSubscription(organizationId: string) {
     throw new Error(error.message);
   }
 
-  return (data ?? [])[0] as { id: string; package_id: string } | undefined;
+  return (data ?? [])[0] as { id: string; package_id: string; status: string } | undefined;
 }
 
 export async function syncOrganizationEntitlements(organizationId: string, reason = "Entitlements synced."): Promise<SyncResult> {
   try {
     const subscription = await getActiveSubscription(organizationId);
     if (!subscription) {
+      // Check if there's a cancelled subscription — preserve billing features
+      const cancelledSub = await getActiveSubscription(organizationId, true);
+      if (cancelledSub && cancelledSub.status === "cancelled") {
+        const client = rawDb();
+        // Delete all non-billing entitlements
+        const { data: existing } = await client
+          .from("organization_entitlements")
+          .select("feature_code")
+          .eq("organization_id", organizationId);
+        const existingFeatures = (existing ?? []).map((r: Record<string, unknown>) => r.feature_code as string);
+        for (const code of existingFeatures) {
+          if (!CANCELLED_BILLING_FEATURES.includes(code as never)) {
+            await client.from("organization_entitlements").delete()
+              .eq("organization_id", organizationId)
+              .eq("feature_code", code);
+          }
+        }
+        return { ok: true, subscriptionId: cancelledSub.id };
+      }
       const client = rawDb();
       await client.from("organization_entitlements").delete().eq("organization_id", organizationId);
       return { ok: true, subscriptionId: "none" };
@@ -114,6 +135,11 @@ export async function syncOrganizationUsageLimits(organizationId: string, reason
   try {
     const subscription = await getActiveSubscription(organizationId);
     if (!subscription) {
+      // For cancelled subscriptions, preserve usage limits (they're needed for billing display)
+      const cancelledSub = await getActiveSubscription(organizationId, true);
+      if (cancelledSub && cancelledSub.status === "cancelled") {
+        return { ok: true, subscriptionId: cancelledSub.id };
+      }
       const client = rawDb();
       await client.from("organization_usage_limits").delete().eq("organization_id", organizationId);
       return { ok: true, subscriptionId: "none" };
