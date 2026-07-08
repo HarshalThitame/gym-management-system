@@ -602,6 +602,7 @@ async function processSubscriptionWebhookPayment(
     currency: paymentEntity.currency || "INR",
     provider_order_id: paymentEntity.orderId,
     provider_payment_id: paymentEntity.id,
+    payment_method_id: (existingInvoice.payment_method_id as string | null) ?? null,
     paid_at: now,
   });
 

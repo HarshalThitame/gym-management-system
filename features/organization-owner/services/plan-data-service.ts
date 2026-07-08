@@ -70,14 +70,14 @@ export async function getPlanServerData(organizationId: string): Promise<PlanSer
 
   const { data: pmtMethods } = await supabase
     .from("org_payment_methods")
-    .select("id, payment_method_type, last_four_digits, expiry_month, expiry_year, is_default, card_brand, upi_id")
+    .select("id, payment_type, last_four, expiry_month, expiry_year, is_default, card_network")
     .eq("organization_id", organizationId)
     .order("is_default", { ascending: false })
     .limit(1) as never as {
     data: Array<{
-      id: string; payment_method_type: string; last_four_digits: string | null;
+      id: string; payment_type: string; last_four: string | null;
       expiry_month: number | null; expiry_year: number | null; is_default: boolean;
-      card_brand: string | null; upi_id: string | null;
+      card_network: string | null;
     }> | null;
     error: { message: string } | null;
   };
@@ -86,12 +86,12 @@ export async function getPlanServerData(organizationId: string): Promise<PlanSer
   const paymentMethodData: PaymentMethodData = pmt
     ? {
         id: pmt.id,
-        type: pmt.payment_method_type,
-        last4: pmt.last_four_digits ?? "0000",
+        type: pmt.payment_type,
+        last4: pmt.last_four ?? "0000",
         expiryMonth: pmt.expiry_month ?? 0,
         expiryYear: pmt.expiry_year ?? 0,
         isDefault: pmt.is_default,
-        brand: pmt.card_brand ?? pmt.upi_id ?? pmt.payment_method_type,
+        brand: pmt.card_network ?? pmt.payment_type,
       }
     : null;
 

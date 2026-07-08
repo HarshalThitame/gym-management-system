@@ -100,6 +100,18 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
 
   const { data: orgs } = await db.from("organizations").select("").in("id", orgIds);
   const orgMap = new Map((orgs ?? []).map((o) => [o.id as string, o]));
+  const { data: paymentMethods } = await db
+    .from("org_payment_methods")
+    .select("id, organization_id, is_default, is_active")
+    .in("organization_id", orgIds);
+  const defaultPaymentMethodByOrg = new Map<string, string>();
+  for (const method of paymentMethods ?? []) {
+    if (method.is_active !== true || method.is_default !== true) continue;
+    const organizationId = method.organization_id as string;
+    if (!defaultPaymentMethodByOrg.has(organizationId)) {
+      defaultPaymentMethodByOrg.set(organizationId, method.id as string);
+    }
+  }
 
   const pkgIds = [...new Set(subsDue.map((s) => s.package_id as string))];
   const [packagesResult, pricingResult] = await Promise.all([
@@ -170,11 +182,13 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
       const periodStart = new Date(now);
       const periodEnd = new Date(now);
       periodEnd.setDate(periodEnd.getDate() + daysUntilNextBilling);
+      const defaultPaymentMethodId = defaultPaymentMethodByOrg.get(sub.organization_id as string) ?? null;
 
       const { data: invoice } = await db.from("org_subscription_invoices").select("").insert({
         organization_id: sub.organization_id,
         subscription_id: sub.id,
         package_id: sub.package_id,
+        payment_method_id: defaultPaymentMethodId,
         invoice_number: invoiceNumber,
         status: "issued",
         currency,
@@ -260,6 +274,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
           razorpayOrderId,
           amount: price,
           nextBillingDate: nextBilling.toISOString(),
+          paymentMethodId: defaultPaymentMethodId,
         },
         reason: `Renewal invoice ${invoiceNumber} issued and Razorpay order ${razorpayOrderId} created for ${billingPeriod} billing period`,
       });

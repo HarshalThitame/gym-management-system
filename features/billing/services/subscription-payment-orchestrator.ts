@@ -132,6 +132,15 @@ export async function createSecureSubscriptionCheckoutOrderAction(
     }
     const d = adminDbClient as unknown as CheckoutDb;
 
+    const { data: defaultPaymentMethod } = await d
+      .from("org_payment_methods")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true)
+      .eq("is_default", true)
+      .maybeSingle();
+    const defaultPaymentMethodId = (defaultPaymentMethod as { id?: string } | null)?.id ?? null;
+
     const readDb = supabase as unknown as CheckoutDb;
     const { data: pricingRows } = await readDb
       .from("package_pricing")
@@ -200,7 +209,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     const { data: existingInvs } = await d
       .from("org_subscription_invoices")
-      .select("id, razorpay_order_id, status, total_amount, currency, organization_id, package_id, provider_environment")
+      .select("id, razorpay_order_id, status, total_amount, currency, organization_id, package_id, provider_environment, payment_method_id")
       .eq("idempotency_key", idempotencyKey)
       .eq("provider_environment", providerEnvironment)
       .limit(1);
@@ -212,6 +221,11 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 
     if (existingInv) {
       invoiceId = String(existingInv.id);
+      if (!existingInv.payment_method_id && defaultPaymentMethodId) {
+        await d.from("org_subscription_invoices").update({
+          payment_method_id: defaultPaymentMethodId,
+        }).eq("id", invoiceId);
+      }
       if (typeof existingInv.razorpay_order_id === "string" && existingInv.razorpay_order_id && existingInv.status !== "cancelled") {
         existingOrderId = existingInv.razorpay_order_id;
         const existingAmountPaise = typeof existingInv.total_amount === "number" ? existingInv.total_amount : totalAmountPaise;
@@ -263,6 +277,7 @@ export async function createSecureSubscriptionCheckoutOrderAction(
         billing_cycle: billingCycle,
         provider: "razorpay",
         provider_environment: providerEnvironment,
+        payment_method_id: defaultPaymentMethodId,
         idempotency_key: idempotencyKey,
         package_id: targetPackageId,
         notes: JSON.stringify({ purchase_intent: purchaseIntentType, startMode }),
