@@ -29,7 +29,7 @@ export function UsageDashboardCard() {
   }, [plan?.packageId]);
 
   const limits = [
-    { key: "max_branches", label: "Branches", icon: <Building2 className="size-4" />, current: usage?.branches ?? 0 },
+    { key: "max_branches", label: "Gyms", icon: <Building2 className="size-4" />, current: usage?.branches ?? 0 },
     { key: "max_members", label: "Members", icon: <Users className="size-4" />, current: usage?.members ?? 0 },
     { key: "max_trainers", label: "Trainers", icon: <Dumbbell className="size-4" />, current: usage?.trainers ?? 0 },
     { key: "max_staff", label: "Staff", icon: <UserRound className="size-4" />, current: usage?.staff ?? 0 },

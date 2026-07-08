@@ -461,7 +461,7 @@ function SplitReportsTab({ dashboard }: { dashboard: OrganizationOwnerDashboard 
             <StatCard label="Net Revenue" value={formatCurrency(totalNet)} detail="Total after split adjustments" icon={<TrendingUp className="size-5" />} />
             <StatCard label="Split In" value={formatCurrency(totalSplitIn)} detail="Revenue received from other branches" icon={<ArrowRight className="size-5" />} status="watch" />
             <StatCard label="Split Out" value={formatCurrency(totalSplitOut)} detail="Revenue given to other branches" icon={<ArrowRight className="size-5 rotate-90" />} status="risk" />
-            <StatCard label="Branches" value={formatCompactNumber(report.length)} detail="Active branches with revenue data" icon={<BarChart3 className="size-5" />} />
+            <StatCard label="Gyms" value={formatCompactNumber(report.length)} detail="Active gyms with revenue data" icon={<BarChart3 className="size-5" />} />
           </section>
 
           <Card>

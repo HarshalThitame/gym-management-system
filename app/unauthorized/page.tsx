@@ -4,6 +4,9 @@ import { SignOutButton } from "@/components/pwa/sign-out-button";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { signOutAction } from "@/features/auth/actions/auth-actions";
+import { getOrganizationEntitlements } from "@/features/entitlement";
+import { getAuthContext } from "@/lib/auth/session";
+import { resolveUnauthorizedReason } from "@/lib/auth/unauthorized-state";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata: Metadata = createMetadata({
@@ -20,10 +23,15 @@ type UnauthorizedPageProps = {
 
 export default async function UnauthorizedPage({ searchParams }: UnauthorizedPageProps) {
   const params = await searchParams;
-  const isTenantMismatch = params.reason === "tenant";
-  const isFeatureUnavailable = params.reason === "feature_unavailable";
-  const isSubscriptionSuspended = params.reason === "subscription_suspended";
-  const isSubscriptionCancelled = params.reason === "subscription_cancelled";
+  const authContext = await getAuthContext();
+  const liveSubscriptionStatus = authContext.isAuthenticated && authContext.organizationId
+    ? await resolveLiveSubscriptionStatus(authContext.organizationId)
+    : null;
+  const reason = resolveUnauthorizedReason(params.reason, liveSubscriptionStatus);
+  const isTenantMismatch = reason === "tenant";
+  const isFeatureUnavailable = reason === "feature_unavailable";
+  const isSubscriptionSuspended = reason === "subscription_suspended";
+  const isSubscriptionCancelled = reason === "subscription_cancelled";
   const isBillingAccessWindow = isSubscriptionCancelled || isSubscriptionSuspended;
 
   return (
@@ -70,4 +78,11 @@ export default async function UnauthorizedPage({ searchParams }: UnauthorizedPag
       </Card>
     </main>
   );
+}
+
+async function resolveLiveSubscriptionStatus(organizationId: string) {
+  const snapshot = await getOrganizationEntitlements(organizationId);
+  return snapshot.subscriptionStatus === "cancelled" || snapshot.subscriptionStatus === "suspended"
+    ? snapshot.subscriptionStatus
+    : null;
 }

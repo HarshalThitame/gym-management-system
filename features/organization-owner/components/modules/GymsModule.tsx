@@ -41,7 +41,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const [editingGym, setEditingGym] = useState<GymRow | null>(null);
   const [detailGym, setDetailGym] = useState<GymRow | null>(null);
   const [savingStatus, setSavingStatus] = useState<"idle" | "saving">("idle");
-  const [moduleTab, setModuleTab] = useState<"locations" | "cross-branch">("locations");
+  const [moduleTab, setModuleTab] = useState<"gyms" | "cross-branch">("gyms");
   const [state, formAction] = useActionState(saveGymAction, initialAuthActionState);
   const formRef = useRef<HTMLFormElement>(null);
   const [statPanel, setStatPanel] = useState<StatKey>(null);
@@ -103,7 +103,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
     if (result.status === "success") {
       removeOptimistic(tempId);
       if (isEdit) {
-        setSuccessAction({ action: "updated", title: "Location Updated!", itemName: name });
+        setSuccessAction({ action: "updated", title: "Gym Updated!", itemName: name });
       }
     } else {
       removeOptimistic(tempId);
@@ -122,7 +122,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
     } else {
       if (status === "archived") {
         const name = gyms.find((g) => g.id === gymId)?.name ?? "";
-        setSuccessAction({ action: "deleted", title: "Location Deleted!", itemName: name });
+        setSuccessAction({ action: "deleted", title: "Gym Deleted!", itemName: name });
       } else {
         showToast(`Gym ${status}`, "success");
       }
@@ -186,8 +186,8 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all ${moduleTab === "locations" ? "bg-surface shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-          onClick={() => setModuleTab("locations")}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold transition-all ${moduleTab === "gyms" ? "bg-surface shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setModuleTab("gyms")}
           type="button"
         >
           <Building2 className="size-4" /> Locations
@@ -218,7 +218,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
           whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.98 }}
           type="button" onClick={() => setStatPanel("all")} className="text-left transition-all">
-          <StatCard detail="Total locations across your organization" icon={<Building2 className="size-5" />} label="Total Locations" value={String(gyms.length)} />
+          <StatCard detail="Total gyms across your organization" icon={<Building2 className="size-5" />} label="Total Gyms" value={String(gyms.length)} />
         </motion.button>
         <motion.button
           initial={{ opacity: 0, y: 20 }}
@@ -227,7 +227,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
           whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.98 }}
           type="button" onClick={() => setStatPanel("active")} className="text-left transition-all">
-          <StatCard detail="Active locations" icon={<Building2 className="size-5" />} label="Active" value={String(activeGyms)} />
+          <StatCard detail="Active gyms" icon={<Building2 className="size-5" />} label="Active" value={String(activeGyms)} />
         </motion.button>
         <motion.button
           initial={{ opacity: 0, y: 20 }}
@@ -236,7 +236,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
           whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.98 }}
           type="button" onClick={() => setStatPanel("suspended")} className="text-left transition-all">
-          <StatCard detail="Suspended locations" icon={<Building2 className="size-5" />} label="Suspended" value={String(suspendedGyms)} />
+          <StatCard detail="Suspended gyms" icon={<Building2 className="size-5" />} label="Suspended" value={String(suspendedGyms)} />
         </motion.button>
       </section>
 
@@ -247,7 +247,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
             { value: "active", label: "Active" }, { value: "suspended", label: "Suspended" }, { value: "archived", label: "Archived" }
           ]}
         ]}
-        searchPlaceholder="Search by location name, slug, timezone, or currency..."
+        searchPlaceholder="Search by gym name, slug, timezone, or currency..."
         onApply={handleApplyFilters}
         activeFilters={filters as unknown as Record<string, string>}
       />
@@ -255,13 +255,13 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
       <DataList
         selectable
         bulkActions={[
-          { label: "Export CSV", onClick: (ids) => { const data = gyms.filter((g) => ids.includes(g.id)).map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })); exportToCSV(data, "locations-export"); }, variant: "secondary" as const, icon: <Download className="size-3.5" /> },
-          { label: "Suspend", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "suspended"); showToast(`${ids.length} location(s) suspended`, "success"); }, variant: "destructive" as const, icon: <ShieldAlert className="size-3.5" /> },
-          { label: "Activate", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "active"); showToast(`${ids.length} location(s) activated`, "success"); }, variant: "primary" as const, icon: <ShieldCheck className="size-3.5" /> },
+          { label: "Export CSV", onClick: (ids) => { const data = gyms.filter((g) => ids.includes(g.id)).map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })); exportToCSV(data, "gyms-export"); }, variant: "secondary" as const, icon: <Download className="size-3.5" /> },
+          { label: "Suspend", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "suspended"); showToast(`${ids.length} gym(s) suspended`, "success"); }, variant: "destructive" as const, icon: <ShieldAlert className="size-3.5" /> },
+          { label: "Activate", onClick: async (ids) => { for (const id of ids) await handleSetStatus(id, "active"); showToast(`${ids.length} gym(s) activated`, "success"); }, variant: "primary" as const, icon: <ShieldCheck className="size-3.5" /> },
         ]}
-        onExportCSV={() => exportToCSV(gyms.map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })), "all-locations")}
-        headerAction={<Button onClick={openCreate} size="sm" variant="primary"><Plus className="size-4" /> Create Location</Button>}
-        headerTitle="Locations"
+        onExportCSV={() => exportToCSV(gyms.map((g) => ({ id: g.id, name: g.name, slug: g.slug, status: g.status, timezone: g.timezone, currency: g.currency })), "all-gyms")}
+        headerAction={<Button onClick={openCreate} size="sm" variant="primary"><Plus className="size-4" /> Create Gym</Button>}
+        headerTitle="Gyms"
         items={items}
         totalItems={totalItems}
         totalPages={moduleData?.totalPages ?? Math.ceil(gyms.length / 12)}
@@ -271,12 +271,12 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
       />
 
       {/* ═══ LOCATION DRAWER ═══ */}
-      <OrgOwnerDrawer description={editingGym ? `Editing ${editingGym.name}` : "Create a new location"} onClose={closeDrawer} open={drawerOpen} title={editingGym ? "Edit Location" : "Create Location"} size="lg">
+      <OrgOwnerDrawer description={editingGym ? `Editing ${editingGym.name}` : "Create a new gym"} onClose={closeDrawer} open={drawerOpen} title={editingGym ? "Edit Gym" : "Create Gym"} size="lg">
         <form ref={formRef} onSubmit={handleOptimisticSubmit} className="space-y-5">
           <DrawerFormMessage status={state.status} message={state.message} />
           {editingGym ? <input name="gymId" type="hidden" value={editingGym.id} /> : null}
           <div className="grid gap-5 md:grid-cols-2">
-            <DrawerField label="Location Name" required>
+            <DrawerField label="Gym Name" required>
               <input className={selectClass} defaultValue={editingGym?.name ?? ""} name="name" placeholder="Bandra West Fitness" required type="text" />
             </DrawerField>
             <DrawerField label="Slug">
@@ -296,7 +296,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
           </div>
           <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button className="rounded-md border border-border bg-surface px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={closeDrawer} type="button">Cancel</button>
-            <DrawerSubmitButton loading={savingStatus === "saving"}>{editingGym ? "Update Location" : "Create Location"}</DrawerSubmitButton>
+            <DrawerSubmitButton loading={savingStatus === "saving"}>{editingGym ? "Update Gym" : "Create Gym"}</DrawerSubmitButton>
           </div>
         </form>
       </OrgOwnerDrawer>
@@ -372,9 +372,9 @@ function LocationStatDetailPanel({
   const [search, setSearch] = useState("");
 
   const titleByKey: Record<string, string> = {
-    all: "All Locations",
-    active: "Active Locations",
-    suspended: "Suspended Locations",
+    all: "All Gyms",
+    active: "Active Gyms",
+    suspended: "Suspended Gyms",
   };
 
   const iconByKey: Record<string, ReactNode> = {
@@ -437,7 +437,7 @@ function LocationStatDetailPanel({
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
-              placeholder="Search locations..."
+              placeholder="Search gyms..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -482,7 +482,7 @@ function LocationStatDetailPanel({
             {filtered.length === 0 && (
               <div className="col-span-2 rounded-lg border border-dashed border-border bg-surface-muted p-12 text-center">
                 <Search className="mx-auto size-8 text-muted-foreground" />
-                <p className="mt-2 text-sm text-muted-foreground">No locations match your search.</p>
+                <p className="mt-2 text-sm text-muted-foreground">No gyms match your search.</p>
               </div>
             )}
           </div>

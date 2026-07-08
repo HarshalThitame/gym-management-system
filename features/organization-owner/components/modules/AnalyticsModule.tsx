@@ -146,7 +146,7 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
     <div className="space-y-6">
       {/* ═══ KPI GRID ═══ */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="Branch metric snapshots collected" icon={<BarChart3 className="size-5" />} label="Snapshots" value={formatCompactNumber(branchMetrics.length)} />
+        <StatCard detail="Gym metric snapshots collected" icon={<BarChart3 className="size-5" />} label="Snapshots" value={formatCompactNumber(branchMetrics.length)} />
         <StatCard detail="Month-over-month revenue change" icon={revMom >= 0 ? <TrendingUp className="size-5" /> : <ArrowDown className="size-5" />} label="Revenue MoM" status={revMom >= 0 ? "good" : "risk"} value={`${revMom >= 0 ? "+" : ""}${revMom}%`} />
         <StatCard detail="Month-over-month member change" icon={memMom >= 0 ? <TrendingUp className="size-5" /> : <ArrowDown className="size-5" />} label="Member MoM" status={memMom >= 0 ? "good" : "risk"} value={`${memMom >= 0 ? "+" : ""}${memMom}%`} />
         <StatCard detail="Avg trainer utilization" icon={<Dumbbell className="size-5" />} label="Trainer Util" value={`${dashboard.metrics.avgTrainerUtilization}%`} />
@@ -164,7 +164,7 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
           hasTrainerPerf ? { key: "trainer_perf", label: "Trainer Performance" } : null,
           hasClassOcc ? { key: "class_occ", label: "Class Occupancy" } : null,
           hasLeadConv ? { key: "lead_conv", label: "Lead Conversion" } : null,
-          hasBranchRev ? { key: "branch_rev", label: "Branch Revenue" } : null,
+          hasBranchRev ? { key: "branch_rev", label: "Gym Revenue" } : null,
           hasScheduledReports ? { key: "scheduled", label: "Scheduled Reports" } : null,
         ] as { key: AnalyticsTab; label: string }[])
           .filter((t): t is { key: AnalyticsTab; label: string } => t !== null)
@@ -399,7 +399,7 @@ export function AnalyticsEnterpriseModule({ dashboard, moduleData }: AnalyticsEn
           attendance: m.attendance_count, members: m.active_members,
           trainerUtil: m.trainer_utilization, classUtil: m.class_utilization
         })), "all-metrics")}
-        headerTitle="Branch Metrics"
+        headerTitle="Gym Metrics"
         items={items}
         totalItems={totalItems}
         totalPages={Math.ceil(totalItems / (filters.pageSize ?? 12))}

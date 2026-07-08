@@ -105,9 +105,9 @@ export function BranchRevenueReport({ organizationId: _organizationId, hasFeatur
   const handleExportCSV = useCallback(() => {
     if (!data) return;
     downloadCSV(
-      ["Branch", "Total Revenue", "Avg Members", "Attendance", "Revenue/Member"],
+      ["Gym", "Total Revenue", "Avg Members", "Attendance", "Revenue/Member"],
       data.branches.map((b) => [b.branchName, String(b.totalRevenue), String(b.memberCount), String(b.attendanceCount), String(b.revenuePerMember)]),
-      "branch-revenue-report"
+      "gym-revenue-report"
     );
   }, [data]);
 

@@ -437,7 +437,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
     ) as "info" | "warning" | "error" | "neutral",
     sections: [
       { label: "Type", value: formatEnterpriseLabel(eq.equipment_type) },
-      { label: "Branch", value: dashboard.branches.find((b) => b.id === eq.branch_id)?.name ?? "N/A" },
+      { label: "Gym", value: dashboard.branches.find((b) => b.id === eq.branch_id)?.name ?? "N/A" },
       { label: "Status", value: formatEnterpriseLabel(eq.status) },
       { label: "Last Service", value: eq.last_service_date ?? "N/A" },
       { label: "Next Service", value: eq.next_service_date ?? "N/A" },
@@ -856,7 +856,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
                 {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{formatEnterpriseLabel(t)}</option>)}
               </select>
             </DrawerField>
-            <DrawerField label="Branch">
+            <DrawerField label="Gym">
               <select className={selectClass} value={formBranchId} onChange={(e) => setFormBranchId(e.target.value)}>
                 <option value="">None</option>
                 {dashboard.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -894,7 +894,7 @@ export function EquipmentModule({ dashboard, moduleData }: EquipmentModuleProps)
                 {EQUIPMENT_STATUSES.map((s) => <option key={s} value={s}>{formatEnterpriseLabel(s)}</option>)}
               </select>
             </DrawerField>
-            <DrawerField label="Location">
+            <DrawerField label="Gym">
               <input className={selectClass} value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="e.g. Floor 1, Zone A" />
             </DrawerField>
           </div>

@@ -41,9 +41,13 @@ class PayuProvider implements IPaymentProvider {
       const txnid = input.receipt || `TXN_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
       const amount = input.amountInRupees.toFixed(2);
       const productinfo = input.notes?.description || "Membership payment";
-      const firstname = input.notes?.customer_name || "Customer";
-      const email = input.notes?.customer_email || "customer@example.com";
-      const phone = input.notes?.customer_phone || "9999999999";
+      const firstname = input.notes?.customer_name || "Member";
+      const email = input.notes?.customer_email;
+      const phone = input.notes?.customer_phone;
+
+      if (!email || !phone) {
+        return { ok: false, message: "Customer email and phone are required for PayU payment" };
+      }
 
       const hashString = `${config.merchantKey}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${config.merchantSalt}`;
       const hash = crypto.createHash("sha512").update(hashString).digest("hex");

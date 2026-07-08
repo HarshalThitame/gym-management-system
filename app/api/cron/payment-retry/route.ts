@@ -83,8 +83,15 @@ export async function GET(request: Request) {
   const { data: orgsResult } = await db.from("organizations").select("").in("id", orgIds);
   const orgMap = new Map((orgsResult ?? []).map((o) => [o.id, o]));
 
-  const { data: pkgsResult } = await db.from("packages").select("").in("id", pkgIds);
-  const pkgMap = new Map((pkgsResult ?? []).map((p) => [p.id, p]));
+  const [pkgsResult, pricingResult] = await Promise.all([
+    db.from("packages").select("").in("id", pkgIds),
+    db.from("package_pricing").select("").in("package_id", pkgIds),
+  ]);
+  const pkgMap = new Map((pkgsResult.data ?? []).map((p) => [p.id, p]));
+  const pricingByKey = new Map<string, Record<string, unknown>>();
+  for (const pr of pricingResult.data ?? []) {
+    pricingByKey.set(`${pr.package_id}:${pr.billing_period}`, pr);
+  }
 
   let retried = 0;
   let suspended = 0;
@@ -96,9 +103,23 @@ export async function GET(request: Request) {
 
     const nextAttempt = sub.dunning_attempts + 1;
     const pkg = pkgMap.get(sub.package_id) as { name: string; price: number; currency: string } | undefined;
+    const billingPeriod = (sub as Record<string, unknown>).billing_period as string | undefined || "monthly";
     const priceOverride = (sub as Record<string, unknown>).price_override as number | null | undefined;
-    const price = priceOverride ?? (pkg?.price ?? 99900);
-    const currency = pkg?.currency ?? "INR";
+
+    let price: number;
+    let currency: string;
+    if (priceOverride !== null && priceOverride !== undefined) {
+      price = priceOverride;
+      currency = (pkg?.currency as string) ?? "INR";
+    } else {
+      const pricingRow = pricingByKey.get(`${sub.package_id}:${billingPeriod}`);
+      if (!pricingRow || typeof pricingRow.price !== "number") {
+        console.error(`[payment-retry] Missing package_pricing for package ${sub.package_id}, billing_period ${billingPeriod}. Using price_override or skipping.`);
+        continue;
+      }
+      price = pricingRow.price as number;
+      currency = (pricingRow.currency as string) ?? "INR";
+    }
 
     const paymentResult = await processPaymentRetry(sub.organization_id, sub.id, price, currency);
 
@@ -225,9 +246,10 @@ async function processPaymentRetry(
   const supabase = getSupabaseAdminClient();
   if (!supabase) return { success: false };
 
+  const amountInRupees = price / 100;
   try {
     const orderResult = await createRazorpayOrder({
-      amountInRupees: price,
+      amountInRupees,
       currency: currency || "INR",
       receipt: `DUN-${organizationId.slice(0, 8)}-${Date.now()}`,
       notes: {

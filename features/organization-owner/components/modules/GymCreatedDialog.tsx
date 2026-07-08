@@ -27,7 +27,7 @@ export function GymCreatedDialog({ open, data, onClose }: GymCreatedDialogProps)
     "bg-slate-100 text-slate-600";
 
   const details = [
-    { icon: Building2, label: "Location Name", value: data.name },
+    { icon: Building2, label: "Gym Name", value: data.name },
     { icon: MapPin, label: "Slug", value: data.slug },
     { icon: Clock, label: "Timezone", value: data.timezone },
     { icon: ShieldCheck, label: "Status", value: data.status.charAt(0).toUpperCase() + data.status.slice(1) },
@@ -38,14 +38,14 @@ export function GymCreatedDialog({ open, data, onClose }: GymCreatedDialogProps)
       <div
         className="relative mx-auto w-full max-w-md animate-[reveal-up_0.5s_cubic-bezier(0.2,0,0,1)_both] rounded-2xl border border-border bg-gradient-to-b from-background to-accent/5 p-0 shadow-2xl"
         role="dialog"
-        aria-label="Location created successfully"
+        aria-label="Gym created successfully"
       >
         <div className="relative overflow-hidden rounded-t-2xl bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-10 text-center text-white">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.15),transparent_60%)]" />
           <div className="relative mx-auto flex size-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
             <Check className="size-8" />
           </div>
-          <h2 className="relative mt-4 text-2xl font-black tracking-tight">Location Created!</h2>
+          <h2 className="relative mt-4 text-2xl font-black tracking-tight">Gym Created!</h2>
           <p className="relative mt-1 text-sm text-white/80">{data.name}</p>
         </div>
 

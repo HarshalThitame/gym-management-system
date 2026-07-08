@@ -1,12 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { sanitizeRedirectPath } from "@/lib/auth/redirects";
+import { isSubscriptionManagementPath, isTenantPortalPath } from "@/lib/auth/post-login-routing";
 import { clearTenantHeaders, writeTenantHeaders } from "@/lib/tenant/header-protocol";
 import type { Database } from "@/types/database";
 import { getRequiredSupabasePublicConfig, hasSupabasePublicEnv } from "./env";
 
 const protectedPrefixes = ["/member", "/trainer", "/reception", "/admin", "/organization", "/super-admin"];
-const tenantPortalPrefixes = ["/member", "/trainer", "/reception", "/admin", "/organization"];
 const authPrefixes = ["/login", "/register", "/forgot-password"];
 
 type SubscriptionGateStatus = "suspended" | "cancelled";
@@ -89,22 +89,27 @@ export async function updateSession(request: NextRequest) {
   // org from the authenticated user's profile.
   if (isAuthenticated && shouldApplySubscriptionStatusGate(pathname)) {
     let orgId = resolvedOrganizationId;
+    const userId = data?.claims?.sub ?? null;
 
     // If tenant didn't resolve (direct SaaS login), try to get org from auth user profile claims
     if (!orgId) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("organization_id")
-        .eq("id", data?.claims?.sub ?? "")
+        .eq("id", userId ?? "")
         .maybeSingle();
       orgId = ((profile as { organization_id: string } | null)?.organization_id as string | null) ?? null;
     }
 
     if (orgId) {
-      const isBlocked = await hasHardBlockedSubscription(supabase as unknown as SubscriptionGateClient, orgId);
-      if (isBlocked) {
-        console.warn(`[subscription-gate] Blocked access for org ${orgId} on path ${pathname}`);
-        return createSameOriginRedirect(request, "/unauthorized?reason=subscription_suspended", contentSecurityPolicy);
+      const blockedStatus = await getHardBlockedSubscriptionStatus(supabase as unknown as SubscriptionGateClient, orgId);
+      if (blockedStatus) {
+        const isOwner = await isOrganizationOwnerForOrganization(supabase, orgId, userId);
+        console.warn(`[subscription-gate] Blocked access for org ${orgId} on path ${pathname} (${blockedStatus})`);
+        if (isOwner && blockedStatus === "cancelled") {
+          return createSameOriginRedirect(request, "/organization/plan", contentSecurityPolicy);
+        }
+        return createSameOriginRedirect(request, `/unauthorized?reason=subscription_${blockedStatus}`, contentSecurityPolicy);
       }
     }
   }
@@ -171,10 +176,6 @@ function isAuthPath(pathname: string) {
   return authPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function isTenantPortalPath(pathname: string) {
-  return tenantPortalPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-}
-
 function shouldApplySubscriptionStatusGate(pathname: string) {
   if (!isTenantPortalPath(pathname)) {
     return false;
@@ -183,16 +184,7 @@ function shouldApplySubscriptionStatusGate(pathname: string) {
   return !isSubscriptionManagementPath(pathname);
 }
 
-function isSubscriptionManagementPath(pathname: string) {
-  return (
-    pathname === "/member/plan" ||
-    pathname.startsWith("/member/plan/") ||
-    pathname === "/organization/plan" ||
-    pathname.startsWith("/organization/plan/")
-  );
-}
-
-async function hasHardBlockedSubscription(supabase: SubscriptionGateClient, organizationId: string) {
+async function getHardBlockedSubscriptionStatus(supabase: SubscriptionGateClient, organizationId: string): Promise<SubscriptionGateStatus | null> {
   try {
     const { data, error } = await supabase
       .from("organization_subscriptions")
@@ -204,14 +196,43 @@ async function hasHardBlockedSubscription(supabase: SubscriptionGateClient, orga
 
     if (error) {
       console.error("Subscription status gate failed.", error);
-      return false;
+      return null;
     }
 
-    return data?.status === "suspended" || data?.status === "cancelled";
+    return data?.status === "suspended" || data?.status === "cancelled" ? data.status : null;
   } catch (error) {
     console.error("Subscription status gate failed.", error);
-    return false;
+    return null;
   }
+}
+
+async function isOrganizationOwnerForOrganization(
+  supabase: any,
+  organizationId: string,
+  userId: string | null,
+) {
+  if (!userId) return false;
+
+  const [{ data: organization }, { data: branchUser }] = await Promise.all([
+    supabase
+      .from("organizations")
+      .select("owner_user_id")
+      .eq("id", organizationId)
+      .maybeSingle(),
+    supabase
+      .from("branch_users")
+      .select("organization_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .eq("role_name", "organization_owner")
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const ownerUserId = (organization as { owner_user_id?: string | null } | null)?.owner_user_id ?? null;
+  const branchOwnerOrganizationId = (branchUser as { organization_id?: string | null } | null)?.organization_id ?? null;
+  return ownerUserId === userId || branchOwnerOrganizationId === organizationId;
 }
 
 function redirectToLogin(request: NextRequest, contentSecurityPolicy: string) {

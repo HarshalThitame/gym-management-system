@@ -330,7 +330,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
                   </select>
                 </DrawerField>
                 <DrawerField label="Location">
-                  <input className={selectClass} defaultValue={editingClass?.location ?? ""} name="location" type="text" placeholder="Studio A" />
+                  <input className={selectClass} defaultValue={editingClass?.location ?? ""} name="location" type="text" placeholder="Gym Studio A" />
                 </DrawerField>
                 <DrawerField label="Membership Access">
                   <select className={selectClass} defaultValue={editingClass?.membership_access ?? "active_members"} name="membershipAccess">
@@ -454,7 +454,7 @@ export function ClassesEnterpriseModule({ dashboard, moduleData }: ClassesEnterp
               </select>
             </DrawerField>
             <DrawerField label="Location">
-              <input className={selectClass} defaultValue={editingSession?.location ?? ""} name="location" type="text" placeholder="Studio A, Floor 2" />
+              <input className={selectClass} defaultValue={editingSession?.location ?? ""} name="location" type="text" placeholder="Gym Studio A, Floor 2" />
             </DrawerField>
           </div>
           <div className="flex justify-end gap-3 border-t border-border pt-6">

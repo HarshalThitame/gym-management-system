@@ -215,7 +215,7 @@ export async function resolveModuleData(
     }
 
     case "billing": {
-      const q = supabase.from("platform_subscriptions").select("*", { count: "exact" }).eq("organization_id", orgId);
+      const q = supabase.from("organization_subscriptions").select("*", { count: "exact" }).eq("organization_id", orgId);
       const { data, count } = await q.order("updated_at", { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
       return { moduleData: { items: data ?? [] }, total: count ?? 0, page, pageSize, totalPages: Math.ceil((count ?? 0) / pageSize) } as never;
     }

@@ -61,18 +61,24 @@ export function SubscriptionsClient({ data }: { data: Data }) {
   const trialSubs = data.subscriptions.filter((s: any) => s.status === "trial").length;
   const unassigned = data.organizations.length - data.subscriptions.length;
 
-  // Normalize MRR by billing period
+  // Normalize MRR by billing period — resolves the live price from _pricing
   const computeMrr = (price: number, period: string) => {
     if (!price) return 0;
     const divisors: Record<string, number> = { monthly: 1, annual: 12, yearly: 12 };
     return Math.round(price / (divisors[period] || 1));
   };
 
+  const formatMonthlyPackagePrice = (pkg: any) => {
+    const monthlyPrice = pkg?._pricing?.find((pr: any) => pr.billing_period === "monthly")?.price;
+    return typeof monthlyPrice === "number" && monthlyPrice > 0 ? `${formatCurrency(monthlyPrice)}/mo` : "Pricing unavailable";
+  };
+
   const totalMonthlyRevenue = data.subscriptions.reduce((sum: number, s: any) => {
     if (s.status !== "active") return sum;
     const pkg = data.packages.find((p: any) => p.id === s.package_id);
-    const price = s.price_override ?? pkg?.price ?? 0;
     const period = s.billing_period || pkg?.billing_period || "monthly";
+    const pricingRow = (pkg?._pricing ?? []).find((pr: any) => pr.billing_period === period);
+    const price = s.price_override ?? pricingRow?.price ?? 0;
     return sum + computeMrr(price, period);
   }, 0);
 
@@ -405,7 +411,7 @@ function SubscriptionDrawer({ data, drawerOrg, onClose, execAction, triggeredSyn
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <Detail label="Plan" value={pkg?.name ?? "—"} /><Detail label="Status" value={sub?.status ?? "—"} />
                 <Detail label="Billing Cycle" value={sub?.billing_period ? sub.billing_period.charAt(0).toUpperCase() + sub.billing_period.slice(1) : "—"} />
-                <Detail label="Price" value={sub ? `${formatCurrency(sub.price_override ?? pkg?.price ?? 0)}/mo` : "—"} />
+                <Detail label="Price" value={sub ? (sub.price_override ? `${formatCurrency(sub.price_override)}/mo` : formatMonthlyPackagePrice(pkg)) : "—"} />
                 <Detail label="Started" value={sub?.started_at ? new Date(sub.started_at).toLocaleDateString("en-IN") : "—"} />
                 <Detail label="Next Billing" value={sub?.next_billing_date ? new Date(sub.next_billing_date).toLocaleDateString("en-IN") : sub?.expires_at ? new Date(sub.expires_at).toLocaleDateString("en-IN") : "—"} />
                 {sub?.trial_ends_at && <Detail label="Trial Ends" value={`${new Date(sub.trial_ends_at).toLocaleDateString("en-IN")}${new Date(sub.trial_ends_at) > new Date() ? ` (${Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / 86400000)}d left)` : " (expired)"}`} />}
@@ -599,12 +605,12 @@ function ChangePlanModal({ sub, pkg, packages, onClose, execAction, actionLoadin
         <div className="space-y-3">
           <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm">
             <option value="">Select target...</option>
-            {higherPlans.map((p: any) => <option key={p.id} value={p.id}>↑ {p.name} — {formatCurrency(p.price ?? 0)}/mo</option>)}
+            {higherPlans.map((p: any) => <option key={p.id} value={p.id}>↑ {p.name} — {formatMonthlyPackagePrice(p)}</option>)}
             {lowerPlans.length > 0 && <option disabled>───</option>}
-            {lowerPlans.map((p: any) => <option key={p.id} value={p.id}>↓ {p.name} — {formatCurrency(p.price ?? 0)}/mo</option>)}
+            {lowerPlans.map((p: any) => <option key={p.id} value={p.id}>↓ {p.name} — {formatMonthlyPackagePrice(p)}</option>)}
           </select>
           {isDowngrade && <div className="rounded-md bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800 flex items-start gap-2"><AlertTriangle className="size-3.5 shrink-0 mt-0.5" />Downgrade may remove access to features in the current plan.</div>}
-          {targetPkg && <div className="rounded-md bg-accent/5 p-2 text-xs space-y-1"><p><span className="font-semibold">New:</span> {targetPkg.name} — {formatCurrency(targetPkg.price ?? 0)}/mo</p>{targetPkg._limits?.max_members > 0 && <p><span className="font-semibold">Members:</span> {targetPkg._limits?.max_members === -1 ? "Unlimited" : targetPkg._limits?.max_members}</p>}</div>}
+          {targetPkg && <div className="rounded-md bg-accent/5 p-2 text-xs space-y-1"><p><span className="font-semibold">New:</span> {targetPkg.name} — {formatMonthlyPackagePrice(targetPkg)}</p>{targetPkg._limits?.max_members > 0 && <p><span className="font-semibold">Members:</span> {targetPkg._limits?.max_members === -1 ? "Unlimited" : targetPkg._limits?.max_members}</p>}</div>}
           <div><label className="text-xs font-black uppercase text-muted-foreground">Reason</label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} className="mt-1" placeholder="Optional reason..." /></div>
           <InlineMfaStepUp compact />
           <div className="flex justify-end gap-3 pt-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!targetId || !!actionLoading} className="gap-2">{actionLoading === "change_plan" ? <Loader2 className="size-4 animate-spin" /> : null}{isDowngrade ? "Downgrade" : "Upgrade"}</Button></div>
@@ -683,7 +689,7 @@ function ConvertTrialModal({ sub, packages, onClose, execAction, actionLoading }
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-black mb-4">Convert to Paid</h3>
         <select value={pkgId} onChange={(e) => setPkgId(e.target.value)} className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm">
-          <option value="">Select package...</option>{packages.filter((p: any) => p.is_active).map((p: any) => <option key={p.id} value={p.id}>{p.name} — {formatCurrency(p.price ?? 0)}/mo</option>)}
+          <option value="">Select package...</option>{packages.filter((p: any) => p.is_active).map((p: any) => <option key={p.id} value={p.id}>{p.name} — {formatMonthlyPackagePrice(p)}</option>)}
         </select>
         <div className="flex justify-end gap-3 pt-4"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="button" variant="primary" onClick={handleSubmit} disabled={!pkgId || !!actionLoading} className="gap-2">{actionLoading === "convert_trial" ? <Loader2 className="size-4 animate-spin" /> : null}Convert</Button></div>
       </div>
@@ -825,7 +831,7 @@ function UsageLimitsView({ orgId }: { orgId: string }) {
 
   const limits = [
     { name: "Members", current: usage.memberCount, limit: usage.memberLimit, percent: usage.memberPercent, isOver: usage.isOverMemberLimit, key: "members" },
-    { name: "Branches", current: usage.branchCount, limit: usage.branchLimit, percent: usage.branchPercent, isOver: usage.isOverBranchLimit, key: "branches" },
+    { name: "Gyms", current: usage.branchCount, limit: usage.branchLimit, percent: usage.branchPercent, isOver: usage.isOverBranchLimit, key: "branches" },
     { name: "Trainers", current: 0, limit: usage.trainerLimit ?? -1, percent: 0, isOver: false, key: "trainers" },
     { name: "Storage (GB)", current: 0, limit: usage.storageLimit ?? -1, percent: 0, isOver: false, key: "storage" },
     { name: "API Calls", current: 0, limit: usage.apiCallLimit ?? -1, percent: 0, isOver: false, key: "api_calls" },

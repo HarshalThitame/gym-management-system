@@ -24,22 +24,35 @@ export type SubscriptionAnalytics = {
 
 export async function getSubscriptionAnalytics(): Promise<SubscriptionAnalytics> {
   const supabase = await createSupabaseServerClient();
-  const sbRaw = supabase as never as { from(t: string): { select(c: string): unknown } };
+  const sbRaw = supabase as never as {
+    from(t: string): {
+      select(c: string): {
+        eq(k: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+      };
+    };
+  };
 
-  const [orgsResult, subsResult, packagesResult, eventsResult] = await Promise.all([
+  const [orgsResult, subsResult, packagesResult, pricingResult, eventsResult] = await Promise.all([
     supabase.from("organizations").select("id", { count: "exact", head: true }),
-    supabase.from("organization_subscriptions").select("id, status, package_id, dunning_attempts, organization_id"),
-    supabase.from("packages").select("id, name, price, billing_period"),
+    supabase.from("organization_subscriptions").select("id, status, package_id, dunning_attempts, organization_id, billing_period, price_override"),
+    supabase.from("packages").select("id, name"),
+    (sbRaw.from("package_pricing").select("package_id, billing_period, price") as Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>),
     (sbRaw.from("subscription_events").select("event_type, created_at") as Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>),
   ]);
 
   const totalOrgs = orgsResult.count ?? 0;
   const subs = (subsResult.data ?? []) as unknown as Array<{
-    id: string; status: string; package_id: string; dunning_attempts: number; organization_id: string;
+    id: string; status: string; package_id: string; dunning_attempts: number; organization_id: string; billing_period: string | null; price_override: number | null;
   }>;
   const packages = (packagesResult.data ?? []) as unknown as Array<{
-    id: string; name: string; price: number | null; billing_period: string | null;
+    id: string; name: string;
   }>;
+
+  // Build pricing map from package_pricing (canonical source) keyed by package_id:billing_period
+  const pricingByKey = new Map<string, number>();
+  for (const pr of (pricingResult.data ?? []) as Array<Record<string, unknown>>) {
+    pricingByKey.set(`${pr.package_id}:${pr.billing_period}`, pr.price as number);
+  }
 
   const active = subs.filter((s) => s.status === "active");
   const trialing = subs.filter((s) => s.status === "trial");
@@ -53,12 +66,12 @@ export async function getSubscriptionAnalytics(): Promise<SubscriptionAnalytics>
   const convertedTrials = historyConversions(eventsResult);
   const trialConversionRate = totalTrials > 0 ? Math.round((convertedTrials / totalTrials) * 100) : 0;
 
-  const mrr = calculateMrr(active, trialing, packageMap);
+  const mrr = calculateMrr(active, trialing, packageMap, pricingByKey);
 
   const revenueByPlanMap = new Map<string, { count: number; mrr: number }>();
   for (const p of packages) {
     const planSubs = active.filter((s) => s.package_id === p.id);
-    const planMrr = calculateMrrForPlan(planSubs, p);
+    const planMrr = calculateMrrForPlan(planSubs, p, pricingByKey);
     revenueByPlanMap.set(p.name, { count: planSubs.length, mrr: planMrr });
   }
 
@@ -100,16 +113,18 @@ export async function getSubscriptionAnalytics(): Promise<SubscriptionAnalytics>
 function calculateMrr(
   active: Array<Record<string, unknown>>,
   trialing: Array<Record<string, unknown>>,
-  packageMap: Map<string, { id: string; name: string; price: number | null; billing_period: string | null }>
+  packageMap: Map<string, { id: string; name: string }>,
+  pricingByKey: Map<string, number>,
 ): number {
   let total = 0;
   for (const sub of [...active, ...trialing]) {
     const pkg = packageMap.get(sub.package_id as string);
     if (!pkg) continue;
-    // Use price_override if set, otherwise fall back to package price
-    const effectivePrice = (sub.price_override as number | null) ?? pkg.price;
+    const billingPeriod = (sub.billing_period as string | null) ?? "monthly";
+    const priceOverride = sub.price_override as number | null;
+    const effectivePrice = priceOverride ?? pricingByKey.get(`${sub.package_id}:${billingPeriod}`) ?? 0;
     if (effectivePrice) {
-      total += normalizeToMonthly(effectivePrice, pkg.billing_period);
+      total += normalizeToMonthly(effectivePrice, billingPeriod);
     }
   }
   return total;
@@ -117,13 +132,20 @@ function calculateMrr(
 
 function calculateMrrForPlan(
   subs: Array<Record<string, unknown>>,
-  pkg: { id: string; name: string; price: number | null; billing_period: string | null }
+  pkg: { id: string; name: string },
+  pricingByKey: Map<string, number>,
 ): number {
-  let total = 0;
-  if (pkg.price) {
-    total += normalizeToMonthly(pkg.price, pkg.billing_period) * subs.length;
+  if (subs.length === 0) return 0;
+  // Use the most common billing period among the plan's subscriptions
+  const periodCounts = new Map<string, number>();
+  for (const sub of subs) {
+    const period = (sub.billing_period as string | null) ?? "monthly";
+    periodCounts.set(period, (periodCounts.get(period) ?? 0) + 1);
   }
-  return total;
+  const dominantPeriod = [...periodCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "monthly";
+  const price = pricingByKey.get(`${pkg.id}:${dominantPeriod}`) ?? 0;
+  if (!price) return 0;
+  return normalizeToMonthly(price, dominantPeriod) * subs.length;
 }
 
 function normalizeToMonthly(price: number, period: string | null): number {

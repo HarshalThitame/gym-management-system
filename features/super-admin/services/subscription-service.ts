@@ -1,6 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { SUBSCRIPTION_STATUSES, type SubscriptionStatus as CanonicalSubscriptionStatus } from "@/features/entitlement";
-import { normalizePackageTierOrFallback } from "@/features/entitlement/package-tier";
 import { syncSubscriptionArtifactsForOrganization } from "./subscription-entitlement-sync";
 
 export const subscriptionStatuses = SUBSCRIPTION_STATUSES;
@@ -91,16 +90,6 @@ type PackageSummaryRow = {
   slug?: string;
 };
 
-type PlatformSubscriptionFallbackRow = {
-  id: string;
-  organization_id: string;
-  plan_tier: "starter" | "growth" | "professional" | "enterprise";
-  status: "trial" | "active" | "past_due" | "cancelled" | "suspended";
-  starts_on: string;
-  renews_on: string | null;
-  trial_ends_on: string | null;
-};
-
 type OrganizationSubscriptionRow = {
   id: string;
   organization_id: string;
@@ -149,10 +138,6 @@ type OrganizationSubscriptionMutation = {
   update(payload: Pick<OrganizationSubscriptionRow, "status">): OrganizationSubscriptionFilterQuery;
 };
 
-type PlatformSubscriptionQuery = {
-  select(columns: string): QueryResult<PlatformSubscriptionFallbackRow>;
-};
-
 type OrganizationSubscriptionFilterQuery = {
   eq(column: "id", value: string): OrganizationSubscriptionReturningQuery;
 };
@@ -169,7 +154,6 @@ type SubscriptionServiceSupabaseClient = {
   from(table: "organizations"): OrganizationQuery;
   from(table: "packages"): PackageQuery;
   from(table: "organization_subscriptions"): OrganizationSubscriptionMutation;
-  from(table: "platform_subscriptions"): PlatformSubscriptionQuery;
 };
 
 const ORGANIZATION_SUBSCRIPTION_SELECT = `
@@ -206,15 +190,11 @@ export async function getAllOrgsWithSubscriptions(): Promise<OrgSubscriptionSumm
     return [];
   }
 
-  if (isSchemaCacheMissing(subscriptionsResult.error) || isSchemaCacheMissing(packagesResult.error)) {
-    return getAllOrgsWithLegacySubscriptions(supabase, organizationsResult.data ?? []);
-  }
-
   const firstError = [subscriptionsResult, packagesResult].find((result) => result.error)?.error;
 
   if (firstError) {
     console.error("[subscription-service] Subscription or packages query failed.", firstError.message);
-    return getAllOrgsWithLegacySubscriptions(supabase, organizationsResult.data ?? []);
+    return [];
   }
 
   const subscriptionsByOrganization = new Map((subscriptionsResult.data ?? []).map((subscription) => [subscription.organization_id, subscription]));
@@ -238,12 +218,8 @@ export async function getAllPackages(): Promise<PackageRow[]> {
     .order("sort_order", { ascending: true });
 
   if (error) {
-    if (isSchemaCacheMissing(error)) {
-      console.error("[subscription-service] Packages table is not available. Apply the packages migration before assigning plans.");
-      return [];
-    }
-
-    throw new Error(error.message);
+    console.error("[subscription-service] Packages query failed.", error.message);
+    return [];
   }
 
   return (data ?? []).map((pkg) => {
@@ -350,60 +326,5 @@ function mapOrganizationSubscription(row: OrganizationBaseRow, subscription: Org
   };
 }
 
-async function getAllOrgsWithLegacySubscriptions(supabase: SubscriptionServiceSupabaseClient, organizations: OrganizationBaseRow[]): Promise<OrgSubscriptionSummary[]> {
-  console.error("[subscription-service] Package subscription tables are not available. Falling back to platform_subscriptions for read-only summaries.");
-
-  const { data, error } = await supabase
-    .from("platform_subscriptions")
-    .select("id, organization_id, plan_tier, status, starts_on, renews_on, trial_ends_on");
-
-  if (error) {
-    console.error("[subscription-service] Legacy subscription fallback failed.", error.message);
-    return organizations.map((organization) => mapLegacyOrganizationSubscription(organization, null));
-  }
-
-  const subscriptionsByOrganization = new Map((data ?? []).map((subscription) => [subscription.organization_id, subscription]));
-
-  return organizations.map((organization) => mapLegacyOrganizationSubscription(organization, subscriptionsByOrganization.get(organization.id) ?? null));
-}
-
-function mapLegacyOrganizationSubscription(row: OrganizationBaseRow, subscription: PlatformSubscriptionFallbackRow | null): OrgSubscriptionSummary {
-  return {
-    organizationId: row.id,
-    organizationName: row.name,
-    organizationContact: row.billing_email ?? row.primary_domain,
-    packageId: null,
-    packageName: subscription ? legacyPackageName(subscription.plan_tier) : null,
-    status: subscription ? legacySubscriptionStatus(subscription.status) : null,
-    startedAt: subscription?.starts_on ?? null,
-    expiresAt: subscription?.renews_on ?? null,
-    trialEndsAt: subscription?.trial_ends_on ?? null,
-    subscriptionId: subscription?.id ?? null
-  };
-}
-
-function legacySubscriptionStatus(status: PlatformSubscriptionFallbackRow["status"]): SubscriptionStatus {
-  if (status === "past_due") {
-    return "expired";
-  }
-
-  return status;
-}
-
-function legacyPackageName(planTier: PlatformSubscriptionFallbackRow["plan_tier"]) {
-  const normalizedTier = normalizePackageTierOrFallback(planTier);
-  if (normalizedTier === "starter") return "Starter";
-  if (normalizedTier === "growth") return "Growth";
-  return "Enterprise";
-}
-
-function isSchemaCacheMissing(error: SupabaseQueryError | null | undefined) {
-  if (!error) {
-    return false;
-  }
-
-  return error.code === "PGRST205"
-    || error.message.includes("schema cache")
-    || error.message.includes("Could not find the table")
-    || error.message.includes("Could not find a relationship");
-}
+// Legacy platform_subscriptions fallback removed.
+// All subscription data now uses organization_subscriptions and packages tables.

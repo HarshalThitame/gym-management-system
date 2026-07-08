@@ -8,7 +8,7 @@ import type { GymBranchManagementData } from "@/features/super-admin/services/gy
 import { GymBranchManagementWorkspace } from "@/features/super-admin/components/gyms/GymBranchManagementWorkspace";
 
 export const metadata: Metadata = createMetadata({
-  title: "Branch & Location Management",
+  title: "Gym Management",
   description: "Manage branches, locations, status, assignments, capacity, and operational visibility across all organizations.",
   path: "/super-admin/branches",
 });

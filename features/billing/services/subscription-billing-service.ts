@@ -23,9 +23,14 @@ type DBSelect = {
 type DBSelectChain = {
   eq(c: string, v: unknown): DBSelectEq;
   in(c: string, v: string[]): DBSelectIn;
+  not(c: string, op: string, v: unknown): DBSelectNotIn;
   order(c: string, o: { ascending: boolean }): QueryResLimit;
   update(r: Record<string, unknown>): { eq(c: string, v: string): Promise<{ error: { message: string } | null }> };
   insert(r: Record<string, unknown>): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+};
+
+type DBSelectNotIn = Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> & {
+  lte(c: string, v: string): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
 };
 
 type DBSelectIn = Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> & {
@@ -97,8 +102,15 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
   const orgMap = new Map((orgs ?? []).map((o) => [o.id as string, o]));
 
   const pkgIds = [...new Set(subsDue.map((s) => s.package_id as string))];
-  const { data: packages } = await db.from("packages").select("").in("id", pkgIds);
-  const pkgMap = new Map((packages ?? []).map((p) => [p.id as string, p]));
+  const [packagesResult, pricingResult] = await Promise.all([
+    db.from("packages").select("").in("id", pkgIds),
+    db.from("package_pricing").select("").in("package_id", pkgIds),
+  ]);
+  const pkgMap = new Map((packagesResult.data ?? []).map((p) => [p.id as string, p]));
+  const pricingByKey = new Map<string, Record<string, unknown>>();
+  for (const pr of pricingResult.data ?? []) {
+    pricingByKey.set(`${pr.package_id}:${pr.billing_period}`, pr);
+  }
 
   for (const sub of subsDue) {
     try {
@@ -114,11 +126,45 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
         result.errors.push(`Missing billing email for org ${sub.organization_id}. subscription ${sub.id} skipped`);
         continue;
       }
+
+      const billingPeriod = (sub.billing_period as string) || "monthly";
       const priceOverride = sub.price_override as number | null;
-      const price = priceOverride ?? (pkg.price as number);
-      const billingPeriod = (sub.billing_period as string) || (pkg.billing_period as string) || "monthly";
+
+      let price: number;
+      let currency: string;
+      if (priceOverride !== null && priceOverride !== undefined) {
+        price = priceOverride;
+        currency = (pkg.currency as string) || "INR";
+      } else {
+        const pricingRow = pricingByKey.get(`${sub.package_id}:${billingPeriod}`);
+        if (!pricingRow || typeof pricingRow.price !== "number") {
+          result.errors.push(`Missing package_pricing for package ${sub.package_id}, billing_period ${billingPeriod}. Subscription ${sub.id} skipped — cannot bill without valid pricing.`);
+          continue;
+        }
+        price = pricingRow.price as number;
+        currency = (pricingRow.currency as string) || "INR";
+      }
+
+      if (price <= 0) {
+        result.errors.push(`Invalid price ${price} for subscription ${sub.id}. Skipping — cannot bill zero or negative amount.`);
+        continue;
+      }
+
       const daysUntilNextBilling = BILLING_PERIOD_MAP[billingPeriod] ?? 30;
-      const currency = (pkg.currency as string) || "INR";
+
+      // Idempotency — skip if invoice already exists for this sub + billing period window
+      const idempotencyKey = `renew_${sub.organization_id}_${sub.package_id}_${billingPeriod}_${now.toISOString().slice(0, 10)}`;
+      const { data: existingInvoices } = await db
+        .from("org_subscription_invoices")
+        .select("id, status, razorpay_order_id")
+        .eq("organization_id", sub.organization_id as string)
+        .eq("idempotency_key", idempotencyKey)
+        .limit(1) as unknown as { data: Array<Record<string, unknown>> | null; error: { message: string } | null };
+
+      if (existingInvoices && existingInvoices.length > 0) {
+        result.errors.push(`Duplicate invoice blocked for sub ${sub.id}: invoice ${existingInvoices[0].id} already exists with key ${idempotencyKey}`);
+        continue;
+      }
 
       const invoiceNumber = `SUB-INV-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`;
       const periodStart = new Date(now);
@@ -128,16 +174,20 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
       const { data: invoice } = await db.from("org_subscription_invoices").select("").insert({
         organization_id: sub.organization_id,
         subscription_id: sub.id,
+        package_id: sub.package_id,
         invoice_number: invoiceNumber,
         status: "issued",
         currency,
         subtotal_amount: price,
         discount_amount: 0,
         tax_amount: 0,
+        total_amount: price,
         billing_period_start: periodStart.toISOString().slice(0, 10),
         billing_period_end: periodEnd.toISOString().slice(0, 10),
+        billing_cycle: billingPeriod,
         issued_at: now.toISOString(),
         due_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        idempotency_key: idempotencyKey,
       });
 
       if (!invoice) {
@@ -147,8 +197,10 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
       result.invoiceGenerated++;
 
       const razorpayReceipt = `SUB-${sub.organization_id?.toString().slice(0, 8)}-${Date.now()}`;
+      // price is in paise; createRazorpayOrder expects rupees
+      const amountInRupees = price / 100;
       const orderResult = await createRazorpayOrder({
-        amountInRupees: price,
+        amountInRupees,
         currency,
         receipt: razorpayReceipt,
         notes: {
@@ -188,12 +240,15 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
         result.emailsSent++;
       }
 
+      // Advance next_billing_date and expires_at so cron does not re-fire for the same period.
+      // The RPC finalize_razorpay_subscription_payment will correct these on payment confirmation.
       const nextBilling = new Date(now);
       nextBilling.setDate(nextBilling.getDate() + daysUntilNextBilling);
 
       await db.from("organization_subscriptions").update({
         last_billing_date: now.toISOString(),
         next_billing_date: nextBilling.toISOString(),
+        expires_at: periodEnd.toISOString(),
       }).eq("id", sub.id as string);
 
       await recordSubscriptionEvent({
@@ -206,7 +261,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
           amount: price,
           nextBillingDate: nextBilling.toISOString(),
         },
-        reason: `Subscription billing invoice ${invoiceNumber} generated and Razorpay order ${razorpayOrderId} created`,
+        reason: `Renewal invoice ${invoiceNumber} issued and Razorpay order ${razorpayOrderId} created for ${billingPeriod} billing period`,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
@@ -230,8 +285,9 @@ export async function processDunningRetry(subscriptionId: string, organizationId
   if (!supabase) return { success: false, error: "Supabase admin client not configured" };
 
   try {
+    const amountInRupees = price / 100;
     const orderResult = await createRazorpayOrder({
-      amountInRupees: price,
+      amountInRupees,
       currency: currency || "INR",
       receipt: `DUN-${organizationId.slice(0, 8)}-${Date.now()}`,
       notes: {

@@ -111,7 +111,7 @@ export async function getOrganizationOwnerDashboard(context: ScopedOrganizationO
     supabase.from("tenant_domain_checks").select("*").eq("organization_id", organizationId).order("checked_at", { ascending: false }).limit(50),
     supabase.from("tenant_domain_provider_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50),
     supabase.from("feature_flags").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(50),
-    supabase.from("platform_subscriptions").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(10),
+    supabase.from("organization_subscriptions").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }).limit(10),
     supabase.from("activity_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50),
     supabase.from("security_events").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50),
     supabase.from("compliance_requests").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(50)

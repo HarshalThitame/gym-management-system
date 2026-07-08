@@ -327,14 +327,14 @@ export function BranchesClient({ data }: BranchesClientProps) {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Branch & Location Management</h1>
+          <h1 className="text-3xl font-black tracking-tight">Gym Management</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {formatCompactNumber(kpis.total)} branches across {formatCompactNumber(kpis.orgsWith)} organizations
+            {formatCompactNumber(kpis.total)} gyms across {formatCompactNumber(kpis.orgsWith)} organizations
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setShowCreate(true)} variant="accent" size="sm">
-            <Plus className="size-4" /> Create Branch
+            <Plus className="size-4" /> Create Gym
           </Button>
           <ButtonLink
             href={`/api/super-admin/organizations/export?scope=branches&format=csv`}
@@ -348,7 +348,7 @@ export function BranchesClient({ data }: BranchesClientProps) {
 
       {/* KPI Row 1 */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
-        <KpiCard icon={<Building2 className="size-5" />} label="Total Branches" value={formatCompactNumber(kpis.total)} {...(kpis.active > 0 ? { trend: `${Math.round((kpis.active / Math.max(kpis.total, 1)) * 100)}% active` } : {})} />
+        <KpiCard icon={<Building2 className="size-5" />} label="Total Gyms" value={formatCompactNumber(kpis.total)} {...(kpis.active > 0 ? { trend: `${Math.round((kpis.active / Math.max(kpis.total, 1)) * 100)}% active` } : {})} />
         <KpiCard icon={<CheckCircle2 className="size-5 text-green-600" />} label="Active" value={formatCompactNumber(kpis.active)} />
         <KpiCard icon={<Ban className="size-5 text-amber-600" />} label="Suspended" value={formatCompactNumber(kpis.suspended)} />
         <KpiCard icon={<AlertTriangle className="size-5 text-red-600" />} label="Needs Attention" value={formatCompactNumber(kpis.attention)} />
@@ -356,7 +356,7 @@ export function BranchesClient({ data }: BranchesClientProps) {
 
       {/* KPI Row 2 */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
-        <KpiCard icon={<Users className="size-5 text-blue-600" />} label="Avg Members / Branch" value={formatCompactNumber(avgMembers)} />
+        <KpiCard icon={<Users className="size-5 text-blue-600" />} label="Avg Members / Gym" value={formatCompactNumber(avgMembers)} />
         <KpiCard icon={<Cpu className="size-5" />} label="No Setup" value={formatCompactNumber(kpis.noSetup)} />
         <KpiCard icon={<ShieldAlert className="size-5" />} label="No Admin" value={formatCompactNumber(kpis.noAdmin)} />
         <KpiCard icon={<TrendingUp className="size-5 text-indigo-600" />} label="Inactive / Issues" value={formatCompactNumber(kpis.inactive)} />
@@ -404,10 +404,10 @@ export function BranchesClient({ data }: BranchesClientProps) {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-accent bg-accent/5 p-3">
           <span className="text-sm font-bold">{selectedIds.size} selected</span>
-          <Button size="sm" variant="secondary" onClick={() => { selectedIds.forEach((id) => handleStatusAction(id, "activate", "Branches")); setActionLoading("bulk-activate"); }}>
+          <Button size="sm" variant="secondary" onClick={() => { selectedIds.forEach((id) => handleStatusAction(id, "activate", "Gyms")); setActionLoading("bulk-activate"); }}>
             <PlayCircle className="size-4" /> Activate All
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => { selectedIds.forEach((id) => handleStatusAction(id, "suspend", "Branches")); setActionLoading("bulk-suspend"); }}>
+          <Button size="sm" variant="destructive" onClick={() => { selectedIds.forEach((id) => handleStatusAction(id, "suspend", "Gyms")); setActionLoading("bulk-suspend"); }}>
             <PauseCircle className="size-4" /> Suspend All
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setSelectedIds(new Set())}>
@@ -422,9 +422,9 @@ export function BranchesClient({ data }: BranchesClientProps) {
           {paginated.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Building2 className="size-12 text-muted-foreground/40" />
-              <p className="mt-4 text-lg font-bold">{query || statusFilter !== "all" || orgFilter !== "all" ? "No branches match your filters" : "No branches exist yet"}</p>
+              <p className="mt-4 text-lg font-bold">{query || statusFilter !== "all" || orgFilter !== "all" ? "No gyms match your filters" : "No gyms exist yet"}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {query || statusFilter !== "all" || orgFilter !== "all" ? "Try adjusting your search or filter criteria." : "Create your first branch to get started."}
+                {query || statusFilter !== "all" || orgFilter !== "all" ? "Try adjusting your search or filter criteria." : "Create your first gym to get started."}
               </p>
               <div className="mt-4 flex gap-3">
                 {(query || statusFilter !== "all" || orgFilter !== "all") && (
@@ -433,7 +433,7 @@ export function BranchesClient({ data }: BranchesClientProps) {
                   </Button>
                 )}
                 <Button onClick={() => setShowCreate(true)} variant="accent">
-                  <Plus className="size-4" /> Create Branch
+                  <Plus className="size-4" /> Create Gym
                 </Button>
               </div>
             </div>
@@ -566,26 +566,26 @@ export function BranchesClient({ data }: BranchesClientProps) {
         </div>
       )}
 
-      {/* Create Branch Drawer */}
+      {/* Create Gym Drawer */}
       {showCreate && (
         <BranchFormDrawer
-          title="Create Branch"
+          title="Create Gym"
           orgOptions={orgOptions}
           orgBranchInfo={orgBranchInfo}
           onClose={() => setShowCreate(false)}
-          onSubmit={() => { showToast("Branch created successfully.", "success"); setShowCreate(false); }}
+          onSubmit={() => { showToast("Gym created successfully.", "success"); setShowCreate(false); }}
         />
       )}
 
-      {/* Edit Branch Drawer */}
+      {/* Edit Gym Drawer */}
       {editBranch && (
         <BranchFormDrawer
-          title="Edit Branch"
+          title="Edit Gym"
           branch={editBranch}
           orgOptions={orgOptions}
           orgBranchInfo={orgBranchInfo}
           onClose={() => setEditBranch(null)}
-          onSubmit={() => { showToast("Branch updated successfully.", "success"); setEditBranch(null); }}
+          onSubmit={() => { showToast("Gym updated successfully.", "success"); setEditBranch(null); }}
         />
       )}
 
@@ -694,7 +694,7 @@ function BranchFormDrawer({
     e.preventDefault();
     if (!name.trim() || !selectedOrg) return;
     if (atLimit) {
-      showToast(`Branch limit reached for this organization (${orgInfo?.branchCount}/${orgInfo?.maxBranches}). Upgrade the plan or apply an override.`, "error");
+      showToast(`Gym limit reached for this organization (${orgInfo?.branchCount}/${orgInfo?.maxBranches}). Upgrade the plan or apply an override.`, "error");
       return;
     }
     setSubmitting(true);
@@ -735,18 +735,18 @@ function BranchFormDrawer({
           {atLimit && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
               <AlertTriangle className="mr-1 inline size-4" />
-              This organization has reached its branch limit ({orgInfo?.branchCount}/{orgInfo?.maxBranches}). Upgrade the plan or apply a Super Admin override to add more branches.
+              This organization has reached its gym limit ({orgInfo?.branchCount}/{orgInfo?.maxBranches}). Upgrade the plan or apply a Super Admin override to add more branches.
             </div>
           )}
 
           {/* Name & Code */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-bold">Branch Name <span className="text-red-500">*</span></label>
+              <label className="text-sm font-bold">Gym Name <span className="text-red-500">*</span></label>
               <input className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" value={name} onChange={(e) => setName(e.target.value)} placeholder="Downtown Fitness" required />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-bold">Branch Code</label>
+              <label className="text-sm font-bold">Gym Code</label>
               <input className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" value={code} onChange={(e) => setCode(e.target.value)} placeholder="DTN-001" />
             </div>
           </div>
@@ -777,7 +777,7 @@ function BranchFormDrawer({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-bold">Email</label>
-              <input className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="branch@example.com" />
+              <input className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="gym@example.com" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold">Phone</label>
@@ -799,7 +799,7 @@ function BranchFormDrawer({
           <div className="flex gap-3 pt-2">
             <Button type="submit" variant="primary" className="flex-1" disabled={submitting || !name.trim() || !selectedOrg}>
               {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-              {branch ? "Update Branch" : "Create Branch"}
+              {branch ? "Update Gym" : "Create Gym"}
             </Button>
             <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
           </div>
@@ -847,7 +847,7 @@ function BranchDetailDrawer({ branch, orgInfo, onClose, onEdit }: { branch: Bran
                 </div>
               )}
               {!orgInfo.isUnlimited && orgInfo.remaining <= 0 && (
-                <p className="mt-2 text-xs font-semibold text-red-600">Branch limit reached. Apply override or upgrade plan.</p>
+                <p className="mt-2 text-xs font-semibold text-red-600">Gym limit reached. Apply override or upgrade plan.</p>
               )}
             </div>
           )}
@@ -918,10 +918,10 @@ function BranchDetailDrawer({ branch, orgInfo, onClose, onEdit }: { branch: Bran
 
           {/* Actions */}
           <div className="flex gap-3">
-            <Button onClick={() => { showToast("Branch overrides coming soon.", "info"); }} variant="secondary" className="flex-1">
+            <Button onClick={() => { showToast("Gym overrides coming soon.", "info"); }} variant="secondary" className="flex-1">
               <ShieldCheck className="size-4" /> Apply Override
             </Button>
-            <Button onClick={() => { showToast("Branch audit logs coming soon.", "info"); }} variant="secondary" className="flex-1">
+            <Button onClick={() => { showToast("Gym audit logs coming soon.", "info"); }} variant="secondary" className="flex-1">
               <Eye className="size-4" /> View Audit
             </Button>
           </div>

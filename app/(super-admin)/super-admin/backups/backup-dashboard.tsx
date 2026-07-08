@@ -765,7 +765,7 @@ function CreateBackupModal({ onClose, onSuccess }: { onClose: () => void; onSucc
   const scopes = [
     { value: "platform", label: "Platform", desc: "Entire system" },
     { value: "tenant", label: "Tenant", desc: "Specific organization" },
-    { value: "branch", label: "Branch", desc: "Specific branch" },
+    { value: "gym", label: "Gym", desc: "Specific gym" },
   ];
 
   const types = [
@@ -833,8 +833,8 @@ function CreateBackupModal({ onClose, onSuccess }: { onClose: () => void; onSucc
             )}
             {scope === "branch" && (
               <div className="mt-3">
-                <label className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Branch ID</label>
-                <input value={branchId} onChange={(e) => setBranchId(e.target.value)} placeholder="branch_..." className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                <label className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Gym ID</label>
+                <input value={branchId} onChange={(e) => setBranchId(e.target.value)} placeholder="gym_..." className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
               </div>
             )}
           </div>
@@ -893,7 +893,7 @@ function CreateBackupModal({ onClose, onSuccess }: { onClose: () => void; onSucc
         {step < 3 ? (
           <button onClick={() => {
             if (step === 0 && scope !== "platform" && !organizationId) { setError("Organization ID is required for tenant/branch scope."); return; }
-            if (step === 0 && scope === "branch" && !branchId) { setError("Branch ID is required for branch scope."); return; }
+            if (step === 0 && scope === "branch" && !branchId) { setError("Gym ID is required for branch scope."); return; }
             setError(null); setStep(step + 1);
           }} className="inline-flex items-center gap-2 rounded-md bg-accent text-accent-foreground px-4 py-2 text-sm font-black">
             Next <ArrowRight className="size-4" />
@@ -999,7 +999,7 @@ function RecoveryWizardModal({ dashboard, preselectedBackupId, onClose, onSucces
     { value: "database", label: "Database" },
     { value: "storage", label: "Storage" },
     { value: "tenant", label: "Tenant" },
-    { value: "branch", label: "Branch" },
+    { value: "gym", label: "Gym" },
     { value: "membership_data", label: "Membership Data" },
     { value: "payment_data", label: "Payment Data" },
     { value: "user_data", label: "User Data" },
@@ -1110,7 +1110,7 @@ function RecoveryWizardModal({ dashboard, preselectedBackupId, onClose, onSucces
             )}
             {scope === "branch" && (
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Branch ID</label>
+                <label className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Gym ID</label>
                 <input value={branchId} onChange={(e) => setBranchId(e.target.value)} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
               </div>
             )}

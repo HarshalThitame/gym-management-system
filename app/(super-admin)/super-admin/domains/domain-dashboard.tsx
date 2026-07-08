@@ -435,7 +435,7 @@ export function DomainDashboard({
                           showToast(`Routing set to ${mode}`, "success");
                         }} onBlur={() => setEditingRouting(null)}>
                           <option value="organization">Org</option>
-                          <option value="branch">Branch</option>
+                          <option value="gym">Gym</option>
                           <option value="gym">Gym</option>
                         </select>
                       ) : (
@@ -1018,7 +1018,7 @@ function AddDomainModal({ organizations, onClose }: { organizations: OrgRow[]; o
             <p className="text-xs font-semibold mb-1">Routing Mode</p>
             <select className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm" value={routing} onChange={(e) => setRouting(e.target.value)} disabled={submitting}>
               <option value="organization">Organization</option>
-              <option value="branch">Branch</option>
+              <option value="gym">Gym</option>
               <option value="gym">Gym</option>
             </select>
           </div>

@@ -384,13 +384,13 @@ function GymsTab({ data }: { data: NonNullable<Awaited<ReturnType<typeof getOrga
                     </div>
                   )}
                   {gymBranches.length === 0 && (
-                    <p className="text-xs font-semibold text-muted-foreground">No branches under this gym.</p>
+                    <p className="text-xs font-semibold text-muted-foreground">No gyms under this organization.</p>
                   )}
                 </div>
               </details>
             );
           }) : (
-            <div className="rounded-md border border-dashed border-border bg-background p-5 text-sm font-semibold text-muted-foreground">No locations were found.</div>
+            <div className="rounded-md border border-dashed border-border bg-background p-5 text-sm font-semibold text-muted-foreground">No gyms were found.</div>
           )}
           <DetailPaginationControls organizationId={data.record.organization.id} pageParam="gymsPage" pageSizeParam="gymsPageSize" pagination={data.listPagination.gyms} tab="gyms" />
         </div>

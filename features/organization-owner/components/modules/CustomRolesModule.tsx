@@ -43,7 +43,7 @@ const resourceLabels: Record<AuthResource, string> = {
   reports: "Reports",
   settings: "Settings",
   organizations: "Organizations",
-  branches: "Branches",
+  branches: "Gyms",
   feature_flags: "Feature Flags",
   licenses: "Licenses",
   compliance: "Compliance",
@@ -509,7 +509,7 @@ export function CustomRolesModule({ dashboard, moduleData, hasFeature }: CustomR
               className={selectClass}
               defaultValue={editingRole?.name ?? ""}
               name="name"
-              placeholder="e.g. Branch Billing Manager"
+              placeholder="e.g. Gym Billing Manager"
               required
               type="text"
             />

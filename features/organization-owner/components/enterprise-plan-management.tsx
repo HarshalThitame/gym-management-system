@@ -348,7 +348,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                     {(() => {
                       const pkgAny = currentPkg as any;
                       const pricing = pkgAny?._pricing ?? [];
-                      const monthlyPrice = pricing.find((p: any) => p.billing_period === "monthly")?.price ?? currentPkg?.price ?? 0;
+                      const monthlyPrice = pricing.find((p: any) => p.billing_period === "monthly")?.price ?? 0;
                       const annualPricing = pricing.find((p: any) => p.billing_period === "annual");
                       if (currentPkg?.name === "Enterprise") {
                         return <p className="mt-2 text-lg font-black">Custom Pricing</p>;
@@ -464,7 +464,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                 <LimitBar label="Membership Plans" current={orgUsage.planTypesCount} limit={orgUsage.planTypesLimit} limitLabel="Up to 10 plan types" />
                 <LimitBar label="Weekly Classes" current={orgUsage.weeklyClasses} limit={orgUsage.weeklyClassesLimit} limitLabel="Up to 5 classes per week" />
                 <LimitBar label="SMS Used (Monthly)" current={orgUsage.smsUsed} limit={orgUsage.smsLimit} limitLabel="Up to 500 SMS per month" />
-                <LimitBar label="Branches" current={orgUsage.branchCount} limit={orgUsage.branchLimit} limitLabel="Single branch" />
+                <LimitBar label="Gyms" current={orgUsage.branchCount} limit={orgUsage.branchLimit} limitLabel="Single gym" />
               </div>
 
               {usageHistory.length >= 2 && (
@@ -607,8 +607,8 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                 {allPackages.map((pkg) => {
                   const pkgPricing = (pkg as any)._pricing ?? [];
                   const monthlyPrice = isYearly
-                    ? (pkgPricing.find((p: any) => p.billing_period === "annual")?.price ?? pkg.price ?? 0)
-                    : (pkgPricing.find((p: any) => p.billing_period === "monthly")?.price ?? pkg.price ?? 0);
+                    ? (pkgPricing.find((p: any) => p.billing_period === "annual")?.price ?? 0)
+                    : (pkgPricing.find((p: any) => p.billing_period === "monthly")?.price ?? 0);
                   const isCurrent = currentPkg?.id === pkg.id;
                   const limits = (pkg as any)._limits ?? {};
                   const features = (pkg as any)._features ?? {};

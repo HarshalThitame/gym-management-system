@@ -128,7 +128,7 @@ export function DomainsEnterpriseModule({ dashboard, moduleData }: DomainsEnterp
             </DrawerField>
             <DrawerField label="Routing Mode">
               <select className={selectClass} defaultValue="organization" name="routingMode">
-                <option value="organization">Organization</option><option value="branch">Branch</option><option value="gym">Gym</option>
+                <option value="organization">Organization</option><option value="gym">Branch</option><option value="gym">Gym</option>
               </select>
             </DrawerField>
           </div>

@@ -194,7 +194,7 @@ export function PackageManagementClient({ data }: { data: { organizations: any[]
               {filteredPkgs.map((pkg: any) => (
                 <tr key={pkg.id} className="border-b border-border hover:bg-accent/5 transition-colors">
                   <td className="px-5 py-3 font-semibold">{pkg.name}</td>
-                  <td className="px-5 py-3">₹{Intl.NumberFormat("en-IN").format(pkg.price ?? 0)}</td>
+                  <td className="px-5 py-3">₹{Intl.NumberFormat("en-IN").format((pkg._pricing?.find((pr: any) => pr.billing_period === "monthly")?.price ?? 0) / 100)}/mo</td>
                   <td className="px-5 py-3">{getPackageLimitValue(pkg, "max_members") === -1 ? "Unlimited" : getPackageLimitValue(pkg, "max_members")}</td>
                   <td className="px-5 py-3">{getPackageLimitValue(pkg, "max_branches") === -1 ? "Unlimited" : getPackageLimitValue(pkg, "max_branches")}</td>
                   <td className="px-5 py-3">{getPackageLimitValue(pkg, "max_staff") === -1 ? "Unlimited" : getPackageLimitValue(pkg, "max_staff")}</td>
@@ -302,7 +302,7 @@ function PackageCard({ pkg, subsCount, activeSubsCount, onEdit, onDelete, onView
         ) : (
           <div className="mt-3 space-y-1">
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black">₹{Intl.NumberFormat("en-IN").format(Math.round((pkg._pricing?.find((pr: any) => pr.billing_period === "monthly")?.price ?? pkg.price ?? 0) / 100))}</span>
+              <span className="text-2xl font-black">₹{Intl.NumberFormat("en-IN").format(Math.round((pkg._pricing?.find((pr: any) => pr.billing_period === "monthly")?.price ?? 0) / 100))}</span>
               <span className="text-xs text-muted-foreground">/month</span>
             </div>
             <div className="flex items-baseline gap-1 text-sm">
@@ -321,7 +321,7 @@ function PackageCard({ pkg, subsCount, activeSubsCount, onEdit, onDelete, onView
             color="green"
           />
           <LimitBadge
-            label="Branches"
+            label="Gyms"
             value={branchLimit === -1 ? "∞" : branchLimit}
             color="blue"
           />
@@ -432,7 +432,8 @@ function PackageDetailView({ pkg, onClose, onEdit, subs }: {
 
         {/* Pricing & Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-          <StatCard label="Monthly Price" value={`₹${Intl.NumberFormat("en-IN").format(pkg.price ?? 0)}`} detail="Per month" />
+          <StatCard label="Monthly Price" value={`₹${Intl.NumberFormat("en-IN").format(Math.round((pkg._pricing?.find((pr: any) => pr.billing_period === "monthly")?.price ?? 0) / 100))}`} detail="Per month" />
+          <StatCard label="Annual Price" value={`₹${Intl.NumberFormat("en-IN").format(Math.round((pkg._pricing?.find((pr: any) => pr.billing_period === "annual")?.price ?? 0) / 100))}`} detail="Per year" />
           <StatCard label="Organizations" value={String(orgAssigned.length)} detail={`${activeOrgs} active`} />
           <StatCard label="Billing Period" value={pkg.billing_period ?? "monthly"} detail="Default cycle" />
           <StatCard label="Trial Days" value={String(pkg.trial_days ?? 0)} detail="Free trial duration" />
@@ -528,8 +529,10 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
 }) {
   const [activeFeatureTab, setActiveFeatureTab] = useState<string>("members");
   const pkgMeta = typeof pkg?.metadata === "object" ? (pkg.metadata ?? {}) : {};
-  const [priceMonthly, setPriceMonthly] = useState(pkgMeta?.price_monthly ?? pkg?.price ?? 0);
-  const [priceAnnual, setPriceAnnual] = useState(pkgMeta?.price_annual ?? (pkg?.price ?? 0) * 10);
+  const initialMonthly = pkg?._pricing?.find((pr: any) => pr.billing_period === "monthly")?.price ?? 0;
+  const initialAnnual = pkg?._pricing?.find((pr: any) => pr.billing_period === "annual")?.price ?? 0;
+  const [priceMonthly, setPriceMonthly] = useState(initialMonthly);
+  const [priceAnnual, setPriceAnnual] = useState(initialAnnual);
   const [annualDiscountLabel] = useState(pkgMeta?.annual_discount_label ?? "2 months free");
   if (!open) return null;
 
@@ -611,7 +614,7 @@ function PackageEditorModal({ open, pkg, mode, savePending, formAction, onClose 
             <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground mb-3">Resource Limits</p>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <LimitField label="Max Members (-1 = ∞)" name="maxMembers" value={pkg?.max_members ?? pkg?._limits?.max_members ?? 0} disabled={savePending} />
-              <LimitField label="Max Branches (-1 = ∞)" name="maxBranches" value={pkg?.max_branches ?? pkg?._limits?.max_branches ?? 0} disabled={savePending} />
+              <LimitField label="Max Gyms (-1 = ∞)" name="maxBranches" value={pkg?.max_branches ?? pkg?._limits?.max_branches ?? 0} disabled={savePending} />
               <LimitField label="Max Trainers (-1 = ∞)" name="maxTrainers" value={pkg?.max_trainers ?? pkg?._limits?.max_trainers ?? 0} disabled={savePending} />
               <LimitField label="Max Staff (-1 = ∞)" name="maxStaff" value={pkg?.max_staff ?? pkg?._limits?.max_staff ?? 0} disabled={savePending} />
               <LimitField label="Max Gyms (-1 = ∞)" name="maxGyms" value={pkg?.max_gyms ?? pkg?._limits?.max_gyms ?? 0} disabled={savePending} />

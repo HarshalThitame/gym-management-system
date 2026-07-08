@@ -89,7 +89,7 @@ async function getData() {
     const packages = (pkgsRes.data ?? []).map((p: any) => {
       const pkgId = p.id;
       const pkgPricing = pricingByPackage[pkgId] ?? [];
-      const monthlyPrice = pkgPricing.find((pr: any) => pr.billing_period === "monthly")?.price ?? p.price ?? 0;
+      const monthlyPrice = pkgPricing.find((pr: any) => pr.billing_period === "monthly")?.price ?? 0;
       return {
         ...p,
         price: monthlyPrice,

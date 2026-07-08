@@ -198,7 +198,7 @@ export function StaffBranchAssignmentPanel({ dashboard, hasFeature }: StaffBranc
             badgeVariant: (a.status === "active" ? "success" : "neutral") as "success" | "neutral",
             sections: [
               { label: "Role", value: formatEnterpriseLabel(a.role_name) },
-              { label: "Branch Role", value: formatEnterpriseLabel(a.branch_role) },
+              { label: "Gym Role", value: formatEnterpriseLabel(a.branch_role) },
               { label: "Access Scope", value: formatEnterpriseLabel(a.access_scope) },
               { label: "Assigned", value: new Date(a.created_at).toLocaleDateString("en-IN") },
             ],
@@ -207,7 +207,7 @@ export function StaffBranchAssignmentPanel({ dashboard, hasFeature }: StaffBranc
             ],
           }))}
           totalItems={assignments.length}
-          headerTitle="Branch Assignments"
+          headerTitle="Gym Assignments"
         />
       )}
 
@@ -229,7 +229,7 @@ export function StaffBranchAssignmentPanel({ dashboard, hasFeature }: StaffBranc
           <DrawerFormMessage status={assignState.status} message={assignState.message} />
           <input name="userId" type="hidden" value={selectedStaffId} />
 
-          <DrawerField label="Branch" required>
+          <DrawerField label="Gym" required>
             <select className={selectClass} name="branchId" required>
               <option value="">Select branch</option>
               {unassignedBranches.map((branch) => {

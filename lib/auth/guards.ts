@@ -52,7 +52,7 @@ export async function requireActiveSubscription(organizationId: string): Promise
   const planContext = await getOrgPlanContext(organizationId);
 
   if (planContext.status === "suspended" || planContext.status === "cancelled") {
-    redirect("/unauthorized?reason=subscription_suspended");
+    redirect(`/unauthorized?reason=subscription_${planContext.status}`);
   }
 
   return planContext;

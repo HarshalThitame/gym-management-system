@@ -148,7 +148,7 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard detail="Feature flags controlling platform behavior" icon={<Gauge className="size-5" />} label="Flags" value={String(flags.length)} />
         <StatCard detail="Feature flags currently enabled" icon={<CheckCircle2 className="size-5" />} label="Enabled" value={String(enabledFlags)} />
-        <StatCard detail="Branch-level configuration records" icon={<SettingsIcon className="size-5" />} label="Branch Settings" value={String(branchSettings.length)} />
+        <StatCard detail="Branch-level configuration records" icon={<SettingsIcon className="size-5" />} label="Gym Settings" value={String(branchSettings.length)} />
         <StatCard detail="Active compliance requests" icon={<ShieldCheck className="size-5" />} label="Open Compliance" status={openCompliance > 0 ? "watch" : "good"} value={String(openCompliance)} />
       </section>
 
@@ -156,7 +156,7 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
       <div className="flex gap-1 rounded-lg border border-border bg-surface p-1 flex-wrap" role="tablist">
         {(["flags", "branch", "compliance", "notifications"] as const).map((tab) => (
           <button key={tab} className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${activeTab === tab ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => setActiveTab(tab)} role="tab" aria-selected={activeTab === tab} type="button">
-            {tab === "flags" ? "Feature Flags" : tab === "branch" ? "Branch Settings" : tab === "compliance" ? "Compliance" : "Notifications"}
+            {tab === "flags" ? "Feature Flags" : tab === "branch" ? "Gym Settings" : tab === "compliance" ? "Compliance" : "Notifications"}
           </button>
         ))}
         {(hasGoogleCalendar || hasWebhooks) && (
@@ -221,7 +221,7 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
           <Card>
             <CardHeader>
               <h3 className="text-2xl font-black">Geofence Attendance</h3>
-              <p className="text-sm text-muted-foreground">Configure the branch geofence used for location reporting and checkout-only auto-checkout.</p>
+              <p className="text-sm text-muted-foreground">Configure the gym geofence used for location reporting and checkout-only auto-checkout.</p>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <label className="space-y-1">
@@ -325,7 +325,7 @@ export function SettingsEnterpriseModule({ dashboard, moduleData }: SettingsEnte
             <>
               <p className="text-sm text-muted-foreground">{branchSettings.length} branch{branchSettings.length !== 1 ? "es" : ""} have custom settings configured.</p>
               <DataList
-                headerTitle="Branch Configurations"
+                headerTitle="Gym Configurations"
                 items={branchItems}
                 totalItems={branchSettings.length}
                 totalPages={Math.ceil(branchSettings.length / 12)}

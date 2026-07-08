@@ -123,11 +123,11 @@ export function DashboardCharts({ dashboard }: DashboardChartsProps) {
         </CardContent>
       </Card>
 
-      {/* Branch Performance */}
+      {/* Gym Performance */}
       <Card>
         <CardHeader>
           <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Branches</p>
-          <h3 className="text-2xl font-black">Branch Performance</h3>
+          <h3 className="text-2xl font-black">Gym Performance</h3>
         </CardHeader>
         <CardContent>
           {branchPerf.length === 0 ? (

@@ -136,9 +136,12 @@ export async function suspendSubscriptionForNonPaymentAction(input: {
     const db = getSupabaseAdminClient() as any;
     if (!db) return { status: "error", message: "Database connection failed." };
 
+    const { data: currentSub } = await db.from("organization_subscriptions").select("dunning_attempts").eq("id", input.subscriptionId).maybeSingle();
+    const currentAttempts = (currentSub?.dunning_attempts as number ?? 0) + 1;
+
     await db.from("organization_subscriptions").update({
       status: "suspended",
-      dunning_attempts: db.raw("COALESCE(dunning_attempts, 0) + 1"),
+      dunning_attempts: currentAttempts,
     }).eq("id", input.subscriptionId);
 
     await db.from("org_subscription_invoices").update({

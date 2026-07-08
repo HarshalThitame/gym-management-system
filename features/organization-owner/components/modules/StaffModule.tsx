@@ -199,7 +199,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
         ...(hasCustomRoles && (userCustomRoleNames[item.userId]?.length ?? 0) > 0
           ? [{ label: "Custom Roles", value: userCustomRoleNames[item.userId]!.join(", ") }]
           : []),
-        { label: "Branch Role", value: formatEnterpriseLabel(item.branchRole) },
+        { label: "Gym Role", value: formatEnterpriseLabel(item.branchRole) },
         { label: "Access Scope", value: formatEnterpriseLabel(item.accessScope) },
         { label: "Gym", value: gym?.name ?? "—" },
       ],
@@ -226,7 +226,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
       t.push({ key: "leave", label: "Leave", icon: <Mail className="size-4" /> });
     }
     if (hasMultiBranch) {
-      t.push({ key: "branchAccess", label: "Branch Access", icon: <ArrowLeftRight className="size-4" /> });
+      t.push({ key: "branchAccess", label: "Gym Access", icon: <ArrowLeftRight className="size-4" /> });
     }
     if (hasHRDocs) {
       t.push({ key: "documents", label: "Documents", icon: <FileText className="size-4" /> });
@@ -383,7 +383,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
             <DrawerField label="Role" required>
               <select className={selectClass} defaultValue={editingStaff?.roleName ?? ""} name="roleName" required>
                 <option value="">Select role</option>
-                <option value="gym_admin">Branch Manager</option>
+                <option value="gym_admin">Gym Manager</option>
                 <option value="reception_staff">Reception Staff</option>
                 <option value="trainer">Trainer</option>
               </select>
@@ -394,7 +394,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
                 {dashboard.gyms.map((gym) => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
               </select>
             </DrawerField>
-            <DrawerField label="Branches (Multi-Assign)">
+            <DrawerField label="Gyms (Multi-Assign)">
               {!editingStaff && hasMultiBranch ? (
                 <div className="space-y-2 max-h-48 overflow-y-auto rounded-md border border-border bg-surface-muted p-3">
                   {dashboard.branches.map((branch) => {
@@ -436,7 +436,7 @@ export function StaffModule({ dashboard, moduleData }: StaffModuleProps) {
                 <option value="organization">Organization</option>
               </select>
             </DrawerField>
-            <DrawerField label="Branch Role">
+            <DrawerField label="Gym Role">
               <select className={selectClass} defaultValue={editingStaff?.branchRole ?? "staff"} name="branchRole">
                 <option value="owner">Owner</option>
                 <option value="admin">Admin</option>

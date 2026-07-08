@@ -131,7 +131,7 @@ export function CrossBranchAccessPanel({ dashboard }: CrossBranchAccessPanelProp
       ? members.find((m) => m.id === selectedMemberId)?.full_name ?? "Member"
       : "All members";
     const fromLabel = selectedFromBranchId
-      ? allBranches.find((b) => b.id === selectedFromBranchId)?.name ?? "branch"
+      ? allBranches.find((b) => b.id === selectedFromBranchId)?.name ?? "gym"
       : "any branch";
     const toLabel = selectedToBranchId
       ? allBranches.find((b) => b.id === selectedToBranchId)?.name ?? "a branch"

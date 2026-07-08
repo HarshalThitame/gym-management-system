@@ -115,7 +115,7 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
       status: d.status as string,
       sections: [
         { label: "Type", value: type?.name as string ?? "—" },
-        { label: "Location", value: d.location as string ?? "—" },
+        { label: "Gym", value: d.location as string ?? "—" },
         { label: "IP Address", value: d.ip_address as string ?? "—" },
         { label: "Last Seen", value: d.last_seen_at ? new Date(d.last_seen_at as string).toLocaleString("en-IN") : "Never" },
       ],
@@ -188,7 +188,7 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
           <p className="text-sm text-muted-foreground">Fleet readiness, branch coverage, and devices that need follow-up.</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
-          <LifecycleRow label="Branch assigned" value={`${assignedCount}/${devices.length}`} />
+          <LifecycleRow label="Gym assigned" value={`${assignedCount}/${devices.length}`} />
           <LifecycleRow label="Healthy" value={String(healthSummary.healthy)} />
           <LifecycleRow label="Needs review" value={String(healthSummary.watch + healthSummary.stale + healthSummary.critical)} />
           <LifecycleRow label="Pending enrollment" value={String(healthSummary.pending)} />
@@ -202,7 +202,7 @@ export function DeviceManagementPanel({ dashboard }: { dashboard: any }) {
                 <div>
                   <p className="font-bold">{device.device_name as string}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatDeviceFreshness(health)} · {device.branch_id ? "Branch assigned" : "Unassigned"}
+                    {formatDeviceFreshness(health)} · {device.branch_id ? "Gym assigned" : "Unassigned"}
                   </p>
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wider text-red-600">
@@ -615,7 +615,7 @@ function DeviceDetailDrawer({
             <CardContent className="space-y-3">
               <div className="grid gap-2 text-sm">
                 <LifecycleRow label="Registered" value={device.id ? "Yes" : "No"} />
-                <LifecycleRow label="Branch assigned" value={branch?.name ? branch.name : "Not assigned"} />
+                <LifecycleRow label="Gym assigned" value={branch?.name ? branch.name : "Not assigned"} />
                 <LifecycleRow label="Heartbeat" value={device.last_seen_at ? new Date(device.last_seen_at as string).toLocaleString("en-IN") : "No heartbeat yet"} />
                 <LifecycleRow label="API key" value={device.is_active ? "Active" : "Revoked / inactive"} />
                 <LifecycleRow label="Enrollment" value={String((device.metadata as Record<string, unknown> | null)?.enrollment?.state ?? (device.status as string))} />

@@ -335,7 +335,7 @@ function EnterpriseNav({ activeSection, setActiveSection, dashboard }: { activeS
     { id: "revenue", label: "Revenue", icon: <TrendingUp className="size-4" />, count: dashboard.revenueIntelligence.revenueBySource.length },
     { id: "membership", label: "Membership", icon: <UsersRound className="size-4" />, count: dashboard.membershipAnalytics.cohorts.length },
     { id: "retention", label: "Retention", icon: <AlertTriangle className="size-4" />, count: dashboard.retention.churnTrends.length },
-    { id: "branches", label: "Branches", icon: <Globe2 className="size-4" />, count: dashboard.branchScorecards.length },
+    { id: "branches", label: "Gyms", icon: <Globe2 className="size-4" />, count: dashboard.branchScorecards.length },
     { id: "trainers", label: "Trainers", icon: <Dumbbell className="size-4" />, count: dashboard.trainerPerformance.length },
     { id: "marketing", label: "Marketing", icon: <BarChart3 className="size-4" />, count: dashboard.marketingAnalytics.campaigns.length },
     { id: "forecasting", label: "Forecast", icon: <LineChart className="size-4" />, count: dashboard.forecastScenarios.length },
@@ -408,7 +408,7 @@ function ExecutiveSection({ dashboard, summary }: { dashboard: EnterpriseAnalyti
     { label: "NRR", value: `${summary.nrr}%`, detail: "Net Revenue Retention", icon: <RefreshCcw className="size-5" />, status: summary.nrr >= 100 ? "good" as const : "watch" as const },
     { label: "Refund Rate", value: `${summary.refundRate}%`, detail: "Refund ratio", icon: <CreditCard className="size-5" />, status: summary.refundRate < 5 ? "good" as const : "watch" as const },
     { label: "Occupancy", value: `${summary.occupancyUtilization}%`, detail: "Facility utilization", icon: <Activity className="size-5" />, status: "good" as const },
-    { label: "Branch Index", value: formatCurrency(summary.branchPerformanceIndex), detail: "Avg per branch", icon: <BarChart3 className="size-5" />, status: "good" as const }
+    { label: "Gym Index", value: formatCurrency(summary.branchPerformanceIndex), detail: "Avg per gym", icon: <BarChart3 className="size-5" />, status: "good" as const }
   ], [summary]);
 
   return (
@@ -600,7 +600,7 @@ function BranchSection({ dashboard }: { dashboard: EnterpriseAnalyticsDashboard 
   const ranking = dashboard.branchRanking;
   return (
     <section id="branches">
-      <SectionHeader icon={<Globe2 className="size-5" />} subtitle="Scorecards, benchmarking, ranking" title="Branch & Franchise Performance" />
+      <SectionHeader icon={<Globe2 className="size-5" />} subtitle="Scorecards, benchmarking, ranking" title="Gym Branch & Franchise Performance Franchise Performance" />
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
         <ScorecardCard title="Top Performers" data={ranking.topPerformers} variant="success" />
         <ScorecardCard title="Underperformers" data={ranking.underperformers} variant="danger" />

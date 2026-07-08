@@ -45,6 +45,15 @@ test.describe("subscription gate smoke", () => {
     await expect(page.getByText("Branch Limit")).toBeVisible();
   });
 
+  test("Organization Owner lands on billing recovery when subscription is cancelled", async ({ page }) => {
+    const organizationId = await getOrganizationIdForAccount(organizationOwnerEmail);
+    await ensureSubscriptionStatus(organizationId, "cancelled");
+
+    await loginAs(page, organizationOwnerEmail, "/organization/plan");
+
+    await ensureSubscriptionStatus(organizationId, "active");
+  });
+
   test("Organization Owner is redirected when subscription is suspended", async ({ page }) => {
     const organizationId = await getOrganizationIdForAccount(organizationOwnerEmail);
     await ensureSubscriptionStatus(organizationId, "active");
@@ -93,11 +102,14 @@ async function getOrganizationIdForAccount(email: string) {
   return requireRow(gyms, `gym ${profile.gym_id}`).organization_id;
 }
 
-async function ensureSubscriptionStatus(organizationId: string, status: "active" | "suspended") {
+async function ensureSubscriptionStatus(organizationId: string, status: "active" | "suspended" | "cancelled") {
   const subscription = await getSubscriptionForOrganization(organizationId);
   if (subscription) {
     if (subscription.status !== status) {
-      await servicePatch("organization_subscriptions", [eq("id", subscription.id)], { status });
+      await servicePatch("organization_subscriptions", [eq("id", subscription.id)], {
+        status,
+        cancelled_at: status === "cancelled" ? new Date().toISOString() : null
+      });
     }
     return;
   }
@@ -106,7 +118,8 @@ async function ensureSubscriptionStatus(organizationId: string, status: "active"
   await serviceInsert("organization_subscriptions", {
     organization_id: organizationId,
     package_id: packageId,
-    status
+    status,
+    cancelled_at: status === "cancelled" ? new Date().toISOString() : null
   });
 }
 

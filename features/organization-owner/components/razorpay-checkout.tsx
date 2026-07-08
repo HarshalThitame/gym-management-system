@@ -95,7 +95,7 @@ export function RazorpayCheckout({
   const getPrice = useCallback((pkg: PackageInfo) => {
     const pricing = pkg._pricing ?? [];
     const found = pricing.find((p) => p.billing_period === billingCycle);
-    return found?.price ?? pkg.price;
+    return found?.price ?? 0;
   }, [billingCycle]);
 
   const getMonthlyPrice = useCallback((pkg: PackageInfo) => {
@@ -103,10 +103,16 @@ export function RazorpayCheckout({
     return pricing.find((p) => p.billing_period === "monthly")?.price ?? 0;
   }, []);
 
+  const getAnnualPrice = useCallback((pkg: PackageInfo) => {
+    const pricing = pkg._pricing ?? [];
+    return pricing.find((p) => p.billing_period === "annual")?.price ?? 0;
+  }, []);
+
   const selectedPkg = selectedPkgId ? activePackages.find((p) => p.id === selectedPkgId) ?? null : null;
   const price = selectedPkg ? getPrice(selectedPkg) : 0;
   const monthlyPrice = selectedPkg ? getMonthlyPrice(selectedPkg) : 0;
-  const annualSavings = monthlyPrice * 12 - price;
+  const annualPrice = selectedPkg ? getAnnualPrice(selectedPkg) : 0;
+  const annualSavings = monthlyPrice > 0 && annualPrice > 0 ? monthlyPrice * 12 - annualPrice : 0;
 
   const handlePlanSelect = useCallback((pkgId: string) => {
     if (isActive) return;
@@ -354,9 +360,10 @@ export function RazorpayCheckout({
       <div className="grid gap-5 lg:grid-cols-2">
         {activePackages.map((pkg) => {
           const pkgPrice = billingCycle === "annual"
-            ? pkg._pricing?.find((p) => p.billing_period === "annual")?.price ?? pkg.price
-            : pkg._pricing?.find((p) => p.billing_period === "monthly")?.price ?? pkg.price;
-          const pkgMonthlyPrice = pkg._pricing?.find((p) => p.billing_period === "monthly")?.price ?? pkg.price;
+            ? pkg._pricing?.find((p) => p.billing_period === "annual")?.price ?? 0
+            : pkg._pricing?.find((p) => p.billing_period === "monthly")?.price ?? 0;
+          const pkgMonthlyPrice = pkg._pricing?.find((p) => p.billing_period === "monthly")?.price ?? 0;
+          const pkgAnnualPrice = pkg._pricing?.find((p) => p.billing_period === "annual")?.price ?? 0;
           const isSelected = selectedPkgId === pkg.id;
           const limits = pkg._limits ?? {};
           const maxMembers = readNumericLimit(limits, "max_members");
@@ -392,12 +399,14 @@ export function RazorpayCheckout({
                 <span className="text-sm text-muted-foreground">/{billingCycle === "annual" ? "year" : "month"}</span>
               </div>
 
-              {billingCycle === "annual" && (
+              {billingCycle === "annual" && pkgAnnualPrice > 0 && (
                 <div className="mt-2 space-y-1">
                   <p className="text-xs text-green-600 font-semibold">₹{Intl.NumberFormat("en-IN").format(Math.round((pkgPrice / 12) / 100))}/mo effective</p>
-                  <p className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700 border border-green-200">
-                    Save ₹{Intl.NumberFormat("en-IN").format(Math.round((pkgMonthlyPrice * 12 - pkgPrice) / 100))} · 2 months free
-                  </p>
+                  {pkgMonthlyPrice > 0 && (
+                    <p className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700 border border-green-200">
+                      Save ₹{Intl.NumberFormat("en-IN").format(Math.round((pkgMonthlyPrice * 12 - pkgPrice) / 100))} · 2 months free
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -476,7 +485,7 @@ export function RazorpayCheckout({
                 <p className="text-sm font-semibold">{selectedPkg.name} · {billingCycle === "annual" ? "Annual" : "Monthly"}</p>
                 <p className="text-xs text-muted-foreground">
                   ₹{Intl.NumberFormat("en-IN").format(Math.round(price / 100))}/{billingCycle === "annual" ? "yr" : "mo"}
-                  {billingCycle === "annual" && monthlyPrice > 0 && (
+                  {billingCycle === "annual" && annualPrice > 0 && monthlyPrice > 0 && (
                     <span className="text-green-600 ml-2 font-semibold">
                       Save ₹{Intl.NumberFormat("en-IN").format(Math.round(annualSavings / 100))} · 2 months free
                     </span>

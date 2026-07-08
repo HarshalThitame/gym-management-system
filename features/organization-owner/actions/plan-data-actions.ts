@@ -213,7 +213,7 @@ export async function getUsageHistoryAction(): Promise<UsageHistoryPoint[]> {
       ? Math.round(data.members.reduce((a, b) => a + b, 0) / data.members.length)
       : 0;
     const branchCount = (allBranches ?? []).filter((b) => b.created_at <= `${date}-31`).length;
-    return { date, members: totalMembers, branches: Math.max(1, branchCount) };
+    return { date, members: totalMembers, branches: branchCount };
   });
 }
 
@@ -266,6 +266,15 @@ export async function getOrgUsageAction(): Promise<OrgUsageData | null> {
     .select("id")
     .eq("organization_id", ctx.organizationId);
 
+  const { count: staffCount } = await supabase
+    .from("branch_users")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", ctx.organizationId)
+    .eq("status", "active") as never as {
+    count: number | null;
+    error: unknown;
+  };
+
   // Use raw queries for tables not in generated types
   const [plansRaw, classesRaw, smsRaw] = await Promise.all([
     rawFrom("membership_plans").select("id").eq("organization_id", ctx.organizationId),
@@ -275,7 +284,6 @@ export async function getOrgUsageAction(): Promise<OrgUsageData | null> {
 
   const memberCount = (profiles ?? []).length;
   const branchCount = (branches ?? []).length;
-  const staffCount = Math.min(10, Math.max(1, Math.round(memberCount / 50)));
   const planTypesCount = ((plansRaw.data ?? []) as unknown[]).length;
   const weeklyClassesCount = ((classesRaw.data ?? []) as unknown[]).length;
   const smsUsed = ((smsRaw.data ?? []) as unknown[]).length;

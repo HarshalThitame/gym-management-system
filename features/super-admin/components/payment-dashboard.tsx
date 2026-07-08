@@ -60,12 +60,13 @@ export function PaymentDashboard({ organizations, packages, subscriptions, invoi
   const totalPending = pendingInvoices.reduce((s: number, i: any) => s + (i.total_amount ?? i.subtotal_amount ?? 0), 0);
   const totalFailed = failedInvoices.reduce((s: number, i: any) => s + (i.total_amount ?? i.subtotal_amount ?? 0), 0);
 
-  // MRR/ARR from active subscriptions (normalized)
+  // MRR/ARR from active subscriptions (normalized — resolves live pricing from _pricing)
   const activeSubs = subscriptions.filter((s: any) => s.status === "active");
   const mrr = activeSubs.reduce((sum: number, s: any) => {
     const pkg = packages.find((p: any) => p.id === s.package_id);
-    const price = s.price_override ?? pkg?.price ?? 0;
     const period = s.billing_period || pkg?.billing_period || "monthly";
+    const pricingRow = (pkg?._pricing ?? []).find((pr: any) => pr.billing_period === period);
+    const price = s.price_override ?? pricingRow?.price ?? 0;
     return sum + computeMrr(price, period);
   }, 0);
 

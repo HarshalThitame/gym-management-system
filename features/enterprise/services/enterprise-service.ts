@@ -60,7 +60,7 @@ async function buildEnterpriseDashboard(supabase: SupabaseClient<Database>): Pro
     supabase.from("tenant_domain_latest_checks").select("*").order("checked_at", { ascending: false }).limit(200),
     supabase.from("tenant_domain_latest_provider_events").select("*").order("created_at", { ascending: false }).limit(200),
     supabase.from("feature_flags").select("*").order("updated_at", { ascending: false }).limit(200),
-    supabase.from("platform_subscriptions").select("*").order("updated_at", { ascending: false }).limit(100),
+    supabase.from("organization_subscriptions").select("*").order("updated_at", { ascending: false }).limit(100),
     supabase.from("activity_events").select("*").order("created_at", { ascending: false }).limit(80),
     supabase.from("security_events").select("*").order("created_at", { ascending: false }).limit(80),
     supabase.from("compliance_requests").select("*").order("created_at", { ascending: false }).limit(80),

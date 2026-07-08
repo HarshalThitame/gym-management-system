@@ -28,7 +28,6 @@ const packageSchema = z.object({
   smsMonthly: z.coerce.number().int().min(-1).default(0),
   trialDays: z.coerce.number().int().min(0).default(0),
   sortOrder: z.coerce.number().int().min(0).default(0),
-  price: z.coerce.number().int().min(0).default(0),
   billingPeriod: z.enum(["monthly", "annual"]).default("monthly"),
   isActive: z.coerce.boolean().default(true),
   recommended: z.coerce.boolean().default(false),
@@ -168,7 +167,6 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     smsMonthly: formData.get("smsMonthly") ?? "0",
     trialDays: formData.get("trialDays") ?? "0",
     sortOrder: formData.get("sortOrder") ?? "0",
-    price: formData.get("price") ?? "0",
     billingPeriod: formData.get("billingPeriod") ?? "monthly",
     priceMonthly: formData.get("priceMonthly") ?? "0",
     priceAnnual: formData.get("priceAnnual") ?? "0",
@@ -189,6 +187,16 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
   if (!parsed.success) {
     return { status: "error", message: "Validation failed.", fieldErrors: parsed.error.flatten().fieldErrors };
   }
+  if (parsed.data.priceMonthly <= 0 || parsed.data.priceAnnual <= 0) {
+    return {
+      status: "error",
+      message: "Monthly and annual pricing are required for every package. Save both live pricing rows before publishing the plan.",
+      fieldErrors: {
+        priceMonthly: parsed.data.priceMonthly <= 0 ? ["Monthly pricing is required."] : undefined,
+        priceAnnual: parsed.data.priceAnnual <= 0 ? ["Annual pricing is required."] : undefined,
+      },
+    };
+  }
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) return { status: "error", message: "Database connection failed." };
@@ -199,7 +207,6 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     name: parsed.data.name,
     description: parsed.data.description || null,
     sort_order: parsed.data.sortOrder,
-    price: parsed.data.price,
     billing_period: parsed.data.billingPeriod,
     is_active: parsed.data.isActive,
     recommended: parsed.data.recommended,
@@ -263,9 +270,11 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     }
 
     // Save pricing to package_pricing table (monthly + annual + other periods)
+    const priceMonthly = parsed.data.priceMonthly;
+    const priceAnnual = parsed.data.priceAnnual;
     const pricingPeriods: Array<{ billing_period: string; price: number }> = [
-      { billing_period: "monthly", price: parsed.data.priceMonthly || parsed.data.price },
-      { billing_period: "annual", price: parsed.data.priceAnnual || parsed.data.price * 10 },
+      { billing_period: "monthly", price: priceMonthly },
+      { billing_period: "annual", price: priceAnnual },
     ];
     // Also keep quarterly and half_yearly if they exist (auto-calculate)
     for (const existingPrice of (await sb.from("package_pricing").select("billing_period, price").eq("package_id", packageId)).data ?? []) {
@@ -282,15 +291,13 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     }
 
     // Save pricing labels to package metadata
-    const pkgMeta = parsed.data.annualDiscountLabel
-      ? {
-          price_monthly: parsed.data.priceMonthly || parsed.data.price,
-          price_annual: parsed.data.priceAnnual || parsed.data.price * 10,
-          annual_discount_label: parsed.data.annualDiscountLabel,
-          trial_days: parsed.data.trialDays || 0,
-          is_trial_available: parsed.data.isTrialAvailable,
-        }
-      : { trial_days: parsed.data.trialDays || 0, is_trial_available: parsed.data.isTrialAvailable };
+    const pkgMeta = {
+      price_monthly: priceMonthly,
+      price_annual: priceAnnual,
+      annual_discount_label: parsed.data.annualDiscountLabel || "2 months free",
+      trial_days: parsed.data.trialDays || 0,
+      is_trial_available: parsed.data.isTrialAvailable,
+    };
 
     await sb.from("packages").update({ metadata: pkgMeta }).eq("id", packageId);
 

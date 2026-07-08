@@ -51,9 +51,9 @@ export function GymDetailPanel({ gym, dashboard, onClose }: GymDetailPanelProps)
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Branch Manager */}
+          {/* Gym Manager */}
           <div>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Branch Manager</p>
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Gym Manager</p>
             {gymAdmins.length === 0 ? (
               <p className="text-sm text-muted-foreground">No manager assigned</p>
             ) : (
@@ -75,7 +75,7 @@ export function GymDetailPanel({ gym, dashboard, onClose }: GymDetailPanelProps)
           <div>
             <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">Branches ({gymBranches.length})</p>
             {gymBranches.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No branches</p>
+              <p className="text-sm text-muted-foreground">No gyms</p>
             ) : (
               <div className="space-y-2">
                 {gymBranches.map((b) => (
@@ -106,7 +106,7 @@ export function GymDetailPanel({ gym, dashboard, onClose }: GymDetailPanelProps)
                 <div className={`h-full rounded-full transition-all duration-700 ${capacityPercent >= 90 ? "bg-red-500" : capacityPercent >= 75 ? "bg-amber-500" : "bg-accent"}`} style={{ width: `${capacityPercent}%` }} />
               </div>
               {gymBranches.length > 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground">{activeBranchNames.length} of {gymBranches.length} branches active · Total capacity: {formatCompactNumber(totalCapacity)}</p>
+                <p className="mt-2 text-xs text-muted-foreground">{activeBranchNames.length} of {gymBranches.length} gyms active · Total capacity: {formatCompactNumber(totalCapacity)}</p>
               ) : null}
             </div>
           </div>

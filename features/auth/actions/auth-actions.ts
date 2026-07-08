@@ -7,6 +7,7 @@ import { welcomeEmail, passwordChangedEmail } from "@/emails/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { getRoleRedirect } from "@/lib/rbac";
 import { sanitizeRedirectPath } from "@/lib/auth/redirects";
+import { resolvePostLoginPath } from "@/lib/auth/post-login-routing";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIpFromHeaders } from "@/lib/security/request";
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase/env";
@@ -71,14 +72,19 @@ export async function signInAction(_previousState: AuthActionState, formData: Fo
     entityId: data.user.id
   });
 
+  const loginState = await resolveLoginState(supabase, data.user.id);
+  const requestedNext = sanitizeRedirectPath(parsed.data.next, "") || null;
+  const nextPath = resolvePostLoginPath(requestedNext, loginState.fallbackPath, {
+    isOrganizationOwner: loginState.isOrganizationOwner,
+    subscriptionStatus: loginState.subscriptionStatus,
+  });
+
   // Check if user has 2FA enabled
   const has2fa = await checkUserHasTwoFactor(data.user.id);
   if (has2fa) {
-    const nextPath = parsed.data.next ?? await resolveUserRedirect(supabase, data.user.id);
     redirect(`/verify-2fa?next=${encodeURIComponent(nextPath)}`);
   }
 
-  const nextPath = sanitizeRedirectPath(parsed.data.next, await resolveUserRedirect(supabase, data.user.id));
   redirect(nextPath);
 }
 
@@ -337,6 +343,52 @@ async function resolveUserRedirect(supabase: SupabaseClient<Database>, userId: s
   return getRoleRedirect(mergedRoleNames);
 }
 
+async function resolveLoginState(supabase: SupabaseClient<Database>, userId: string) {
+  const fallbackPath = await resolveUserRedirect(supabase, userId);
+  const [branchOwnerResult, organizationOwnerResult] = await Promise.all([
+    supabase
+      .from("branch_users")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .eq("role_name", "organization_owner")
+      .eq("access_scope", "organization")
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("organizations")
+      .select("id")
+      .eq("owner_user_id", userId)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const branchOwner = (branchOwnerResult.data as { organization_id?: string | null } | null)?.organization_id ?? null;
+  const ownedOrganization = (organizationOwnerResult.data as { id?: string | null } | null)?.id ?? null;
+  const organizationId = branchOwner ?? ownedOrganization;
+  if (!organizationId) {
+    return {
+      fallbackPath,
+      isOrganizationOwner: false,
+      subscriptionStatus: null as const,
+    };
+  }
+
+  const { data: subscriptionRow } = await supabase
+    .from("organization_subscriptions")
+    .select("status")
+    .eq("organization_id", organizationId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    fallbackPath,
+    isOrganizationOwner: true,
+    subscriptionStatus: normalizeSubscriptionStatus((subscriptionRow as { status?: string | null } | null)?.status ?? null),
+  };
+}
+
 async function resolveUserRoleNamesWithServiceRole(userId: string): Promise<RoleName[]> {
   const url = getSupabaseUrl();
   const serviceKey = getSupabaseServiceKey();
@@ -430,6 +482,14 @@ async function userHasOrganizationOwnerScopeWithServiceRole(userId: string, url:
   }
 
   return false;
+}
+
+function normalizeSubscriptionStatus(status: string | null): "active" | "trial" | "expired" | "suspended" | "cancelled" | "none" {
+  if (status === "active" || status === "trial" || status === "expired" || status === "suspended" || status === "cancelled") {
+    return status;
+  }
+
+  return "none";
 }
 
 async function createAuthClientOrNull() {
