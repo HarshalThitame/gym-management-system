@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import type { Database } from "@/types/database";
+import { slugifyEnterpriseName } from "@/features/enterprise/lib/business-rules";
 import { getOrgOwnerContext, revalidateOrgModules } from "./action-utils";
 import { requireOrgWithinLimit } from "../lib/entitlement-guards";
 import { entitlementActionCatch, requireOrganizationFeatureAccess } from "@/features/entitlement";
@@ -32,22 +33,32 @@ export async function saveGymAction(prevState: AuthActionState, formData: FormDa
     if (!adminClient) return { ...prevState, status: "error", message: "Server configuration error." };
 
     const gymId = formData.get("gymId") as string | null;
-    const name = formData.get("name") as string;
-    if (!name) return { ...prevState, status: "error", message: "Location name is required." };
+    const name = String(formData.get("name") ?? "").trim();
+    if (!name) return { ...prevState, status: "error", message: "Gym name is required." };
 
-    const slug = (formData.get("slug") as string) || name.toLowerCase().replace(/\s+/g, "-");
-    const timezone = (formData.get("timezone") as string) || "Asia/Kolkata";
-    const currency = (formData.get("currency") as string) || "INR";
+    const slugInput = String(formData.get("slug") ?? "").trim();
+    const slug = slugifyEnterpriseName(slugInput || name);
+    if (!slug) return { ...prevState, status: "error", message: "Gym name must produce a valid slug." };
+
+    const timezone = String(formData.get("timezone") ?? "").trim();
+    if (!timezone) return { ...prevState, status: "error", message: "Timezone is required." };
+
+    const currency = String(formData.get("currency") ?? "").trim().toUpperCase();
+    if (!currency) return { ...prevState, status: "error", message: "Currency is required." };
+
     const status = (formData.get("status") as string) || "active";
+    if (!["active", "suspended", "archived"].includes(status)) {
+      return { ...prevState, status: "error", message: "Unsupported gym status." };
+    }
     const validStatus = status as "active" | "suspended" | "archived";
 
     if (gymId) {
       const update: GymUpdate = { name, slug, timezone, currency, status: validStatus, updated_at: new Date().toISOString() };
       const { error } = await adminClient.from("gyms").update(update as never).eq("id", gymId).eq("organization_id", ctx.organizationId);
       if (error) throw new Error(error.message);
-      await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_location", entityType: "gym", entityId: gymId });
+      await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.update_gym", entityType: "gym", entityId: gymId });
       revalidateOrgModules(["/organization/branches"]);
-      return { ...prevState, status: "success", message: "Location updated." };
+      return { ...prevState, status: "success", message: "Gym updated." };
     }
 
     // Enforce branch/location limit before creation
@@ -61,10 +72,10 @@ export async function saveGymAction(prevState: AuthActionState, formData: FormDa
     const insert: GymInsert = { organization_id: ctx.organizationId, name, slug, timezone, currency, status: validStatus };
     const { data, error } = await adminClient.from("gyms").insert(insert as never).select("id,name,slug,timezone,currency,status").single();
     if (error) throw new Error(error.message);
-    await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.create_location", entityType: "gym", entityId: data.id });
+    await writeAuditLog({ actorId: ctx.userId, action: "organization_owner.create_gym", entityType: "gym", entityId: data.id });
 
     revalidateOrgModules(["/organization/branches"]);
-    return { ...prevState, status: "success", message: "Location saved.", gymData: { id: data.id, name: data.name, slug: data.slug, timezone: data.timezone, currency: data.currency, status: data.status } };
+    return { ...prevState, status: "success", message: "Gym created.", gymData: { id: data.id, name: data.name, slug: data.slug, timezone: data.timezone, currency: data.currency, status: data.status } };
   } catch (e) {
     return entitlementActionCatch(prevState, e, "Failed to save gym.");
   }
@@ -83,9 +94,9 @@ export async function setGymStatusAction(prevState: AuthActionState, formData: F
 
     const { error } = await adminClient.from("gyms").update({ status, updated_at: new Date().toISOString() } as never).eq("id", gymId).eq("organization_id", ctx.organizationId);
     if (error) throw new Error(error.message);
-    await writeAuditLog({ actorId: ctx.userId, action: `organization_owner.${status}_location`, entityType: "gym", entityId: gymId });
+    await writeAuditLog({ actorId: ctx.userId, action: `organization_owner.${status}_gym`, entityType: "gym", entityId: gymId });
     revalidateOrgModules(["/organization/branches"]);
-    return { ...prevState, status: "success", message: `Location ${status}.` };
+    return { ...prevState, status: "success", message: `Gym ${status}.` };
   } catch (e) {
     return entitlementActionCatch(prevState, e, "Failed to update gym.");
   }

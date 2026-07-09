@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useActionState, useRef, useEffect, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Building2, Download, Edit3, Eye, Plus, ShieldAlert, ShieldCheck, Trash2, UserRound, Search, CheckCircle2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { OrganizationOwnerDashboard } from "@/features/organization-owner/services/organization-owner-service";
@@ -10,18 +10,19 @@ import { OrgOwnerDrawer, DrawerField, DrawerSubmitButton, DrawerFormMessage } fr
 import { GymDetailPanel } from "@/features/organization-owner/components/gym-detail-panel";
 import { StatCard } from "@/components/ui/stat-card";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
+import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { saveGymAction, setGymStatusAction } from "@/features/organization-owner/actions/gym-actions";
 import { Button } from "@/components/ui/button";
 import { useOptimisticList } from "@/features/organization-owner/lib/use-optimistic-crud";
 import { useModuleFilters } from "@/features/organization-owner/lib/use-module-filters";
 import { showToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/features/organization-owner/lib/toast-utils";
-import { formatCompactNumber, formatCurrency } from "@/features/enterprise/lib/business-rules";
+import { formatCompactNumber, formatCurrency, slugifyEnterpriseName } from "@/features/enterprise/lib/business-rules";
 import { useHasFeature } from "@/features/organization-owner/entitlements";
 import { CrossBranchAccessPanel } from "@/features/organization-owner/components/modules/CrossBranchAccessPanel";
 import { GenericConfirmDialog } from "@/features/organization-owner/components/modules/GenericConfirmDialog";
 import { GenericSuccessDialog } from "@/features/organization-owner/components/modules/GenericSuccessDialog";
-import { GymCreatedDialog } from "@/features/organization-owner/components/modules/GymCreatedDialog";
+import { EnterpriseOutcomeDialog, type EnterpriseOutcome } from "@/features/enterprise/components/enterprise-outcome-dialog";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
 import type { GymRow } from "@/types/enterprise";
 
@@ -42,27 +43,14 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const [detailGym, setDetailGym] = useState<GymRow | null>(null);
   const [savingStatus, setSavingStatus] = useState<"idle" | "saving">("idle");
   const [moduleTab, setModuleTab] = useState<"gyms" | "cross-branch">("gyms");
-  const [state, formAction] = useActionState(saveGymAction, initialAuthActionState);
-  const formRef = useRef<HTMLFormElement>(null);
   const [statPanel, setStatPanel] = useState<StatKey>(null);
-  const [successGym, setSuccessGym] = useState<{ id: string; name: string; slug: string; timezone: string; currency: string; status: string } | null>(null);
+  const [gymOutcome, setGymOutcome] = useState<EnterpriseOutcome | null>(null);
+  const [gymFormState, setGymFormState] = useState<AuthActionState>(initialAuthActionState);
+  const [gymName, setGymName] = useState("");
   const [successAction, setSuccessAction] = useState<{ action: "created" | "updated" | "deleted"; title: string; itemName: string } | null>(null);
   const [pendingDeleteGymId, setPendingDeleteGymId] = useState<string | null>(null);
   const [pendingSuspendGymId, setPendingSuspendGymId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const gymData = (state as Record<string, unknown>).gymData as Record<string, string> | undefined;
-    if (state.status === "success" && gymData && gymData.id) {
-      setSuccessGym({
-        id: gymData.id!,
-        name: gymData.name!,
-        slug: gymData.slug!,
-        timezone: gymData.timezone!,
-        currency: gymData.currency!,
-        status: gymData.status!,
-      });
-    }
-  }, [state]);
+  const slugPreview = useMemo(() => slugifyEnterpriseName(gymName), [gymName]);
 
   const initialItems = ((moduleData?.items ?? dashboard.gyms) as GymRow[]);
   const { items: gyms, addOptimistic, updateOptimistic, removeOptimistic } = useOptimisticList<GymRow>(initialItems);
@@ -73,24 +61,67 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
   const activeGyms = gyms.filter((g) => g.status === "active").length;
   const suspendedGyms = gyms.filter((g) => g.status === "suspended").length;
 
-  // ── Location CRUD ──
-  const openCreate = useCallback(() => { setEditingGym(null); setSavingStatus("idle"); setDrawerOpen(true); }, []);
-  const openEdit = useCallback((gym: GymRow) => { setEditingGym(gym); setSavingStatus("idle"); setDrawerOpen(true); }, []);
-  const closeDrawer = useCallback(() => { setDrawerOpen(false); setEditingGym(null); setSavingStatus("idle"); }, []);
+  // ── Gym CRUD ──
+  const openCreate = useCallback(() => {
+    setEditingGym(null);
+    setGymName("");
+    setGymFormState(initialAuthActionState);
+    setGymOutcome(null);
+    setSuccessAction(null);
+    setSavingStatus("idle");
+    setDrawerOpen(true);
+  }, []);
+  const openEdit = useCallback((gym: GymRow) => {
+    setEditingGym(gym);
+    setGymName(gym.name);
+    setGymFormState(initialAuthActionState);
+    setGymOutcome(null);
+    setSuccessAction(null);
+    setSavingStatus("idle");
+    setDrawerOpen(true);
+  }, []);
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    setEditingGym(null);
+    setGymName("");
+    setGymFormState(initialAuthActionState);
+    setGymOutcome(null);
+    setSuccessAction(null);
+    setSavingStatus("idle");
+  }, []);
 
   // ── Optimistic submit ──
   const handleOptimisticSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const name = formData.get("name") as string;
-    if (!name) return;
+    const name = String(formData.get("name") ?? "").trim();
+    const timezone = String(formData.get("timezone") ?? "").trim();
+    const currency = String(formData.get("currency") ?? "").trim().toUpperCase();
+    if (!name || !timezone || !currency) {
+      const missing: Record<string, string[]> = {};
+      if (!name) missing.name = ["Gym name is required."];
+      if (!timezone) missing.timezone = ["Timezone is required."];
+      if (!currency) missing.currency = ["Currency is required."];
+      const errorState: AuthActionState = { status: "error", message: "Complete the required gym details before saving.", fieldErrors: missing };
+      setGymFormState(errorState);
+      setGymOutcome({
+        status: "error",
+        title: "Gym details incomplete",
+        itemName: name || "New gym",
+        message: errorState.message,
+        details: Object.entries(missing).map(([label, values]) => ({ label: label === "name" ? "Gym name" : label === "timezone" ? "Timezone" : "Currency", value: values[0] ?? "Required" }))
+      });
+      return;
+    }
 
     const tempId = `temp-${Date.now()}`;
     const optimisticGym: GymRow = {
-      id: tempId, name, slug: (formData.get("slug") as string) || name.toLowerCase().replace(/\s+/g, "-"),
-      timezone: (formData.get("timezone") as string) || "Asia/Kolkata",
-      currency: (formData.get("currency") as string) || "INR",
+      id: tempId,
+      name,
+      slug: slugifyEnterpriseName(name),
+      timezone,
+      currency,
       status: (formData.get("status") as "active" | "suspended" | "archived") || "active",
       organization_id: dashboard.organization.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
     };
@@ -99,18 +130,45 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
     setSavingStatus("saving");
 
     const fd = new FormData(form);
-    const result = await saveGymAction({ status: "idle", message: null } as never, fd);
+    const result = await saveGymAction({ status: "idle", message: "" }, fd);
+    setGymFormState(result);
     if (result.status === "success") {
       removeOptimistic(tempId);
+      const gymData = result.gymData;
       if (isEdit) {
         setSuccessAction({ action: "updated", title: "Gym Updated!", itemName: name });
+      } else {
+        setGymOutcome({
+          status: "success",
+          title: "Gym Created",
+          itemName: gymData?.name ?? name,
+          message: result.message,
+          details: gymData
+            ? [
+                { label: "Slug", value: gymData.slug },
+                { label: "Timezone", value: gymData.timezone },
+                { label: "Currency", value: gymData.currency },
+                { label: "Status", value: gymData.status }
+              ]
+            : []
+        });
       }
+      setDrawerOpen(false);
     } else {
       removeOptimistic(tempId);
-      showToast(result.message || "Failed", "error");
+      setGymOutcome({
+        status: "error",
+        title: isEdit ? "Gym update failed" : "Gym creation failed",
+        itemName: name || "Gym",
+        message: result.message || "We could not save the gym right now.",
+        details: Object.entries(result.fieldErrors ?? {}).map(([key, values]) => ({
+          label: key.replace(/([A-Z])/g, " $1").replace(/^./, (match) => match.toUpperCase()),
+          value: values.join(", ")
+        }))
+      });
     }
     setSavingStatus("idle");
-  }, [addOptimistic, removeOptimistic, closeDrawer, dashboard.organization.id, editingGym]);
+  }, [addOptimistic, removeOptimistic, dashboard.organization.id, editingGym]);
 
   const handleSetStatus = useCallback(async (gymId: string, status: "active" | "suspended" | "archived") => {
     updateOptimistic(gymId, { status });
@@ -190,7 +248,7 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
           onClick={() => setModuleTab("gyms")}
           type="button"
         >
-          <Building2 className="size-4" /> Locations
+          <Building2 className="size-4" /> Gyms
         </motion.button>
         {hasCrossBranchFeature ? (
           <motion.button
@@ -272,24 +330,33 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
 
       {/* ═══ LOCATION DRAWER ═══ */}
       <OrgOwnerDrawer description={editingGym ? `Editing ${editingGym.name}` : "Create a new gym"} onClose={closeDrawer} open={drawerOpen} title={editingGym ? "Edit Gym" : "Create Gym"} size="lg">
-        <form ref={formRef} onSubmit={handleOptimisticSubmit} className="space-y-5">
-          <DrawerFormMessage status={state.status} message={state.message} />
+        <form onSubmit={handleOptimisticSubmit} className="space-y-5">
+          <DrawerFormMessage status={gymFormState.status} message={gymFormState.message} />
           {editingGym ? <input name="gymId" type="hidden" value={editingGym.id} /> : null}
+          <input name="slug" type="hidden" value={editingGym?.slug ?? slugPreview} />
           <div className="grid gap-5 md:grid-cols-2">
             <DrawerField label="Gym Name" required>
-              <input className={selectClass} defaultValue={editingGym?.name ?? ""} name="name" placeholder="Bandra West Fitness" required type="text" />
+              <input
+                className={selectClass}
+                defaultValue={editingGym?.name ?? ""}
+                name="name"
+                onChange={(event) => setGymName(event.target.value)}
+                placeholder="Bandra West Fitness"
+                required
+                type="text"
+              />
             </DrawerField>
-            <DrawerField label="Slug">
-              <input className={selectClass} defaultValue={editingGym?.slug ?? ""} name="slug" placeholder="bandra-west-fitness" type="text" />
+            <DrawerField label="Slug (auto-generated)">
+              <input className={selectClass} placeholder="Auto-generated from the gym name" readOnly value={editingGym?.slug ?? slugPreview} />
             </DrawerField>
-            <DrawerField label="Timezone">
-              <input className={selectClass} defaultValue={editingGym?.timezone ?? "Asia/Kolkata"} name="timezone" type="text" />
+            <DrawerField label="Timezone" required>
+              <input className={selectClass} defaultValue={editingGym?.timezone ?? "Asia/Kolkata"} name="timezone" required type="text" />
             </DrawerField>
-            <DrawerField label="Currency">
-              <input className={selectClass} defaultValue={editingGym?.currency ?? "INR"} name="currency" maxLength={3} type="text" />
+            <DrawerField label="Currency" required>
+              <input className={selectClass} defaultValue={editingGym?.currency ?? "INR"} name="currency" maxLength={3} required type="text" />
             </DrawerField>
-            <DrawerField label="Status">
-              <select className={selectClass} defaultValue={editingGym?.status ?? "active"} name="status">
+            <DrawerField label="Status" required>
+              <select className={selectClass} defaultValue={editingGym?.status ?? "active"} name="status" required>
                 <option value="active">Active</option><option value="suspended">Suspended</option><option value="archived">Archived</option>
               </select>
             </DrawerField>
@@ -327,7 +394,12 @@ export function BranchesModule({ dashboard, moduleData }: BranchesModuleProps) {
         ) : null}
       </AnimatePresence>
 
-      <GymCreatedDialog open={!!successGym} data={successGym} onClose={() => setSuccessGym(null)} />
+      <EnterpriseOutcomeDialog
+        open={!!gymOutcome}
+        outcome={gymOutcome}
+        onClose={() => setGymOutcome(null)}
+        actionLabel="Close"
+      />
       <GenericSuccessDialog
         action={successAction?.action ?? "created"}
         itemName={successAction?.itemName ?? ""}
@@ -423,7 +495,7 @@ function LocationStatDetailPanel({
             <div>
               <h2 className="text-xl font-black">{titleByKey[statKey]}</h2>
               <p className="text-sm text-muted-foreground">
-                {filtered.length} location{filtered.length !== 1 ? "s" : ""}
+                {filtered.length} gym{filtered.length !== 1 ? "s" : ""}
               </p>
             </div>
           </div>

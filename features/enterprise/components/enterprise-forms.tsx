@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -46,7 +46,7 @@ import {
   saveTenantDomainAction,
   updateSecurityEventStatusAction
 } from "../actions/enterprise-actions";
-import { formatEnterpriseLabel } from "../lib/business-rules";
+import { formatEnterpriseLabel, slugifyEnterpriseName } from "../lib/business-rules";
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm";
 
@@ -73,18 +73,20 @@ export function OrganizationForm({ organizations }: { organizations: Organizatio
 
 export function GymForm({ gyms, organizations }: { gyms: GymRow[]; organizations: OrganizationRow[] }) {
   const [state, formAction] = useActionState(saveGymAction, initialAuthActionState);
+  const [gymName, setGymName] = useState("");
+  const slugPreview = useMemo(() => slugifyEnterpriseName(gymName), [gymName]);
   return (
     <form action={formAction} className="space-y-4">
       <FormMessage state={state} />
       <EntitySelect label="Gym" name="gymId" options={gyms.map((item) => ({ label: item.name, value: item.id }))} placeholder="Create new gym" />
-      <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} />
+      <EntitySelect label="Organization" name="organizationId" options={organizations.map((item) => ({ label: item.name, value: item.id }))} required />
       <div className="grid gap-4 md:grid-cols-2">
-        <Field id="gym-name" label="Name" name="name" state={state}><Input id="gym-name" name="name" placeholder="Apex Fitness Mumbai" /></Field>
-        <Field id="gym-slug" label="Slug" name="slug" state={state}><Input id="gym-slug" name="slug" placeholder="apex-fitness-mumbai" /></Field>
+        <Field id="gym-name" label="Gym name" name="name" state={state}><Input id="gym-name" name="name" onChange={(event) => setGymName(event.target.value)} placeholder="Apex Fitness Mumbai" required value={gymName} /></Field>
+        <Field id="gym-slug" label="Slug (auto-generated)" name="slug" state={state}><Input id="gym-slug" name="slug" readOnly value={slugPreview} /></Field>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
-        <Field id="gym-timezone" label="Timezone" name="timezone" state={state}><Input id="gym-timezone" name="timezone" defaultValue="Asia/Kolkata" /></Field>
-        <Field id="gym-currency" label="Currency" name="currency" state={state}><Input id="gym-currency" name="currency" defaultValue="INR" /></Field>
+        <Field id="gym-timezone" label="Timezone" name="timezone" state={state}><Input id="gym-timezone" name="timezone" defaultValue="Asia/Kolkata" required /></Field>
+        <Field id="gym-currency" label="Currency" name="currency" state={state}><Input id="gym-currency" name="currency" defaultValue="INR" maxLength={3} required /></Field>
         <SelectField label="Status" name="status" options={gymStatuses} />
       </div>
       <AuthSubmitButton>Save Gym</AuthSubmitButton>
@@ -708,11 +710,11 @@ function CheckboxControl({ checked, label, onChange }: { checked: boolean; label
   );
 }
 
-function EntitySelect({ label, name, options, placeholder = "Select" }: { label: string; name: string; options: Array<{ label: string; value: string }>; placeholder?: string }) {
+function EntitySelect({ label, name, options, placeholder = "Select", required = false }: { label: string; name: string; options: Array<{ label: string; value: string }>; placeholder?: string; required?: boolean }) {
   return (
     <label className="space-y-2 text-sm font-bold">
-      <span>{label}</span>
-      <select className={selectClass} name={name} defaultValue="">
+      <span>{label}{required ? <span className="ml-1 text-red-500" aria-hidden="true">*</span> : null}</span>
+      <select className={selectClass} name={name} defaultValue="" required={required}>
         <option value="">{placeholder}</option>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>

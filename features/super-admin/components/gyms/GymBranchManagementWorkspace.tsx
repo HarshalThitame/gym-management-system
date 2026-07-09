@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -28,7 +28,8 @@ import { SearchInput } from "@/components/ui/search-input";
 import { initialAuthActionState, type AuthActionState } from "@/features/auth/actions/action-state";
 import { FieldError, FormMessage } from "@/features/auth/components/form-message";
 import { EnterpriseStatusBadge } from "@/features/enterprise/components/enterprise-status-badge";
-import { formatCompactNumber, formatCurrency, formatEnterpriseLabel } from "@/features/enterprise/lib/business-rules";
+import { formatCompactNumber, formatCurrency, formatEnterpriseLabel, slugifyEnterpriseName } from "@/features/enterprise/lib/business-rules";
+import { EnterpriseOutcomeDialog, type EnterpriseOutcome } from "@/features/enterprise/components/enterprise-outcome-dialog";
 import { branchStatuses, gymStatuses } from "@/types/enterprise";
 import type { Json } from "@/types/database";
 import {
@@ -68,6 +69,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
   const [status, setStatus] = useState(data.filters.status);
   const [pageSize, setPageSize] = useState(String(data.filters.pageSize));
   const [drawer, setDrawer] = useState<DrawerState>({ type: "closed" });
+  const [gymOutcome, setGymOutcome] = useState<EnterpriseOutcome | null>(null);
 
   function applyFilters(nextPage = 1, overrides: Partial<{ query: string; organizationId: string; status: string; pageSize: string }> = {}) {
     const params = new URLSearchParams();
@@ -93,7 +95,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
     <div className="space-y-5">
       <div className="bg-background/90 backdrop-blur sticky top-0 z-10 border-b border-border -mx-5 px-5 py-3 space-y-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-black">Branch &amp; Location Governance</h1>
+          <h1 className="text-2xl font-black">Gym &amp; Branch Governance</h1>
           <div className="flex flex-wrap gap-2">
             <ButtonLink href="/api/super-admin/gyms/export?format=csv" variant="secondary" size="sm">
               <Download aria-hidden="true" className="size-4" />
@@ -114,7 +116,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
         </div>
         <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-stretch">
           {[
-            { icon: <Building2 className="size-5" />, label: "Locations", value: formatCompactNumber(data.summary.gyms), detail: `${formatCompactNumber(data.summary.activeGyms)} active` },
+            { icon: <Building2 className="size-5" />, label: "Gyms", value: formatCompactNumber(data.summary.gyms), detail: `${formatCompactNumber(data.summary.activeGyms)} active` },
             { icon: <GitBranch className="size-5" />, label: "Branches", value: formatCompactNumber(data.summary.branches), detail: `${formatCompactNumber(data.summary.activeBranches)} active` },
             { icon: <UserRoundCog className="size-5" />, label: "Missing Admins", value: formatCompactNumber(data.summary.branchesWithoutAdmins), detail: "Branches without active gym admin" },
             { icon: <ShieldAlert className="size-5" />, label: "Warnings", value: formatCompactNumber(data.summary.consistencyWarnings), detail: "Hierarchy and data consistency checks" },
@@ -170,7 +172,7 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
           <Card>
             <CardContent className="p-8 text-center">
               <p className="text-lg font-black">No gyms match these filters.</p>
-              <p className="mt-2 text-sm text-muted-foreground">Create a location or clear filters to review the hierarchy.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Create a gym or clear filters to review the hierarchy.</p>
               <Button className="mt-5" onClick={() => setDrawer({ type: "create_gym" })} variant="accent">
                 <Plus aria-hidden="true" className="size-4" />
                 Create Gym
@@ -206,7 +208,13 @@ export function GymBranchManagementWorkspace({ data }: { data: GymBranchManageme
 
       <AuditTimeline items={data.auditTimeline} />
 
-      <GymBranchDrawer data={data} drawer={drawer} onClose={() => setDrawer({ type: "closed" })} />
+      <GymBranchDrawer data={data} drawer={drawer} onClose={() => setDrawer({ type: "closed" })} onOutcome={setGymOutcome} />
+      <EnterpriseOutcomeDialog
+        open={!!gymOutcome}
+        outcome={gymOutcome}
+        onClose={() => setGymOutcome(null)}
+        actionLabel="Close"
+      />
     </div>
   );
 }
@@ -302,15 +310,25 @@ function BranchRowCard({ branch, onOpen }: { branch: BranchNode; onOpen: (drawer
   );
 }
 
-function GymBranchDrawer({ data, drawer, onClose }: { data: GymBranchManagementData; drawer: DrawerState; onClose: () => void }) {
+function GymBranchDrawer({
+  data,
+  drawer,
+  onClose,
+  onOutcome
+}: {
+  data: GymBranchManagementData;
+  drawer: DrawerState;
+  onClose: () => void;
+  onOutcome: (outcome: EnterpriseOutcome | null) => void;
+}) {
   if (drawer.type === "closed") {
     return null;
   }
   if (drawer.type === "create_gym") {
-    return <GymForm data={data} onClose={onClose} title="Create Gym" />;
+    return <GymForm data={data} onClose={onClose} onOutcome={onOutcome} title="Create Gym" />;
   }
   if (drawer.type === "edit_gym") {
-    return <GymForm data={data} gym={drawer.gym} onClose={onClose} title="Edit Gym" />;
+    return <GymForm data={data} gym={drawer.gym} onClose={onClose} onOutcome={onOutcome} title="Edit Gym" />;
   }
   if (drawer.type === "create_branch") {
     return <BranchForm data={data} defaultGymId={drawer.gymId} defaultOrganizationId={drawer.organizationId} onClose={onClose} title="Create Branch" />;
@@ -336,11 +354,59 @@ function GymBranchDrawer({ data, drawer, onClose }: { data: GymBranchManagementD
   return <LifecycleForm drawer={drawer} onClose={onClose} />;
 }
 
-function GymForm({ data, gym, onClose, title }: { data: GymBranchManagementData; gym?: GymBranchNode; onClose: () => void; title: string }) {
+function GymForm({
+  data,
+  gym,
+  onClose,
+  onOutcome,
+  title
+}: {
+  data: GymBranchManagementData;
+  gym?: GymBranchNode;
+  onClose: () => void;
+  onOutcome: (outcome: EnterpriseOutcome | null) => void;
+  title: string;
+}) {
   const router = useRouter();
   const [state, formAction] = useActionState(saveSuperAdminGymAction, initialAuthActionState);
+  const [gymName, setGymName] = useState(gym?.gym.name ?? "");
+  const [gymTimezone, setGymTimezone] = useState(gym?.gym.timezone ?? "Asia/Kolkata");
+  const [gymCurrency, setGymCurrency] = useState(gym?.gym.currency ?? "INR");
+  const [gymStatus, setGymStatus] = useState(gym?.gym.status ?? "active");
   useCloseOnSuccess(state.status, onClose);
   useRefreshOnSuccess(state.status, router);
+  const slugPreview = useMemo(() => gym?.gym.slug ?? slugifyEnterpriseName(gymName), [gym?.gym.slug, gymName]);
+
+  useEffect(() => {
+    if (state.status === "success" && state.message) {
+      const dataRows = [
+        { label: "Slug", value: slugPreview },
+        { label: "Timezone", value: gymTimezone },
+        { label: "Currency", value: gymCurrency },
+        { label: "Status", value: gymStatus }
+      ];
+      onOutcome({
+        status: "success",
+        title: gym ? "Gym updated" : "Gym created",
+        itemName: gymName || gym?.gym.name || "Gym",
+        message: state.message,
+        details: dataRows
+      });
+      return;
+    }
+    if (state.status === "error" && state.message) {
+      onOutcome({
+        status: "error",
+        title: gym ? "Gym update failed" : "Gym creation failed",
+        itemName: gymName || gym?.gym.name || "Gym",
+        message: state.message,
+        details: Object.entries(state.fieldErrors ?? {}).map(([key, values]) => ({
+          label: key === "organizationId" ? "Organization" : key === "name" ? "Gym name" : key === "slug" ? "Slug" : key === "timezone" ? "Timezone" : key === "currency" ? "Currency" : key,
+          value: values.join(", ")
+        }))
+      });
+    }
+  }, [gym, gymCurrency, gymName, gymStatus, gymTimezone, onOutcome, slugPreview, state.fieldErrors, state.message, state.status]);
 
   return (
     <DrawerShell onClose={onClose} title={title}>
@@ -348,19 +414,24 @@ function GymForm({ data, gym, onClose, title }: { data: GymBranchManagementData;
         <FormMessage state={state} />
         <input name="gymId" type="hidden" value={gym?.gym.id ?? ""} />
         <div className="grid gap-4 md:grid-cols-2">
-          <Field error={state.fieldErrors?.name?.[0]} label="Location name"><Input name="name" defaultValue={gym?.gym.name ?? ""} placeholder="Apex Fitness Mumbai" /></Field>
-          <Field error={state.fieldErrors?.slug?.[0]} label="Slug"><Input name="slug" defaultValue={gym?.gym.slug ?? ""} placeholder="apex-fitness-mumbai" /></Field>
+          <Field error={state.fieldErrors?.name?.[0]} label="Gym name *"><Input name="name" required value={gymName} onChange={(event) => setGymName(event.target.value)} placeholder="Apex Fitness Mumbai" /></Field>
+          <Field error={state.fieldErrors?.slug?.[0]} label="Slug (auto-generated)"><Input name="slug" placeholder="Auto-generated from the gym name" readOnly value={slugPreview} /></Field>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="space-y-2"><span className="text-sm font-bold">Organization</span><select className={selectClass} name="organizationId" defaultValue={gym?.gym.organization_id ?? ""}>{data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select><FieldError message={state.fieldErrors?.organizationId?.[0]} /></label>
-          <label className="space-y-2"><span className="text-sm font-bold">Status</span><select className={selectClass} name="status" defaultValue={gym?.gym.status ?? "active"}>{gymStatuses.map((status) => <option key={status} value={status}>{formatEnterpriseLabel(status)}</option>)}</select></label>
+          <label className="space-y-2"><span className="text-sm font-bold">Organization *</span><select className={selectClass} name="organizationId" defaultValue={gym?.gym.organization_id ?? ""} required><option value="">Select organization</option>{data.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select><FieldError message={state.fieldErrors?.organizationId?.[0]} /></label>
+          <label className="space-y-2"><span className="text-sm font-bold">Status *</span><select className={selectClass} name="status" value={gymStatus} onChange={(event) => setGymStatus(event.target.value)} required>{gymStatuses.map((status) => <option key={status} value={status}>{formatEnterpriseLabel(status)}</option>)}</select></label>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field error={state.fieldErrors?.timezone?.[0]} label="Timezone"><Input name="timezone" defaultValue={gym?.gym.timezone ?? "Asia/Kolkata"} /></Field>
-          <Field error={state.fieldErrors?.currency?.[0]} label="Currency"><Input name="currency" defaultValue={gym?.gym.currency ?? "INR"} /></Field>
+          <Field error={state.fieldErrors?.timezone?.[0]} label="Timezone *"><Input name="timezone" required value={gymTimezone} onChange={(event) => setGymTimezone(event.target.value)} /></Field>
+          <Field error={state.fieldErrors?.currency?.[0]} label="Currency *"><Input name="currency" maxLength={3} required value={gymCurrency} onChange={(event) => setGymCurrency(event.target.value.toUpperCase())} /></Field>
         </div>
-        <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason"><Textarea className="min-h-24" name="reason" placeholder="Reason for this location change." /></Field>
-        <DrawerActions onClose={onClose} submitLabel={gym ? "Save Location" : "Create Location"} />
+        <div className="rounded-xl border border-border bg-background p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Preview</p>
+          <p className="mt-2 text-lg font-black">{gymName || "New gym"}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Slug will be generated automatically from the gym name and kept stable across the hierarchy.</p>
+        </div>
+        <Field error={state.fieldErrors?.reason?.[0]} label="Audit reason"><Textarea className="min-h-24" name="reason" placeholder="Reason for this gym change." /></Field>
+        <DrawerActions onClose={onClose} submitLabel={gym ? "Save Gym" : "Create Gym"} />
       </form>
     </DrawerShell>
   );
@@ -521,7 +592,7 @@ function MoveGymForm({ data, gym, onClose }: { data: GymBranchManagementData; gy
   useRefreshOnSuccess(state.status, router);
 
   return (
-    <DrawerShell onClose={onClose} title="Move Location Across Organization">
+    <DrawerShell onClose={onClose} title="Move Gym Across Organization">
       <form action={formAction} className="space-y-5">
         <FormMessage state={state} />
         <input name="gymId" type="hidden" value={gym.gym.id} />
