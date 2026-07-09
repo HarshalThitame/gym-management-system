@@ -43,6 +43,14 @@ export type SubscriptionWithPackage = {
   cancelled_at: string | null;
   cancellation_reason: string | null;
   auto_renew: boolean;
+  billing_engine?: string | null;
+  provider?: string | null;
+  provider_environment?: string | null;
+  provider_subscription_id?: string | null;
+  provider_plan_id?: string | null;
+  provider_customer_id?: string | null;
+  provider_mandate_id?: string | null;
+  provider_payment_method_id?: string | null;
   package: PackageWithMeta;
 };
 

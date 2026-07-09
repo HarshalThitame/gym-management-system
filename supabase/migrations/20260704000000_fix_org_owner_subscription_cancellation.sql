@@ -69,6 +69,7 @@ AS $$
 DECLARE
   v_subscription record;
   v_now timestamptz := now();
+  v_cancel_at timestamptz;
 BEGIN
   IF p_organization_id IS NULL OR p_actor_id IS NULL THEN
     RETURN jsonb_build_object('success', false, 'code', 'INVALID_SCOPE', 'error', 'Organization and actor are required.');
@@ -95,10 +96,19 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'code', 'ACTIVE_SUBSCRIPTION_NOT_FOUND', 'error', 'No active or trial subscription found for this organization.');
   END IF;
 
+  -- Schedule cancellation at end of billing period: use next_billing_date when available,
+  -- otherwise fall back to 30 days from now (monthly default).
+  -- Clamp to at least tomorrow so the cancel is never immediate from a stale next_billing_date.
+  v_cancel_at := greatest(
+    coalesce(v_subscription.next_billing_date, v_now + interval '30 days'),
+    v_now + interval '1 day'
+  );
+
   UPDATE public.organization_subscriptions
-  SET status = 'cancelled',
+  SET status = 'active',
       auto_renew = false,
-      cancelled_at = v_now,
+      cancelled_at = v_cancel_at,
+      expires_at = least(coalesce(expires_at, v_cancel_at), v_cancel_at),
       cancellation_reason = trim(p_reason),
       cancellation_category = coalesce(cancellation_category, 'organization_requested'),
       data_retention_days = 30,
@@ -118,9 +128,15 @@ BEGIN
   VALUES (
     p_organization_id,
     v_subscription.id,
-    'cancelled',
+    'cancellation_scheduled',
     p_actor_id,
-    jsonb_build_object('status', 'cancelled', 'autoRenew', false, 'cancelledAt', v_now, 'dataRetentionDays', 30),
+    jsonb_build_object(
+      'status', 'active',
+      'autoRenew', false,
+      'cancelledAt', v_cancel_at,
+      'dataRetentionDays', 30,
+      'scheduledEndDate', v_cancel_at
+    ),
     trim(p_reason),
     jsonb_build_object(
       'source', 'organization_owner',
@@ -135,7 +151,7 @@ BEGIN
   RETURN jsonb_build_object(
     'success', true,
     'subscriptionId', v_subscription.id,
-    'cancelledAt', v_now,
+    'scheduledCancelAt', v_cancel_at,
     'dataRetentionDays', 30
   );
 END;

@@ -36,8 +36,8 @@ export function OrderSummaryDialog({
             <Shield className="size-4" />
             <span>Secured by Razorpay</span>
           </div>
-          <h2 className="mt-3 text-2xl font-black">Order Summary</h2>
-          <p className="mt-1 text-sm text-white/80">Review your subscription details before payment</p>
+          <h2 className="mt-3 text-2xl font-black">Subscription Summary</h2>
+          <p className="mt-1 text-sm text-white/80">Review your auto-debit details before authorization</p>
         </div>
 
         <div className="space-y-5 px-6 py-6">
@@ -48,7 +48,7 @@ export function OrderSummaryDialog({
                 <p className="text-lg font-black">{checkoutData.packageDisplayName}</p>
               </div>
               <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-                {checkoutData.billingCycle === "annual" ? "Annual" : "Monthly"}
+                {checkoutData.billingCycle === "annual" ? "Annual auto-debit" : "Monthly auto-debit"}
               </div>
             </div>
           </div>
@@ -68,18 +68,18 @@ export function OrderSummaryDialog({
                 <span className="text-xl font-black text-indigo-600">{formatPaise(checkoutData.amountPaise)}</span>
               </div>
               <p className="mt-1 text-right text-xs text-muted-foreground">
-                {checkoutData.isTestMode ? "Test mode — no real charges" : "All taxes included"}
+                {checkoutData.isTestMode ? "Test mode — no real charges" : "Mandate-based auto-debit will be charged by Razorpay"}
               </p>
             </div>
           </div>
 
-          {checkoutData.isTestMode && (
+            {checkoutData.isTestMode && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
               <div className="flex items-start gap-2">
                 <Shield className="size-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">Test Mode</p>
-                  <p>This is a test payment. No real money will be charged.</p>
+                  <p>This is a test authorization. No real money will be charged.</p>
                 </div>
               </div>
             </div>
@@ -98,11 +98,11 @@ export function OrderSummaryDialog({
             ) : (
               <CreditCard className="size-5" />
             )}
-            {processing ? "Preparing Payment..." : `Pay ${formatPaise(checkoutData.amountPaise)} via Razorpay`}
+            {processing ? "Preparing Authorization..." : `Authorize ${formatPaise(checkoutData.amountPaise)} via Razorpay`}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            Your payment is processed securely by Razorpay. We do not store your card details.
+            Your authorization is processed securely by Razorpay. We do not store card details.
           </p>
         </div>
       </div>

@@ -450,6 +450,19 @@ export async function createRazorpaySubscription(input: {
   }
 }
 
+export async function fetchRazorpaySubscription(
+  subscriptionId: string,
+): Promise<{ ok: true; data: RazorpaySubscriptionData } | { ok: false; message: string }> {
+  try {
+    const client = getClient();
+    const subscription = await client.subscriptions.fetch(subscriptionId) as never as RazorpaySubscriptionData;
+    return { ok: true, data: subscription };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Razorpay subscription fetch failed";
+    return { ok: false, message };
+  }
+}
+
 export async function cancelRazorpaySubscription(
   subscriptionId: string,
 ): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
@@ -460,6 +473,29 @@ export async function cancelRazorpaySubscription(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Razorpay subscription cancellation failed";
     return { ok: false, message };
+  }
+}
+
+export function verifyRazorpaySubscriptionSignature(input: {
+  subscriptionId: string;
+  paymentId: string;
+  signature: string;
+  secret?: string;
+}): boolean {
+  try {
+    const config = getRazorpayConfig();
+    const secret = input.secret ?? config.keySecret;
+    if (!secret) return false;
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update(`${input.paymentId}|${input.subscriptionId}`)
+      .digest("hex");
+    const expectedBuffer = Buffer.from(expected);
+    const receivedBuffer = Buffer.from(input.signature);
+    if (expectedBuffer.length !== receivedBuffer.length) return false;
+    return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  } catch {
+    return false;
   }
 }
 

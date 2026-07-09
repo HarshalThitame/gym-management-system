@@ -49,18 +49,74 @@ export async function GET(request: Request) {
   const now = new Date();
   const results: string[] = [];
 
-  // Step 1: Grace period expired → suspend
+  // Step 1: Pending cancellations — transition active subscriptions with
+  // cancelled_at in the past to cancelled (end-of-period cancellation).
+  // Run before grace-period suspension so pending-cancel subs are not
+  // wrongfully suspended when their expires_at aligns with cancelled_at.
+  const { data: pendingCancel } = await admin
+    .from("organization_subscriptions")
+    .select("id, organization_id, status, cancelled_at")
+    .lt("cancelled_at", now.toISOString())
+    .eq("status", "active");
+
+  if (pendingCancel && pendingCancel.length > 0) {
+    const ids = pendingCancel.map((s) => s.id);
+    const { error } = await admin
+      .from("organization_subscriptions")
+      .update({
+        status: "cancelled",
+        updated_at: now.toISOString(),
+        expires_at: now.toISOString(),
+      })
+      .in("id", ids);
+
+    if (!error) {
+      results.push(`Cancelled ${ids.length} subscription(s) at end of billing period`);
+      for (const sub of pendingCancel) {
+        await syncSubscriptionArtifactsForOrganization(
+          sub.organization_id as string,
+          "Subscription lifecycle cron cancelled subscription at end of billing period.",
+        );
+        await recordSubscriptionEvent({
+          organizationId: sub.organization_id as string,
+          subscriptionId: sub.id as string,
+          eventType: "cancelled",
+          previousState: { status: "active", cancelled_at: sub.cancelled_at },
+          newState: { status: "cancelled" },
+          reason: "End of billing period reached — scheduled cancellation executed.",
+        });
+        await recordSubscriptionHistory({
+          subscriptionId: sub.id as string,
+          organizationId: sub.organization_id as string,
+          eventType: "cancelled",
+          newState: { status: "cancelled" },
+          reason: "Scheduled cancellation executed at end of billing period.",
+        });
+      }
+    }
+  }
+
+  // Step 2: Grace period expired → suspend
+  // Pending-cancel subscriptions are excluded here because Step 1 already
+  // transitioned them to 'cancelled' (they were still 'active' at query time
+  // but no longer match the status filter after the UPDATE).
   const gracePeriodDate = new Date(now);
   gracePeriodDate.setDate(gracePeriodDate.getDate() - GRACE_PERIOD_DAYS);
 
   const { data: expiredGrace } = await admin
     .from("organization_subscriptions")
-    .select("id, organization_id, status, expires_at")
+    .select("id, organization_id, status, expires_at, billing_engine, provider_subscription_id")
     .lt("expires_at", gracePeriodDate.toISOString())
     .eq("status", "active");
 
-  if (expiredGrace && expiredGrace.length > 0) {
-    const ids = expiredGrace.map((s) => s.id);
+  const billableExpiredGrace = (expiredGrace ?? []).filter((sub) => {
+    const billingEngine = sub.billing_engine as string | null;
+    const providerSubscriptionId = sub.provider_subscription_id as string | null;
+    return billingEngine !== "subscription" && !providerSubscriptionId;
+  });
+
+  if (billableExpiredGrace.length > 0) {
+    const ids = billableExpiredGrace.map((s) => s.id);
     const { error } = await admin
       .from("organization_subscriptions")
       .update({ status: "suspended", updated_at: now.toISOString() })
@@ -68,7 +124,7 @@ export async function GET(request: Request) {
 
     if (!error) {
       results.push(`Suspended ${ids.length} subscription(s) past grace period`);
-      for (const sub of expiredGrace) {
+      for (const sub of billableExpiredGrace) {
         await syncSubscriptionArtifactsForOrganization(
           sub.organization_id as string,
           "Subscription lifecycle cron suspended subscription after grace period.",
@@ -91,7 +147,7 @@ export async function GET(request: Request) {
     }
   }
 
-  // Step 2: Data retention expiry for cancelled subscriptions
+  // Step 4: Data retention expiry for cancelled subscriptions
   const { data: retentionExpired } = await admin
     .from("organization_subscriptions")
     .select("id, organization_id, status, expires_at")
@@ -124,16 +180,22 @@ export async function GET(request: Request) {
     }
   }
 
-  // Step 3: Log grace period entries
+  // Step 5: Log grace period entries
   const { data: justExpired } = await admin
     .from("organization_subscriptions")
-    .select("id, organization_id, status, expires_at")
+    .select("id, organization_id, status, expires_at, billing_engine, provider_subscription_id")
     .lt("expires_at", now.toISOString())
     .eq("status", "active");
 
-  if (justExpired && justExpired.length > 0) {
-    results.push(`${justExpired.length} subscription(s) in grace period`);
-    for (const sub of justExpired) {
+  const billableJustExpired = (justExpired ?? []).filter((sub) => {
+    const billingEngine = sub.billing_engine as string | null;
+    const providerSubscriptionId = sub.provider_subscription_id as string | null;
+    return billingEngine !== "subscription" && !providerSubscriptionId;
+  });
+
+  if (billableJustExpired.length > 0) {
+    results.push(`${billableJustExpired.length} subscription(s) in grace period`);
+    for (const sub of billableJustExpired) {
       await recordSubscriptionEvent({
         organizationId: sub.organization_id as string,
         subscriptionId: sub.id as string,

@@ -1,13 +1,11 @@
 "use client";
 
-import { Check, ArrowRight, Shield, FileText, CreditCard, Calendar, Hash } from "lucide-react";
+import { Check, ArrowRight, Shield, CreditCard, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type PaymentSuccessDetails = {
   paymentId: string;
-  orderId: string;
-  invoiceId: string;
-  subscriptionId: string | null;
+  subscriptionId: string;
   amountPaise: number;
   currency: string;
   packageName: string;
@@ -31,11 +29,7 @@ export function PaymentSuccessDialog({ open, details, onClose }: PaymentSuccessD
 
   const detailItems = [
     { icon: CreditCard, label: "Payment ID", value: details.paymentId },
-    { icon: Hash, label: "Order ID", value: details.orderId },
-    { icon: FileText, label: "Invoice ID", value: details.invoiceId },
-    ...(details.subscriptionId
-      ? [{ icon: Shield, label: "Subscription ID", value: details.subscriptionId }]
-      : [] as { icon: typeof Shield; label: string; value: string }[]),
+    { icon: Shield, label: "Subscription ID", value: details.subscriptionId },
     { icon: Calendar, label: "Date & Time", value: new Date(details.timestamp).toLocaleString("en-IN") },
     { icon: CreditCard, label: "Amount Paid", value: formatPaise(details.amountPaise) },
   ];
@@ -47,8 +41,8 @@ export function PaymentSuccessDialog({ open, details, onClose }: PaymentSuccessD
           <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-white/20">
             <Check className="size-8" />
           </div>
-          <h2 className="mt-4 text-2xl font-black">Payment Successful!</h2>
-          <p className="mt-1 text-sm text-white/80">Your subscription has been activated</p>
+          <h2 className="mt-4 text-2xl font-black">Authorization Successful!</h2>
+          <p className="mt-1 text-sm text-white/80">Your auto-debit mandate is active</p>
         </div>
 
         <div className="space-y-5 px-6 py-6">
@@ -59,7 +53,7 @@ export function PaymentSuccessDialog({ open, details, onClose }: PaymentSuccessD
                 <p className="text-lg font-black text-emerald-800">{details.packageName}</p>
               </div>
               <div className="rounded-full bg-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800">
-                {details.billingCycle === "annual" ? "Annual" : "Monthly"}
+                {details.billingCycle === "annual" ? "Annual auto-debit" : "Monthly auto-debit"}
               </div>
             </div>
           </div>
@@ -82,7 +76,7 @@ export function PaymentSuccessDialog({ open, details, onClose }: PaymentSuccessD
                 <Shield className="size-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">Test Mode Payment</p>
-                  <p>This was a test transaction. No real money was charged.</p>
+                  <p>This was a test authorization. No real money was charged.</p>
                 </div>
               </div>
             </div>

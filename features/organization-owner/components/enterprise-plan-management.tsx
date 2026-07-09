@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useActionState } from "react";
 import { AlertTriangle, Check, CheckCircle2, Clock, CreditCard, LineChart, Loader2, Minus, Plus, ReceiptText, RefreshCw, XCircle, Users, Briefcase, Calendar, MessageSquare, BarChart3, Smartphone, Lock, Sparkles } from "lucide-react";
 import { LineChart as RechartsLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Line } from "recharts";
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
 import { formatCurrency } from "@/features/enterprise/lib/business-rules";
-import { toggleAutoRenewAction, cancelSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
+import { toggleAutoRenewAction, cancelSubscriptionAction, reactivateSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
 import { RazorpayCheckout } from "@/features/organization-owner/components/razorpay-checkout";
 import { OrderSummaryDialog } from "@/features/organization-owner/components/order-summary-dialog";
 import { PaymentSuccessDialog } from "@/features/organization-owner/components/payment-success-dialog";
@@ -28,12 +28,13 @@ import { cn } from "@/lib/utils";
 type CheckoutDataSuccess = {
   success: true;
   razorpayKeyId: string;
-  razorpayOrderId: string;
+  razorpaySubscriptionId: string;
+  razorpayCustomerId: string;
   amountPaise: number;
   subtotalPaise: number;
   taxPaise: number;
   currency: string;
-  invoiceId: string;
+  subscriptionId: string;
   packageDisplayName: string;
   organizationDisplayName: string;
   billingCycle: string;
@@ -73,6 +74,19 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   const [showCancel, setShowCancel] = useState(false);
   const [autoRenewState, autoRenewAction, autoRenewPending] = useActionState(toggleAutoRenewAction, initialAuthActionState);
   const [cancelState, cancelAction, cancelPending] = useActionState(cancelSubscriptionAction, initialAuthActionState);
+  const [reactivateState, reactivateAction, reactivatePending] = useActionState(reactivateSubscriptionAction, initialAuthActionState);
+
+  // Close cancel modal on success and show toast for reactivate success
+  useEffect(() => {
+    if (cancelState.status === "success") {
+      setShowCancel(false);
+    }
+  }, [cancelState.status]);
+  useEffect(() => {
+    if (reactivateState.status === "success") {
+      showToast(reactivateState.message ?? "Subscription reactivated.", "success");
+    }
+  }, [reactivateState.status, reactivateState.message]);
   const razorpayScriptStatus = useRazorpayScript();
 
   const [payDialogState, setPayDialogState] = useState<{
@@ -81,9 +95,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
     checkoutData: CheckoutDataSuccess | null;
     successDetails: {
       paymentId: string;
-      orderId: string;
-      invoiceId: string;
-      subscriptionId: string | null;
+      subscriptionId: string;
       amountPaise: number;
       currency: string;
       packageName: string;
@@ -107,7 +119,13 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   const isTrialing = planContext.isTrialing;
   const isSuspended = planContext.isSuspended;
   const isCancelled = planContext.status === "cancelled" || currentSubscription?.status === "cancelled";
+  const cancelledAt = currentSubscription ? (currentSubscription as unknown as { cancelled_at: string | null }).cancelled_at : null;
+  const hasPendingCancel = !isCancelled && cancelledAt != null;
+  const scheduledEndDate = hasPendingCancel ? new Date(cancelledAt!) : null;
   const autoRenew = currentSubscription ? (currentSubscription as unknown as { auto_renew: boolean }).auto_renew : true;
+  const billingEngine = currentSubscription ? (currentSubscription as unknown as { billing_engine?: string | null }).billing_engine : null;
+  const providerSubscriptionId = currentSubscription ? (currentSubscription as unknown as { provider_subscription_id?: string | null }).provider_subscription_id : null;
+  const providerMandateId = currentSubscription ? (currentSubscription as unknown as { provider_mandate_id?: string | null }).provider_mandate_id : null;
 
   const currentPkg = currentSubscription
     ? allPackages.find((p) => p.id === currentSubscription.package_id) ?? null
@@ -148,12 +166,13 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
       const checkout: CheckoutDataSuccess = {
         success: true,
         razorpayKeyId: result.razorpayKeyId,
-        razorpayOrderId: result.razorpayOrderId,
+        razorpaySubscriptionId: result.razorpaySubscriptionId ?? "",
+        razorpayCustomerId: result.razorpayCustomerId ?? "",
         amountPaise: result.amountPaise,
         subtotalPaise: result.subtotalPaise,
         taxPaise: result.taxPaise,
         currency: result.currency,
-        invoiceId: result.invoiceId,
+        subscriptionId: result.subscriptionId ?? "",
         packageDisplayName: result.packageDisplayName,
         organizationDisplayName: result.organizationDisplayName,
         billingCycle: result.billingCycle,
@@ -188,9 +207,9 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
       key: data.razorpayKeyId,
       amount: data.amountPaise,
       currency: data.currency,
-      order_id: data.razorpayOrderId,
+      subscription_id: data.razorpaySubscriptionId,
       name: organizationName || "Gym Management",
-      description: `${data.packageDisplayName} — ${serverBillingCycle === "annual" ? "Annual" : "Monthly"}`,
+      description: `${data.packageDisplayName} — ${serverBillingCycle === "annual" ? "Annual auto-debit" : "Monthly auto-debit"}`,
       prefill: { name: organizationName, email: customerEmail },
       theme: { color: "#6366f1" },
       modal: {
@@ -200,18 +219,16 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
         },
         confirm_close: true,
       },
-      handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+      handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
         const ackResult = await acknowledgeRazorpayCheckoutResultAction({
-          razorpay_order_id: response.razorpay_order_id,
+          razorpay_subscription_id: response.razorpay_subscription_id,
           razorpay_payment_id: response.razorpay_payment_id,
           razorpay_signature: response.razorpay_signature,
         });
         if (ackResult.success) {
           const newDetails = {
             paymentId: response.razorpay_payment_id,
-            orderId: response.razorpay_order_id,
-            invoiceId: ackResult.invoiceId,
-            subscriptionId: ackResult.subscriptionId ?? null,
+            subscriptionId: ackResult.subscriptionId ?? response.razorpay_subscription_id,
             amountPaise: data.amountPaise,
             currency: data.currency,
             packageName: data.packageDisplayName,
@@ -247,10 +264,11 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   }, []);
 
   const handleToggleAutoRenew = useCallback(() => {
+    if (hasPendingCancel) return;
     const fd = new FormData();
     fd.set("enabled", String(!autoRenew));
     autoRenewAction(fd);
-  }, [autoRenew, autoRenewAction]);
+  }, [autoRenew, autoRenewAction, hasPendingCancel]);
 
   return (
     <div className="space-y-8">
@@ -263,6 +281,15 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
           <p className="mt-2 text-sm text-amber-900/80">
             You can still review invoices, payments, and plan history while the retention period is active.
             Reactivate or choose a new plan to restore full platform access.
+          </p>
+        </div>
+      ) : hasPendingCancel && scheduledEndDate ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-blue-900">
+          <p className="text-xs font-black uppercase tracking-[0.14em]">Cancellation scheduled</p>
+          <h3 className="mt-1 text-lg font-black">Your plan remains active until {scheduledEndDate.toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}</h3>
+          <p className="mt-2 text-sm text-blue-900/80">
+            Auto-renewal has been turned off. Full platform access continues until the scheduled cancellation date.
+            You can reactivate before then to keep your plan.
           </p>
         </div>
       ) : null}
@@ -383,7 +410,14 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                     </button>
                   </div>
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Renewal</p><p className="mt-1 text-sm font-bold">{planContext.expiresAt ? planContext.expiresAt.toLocaleDateString("en-IN") : "No expiry"}</p></div>
+                  <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Billing Engine</p><p className="mt-1 text-sm font-bold">{billingEngine === "subscription" ? "Auto-debit" : "Invoice renewal"}</p></div>
                 </div>
+                {billingEngine === "subscription" ? (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+                    <p className="font-bold">Mandate-based recurring billing is active.</p>
+                    <p className="mt-1 break-all">Subscription {providerSubscriptionId ?? "—"}{providerMandateId ? ` · Mandate ${providerMandateId}` : ""}</p>
+                  </div>
+                ) : null}
                 {/* Trial Status */}
                 {isTrialing && trialDaysRemaining !== null && (
                   <div className="mt-2 flex items-center gap-2 rounded-md bg-cyan-50 border border-cyan-200 p-2">
@@ -736,15 +770,30 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between rounded-md border border-border bg-background p-4">
                 <div><p className="text-sm font-bold">Auto-Renewal</p><p className="text-xs text-muted-foreground">Automatically renew each billing cycle</p></div>
-                <button className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${isCancelled ? "cursor-not-allowed bg-muted text-muted-foreground" : autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending || isCancelled} onClick={handleToggleAutoRenew} type="button">
+                <button className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${isCancelled || hasPendingCancel ? "cursor-not-allowed bg-muted text-muted-foreground" : autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending || isCancelled || hasPendingCancel} onClick={handleToggleAutoRenew} type="button">
                   {autoRenewPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {isCancelled ? "Unavailable" : autoRenew ? "Enabled" : "Disabled"}
+                  {isCancelled ? "Unavailable" : hasPendingCancel ? "Scheduled End" : autoRenew ? "Enabled" : "Disabled"}
                 </button>
               </div>
-              <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-4">
-                <div><p className="text-sm font-bold text-red-800">Cancel Subscription</p><p className="text-xs text-red-600">Data retained for 30 days after cancellation</p></div>
-                <button className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={isCancelled} onClick={() => setShowCancel(true)} type="button">{isCancelled ? "Cancelled" : "Cancel"}</button>
-              </div>
+              {hasPendingCancel ? (
+                <div className="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 p-4">
+                  <div>
+                    <p className="text-sm font-bold text-blue-800">Cancellation Scheduled</p>
+                    <p className="text-xs text-blue-600">Ends {scheduledEndDate?.toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}</p>
+                  </div>
+                  <form action={reactivateAction}>
+                    <button className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={reactivatePending} type="submit">
+                      {reactivatePending ? <Loader2 className="size-4 animate-spin" /> : null}
+                      Reactivate
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-4">
+                  <div><p className="text-sm font-bold text-red-800">Cancel Subscription</p><p className="text-xs text-red-600">You will keep access until the end of the billing period</p></div>
+                  <button className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={isCancelled} onClick={() => setShowCancel(true)} type="button">{isCancelled ? "Cancelled" : "Cancel"}</button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -855,7 +904,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
               <label className="flex cursor-pointer items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
                 <input className="mt-0.5 size-4 shrink-0 accent-red-600" name="termsAccepted" required type="checkbox" value="true" />
                 <span>
-                  I understand this cancellation cannot be undone, auto-renewal will stop, and no refund will be issued for the current billing period.
+                  I understand that my plan stays active until the end of the billing period, auto-renewal stops, and no refund is issued for the current paid period. I can reactivate at any time before the end date to keep my plan.
                 </span>
               </label>
               <div className="flex justify-end gap-3 pt-4">

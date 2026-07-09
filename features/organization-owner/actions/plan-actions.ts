@@ -21,6 +21,20 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
 
     const enabled = formData.get("enabled") === "true";
 
+    const { data: currentSub } = await (supabase as any)
+      .from("organization_subscriptions")
+      .select("cancelled_at")
+      .eq("organization_id", ctx.organizationId)
+      .in("status", ["active", "trial"])
+      .maybeSingle();
+
+    if (!currentSub) {
+      return { status: "error", message: "No active subscription found." };
+    }
+    if (currentSub.cancelled_at) {
+      return { status: "error", message: "Cannot change auto-renewal while a cancellation is scheduled. Reactivate the subscription first." };
+    }
+
     const { error } = await (supabase as any)
       .from("organization_subscriptions")
       .update({ auto_renew: enabled, updated_at: new Date().toISOString() })
@@ -61,7 +75,7 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
       return { status: "error", message: "Type CANCEL exactly to confirm." };
     }
     if (!termsAccepted) {
-      return { status: "error", message: "Accept the cancellation terms, including that cancellation cannot be undone and no refund will be issued." };
+      return { status: "error", message: "Accept the cancellation terms: your plan remains active until the end of the billing period, auto-renewal stops, and no refund is issued for the current period." };
     }
 
     const admin = getSupabaseAdminClient();
@@ -121,9 +135,57 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
 
     revalidatePath("/organization/plan");
     revalidatePath("/organization");
-    return { status: "success", message: "Subscription cancelled. Auto-renewal is disabled and data will be retained for 30 days." };
+    return { status: "success", message: "Cancellation scheduled. Your plan remains active until the end of the current billing period." };
   } catch (e) {
     return entitlementSimpleCatch(e, "Failed to cancel subscription.");
+  }
+}
+
+export async function reactivateSubscriptionAction(prevState: ActionState, _formData?: FormData): Promise<ActionState> {
+  try {
+    const ctx = await requireOrganizationOwner("/organization/plan");
+    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
+    if (!ctx.userId) {
+      return { status: "error", message: "Authenticated user could not be resolved." };
+    }
+
+    const admin = getSupabaseAdminClient();
+    if (!admin) {
+      return { status: "error", message: "Database connection failed." };
+    }
+
+    const { error } = await (admin as any)
+      .from("organization_subscriptions")
+      .update({
+        cancelled_at: null,
+        cancellation_reason: null,
+        cancellation_category: null,
+        auto_renew: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("organization_id", ctx.organizationId)
+      .in("status", ["active", "trial"]);
+
+    if (error) throw new Error(error.message);
+
+    await syncSubscriptionArtifactsForOrganization(
+      ctx.organizationId,
+      "Organization owner reactivated subscription.",
+    );
+
+    await writeAuditLog({
+      actorId: ctx.userId,
+      action: "organization_owner.reactivate_subscription",
+      entityType: "organization_subscription",
+      entityId: null,
+      metadata: { reason: "Organization owner reactivated after scheduled cancellation." },
+    } as never);
+
+    revalidatePath("/organization/plan");
+    revalidatePath("/organization");
+    return { status: "success", message: "Subscription reactivated. Auto-renewal is enabled again." };
+  } catch (e) {
+    return entitlementSimpleCatch(e, "Failed to reactivate subscription.");
   }
 }
 

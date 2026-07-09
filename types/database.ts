@@ -28598,10 +28598,13 @@ export type Database = {
           is_default: boolean
           last_four: string | null
           metadata: Json | null
+          mandate_status: string | null
           organization_id: string
           payment_type: string
           provider: string
           provider_customer_id: string | null
+          provider_mandate_id: string | null
+          provider_payment_method_id: string | null
           updated_at: string
         }
         Insert: {
@@ -28615,10 +28618,13 @@ export type Database = {
           is_default?: boolean
           last_four?: string | null
           metadata?: Json | null
+          mandate_status?: string | null
           organization_id: string
           payment_type: string
           provider: string
           provider_customer_id?: string | null
+          provider_mandate_id?: string | null
+          provider_payment_method_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -28632,10 +28638,13 @@ export type Database = {
           is_default?: boolean
           last_four?: string | null
           metadata?: Json | null
+          mandate_status?: string | null
           organization_id?: string
           payment_type?: string
           provider?: string
           provider_customer_id?: string | null
+          provider_mandate_id?: string | null
+          provider_payment_method_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -28760,6 +28769,7 @@ export type Database = {
           provider_environment: string | null
           provider_order_id: string | null
           provider_payment_link_id: string | null
+          provider_subscription_id: string | null
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
           status: string
@@ -28801,6 +28811,7 @@ export type Database = {
           provider_environment?: string | null
           provider_order_id?: string | null
           provider_payment_link_id?: string | null
+          provider_subscription_id?: string | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           status?: string
@@ -28842,6 +28853,7 @@ export type Database = {
           provider_environment?: string | null
           provider_order_id?: string | null
           provider_payment_link_id?: string | null
+          provider_subscription_id?: string | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           status?: string
@@ -28944,6 +28956,7 @@ export type Database = {
           provider_order_id: string | null
           provider_payment_id: string | null
           provider_signature_verified: boolean | null
+          provider_subscription_id: string | null
           status: string
           subscription_id: string | null
           updated_at: string
@@ -28967,6 +28980,7 @@ export type Database = {
           provider_order_id?: string | null
           provider_payment_id?: string | null
           provider_signature_verified?: boolean | null
+          provider_subscription_id?: string | null
           status?: string
           subscription_id?: string | null
           updated_at?: string
@@ -28990,6 +29004,7 @@ export type Database = {
           provider_order_id?: string | null
           provider_payment_id?: string | null
           provider_signature_verified?: boolean | null
+          provider_subscription_id?: string | null
           status?: string
           subscription_id?: string | null
           updated_at?: string
@@ -29578,6 +29593,7 @@ export type Database = {
           auto_renew: boolean | null
           billing_anchor: string | null
           billing_period: string | null
+          billing_engine: string | null
           cancellation_category: string | null
           cancellation_reason: string | null
           cancelled_at: string | null
@@ -29597,8 +29613,13 @@ export type Database = {
           organization_id: string
           package_id: string
           price_override: number | null
+          provider_customer_id: string | null
           provider: string | null
           provider_environment: string | null
+          provider_mandate_id: string | null
+          provider_payment_method_id: string | null
+          provider_plan_id: string | null
+          provider_subscription_id: string | null
           replaced_at: string | null
           scheduled_change_id: string | null
           scheduled_start_date: string | null
@@ -29612,6 +29633,7 @@ export type Database = {
           auto_renew?: boolean | null
           billing_anchor?: string | null
           billing_period?: string | null
+          billing_engine?: string | null
           cancellation_category?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
@@ -29631,8 +29653,13 @@ export type Database = {
           organization_id: string
           package_id: string
           price_override?: number | null
+          provider_customer_id?: string | null
           provider?: string | null
           provider_environment?: string | null
+          provider_mandate_id?: string | null
+          provider_payment_method_id?: string | null
+          provider_plan_id?: string | null
+          provider_subscription_id?: string | null
           replaced_at?: string | null
           scheduled_change_id?: string | null
           scheduled_start_date?: string | null
@@ -29646,6 +29673,7 @@ export type Database = {
           auto_renew?: boolean | null
           billing_anchor?: string | null
           billing_period?: string | null
+          billing_engine?: string | null
           cancellation_category?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
@@ -29665,8 +29693,13 @@ export type Database = {
           organization_id?: string
           package_id?: string
           price_override?: number | null
+          provider_customer_id?: string | null
           provider?: string | null
           provider_environment?: string | null
+          provider_mandate_id?: string | null
+          provider_payment_method_id?: string | null
+          provider_plan_id?: string | null
+          provider_subscription_id?: string | null
           replaced_at?: string | null
           scheduled_change_id?: string | null
           scheduled_start_date?: string | null
@@ -30162,6 +30195,7 @@ export type Database = {
           package_id: string
           price: number
           setup_fee: number
+          provider_plan_id: string | null
         }
         Insert: {
           billing_period: string
@@ -30172,6 +30206,7 @@ export type Database = {
           package_id: string
           price: number
           setup_fee?: number
+          provider_plan_id?: string | null
         }
         Update: {
           billing_period?: string
@@ -30182,6 +30217,7 @@ export type Database = {
           package_id?: string
           price?: number
           setup_fee?: number
+          provider_plan_id?: string | null
         }
         Relationships: [
           {

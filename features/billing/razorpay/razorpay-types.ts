@@ -64,32 +64,35 @@ export type SecureCheckoutIntentInput = {
 export type SecureCheckoutIntentResult = {
   success: true;
   razorpayKeyId: string;
-  razorpayOrderId: string;
+  razorpayOrderId?: string;
+  razorpaySubscriptionId?: string;
+  razorpayCustomerId?: string;
   amountPaise: number;
   subtotalPaise: number;
   taxPaise: number;
   currency: string;
-  invoiceId: string;
+  invoiceId?: string;
   packageDisplayName: string;
   organizationDisplayName: string;
   billingCycle: string;
   isTestMode: boolean;
   environmentLabel: string;
+  subscriptionId?: string;
 } | {
   success: false;
   error: string;
 };
 
 export type PaymentAcknowledgementInput = {
-  razorpay_order_id: string;
+  razorpay_subscription_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
 };
 
 export type PaymentAcknowledgementResult = {
   success: true;
-  status: "signature_acknowledged" | "payment_confirmed" | "already_processed";
-  invoiceId: string;
+  status: "signature_acknowledged" | "subscription_confirmed" | "already_processed" | "awaiting_webhook";
+  invoiceId?: string;
   subscriptionStatus?: string;
   paymentId?: string;
   subscriptionId?: string;

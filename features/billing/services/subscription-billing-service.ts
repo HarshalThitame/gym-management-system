@@ -89,16 +89,35 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
 
   const { data: subsDue } = await db
     .from("organization_subscriptions")
-    .select("")
+    .select("*")
     .in("status", ["active", "trial"])
     .not("next_billing_date", "is", null)
     .lte("next_billing_date", now.toISOString());
 
   if (!subsDue || subsDue.length === 0) return result;
 
-  const orgIds = [...new Set(subsDue.map((s) => s.organization_id as string))];
+  // Exclude subscriptions with a scheduled (pending) cancellation — they should
+  // not be billed for a new period since auto_renew is already disabled.
+  const billableSubs = subsDue.filter((s: Record<string, unknown>) => {
+    const cancelledAt = s.cancelled_at as string | null;
+    const autoRenew = s.auto_renew as boolean | null;
+    if (cancelledAt && autoRenew === false) return false;
+    return true;
+  });
 
-  const { data: orgs } = await db.from("organizations").select("").in("id", orgIds);
+  if (billableSubs.length === 0) return result;
+
+  const invoiceModeSubs = billableSubs.filter((s: Record<string, unknown>) => {
+    const billingEngine = s.billing_engine as string | null;
+    const providerSubscriptionId = s.provider_subscription_id as string | null;
+    return billingEngine !== "subscription" && !providerSubscriptionId;
+  });
+
+  if (invoiceModeSubs.length === 0) return result;
+
+  const orgIds = [...new Set(invoiceModeSubs.map((s) => s.organization_id as string))];
+
+  const { data: orgs } = await db.from("organizations").select("*").in("id", orgIds);
   const orgMap = new Map((orgs ?? []).map((o) => [o.id as string, o]));
   const { data: paymentMethods } = await db
     .from("org_payment_methods")
@@ -113,10 +132,10 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
     }
   }
 
-  const pkgIds = [...new Set(subsDue.map((s) => s.package_id as string))];
+  const pkgIds = [...new Set(invoiceModeSubs.map((s) => s.package_id as string))];
   const [packagesResult, pricingResult] = await Promise.all([
-    db.from("packages").select("").in("id", pkgIds),
-    db.from("package_pricing").select("").in("package_id", pkgIds),
+    db.from("packages").select("*").in("id", pkgIds),
+    db.from("package_pricing").select("*").in("package_id", pkgIds),
   ]);
   const pkgMap = new Map((packagesResult.data ?? []).map((p) => [p.id as string, p]));
   const pricingByKey = new Map<string, Record<string, unknown>>();
@@ -124,7 +143,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
     pricingByKey.set(`${pr.package_id}:${pr.billing_period}`, pr);
   }
 
-  for (const sub of subsDue) {
+  for (const sub of invoiceModeSubs) {
     try {
       const org = orgMap.get(sub.organization_id as string);
       const pkg = pkgMap.get(sub.package_id as string);
@@ -174,8 +193,21 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
         .limit(1) as unknown as { data: Array<Record<string, unknown>> | null; error: { message: string } | null };
 
       if (existingInvoices && existingInvoices.length > 0) {
-        result.errors.push(`Duplicate invoice blocked for sub ${sub.id}: invoice ${existingInvoices[0].id} already exists with key ${idempotencyKey}`);
-        continue;
+        const existingInvoice = existingInvoices[0] as Record<string, unknown>;
+        const existingOrderId = existingInvoice.razorpay_order_id as string | null;
+        // If the existing invoice has no Razorpay order, it's a stuck draft
+        // from a previous failed run (order creation failed after invoice was
+        // created). Clean it up so the next attempt can create a fresh one.
+        if (!existingOrderId) {
+          await (supabase as any)
+            .from("org_subscription_invoices")
+            .delete()
+            .eq("id", existingInvoice.id as string);
+          result.errors.push(`Cleaned up stuck invoice ${existingInvoice.id} for sub ${sub.id} — retrying.`);
+        } else {
+          result.errors.push(`Duplicate invoice blocked for sub ${sub.id}: invoice ${existingInvoice.id} already exists with key ${idempotencyKey}`);
+          continue;
+        }
       }
 
       const invoiceNumber = `SUB-INV-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`;
@@ -184,28 +216,32 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
       periodEnd.setDate(periodEnd.getDate() + daysUntilNextBilling);
       const defaultPaymentMethodId = defaultPaymentMethodByOrg.get(sub.organization_id as string) ?? null;
 
-      const { data: invoice } = await db.from("org_subscription_invoices").select("").insert({
-        organization_id: sub.organization_id,
-        subscription_id: sub.id,
-        package_id: sub.package_id,
-        payment_method_id: defaultPaymentMethodId,
-        invoice_number: invoiceNumber,
-        status: "issued",
-        currency,
-        subtotal_amount: price,
-        discount_amount: 0,
-        tax_amount: 0,
-        total_amount: price,
-        billing_period_start: periodStart.toISOString().slice(0, 10),
-        billing_period_end: periodEnd.toISOString().slice(0, 10),
-        billing_cycle: billingPeriod,
-        issued_at: now.toISOString(),
-        due_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        idempotency_key: idempotencyKey,
-      });
+      const { data: invoice, error: invoiceError } = await (supabase as any)
+        .from("org_subscription_invoices")
+        .insert({
+          organization_id: sub.organization_id,
+          subscription_id: sub.id,
+          package_id: sub.package_id,
+          payment_method_id: defaultPaymentMethodId,
+          invoice_number: invoiceNumber,
+          status: "issued",
+          currency,
+          subtotal_amount: price,
+          discount_amount: 0,
+          tax_amount: 0,
+          total_amount: price,
+          billing_period_start: periodStart.toISOString().slice(0, 10),
+          billing_period_end: periodEnd.toISOString().slice(0, 10),
+          billing_cycle: billingPeriod,
+          issued_at: now.toISOString(),
+          due_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          idempotency_key: idempotencyKey,
+        })
+        .select("*")
+        .single();
 
-      if (!invoice) {
-        result.errors.push(`Failed to create invoice for sub ${sub.id}`);
+      if (invoiceError || !invoice) {
+        result.errors.push(`Failed to create invoice for sub ${sub.id}: ${invoiceError?.message ?? "unknown error"}`);
         continue;
       }
       result.invoiceGenerated++;

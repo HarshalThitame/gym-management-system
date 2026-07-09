@@ -48,14 +48,20 @@ export async function GET(request: Request) {
 
     const { data: expiring } = await db
       .from("organization_subscriptions")
-      .select("")
+      .select("*")
       .eq("status", "active")
       .gte("expires_at", `${targetDate}T00:00:00.000Z`)
       .lte("expires_at", `${targetDate}T23:59:59.999Z`);
 
-    if (!expiring || expiring.length === 0) continue;
+    const billableExpiring = (expiring ?? []).filter((sub) => {
+      const billingEngine = (sub as Record<string, unknown>).billing_engine as string | null;
+      const providerSubscriptionId = (sub as Record<string, unknown>).provider_subscription_id as string | null;
+      return billingEngine !== "subscription" && !providerSubscriptionId;
+    });
 
-    const orgIds = [...new Set(expiring.map((s) => s.organization_id))];
+    if (billableExpiring.length === 0) continue;
+
+    const orgIds = [...new Set(billableExpiring.map((s) => s.organization_id))];
 
     const orgDb = admin as never as {
       from(t: string): {
@@ -72,7 +78,7 @@ export async function GET(request: Request) {
 
     const orgMap = new Map((orgs ?? []).map((o) => [o.id, o]));
 
-    const pkgIds = [...new Set(expiring.map((s) => s.package_id))];
+    const pkgIds = [...new Set(billableExpiring.map((s) => s.package_id))];
     const pkgDb = admin as never as {
       from(t: string): {
         select(c: string): {
@@ -84,7 +90,7 @@ export async function GET(request: Request) {
     const pkgMap = new Map((pkgs ?? []).map((p) => [p.id, p.name]));
 
     let sent = 0;
-    for (const sub of expiring) {
+    for (const sub of billableExpiring) {
       const org = orgMap.get(sub.organization_id);
       if (!org?.billing_email) continue;
       const planName = pkgMap.get(sub.package_id) ?? "Current Plan";

@@ -64,7 +64,7 @@ export async function GET(request: Request) {
   const now = new Date();
   const { data: dueForRetry } = await db
     .from("organization_subscriptions")
-    .select("")
+    .select("*")
     .not("dunning_next_retry", "is", null)
     .in("status", ["active", "suspended"])
     .lte("dunning_next_retry", now.toISOString());
@@ -77,15 +77,29 @@ export async function GET(request: Request) {
     });
   }
 
-  const orgIds = [...new Set(dueForRetry.map((s) => s.organization_id))];
-  const pkgIds = [...new Set(dueForRetry.map((s) => s.package_id))];
+  const invoiceModeSubs = dueForRetry.filter((s) => {
+    const billingEngine = (s as Record<string, unknown>).billing_engine as string | null;
+    const providerSubscriptionId = (s as Record<string, unknown>).provider_subscription_id as string | null;
+    return billingEngine !== "subscription" && !providerSubscriptionId;
+  });
 
-  const { data: orgsResult } = await db.from("organizations").select("").in("id", orgIds);
+  if (invoiceModeSubs.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      timestamp: now.toISOString(),
+      actions: ["No invoice-mode subscriptions due for retry"],
+    });
+  }
+
+  const orgIds = [...new Set(invoiceModeSubs.map((s) => s.organization_id))];
+  const pkgIds = [...new Set(invoiceModeSubs.map((s) => s.package_id))];
+
+  const { data: orgsResult } = await db.from("organizations").select("*").in("id", orgIds);
   const orgMap = new Map((orgsResult ?? []).map((o) => [o.id, o]));
 
   const [pkgsResult, pricingResult] = await Promise.all([
-    db.from("packages").select("").in("id", pkgIds),
-    db.from("package_pricing").select("").in("package_id", pkgIds),
+    db.from("packages").select("*").in("id", pkgIds),
+    db.from("package_pricing").select("*").in("package_id", pkgIds),
   ]);
   const pkgMap = new Map((pkgsResult.data ?? []).map((p) => [p.id, p]));
   const pricingByKey = new Map<string, Record<string, unknown>>();
@@ -97,7 +111,7 @@ export async function GET(request: Request) {
   let suspended = 0;
   let recovered = 0;
 
-  for (const sub of dueForRetry) {
+  for (const sub of invoiceModeSubs) {
     const org = orgMap.get(sub.organization_id) as { name: string; billing_email: string | null } | undefined;
     if (!org?.billing_email) continue;
 

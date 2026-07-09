@@ -22,7 +22,6 @@ type PackageInfo = {
   sort_order: number;
   _pricing?: Array<{ billing_period: string; price: number }>;
   _limits?: Record<string, unknown>;
-  price: number;
 };
 
 type RazorpayConstructor = new (options: Record<string, unknown>) => { open(): void };
@@ -57,13 +56,12 @@ export function RazorpayCheckout({
   const [paymentState, setPaymentState] = useState<CheckoutOrderState>("idle");
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<{
-    invoiceId: string;
+    subscriptionId: string;
     paymentId?: string;
-    subscriptionId?: string;
   } | null>(null);
   const [orderResult, setOrderResult] = useState<{
-    orderId: string;
-    invoiceId: string;
+    subscriptionId: string;
+    customerId: string;
     amountPaise: number;
     currency: string;
     keyId: string;
@@ -154,8 +152,8 @@ export function RazorpayCheckout({
       return;
     }
 
-    if (!result.razorpayOrderId || !result.invoiceId) {
-      const message = "Failed to create payment order.";
+    if (!result.razorpaySubscriptionId || !result.subscriptionId) {
+      const message = "Failed to create subscription checkout.";
       showToast(message, "error");
       setPaymentError(message);
       setPaymentState("payment_failed");
@@ -163,8 +161,8 @@ export function RazorpayCheckout({
     }
 
     setOrderResult({
-      orderId: result.razorpayOrderId,
-      invoiceId: result.invoiceId,
+      subscriptionId: result.razorpaySubscriptionId,
+      customerId: result.razorpayCustomerId ?? "",
       amountPaise: result.amountPaise,
       currency: result.currency,
       keyId: result.razorpayKeyId,
@@ -176,9 +174,9 @@ export function RazorpayCheckout({
       key: result.razorpayKeyId,
       amount: result.amountPaise,
       currency: result.currency,
-      order_id: result.razorpayOrderId,
+      subscription_id: result.razorpaySubscriptionId,
       name: organizationName || "Gym Management",
-      description: `${result.packageDisplayName} — ${billingCycle === "annual" ? "Annual" : "Monthly"}`,
+      description: `${result.packageDisplayName} — ${billingCycle === "annual" ? "Annual auto-debit" : "Monthly auto-debit"}`,
       prefill: {
         name: result.organizationDisplayName || organizationName,
         email: customerEmail,
@@ -192,46 +190,44 @@ export function RazorpayCheckout({
         },
         confirm_close: true,
       },
-      handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+      handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
         setPaymentState("payment_callback_received");
-        showToast("Payment received. Confirming...", "info");
+        showToast("Authorization received. Confirming...", "info");
 
         const ackResult = await acknowledgeRazorpayCheckoutResultAction({
-          razorpay_order_id: response.razorpay_order_id,
+          razorpay_subscription_id: response.razorpay_subscription_id,
           razorpay_payment_id: response.razorpay_payment_id,
           razorpay_signature: response.razorpay_signature,
         });
 
         if (ackResult.success) {
-          if (ackResult.status === "already_processed" || ackResult.status === "payment_confirmed") {
+          if (ackResult.status === "already_processed" || ackResult.status === "subscription_confirmed") {
             setPaymentDetails({
-              invoiceId: ackResult.invoiceId,
+              subscriptionId: ackResult.subscriptionId ?? response.razorpay_subscription_id,
               ...(ackResult.paymentId ? { paymentId: ackResult.paymentId } : {}),
-              ...(ackResult.subscriptionId ? { subscriptionId: ackResult.subscriptionId } : {}),
             });
             setPaymentState("payment_confirmed");
-            showToast("Payment confirmed! Your subscription is active.", "success");
+            showToast("Subscription confirmed! Auto-debit is active.", "success");
             refreshEntitlements();
           } else {
             setPaymentState("waiting_for_webhook");
-            showToast(ackResult.warning || "Payment received. Confirmation is in progress.", "info");
+            showToast(ackResult.warning || "Subscription authorization completed. Confirmation is in progress.", "info");
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
             if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
             pollIntervalRef.current = setInterval(async () => {
               const statusResult = await getSubscriptionPaymentStatusAction({
-                razorpay_order_id: response.razorpay_order_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               });
-              if (statusResult.success && statusResult.status === "payment_confirmed") {
+              if (statusResult.success && statusResult.status === "subscription_confirmed") {
                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                 setPaymentDetails({
-                  invoiceId: statusResult.invoiceId,
+                  subscriptionId: statusResult.subscriptionId ?? response.razorpay_subscription_id,
                   ...(statusResult.paymentId ? { paymentId: statusResult.paymentId } : {}),
-                  ...(statusResult.subscriptionId ? { subscriptionId: statusResult.subscriptionId } : {}),
                 });
                 setPaymentState("payment_confirmed");
-                showToast("Payment confirmed! Your subscription is active.", "success");
+                showToast("Subscription confirmed! Auto-debit is active.", "success");
                 refreshEntitlements();
               }
             }, 5000);
@@ -331,8 +327,8 @@ export function RazorpayCheckout({
         <Shield className="size-4" />
         <span>
           {orderResult
-            ? <><strong>{orderResult.environmentLabel}:</strong> {orderResult.isTestMode ? "No real charges will be made." : "Live Razorpay charges are enabled."}</>
-            : "Razorpay checkout mode will be confirmed before payment opens."}
+            ? <><strong>{orderResult.environmentLabel}:</strong> {orderResult.isTestMode ? "No real charges will be made." : "Live Razorpay auto-debit is enabled."}</>
+            : "Razorpay subscription mode will be confirmed before authorization opens."}
         </span>
       </div>
 
@@ -462,10 +458,9 @@ export function RazorpayCheckout({
                     <div className="grid gap-1 rounded-md border border-green-200 bg-white/70 p-3 text-[11px] text-green-900">
                       <p>Plan: <span className="font-semibold">{selectedPkg.name}</span></p>
                       <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
-                      <p>Invoice ID: <span className="font-mono">{paymentDetails.invoiceId}</span></p>
+                      <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p>
                       {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
-                      {paymentDetails.subscriptionId ? <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p> : null}
-                      {orderResult?.orderId ? <p>Razorpay Order ID: <span className="font-mono">{orderResult.orderId}</span></p> : null}
+                      {orderResult?.subscriptionId ? <p>Razorpay Subscription ID: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
@@ -517,7 +512,7 @@ export function RazorpayCheckout({
                     <div className="rounded-md border border-green-200 bg-white/70 p-3 text-[11px] text-green-900">
                       <p className="font-semibold">Transaction details</p>
                       <div className="mt-1 grid gap-1">
-                        <p>Invoice: <span className="font-mono">{paymentDetails.invoiceId}</span></p>
+                        <p>Subscription: <span className="font-mono">{paymentDetails.subscriptionId}</span></p>
                         {paymentDetails.paymentId ? <p>Payment: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
                         {paymentDetails.subscriptionId ? <p>Subscription: <span className="font-mono">{paymentDetails.subscriptionId}</span></p> : null}
                       </div>
@@ -539,10 +534,9 @@ export function RazorpayCheckout({
                     <div className="grid gap-1 rounded-md border border-green-200 bg-white/70 p-3 text-[11px] text-green-900">
                       <p>Plan: <span className="font-semibold">{selectedPkg.name}</span></p>
                       <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
-                      <p>Invoice ID: <span className="font-mono">{paymentDetails.invoiceId}</span></p>
+                      <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p>
                       {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
-                      {paymentDetails.subscriptionId ? <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p> : null}
-                      {orderResult?.orderId ? <p>Razorpay Order ID: <span className="font-mono">{orderResult.orderId}</span></p> : null}
+                      {orderResult?.subscriptionId ? <p>Razorpay Subscription ID: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
@@ -574,14 +568,14 @@ export function RazorpayCheckout({
             {paymentState === "creating_order" && (
               <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                 <Loader2 className="size-5 animate-spin" />
-                <span>Creating payment order...</span>
+                <span>Creating subscription checkout...</span>
               </div>
             )}
 
             {paymentState === "payment_callback_received" && (
               <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                 <Loader2 className="size-5 animate-spin" />
-                <span>Verifying payment...</span>
+                <span>Verifying subscription authorization...</span>
               </div>
             )}
 
@@ -594,7 +588,7 @@ export function RazorpayCheckout({
               type="button"
             >
               {isActive ? <Lock className="size-5" /> : isLoading ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />}
-              {isActive ? "Plan Active" : isLoading ? "Creating Order..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Pay ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via Razorpay`}
+              {isActive ? "Plan Active" : isLoading ? "Creating Subscription..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Authorize ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via Razorpay`}
             </Button>
 
             <p className="text-center text-[11px] text-muted-foreground">
