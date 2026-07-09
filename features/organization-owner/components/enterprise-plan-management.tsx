@@ -87,7 +87,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
       showToast(reactivateState.message ?? "Subscription reactivated.", "success");
     }
   }, [reactivateState.status, reactivateState.message]);
-  const razorpayScriptStatus = useRazorpayScript();
+  const razorpayScriptStatus = useRazorpayScript(activeTab === "compare" || activeTab === "pay");
 
   const [payDialogState, setPayDialogState] = useState<{
     showOrderSummary: boolean;

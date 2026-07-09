@@ -4,12 +4,17 @@ import { useState, useEffect, useCallback } from "react";
 
 const RAZORPAY_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
 
-type ScriptStatus = "loading" | "loaded" | "error";
+type ScriptStatus = "idle" | "loading" | "loaded" | "error";
 
-export function useRazorpayScript(): ScriptStatus {
-  const [status, setStatus] = useState<ScriptStatus>("loading");
+export function useRazorpayScript(enabled = true): ScriptStatus {
+  const [status, setStatus] = useState<ScriptStatus>(enabled ? "loading" : "idle");
 
   useEffect(() => {
+    if (!enabled) {
+      setStatus("idle");
+      return;
+    }
+
     if (typeof window === "undefined") return;
     if (window.Razorpay) {
       setStatus("loaded");
@@ -33,7 +38,7 @@ export function useRazorpayScript(): ScriptStatus {
     return () => {
       // Cleanup not needed; script stays in DOM
     };
-  }, []);
+  }, [enabled]);
 
   return status;
 }
