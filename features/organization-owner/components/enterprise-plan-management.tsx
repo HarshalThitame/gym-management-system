@@ -118,11 +118,13 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   const isActive = planContext.status === "active";
   const isTrialing = planContext.isTrialing;
   const isSuspended = planContext.isSuspended;
+  const hasCurrentSubscription = Boolean(currentSubscription);
+  const canManageSubscription = hasCurrentSubscription && (currentSubscription?.status === "active" || currentSubscription?.status === "trial");
   const isCancelled = planContext.status === "cancelled" || currentSubscription?.status === "cancelled";
   const cancelledAt = currentSubscription ? (currentSubscription as unknown as { cancelled_at: string | null }).cancelled_at : null;
   const hasPendingCancel = !isCancelled && cancelledAt != null;
   const scheduledEndDate = hasPendingCancel ? new Date(cancelledAt!) : null;
-  const autoRenew = currentSubscription ? (currentSubscription as unknown as { auto_renew: boolean }).auto_renew : true;
+  const autoRenew = currentSubscription ? (currentSubscription as unknown as { auto_renew: boolean }).auto_renew : null;
   const billingEngine = currentSubscription ? (currentSubscription as unknown as { billing_engine?: string | null }).billing_engine : null;
   const providerSubscriptionId = currentSubscription ? (currentSubscription as unknown as { provider_subscription_id?: string | null }).provider_subscription_id : null;
   const providerMandateId = currentSubscription ? (currentSubscription as unknown as { provider_mandate_id?: string | null }).provider_mandate_id : null;
@@ -264,11 +266,11 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
   }, []);
 
   const handleToggleAutoRenew = useCallback(() => {
-    if (hasPendingCancel) return;
+    if (!canManageSubscription || hasPendingCancel || autoRenew === null) return;
     const fd = new FormData();
     fd.set("enabled", String(!autoRenew));
     autoRenewAction(fd);
-  }, [autoRenew, autoRenewAction, hasPendingCancel]);
+  }, [autoRenew, autoRenewAction, canManageSubscription, hasPendingCancel]);
 
   return (
     <div className="space-y-8">
@@ -404,10 +406,16 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                 <div className="grid grid-cols-2 gap-4 mt-2">
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Status</p><Badge className="mt-1" variant={isActive ? "success" : isTrialing ? "info" : "error"}>{planContext.status}</Badge></div>
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Auto-Renew</p>
-                    <button className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending} onClick={handleToggleAutoRenew} type="button">
-                      {autoRenewPending ? <Loader2 className="size-3 animate-spin" /> : null}
-                      {autoRenew ? "Enabled" : "Disabled"} <RefreshCw className="size-3" />
-                    </button>
+                    {canManageSubscription && autoRenew !== null ? (
+                      <button className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending} onClick={handleToggleAutoRenew} type="button">
+                        {autoRenewPending ? <Loader2 className="size-3 animate-spin" /> : null}
+                        {autoRenew ? "Enabled" : "Disabled"} <RefreshCw className="size-3" />
+                      </button>
+                    ) : (
+                      <span className="mt-1 inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
+                        Not available
+                      </span>
+                    )}
                   </div>
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Renewal</p><p className="mt-1 text-sm font-bold">{planContext.expiresAt ? planContext.expiresAt.toLocaleDateString("en-IN") : "No expiry"}</p></div>
                   <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Billing Engine</p><p className="mt-1 text-sm font-bold">{billingEngine === "subscription" ? "Auto-debit" : "Invoice renewal"}</p></div>
@@ -479,7 +487,11 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                 <button onClick={() => setActiveTab("compare")} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5" type="button">Compare Plans & Upgrade</button>
                 <button onClick={() => setActiveTab("features")} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-bold transition-all hover:bg-accent/10" type="button">View Features</button>
                 <button onClick={() => setActiveTab("billing")} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-bold transition-all hover:bg-accent/10" type="button">Billing & Invoices</button>
-                <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-all hover:bg-red-100" onClick={() => setShowCancel(true)} type="button">Cancel Subscription</button>
+                {canManageSubscription ? (
+                  <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-all hover:bg-red-100" onClick={() => setShowCancel(true)} type="button">Cancel Subscription</button>
+                ) : (
+                  <button className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 text-sm font-bold text-muted-foreground" onClick={() => setActiveTab("compare")} type="button">Choose a Plan</button>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -770,9 +782,9 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between rounded-md border border-border bg-background p-4">
                 <div><p className="text-sm font-bold">Auto-Renewal</p><p className="text-xs text-muted-foreground">Automatically renew each billing cycle</p></div>
-                <button className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${isCancelled || hasPendingCancel ? "cursor-not-allowed bg-muted text-muted-foreground" : autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending || isCancelled || hasPendingCancel} onClick={handleToggleAutoRenew} type="button">
+                <button className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${!canManageSubscription || isCancelled || hasPendingCancel || autoRenew === null ? "cursor-not-allowed bg-muted text-muted-foreground" : autoRenew ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`} disabled={autoRenewPending || !canManageSubscription || isCancelled || hasPendingCancel || autoRenew === null} onClick={handleToggleAutoRenew} type="button">
                   {autoRenewPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {isCancelled ? "Unavailable" : hasPendingCancel ? "Scheduled End" : autoRenew ? "Enabled" : "Disabled"}
+                  {!canManageSubscription || autoRenew === null ? "Unavailable" : isCancelled ? "Unavailable" : hasPendingCancel ? "Scheduled End" : autoRenew ? "Enabled" : "Disabled"}
                 </button>
               </div>
               {hasPendingCancel ? (
@@ -788,10 +800,18 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
                     </button>
                   </form>
                 </div>
-              ) : (
+              ) : canManageSubscription ? (
                 <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-4">
                   <div><p className="text-sm font-bold text-red-800">Cancel Subscription</p><p className="text-xs text-red-600">You will keep access until the end of the billing period</p></div>
                   <button className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={isCancelled} onClick={() => setShowCancel(true)} type="button">{isCancelled ? "Cancelled" : "Cancel"}</button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between rounded-md border border-border bg-surface p-4">
+                  <div>
+                    <p className="text-sm font-bold">No active plan</p>
+                    <p className="text-xs text-muted-foreground">Select a package to enable billing controls.</p>
+                  </div>
+                  <button className="rounded-md border border-border bg-background px-4 py-2 text-sm font-bold text-foreground transition-all hover:border-border-strong" onClick={() => setActiveTab("compare")} type="button">Choose Plan</button>
                 </div>
               )}
             </CardContent>
