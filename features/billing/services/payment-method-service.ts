@@ -65,6 +65,9 @@ export async function savePaymentMethod(
   input: {
     provider: string;
     provider_customer_id?: string;
+    provider_payment_method_id?: string;
+    provider_mandate_id?: string;
+    mandate_status?: string;
     payment_type: "card" | "upi" | "net_banking" | "emandate";
     display_name: string;
     last_four?: string;
@@ -72,6 +75,7 @@ export async function savePaymentMethod(
     expiry_year?: number;
     card_network?: string;
     is_default?: boolean;
+    metadata?: Record<string, unknown>;
   },
 ): Promise<OrgPaymentMethod> {
   const db = await getDb();
@@ -84,12 +88,13 @@ export async function savePaymentMethod(
       .eq("is_default", true);
   }
 
-  const { data } = await db
-    .from("org_payment_methods")
-    .insert({
+  const baseRow = {
       organization_id: organizationId,
       provider: input.provider,
       provider_customer_id: input.provider_customer_id ?? null,
+      provider_payment_method_id: input.provider_payment_method_id ?? null,
+      provider_mandate_id: input.provider_mandate_id ?? null,
+      mandate_status: input.mandate_status ?? null,
       payment_type: input.payment_type,
       display_name: input.display_name,
       last_four: input.last_four ?? null,
@@ -98,7 +103,40 @@ export async function savePaymentMethod(
       card_network: input.card_network ?? null,
       is_default: input.is_default ?? false,
       is_active: true,
-    })
+      metadata: input.metadata ?? {},
+    } as Record<string, unknown>;
+
+  const existing = input.provider_payment_method_id
+    ? await db
+        .from("org_payment_methods")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("provider_payment_method_id", input.provider_payment_method_id)
+        .maybeSingle()
+        .then((result) => result.data as { id: string } | null)
+    : null;
+
+  if (existing?.id) {
+    const { error } = await db
+      .from("org_payment_methods")
+      .update(baseRow)
+      .eq("id", existing.id)
+      .eq("organization_id", organizationId);
+    if (error) throw new Error(error.message);
+
+    const { data } = await db
+      .from("org_payment_methods")
+      .select("")
+      .eq("id", existing.id)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (!data) throw new Error("Failed to save payment method");
+    return data as unknown as OrgPaymentMethod;
+  }
+
+  const { data } = await db
+    .from("org_payment_methods")
+    .insert(baseRow)
     .select("");
   if (!data || data.length === 0) throw new Error("Failed to save payment method");
   return data[0] as unknown as OrgPaymentMethod;

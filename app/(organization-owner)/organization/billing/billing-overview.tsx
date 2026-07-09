@@ -157,6 +157,15 @@ export function BillingOverview({
                         {pm.payment_type as string}
                         {pm.last_four ? ` · ****${pm.last_four}` : ""}
                       </p>
+                      {pm.provider_mandate_id ? (
+                        <p className="text-[11px] text-emerald-600">
+                          Mandate active{pm.mandate_status ? ` · ${String(pm.mandate_status)}` : ""}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-amber-600">
+                          Mandate pending authorization
+                        </p>
+                      )}
                     </div>
                     {(pm.is_default as boolean) && <Badge variant="info" className="ml-auto shrink-0">Default</Badge>}
                   </div>

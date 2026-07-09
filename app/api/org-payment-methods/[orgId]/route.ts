@@ -40,6 +40,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
     const method = await savePaymentMethod(orgId, {
       provider: body.provider ?? "razorpay",
       provider_customer_id: body.provider_customer_id,
+      provider_payment_method_id: body.provider_payment_method_id,
+      provider_mandate_id: body.provider_mandate_id,
+      mandate_status: body.mandate_status,
       payment_type: body.payment_type,
       display_name: body.display_name,
       last_four: body.last_four,
@@ -47,6 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
       expiry_year: body.expiry_year,
       card_network: body.card_network,
       is_default: body.is_default,
+      metadata: body.metadata,
     });
     return NextResponse.json(method, { status: 201 });
   } catch (err) {

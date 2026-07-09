@@ -135,6 +135,7 @@ type OrgPaymentMethodRow = {
   card_network: string | null;
   is_default: boolean;
   is_active: boolean;
+  metadata: Record<string, unknown> | null;
 };
 
 function getDaysForBillingPeriod(period: string | null | undefined): number {
@@ -268,23 +269,115 @@ async function getPackageDetails(admin: ReturnType<typeof getSupabaseAdminClient
   return data ?? null;
 }
 
-function isMandateReadyPaymentMethod(method: OrgPaymentMethodRow | null): method is OrgPaymentMethodRow {
-  return Boolean(
-    method
-      && method.is_active
-      && method.is_default
-      && method.provider_payment_method_id
-      && method.provider_mandate_id
-      && (method.mandate_status === null || ["active", "authorized", "authenticated"].includes(method.mandate_status)),
-  );
-}
-
 function buildReceiptNumber(prefix: string): string {
   return `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`;
 }
 
 function parseSubRow(value: unknown): OrgSubscriptionRow | null {
   return value && typeof value === "object" ? value as OrgSubscriptionRow : null;
+}
+
+function normalizeOrgMandatePaymentType(value: unknown): "card" | "upi" | "net_banking" | "emandate" {
+  if (value === "card" || value === "upi" || value === "net_banking" || value === "emandate") {
+    return value;
+  }
+  return "emandate";
+}
+
+async function upsertOrgMandatePaymentMethod(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  organizationId: string,
+  input: {
+    providerCustomerId?: string | null;
+    providerPaymentMethodId: string;
+    providerMandateId?: string | null;
+    mandateStatus?: string | null;
+    paymentType?: string | null;
+    displayName?: string | null;
+    lastFour?: string | null;
+    cardNetwork?: string | null;
+    expiryMonth?: number | null;
+    expiryYear?: number | null;
+  providerEnvironment?: string | null;
+  },
+): Promise<string | null> {
+  const providerPaymentMethodId = input.providerPaymentMethodId.trim();
+  if (!providerPaymentMethodId) return null;
+
+  const { data: existingByProvider } = await admin
+    .from("org_payment_methods")
+    .select("id, display_name, payment_type, last_four, expiry_month, expiry_year, card_network, is_default, provider_customer_id, provider_payment_method_id, provider_mandate_id, mandate_status, metadata")
+    .eq("organization_id", organizationId)
+    .eq("provider_payment_method_id", providerPaymentMethodId)
+    .maybeSingle() as never as {
+    data: OrgPaymentMethodRow | null;
+    error: { message: string } | null;
+  };
+
+  const targetRow = existingByProvider ?? await (async () => {
+    const { data } = await admin
+      .from("org_payment_methods")
+      .select("id, display_name, payment_type, last_four, expiry_month, expiry_year, card_network, is_default, provider_customer_id, provider_payment_method_id, provider_mandate_id, mandate_status, metadata")
+      .eq("organization_id", organizationId)
+      .eq("is_default", true)
+      .eq("is_active", true)
+      .maybeSingle() as never as {
+      data: OrgPaymentMethodRow | null;
+      error: { message: string } | null;
+    };
+    return data ?? null;
+  })();
+
+  const resolvedDisplayName = input.displayName
+    || targetRow?.display_name
+    || "Razorpay auto-debit";
+
+  const resolvedPaymentType = normalizeOrgMandatePaymentType(input.paymentType);
+  const resolvedMetadata = {
+    ...(targetRow?.metadata && typeof targetRow.metadata === "object" ? targetRow.metadata : {}),
+    source: "org_autodebit",
+    providerEnvironment: input.providerEnvironment ?? null,
+  };
+
+  const payload = {
+    organization_id: organizationId,
+    provider: "razorpay",
+    provider_customer_id: input.providerCustomerId ?? targetRow?.provider_customer_id ?? null,
+    provider_payment_method_id: providerPaymentMethodId,
+    provider_mandate_id: input.providerMandateId ?? targetRow?.provider_mandate_id ?? null,
+    mandate_status: input.mandateStatus ?? targetRow?.mandate_status ?? null,
+    payment_type: resolvedPaymentType,
+    display_name: resolvedDisplayName,
+    last_four: input.lastFour ?? targetRow?.last_four ?? null,
+    expiry_month: input.expiryMonth ?? targetRow?.expiry_month ?? null,
+    expiry_year: input.expiryYear ?? targetRow?.expiry_year ?? null,
+    card_network: input.cardNetwork ?? targetRow?.card_network ?? null,
+    is_default: true,
+    is_active: true,
+    metadata: resolvedMetadata,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (targetRow?.id) {
+    if (!targetRow.is_default) {
+      await admin.from("org_payment_methods").update({ is_default: false } as never).eq("organization_id", organizationId).eq("is_default", true);
+    }
+    await admin.from("org_payment_methods").update(payload as never).eq("id", targetRow.id).eq("organization_id", organizationId);
+    return targetRow.id;
+  } else {
+    await admin.from("org_payment_methods").update({ is_default: false } as never).eq("organization_id", organizationId).eq("is_default", true);
+    const { data } = await admin
+      .from("org_payment_methods")
+      .insert(payload as never)
+      .select("id")
+      .maybeSingle() as never as {
+      data: { id: string } | null;
+      error: { message: string } | null;
+    };
+    return data?.id ?? null;
+  }
+
+  return null;
 }
 
 export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitCheckoutInput): Promise<OrgAutoDebitCheckoutResult> {
@@ -377,16 +470,10 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
     return { success: false, error: planResult.error };
   }
 
-  const defaultPaymentMethod = await getDefaultOrgPaymentMethod(admin, organization.id);
-  if (!isMandateReadyPaymentMethod(defaultPaymentMethod)) {
-    return {
-      success: false,
-      error: "A mandate-ready default payment method is required for auto-debit. Please save an active Razorpay mandate first.",
-    };
-  }
   const contact = await resolveOrgContact(supabase, organization);
 
-  let providerCustomerId = defaultPaymentMethod.provider_customer_id ?? null;
+  const defaultPaymentMethod = await getDefaultOrgPaymentMethod(admin, organization.id);
+  let providerCustomerId = defaultPaymentMethod?.provider_customer_id ?? null;
   if (!providerCustomerId) {
     const customerResult = await createRazorpayCustomer({
       name: contact.name,
@@ -444,8 +531,8 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
     provider_subscription_id: subscriptionResult.data.id,
     provider_plan_id: planResult.planId,
     provider_customer_id: providerCustomerId,
-    provider_payment_method_id: defaultPaymentMethod.provider_payment_method_id,
-    provider_mandate_id: defaultPaymentMethod.provider_mandate_id,
+    provider_payment_method_id: defaultPaymentMethod?.provider_payment_method_id ?? null,
+    provider_mandate_id: defaultPaymentMethod?.provider_mandate_id ?? null,
     latest_invoice_id: currentSubscription?.latest_invoice_id ?? null,
     latest_payment_id: currentSubscription?.latest_payment_id ?? null,
     updated_at: new Date().toISOString(),
@@ -559,6 +646,20 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
   const nextBillingDate = providerSub.data.current_end
     ? new Date(providerSub.data.current_end * 1000).toISOString()
     : dbSub.next_billing_date;
+  const providerMandateId = typeof (providerSub.data as never as Record<string, unknown>).mandate_id === "string"
+    ? (providerSub.data as never as Record<string, unknown>).mandate_id as string
+    : dbSub.provider_mandate_id;
+  const providerPaymentMethodKey = providerMandateId || `subscription:${input.razorpay_subscription_id}`;
+
+  const orgPaymentMethodId = await upsertOrgMandatePaymentMethod(admin, ctx.organizationId, {
+    providerCustomerId: providerSub.data.customer_id || dbSub.provider_customer_id,
+    providerPaymentMethodId: providerPaymentMethodKey,
+    providerMandateId,
+    mandateStatus: providerStatus,
+    paymentType: "emandate",
+    displayName: "Razorpay auto-debit",
+    providerEnvironment: getRazorpayEnvironment(),
+  });
 
   await admin.from("organization_subscriptions").update({
     status: providerStatus === "active" ? "active" : dbSub.status,
@@ -568,6 +669,7 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
     provider_subscription_id: input.razorpay_subscription_id,
     provider_plan_id: providerSub.data.plan_id || dbSub.provider_plan_id,
     provider_customer_id: providerSub.data.customer_id || dbSub.provider_customer_id,
+    provider_payment_method_id: providerPaymentMethodKey,
     next_billing_date: nextBillingDate,
     expires_at: nextBillingDate,
     latest_payment_id: dbSub.latest_payment_id,
@@ -655,6 +757,10 @@ export async function handleOrgSubscriptionActivatedEvent(input: {
     nextBillingDateFromPayload = subscription.next_billing_date;
   }
 
+  const providerMandateId = typeof providerSubscription?.mandate_id === "string"
+    ? providerSubscription.mandate_id
+    : subscription.provider_mandate_id;
+
   await admin.from("organization_subscriptions").update({
     status: "active",
     auto_renew: true,
@@ -664,7 +770,9 @@ export async function handleOrgSubscriptionActivatedEvent(input: {
     provider_plan_id: subscription.provider_plan_id,
     provider_customer_id: subscription.provider_customer_id,
     provider_mandate_id: typeof providerSubscription?.mandate_id === "string" ? providerSubscription.mandate_id : subscription.provider_mandate_id,
-    provider_payment_method_id: typeof providerSubscription?.payment_method === "string" ? providerSubscription.payment_method : subscription.provider_payment_method_id,
+    provider_payment_method_id: typeof providerSubscription?.mandate_id === "string"
+      ? providerSubscription.mandate_id
+      : subscription.provider_mandate_id ?? `subscription:${input.providerSubscriptionId}`,
     next_billing_date: nextBillingDateFromPayload,
     expires_at: nextBillingDateFromPayload,
     updated_at: new Date().toISOString(),
@@ -724,7 +832,6 @@ export async function handleOrgSubscriptionChargedEvent(input: {
   if (!pricing) return { handled: false, error: "Missing pricing row for subscription." };
   const packageDetails = await getPackageDetails(admin, subscription.package_id);
   const organization = await getOrganizationDetails(admin, subscription.organization_id);
-
   const expectedAmount = subscription.price_override ?? pricing.price;
   const currency = pricing.currency || "INR";
   const now = new Date();
@@ -753,7 +860,7 @@ export async function handleOrgSubscriptionChargedEvent(input: {
       organization_id: subscription.organization_id,
       subscription_id: subscription.id,
       package_id: subscription.package_id,
-      payment_method_id: subscription.provider_payment_method_id,
+      payment_method_id: null,
       provider: "razorpay",
       provider_environment: input.providerEnvironment,
       provider_subscription_id: input.providerSubscriptionId,
@@ -800,7 +907,7 @@ export async function handleOrgSubscriptionChargedEvent(input: {
       provider_payment_id: input.providerPaymentId,
       amount: expectedAmount,
       currency,
-      payment_method_id: subscription.provider_payment_method_id,
+      payment_method_id: null,
       provider_signature_verified: true,
       paid_at: now.toISOString(),
       idempotency_key: idempotencyKey,
@@ -815,6 +922,40 @@ export async function handleOrgSubscriptionChargedEvent(input: {
     return { handled: false, error: paymentError?.message ?? "Failed to create organization payment." };
   }
 
+  const providerSubscription = input.payload?.entity && typeof input.payload.entity === "object"
+    ? input.payload.entity as Record<string, unknown>
+    : null;
+  const paymentEntity = input.payload?.payload && typeof input.payload.payload === "object"
+    ? (((input.payload.payload as Record<string, unknown>).payment as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined)
+    : null;
+  const cardEntity = paymentEntity?.card && typeof paymentEntity.card === "object"
+    ? paymentEntity.card as Record<string, unknown>
+    : null;
+  const providerMandateId = typeof providerSubscription?.mandate_id === "string"
+    ? providerSubscription.mandate_id
+    : subscription.provider_mandate_id;
+  const providerPaymentMethodKey = providerMandateId || `subscription:${input.providerSubscriptionId}`;
+  const orgPaymentMethodId = await upsertOrgMandatePaymentMethod(admin, subscription.organization_id, {
+      providerCustomerId: subscription.provider_customer_id,
+      providerPaymentMethodId: providerPaymentMethodKey,
+      providerMandateId,
+      mandateStatus: typeof providerSubscription?.status === "string" ? providerSubscription.status : "active",
+      paymentType: typeof paymentEntity?.method === "string" ? paymentEntity.method : "emandate",
+      displayName: typeof paymentEntity?.method === "string" ? `Razorpay ${paymentEntity.method}` : "Razorpay auto-debit",
+      lastFour: typeof cardEntity?.last4 === "string" ? cardEntity.last4 : null,
+      cardNetwork: typeof cardEntity?.network === "string" ? cardEntity.network : null,
+      providerEnvironment: input.providerEnvironment,
+    });
+
+  if (orgPaymentMethodId) {
+    await admin.from("org_subscription_invoices").update({
+      payment_method_id: orgPaymentMethodId,
+    } as never).eq("id", invoice.id);
+    await admin.from("org_subscription_payments").update({
+      payment_method_id: orgPaymentMethodId,
+    } as never).eq("id", payment.id);
+  }
+
   await admin.from("organization_subscriptions").update({
     status: "active",
     last_billing_date: now.toISOString(),
@@ -827,7 +968,7 @@ export async function handleOrgSubscriptionChargedEvent(input: {
     provider_subscription_id: input.providerSubscriptionId,
     provider_plan_id: subscription.provider_plan_id,
     provider_customer_id: subscription.provider_customer_id,
-    provider_payment_method_id: subscription.provider_payment_method_id,
+    provider_payment_method_id: providerPaymentMethodKey,
     auto_renew: true,
     updated_at: now.toISOString(),
   } as never).eq("id", subscription.id);
@@ -915,6 +1056,7 @@ export async function handleOrgSubscriptionChargeFailedEvent(input: {
   if (!pricing) return { handled: false, error: "Missing pricing row for subscription." };
   const packageDetails = await getPackageDetails(admin, subscription.package_id);
   const organization = await getOrganizationDetails(admin, subscription.organization_id);
+  const expectedAmount = subscription.price_override ?? pricing.price;
 
   const newFailureCount = (subscription.dunning_attempts ?? 0) + 1;
   const retryDays = [3, 5, 7][Math.min(newFailureCount - 1, 2)] ?? 7;
@@ -950,7 +1092,7 @@ export async function handleOrgSubscriptionChargeFailedEvent(input: {
     provider_environment: input.providerEnvironment,
     provider_subscription_id: input.providerSubscriptionId,
     provider_payment_id: input.providerPaymentId ?? null,
-    amount: pricing.price,
+    amount: expectedAmount,
     currency: pricing.currency || "INR",
     failure_reason: input.failureReason,
     idempotency_key: `org_sub_fail_${subscription.id}_${input.providerPaymentId ?? input.eventId}`,
@@ -994,16 +1136,16 @@ export async function handleOrgSubscriptionChargeFailedEvent(input: {
       : newFailureCount === 1
         ? dunningFirstAttempt({
             orgName: organization?.name ?? "Your Organization",
-            planName: packageDetails?.name ?? "Subscription",
-            amount: pricing.price,
-            dueDate: subscription.next_billing_date ?? nextRetry.toISOString(),
-          })
-        : dunningSecondAttempt({
-            orgName: organization?.name ?? "Your Organization",
-            planName: packageDetails?.name ?? "Subscription",
-            amount: pricing.price,
-            daysOverdue,
-          });
+        planName: packageDetails?.name ?? "Subscription",
+        amount: expectedAmount,
+        dueDate: subscription.next_billing_date ?? nextRetry.toISOString(),
+      })
+      : dunningSecondAttempt({
+          orgName: organization?.name ?? "Your Organization",
+          planName: packageDetails?.name ?? "Subscription",
+          amount: expectedAmount,
+          daysOverdue,
+        });
     await sendEmail({
       to: orgOwner.email,
       subject: newFailureCount >= 3 ? "Subscription suspended due to payment failure" : "Payment failed — auto-debit retry scheduled",

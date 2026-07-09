@@ -121,6 +121,9 @@ export type OrgPaymentMethod = {
   organization_id: string;
   provider: string;
   provider_customer_id: string | null;
+  provider_payment_method_id: string | null;
+  provider_mandate_id: string | null;
+  mandate_status: string | null;
   payment_type: PaymentMethodType;
   display_name: string;
   last_four: string | null;

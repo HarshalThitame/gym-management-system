@@ -5,7 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireOrgFeatureAccess, entitlementSimpleCatch } from "@/features/entitlement";
+import { entitlementSimpleCatch } from "@/features/entitlement";
 import { getOrgOwnerContext } from "./action-utils";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import { syncSubscriptionArtifactsForOrganization } from "@/features/super-admin/services/subscription-entitlement-sync";
@@ -15,7 +15,6 @@ type ActionState = { status: "idle" | "success" | "error"; message?: string };
 export async function toggleAutoRenewAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await requireOrganizationOwner("/organization/plan");
-    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     const supabase = getSupabaseAdminClient();
     if (!supabase) return { status: "error", message: "Database connection failed." };
 
@@ -60,7 +59,6 @@ export async function toggleAutoRenewAction(prevState: ActionState, formData: Fo
 export async function cancelSubscriptionAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await requireOrganizationOwner("/organization/plan");
-    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     if (!ctx.userId) {
       return { status: "error", message: "Authenticated user could not be resolved." };
     }
@@ -144,7 +142,6 @@ export async function cancelSubscriptionAction(prevState: ActionState, formData:
 export async function reactivateSubscriptionAction(prevState: ActionState, _formData?: FormData): Promise<ActionState> {
   try {
     const ctx = await requireOrganizationOwner("/organization/plan");
-    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     if (!ctx.userId) {
       return { status: "error", message: "Authenticated user could not be resolved." };
     }
@@ -192,7 +189,6 @@ export async function reactivateSubscriptionAction(prevState: ActionState, _form
 export async function assignAddonAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/plan");
-    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     const addonName = formData.get("addonName") as string;
     const addonPrice = Number(formData.get("addonPrice"));
 
@@ -216,7 +212,6 @@ export async function assignAddonAction(prevState: ActionState, formData: FormDa
 export async function removeAddonAction(prevState: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const ctx = await getOrgOwnerContext("/organization/plan");
-    await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
     const addonName = formData.get("addonName") as string;
 
     await writeAuditLog({

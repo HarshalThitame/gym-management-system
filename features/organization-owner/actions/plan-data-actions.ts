@@ -2,7 +2,6 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
-import { requireOrgFeatureAccess } from "@/features/entitlement";
 
 export type PackageWithMeta = {
   id: string;
@@ -77,7 +76,6 @@ export type OrgUsageData = {
 
 export async function getActivePackagesAction(): Promise<PackageWithMeta[]> {
   const ctx = await requireOrganizationOwner("/organization/plan");
-  await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
   const supabase = await createSupabaseServerClient();
 
   // Get packages with their features and limits
@@ -153,7 +151,6 @@ export async function getActivePackagesAction(): Promise<PackageWithMeta[]> {
 
 export async function getOrgSubscriptionAction(): Promise<SubscriptionWithPackage | null> {
   const ctx = await requireOrganizationOwner("/organization/plan");
-  await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
   const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
@@ -179,7 +176,6 @@ export type UsageHistoryPoint = {
 
 export async function getUsageHistoryAction(): Promise<UsageHistoryPoint[]> {
   const ctx = await requireOrganizationOwner("/organization/plan");
-  await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
   const supabase = await createSupabaseServerClient();
 
   const { data: gyms } = await supabase
@@ -227,7 +223,6 @@ export async function getUsageHistoryAction(): Promise<UsageHistoryPoint[]> {
 
 export async function getOrgUsageAction(): Promise<OrgUsageData | null> {
   const ctx = await requireOrganizationOwner("/organization/plan");
-  await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
   const supabase = await createSupabaseServerClient();
 
   const { data: sub } = await supabase
