@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
-import { requireOrgFeatureAccess } from "@/features/entitlement";
 import { calculateTax } from "@/features/billing/services/tax-service";
 import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
 import {
@@ -391,7 +390,6 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
   }
 
   const ctx = await requireOrganizationOwner("/organization/plan");
-  await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
 
   const admin = getSupabaseAdminClient();
   if (!admin) {
@@ -607,7 +605,6 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
   }
 
   const ctx = await requireOrganizationOwner("/organization/plan");
-  await requireOrgFeatureAccess(ctx.organizationId, "billing_invoices");
 
   const admin = getSupabaseAdminClient();
   if (!admin) {
