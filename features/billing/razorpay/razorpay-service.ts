@@ -396,8 +396,16 @@ export async function createRazorpayPlan(input: {
 }): Promise<{ ok: true; data: RazorpayPlanData } | { ok: false; message: string }> {
   try {
     const client = getClient();
-    const period = input.period === "half_yearly" ? "monthly" : input.period;
-    const interval = input.period === "half_yearly" ? 6 : input.interval ?? 1;
+    const period = input.period === "half_yearly"
+      ? "monthly"
+      : input.period === "annual"
+        ? "yearly"
+        : input.period;
+    const interval = input.period === "half_yearly"
+      ? 6
+      : input.period === "annual"
+        ? 1
+        : input.interval ?? 1;
 
     const plan = await client.plans.create({
       period,
