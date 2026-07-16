@@ -1,4 +1,4 @@
-const APP_VERSION = "apex-pwa-v18-20260701-next-static-refresh";
+const APP_VERSION = "apex-pwa-v19-20260716-org-plan-cache-bust";
 const STATIC_CACHE = `${APP_VERSION}-static`;
 const RUNTIME_CACHE = `${APP_VERSION}-runtime`;
 const OFFLINE_URL = "/offline";
@@ -18,7 +18,20 @@ const APP_SHELL_URLS = [
   "/icons/shortcut-workout.svg"
 ];
 
-const PROTECTED_ROUTE_PREFIXES = ["/admin", "/member", "/trainer", "/auth", "/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
+const PROTECTED_ROUTE_PREFIXES = [
+  "/admin",
+  "/member",
+  "/trainer",
+  "/organization",
+  "/super-admin",
+  "/reception",
+  "/auth",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email"
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
