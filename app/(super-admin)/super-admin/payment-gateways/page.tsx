@@ -8,6 +8,7 @@ import { ProviderConfigForm } from "@/features/billing/components/provider-confi
 import { PaymentGatewayTestButton } from "@/features/billing/components/payment-gateway-test-button";
 import { maskRazorpayKey } from "@/features/billing/razorpay/razorpay-config";
 import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
+import { preflightRazorpayCredentials } from "@/features/billing/razorpay/razorpay-service";
 import { listPlatformProviders } from "@/features/billing/services/platform-provider-config-service";
 
 export const metadata: Metadata = createMetadata({
@@ -29,8 +30,13 @@ export default async function SuperAdminPaymentGatewaysPage() {
   const defaultProvider = providers.find((p) => p.isDefault)?.provider ?? "none";
   const liveProviders = providers.filter((p) => !p.testMode).length;
   const platformCredentials = await resolvePlatformRazorpayCredentials();
+  const platformAuthPreflight = platformCredentials ? await preflightRazorpayCredentials(platformCredentials) : null;
   const platformSource = razorpayConfig?.isActive ? "Platform table" : "Env fallback";
   const platformMode = platformCredentials?.environment ?? "test";
+  const preflightState = platformAuthPreflight
+    ? (platformAuthPreflight.ok ? "Auth valid" : "Auth invalid")
+    : "Not tested";
+  const preflightVariant = platformAuthPreflight?.ok ? "success" : "warning";
 
   return (
     <div className="space-y-8">
@@ -129,6 +135,14 @@ export default async function SuperAdminPaymentGatewaysPage() {
               <p className="text-xs font-black uppercase tracking-[0.14em] text-white/55">Runtime source</p>
               <p className="mt-1 text-lg font-black">{platformSource}</p>
             </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/55">Auth preflight</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant={preflightVariant} className="border-white/20">
+                  {preflightState}
+                </Badge>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
@@ -149,6 +163,14 @@ export default async function SuperAdminPaymentGatewaysPage() {
             <p className="mt-2 text-lg font-black">{razorpayConfig?.isActive ? "Disabled" : "Env active"}</p>
           </div>
         </CardContent>
+        {platformAuthPreflight && !platformAuthPreflight.ok && (
+          <CardContent className="pt-0">
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-white/88">
+              <p className="font-black">Razorpay auth preflight failed</p>
+              <p className="mt-1 text-white/74">{platformAuthPreflight.message}</p>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">

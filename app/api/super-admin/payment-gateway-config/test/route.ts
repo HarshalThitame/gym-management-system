@@ -6,6 +6,7 @@ import { getPlatformProviderConfig } from "@/features/billing/services/platform-
 import { getRazorpayProvider } from "@/features/billing/razorpay/razorpay-provider-adapter";
 import { getRazorpayConfig, maskRazorpayKey } from "@/features/billing/razorpay/razorpay-config";
 import { normalizeRazorpayProviderConfig } from "@/features/billing/razorpay/razorpay-provider-config";
+import { preflightRazorpayCredentials } from "@/features/billing/razorpay/razorpay-service";
 
 const ALLOWED_PROVIDERS: PaymentProviderName[] = ["razorpay", "payu"];
 
@@ -114,13 +115,33 @@ export async function POST(request: Request) {
 
     const providerAdapter = getRazorpayProvider(adapterConfig, normalized.isTestMode);
     const health = providerAdapter.getHealth();
+    const authCheck = await preflightRazorpayCredentials(normalized);
+    if (!authCheck.ok) {
+      const response: TestResult = {
+        ok: false,
+        provider,
+        runtimeSource,
+        message: authCheck.message,
+        health,
+        keyIdMasked: maskRazorpayKey(providerAdapter.getPublicKey()),
+        missingFields: [],
+      };
+
+      billingLogger.warn("payment-gateway-test", "Platform Razorpay auth preflight failed", {
+        actorId: auth.context.userId,
+        runtimeSource,
+        environment: normalized.environment,
+        status: authCheck.status,
+      });
+
+      return NextResponse.json(response, { status: 422 });
+    }
+
     const response: TestResult = {
-      ok: health.configured,
+      ok: authCheck.ok && health.configured,
       provider,
       runtimeSource,
-      message: health.configured
-        ? `Razorpay configuration is valid and ready in ${normalized.environment} mode.`
-        : "Razorpay configuration could not be validated.",
+      message: authCheck.message,
       health,
       keyIdMasked: maskRazorpayKey(providerAdapter.getPublicKey()),
       missingFields: health.configured ? [] : getMissingRazorpayFields(rawConfig),
@@ -131,6 +152,7 @@ export async function POST(request: Request) {
       runtimeSource,
       configured: health.configured,
       environment: normalized.environment,
+      authStatus: authCheck.status,
     });
 
     return NextResponse.json(response, { status: health.configured ? 200 : 422 });

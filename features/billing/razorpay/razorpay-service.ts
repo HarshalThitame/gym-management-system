@@ -36,6 +36,76 @@ function getClientForCredentials(credentials?: RazorpayProviderCredentials | nul
   });
 }
 
+export type RazorpayAuthPreflightResult =
+  | { ok: true; status: number; message: string }
+  | { ok: false; status: number; message: string };
+
+function parseRazorpayErrorBody(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as {
+      error?: {
+        description?: string;
+        message?: string;
+        code?: string;
+      };
+      description?: string;
+      message?: string;
+      code?: string;
+    };
+    return (
+      parsed.error?.description ||
+      parsed.error?.message ||
+      parsed.description ||
+      parsed.message ||
+      parsed.error?.code ||
+      parsed.code ||
+      raw
+    );
+  } catch {
+    return raw;
+  }
+}
+
+export async function preflightRazorpayCredentials(
+  credentials?: RazorpayProviderCredentials | null,
+): Promise<RazorpayAuthPreflightResult> {
+  try {
+    const cfg = credentials ?? getRazorpayConfig();
+    const auth = Buffer.from(`${cfg.keyId}:${cfg.keySecret}`).toString("base64");
+    const response = await fetch("https://api.razorpay.com/v1/orders?count=1", {
+      method: "GET",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      return {
+        ok: true,
+        status: response.status,
+        message: `Razorpay auth valid in ${cfg.environment} mode.`,
+      };
+    }
+
+    const raw = await response.text().catch(() => "");
+    const message = parseRazorpayErrorBody(raw) || `Razorpay auth failed with status ${response.status}.`;
+    return {
+      ok: false,
+      status: response.status,
+      message,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Razorpay auth preflight failed.";
+    return {
+      ok: false,
+      status: 0,
+      message,
+    };
+  }
+}
+
 function extractRazorpayErrorMessage(err: unknown, fallback: string): string {
   if (typeof err === "string") {
     return err.trim() || fallback;
