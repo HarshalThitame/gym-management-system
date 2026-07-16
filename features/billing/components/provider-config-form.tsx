@@ -24,6 +24,8 @@ type ProviderConfigFormProps = {
   priority: number;
   testMode: boolean;
   configFields: ConfigFieldDef[];
+  saveEndpoint?: string;
+  successLabel?: string;
 };
 
 export function ProviderConfigForm({
@@ -34,6 +36,8 @@ export function ProviderConfigForm({
   priority: initialPriority,
   testMode: initialTestMode,
   configFields,
+  saveEndpoint = "/api/billing/provider-config",
+  successLabel,
 }: ProviderConfigFormProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -57,7 +61,7 @@ export function ProviderConfigForm({
     setSaved(false);
 
     try {
-      const res = await fetch("/api/billing/provider-config", {
+      const res = await fetch(saveEndpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,7 +81,7 @@ export function ProviderConfigForm({
       }
 
       setSaved(true);
-      showToast(`${provider === "razorpay" ? "Razorpay" : "PayU"} configuration saved`, "success");
+      showToast(successLabel ?? `${provider === "razorpay" ? "Razorpay" : "PayU"} configuration saved`, "success");
       router.refresh();
       setTimeout(() => setSaved(false), 2000);
     } catch {

@@ -6,6 +6,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { createRazorpayPlan } from "@/features/billing/razorpay/razorpay-service";
+import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
 import { billingLogger } from "@/features/billing/lib/logger";
 import { z } from "zod";
 import { FEATURE_KEYS } from "@/features/entitlement";
@@ -180,6 +181,7 @@ async function ensurePricingPlan(
     return { ok: true, planId: pricing.provider_plan_id };
   }
 
+  const credentials = await resolvePlatformRazorpayCredentials();
   const period = pricing.billing_period === "annual" ? "annual" : "monthly";
   const planResult = await createRazorpayPlan({
     period,
@@ -191,6 +193,7 @@ async function ensurePricingPlan(
       billing_period: period,
       source: "super_admin_package_management",
     },
+    credentials,
   });
 
   if (!planResult.ok) {

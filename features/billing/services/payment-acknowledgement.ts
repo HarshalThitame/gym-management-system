@@ -11,6 +11,7 @@ import {
 } from "@/features/billing/services/org-subscription-autodebit-service";
 import { fetchRazorpaySubscription } from "@/features/billing/razorpay/razorpay-service";
 import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
+import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
 
 export async function acknowledgeRazorpayCheckoutResultAction(
   input: OrgAutoDebitAcknowledgementInput,
@@ -50,7 +51,8 @@ export async function getSubscriptionPaymentStatusAction(
       return { success: false, error: "Subscription not found." };
     }
 
-    const providerSub = await fetchRazorpaySubscription(input.razorpay_subscription_id);
+    const platformCredentials = await resolvePlatformRazorpayCredentials();
+    const providerSub = await fetchRazorpaySubscription(input.razorpay_subscription_id, platformCredentials);
     if (!providerSub.ok) {
       return { success: false, error: providerSub.message };
     }
@@ -58,7 +60,7 @@ export async function getSubscriptionPaymentStatusAction(
     const status = providerSub.data.status || sub.status;
     await admin.from("organization_subscriptions").update({
       status: status === "active" ? "active" : sub.status,
-      provider_environment: getRazorpayEnvironment(),
+      provider_environment: platformCredentials?.environment ?? getRazorpayEnvironment(),
       updated_at: new Date().toISOString(),
     } as never).eq("id", sub.id);
 
@@ -73,4 +75,3 @@ export async function getSubscriptionPaymentStatusAction(
     return { success: false, error: message };
   }
 }
-

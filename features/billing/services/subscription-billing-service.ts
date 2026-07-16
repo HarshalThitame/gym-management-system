@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { absoluteUrl } from "@/lib/utils";
 import { createRazorpayOrder } from "../razorpay/razorpay-service";
+import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
 import { sendEmail } from "@/services/email/resend";
 import {
   subscriptionInvoiceNotification,
@@ -86,6 +87,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
   }
   const db = getDb(supabase);
   const now = new Date();
+  const platformCredentials = await resolvePlatformRazorpayCredentials();
 
   const { data: subsDue } = await db
     .from("organization_subscriptions")
@@ -259,7 +261,7 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
           invoice_id: invoice.id as string,
           billing_period: billingPeriod,
         },
-      });
+      }, platformCredentials);
 
       if (!orderResult.ok) {
         result.errors.push(`Razorpay order failed for sub ${sub.id}: ${orderResult.message}`);
@@ -336,6 +338,8 @@ export async function processDunningRetry(subscriptionId: string, organizationId
   if (!supabase) return { success: false, error: "Supabase admin client not configured" };
 
   try {
+    const platformCredentials = await resolvePlatformRazorpayCredentials();
+    const providerEnvironment = platformCredentials?.environment ?? "test";
     const amountInRupees = price / 100;
     const orderResult = await createRazorpayOrder({
       amountInRupees,
@@ -345,9 +349,9 @@ export async function processDunningRetry(subscriptionId: string, organizationId
         organization_id: organizationId,
         subscription_id: subscriptionId,
         type: "dunning_retry",
-        environment: "test",
+        environment: providerEnvironment,
       },
-    });
+    }, platformCredentials);
 
     if (!orderResult.ok) return { success: false, error: orderResult.message };
 

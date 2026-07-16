@@ -6,6 +6,7 @@ import type { IPaymentProvider } from "@/features/billing/providers/provider-typ
 import { handleMemberPaymentCaptured, handleMemberPaymentFailed } from "@/features/billing/services/member-webhook-handler";
 import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
 import { getRazorpayProvider } from "@/features/billing/razorpay/razorpay-provider-adapter";
+import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
 
 type ProviderEventRow = {
   id?: string;
@@ -357,9 +358,10 @@ async function resolveWebhookProvider(input: {
     };
 
     if (orgSubscription) {
+      const platformCredentials = await resolvePlatformRazorpayCredentials();
       return {
         ok: true,
-        provider: getRazorpayProvider(undefined, false),
+        provider: getRazorpayProvider(platformCredentials?.config, platformCredentials?.isTestMode ?? false),
         gymId: null,
       };
     }
@@ -372,9 +374,10 @@ async function resolveWebhookProvider(input: {
 
   if (!gymId) {
     if (provider === "razorpay" && eventName.startsWith("subscription.")) {
+      const platformCredentials = await resolvePlatformRazorpayCredentials();
       return {
         ok: true,
-        provider: getRazorpayProvider(undefined, false),
+        provider: getRazorpayProvider(platformCredentials?.config, platformCredentials?.isTestMode ?? false),
         gymId: null,
       };
     }

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import { createRazorpayOrder } from "@/features/billing/razorpay/razorpay-service";
-import { getRazorpayEnvironment, getRazorpayPublicKeyId } from "@/features/billing/razorpay/razorpay-config";
+import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
+import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 
 const DUNNING_POLICY = {
@@ -32,6 +33,9 @@ export async function retrySubscriptionPaymentAction(input: {
     const db = getSupabaseAdminClient() as any;
     if (!db) return { status: "error", message: "Database connection failed." };
 
+    const credentials = await resolvePlatformRazorpayCredentials();
+    const providerEnvironment = credentials?.environment ?? getRazorpayEnvironment();
+
     const { data: invoice } = await db.from("org_subscription_invoices").select("*").eq("id", input.invoiceId).maybeSingle();
     if (!invoice) return { status: "error", message: "Invoice not found." };
     if (invoice.status === "paid") return { status: "success", message: "Invoice is already paid." };
@@ -54,9 +58,9 @@ export async function retrySubscriptionPaymentAction(input: {
         invoice_id: input.invoiceId,
         subscription_id: input.subscriptionId,
         type: "dunning_retry",
-        environment: getRazorpayEnvironment(),
+        environment: providerEnvironment,
       },
-    });
+    }, credentials);
 
     if (!orderResult.ok) return { status: "error", message: orderResult.message };
 

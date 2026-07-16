@@ -6,6 +6,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import { calculateTax } from "@/features/billing/services/tax-service";
 import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
+import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
 import {
   createRazorpayCustomer,
   createRazorpayPlan,
@@ -163,7 +164,12 @@ async function resolvePricingRow(admin: ReturnType<typeof getSupabaseAdminClient
   return data;
 }
 
-async function ensureProviderPlan(admin: ReturnType<typeof getSupabaseAdminClient>, pricing: PricingRow, planName: string): Promise<{ ok: true; planId: string } | { ok: false; error: string }> {
+async function ensureProviderPlan(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  pricing: PricingRow,
+  planName: string,
+  credentials: Awaited<ReturnType<typeof resolvePlatformRazorpayCredentials>>,
+): Promise<{ ok: true; planId: string } | { ok: false; error: string }> {
   if (pricing.provider_plan_id) {
     return { ok: true, planId: pricing.provider_plan_id };
   }
@@ -179,6 +185,7 @@ async function ensureProviderPlan(admin: ReturnType<typeof getSupabaseAdminClien
       billing_period: period,
       source: "org_autodebit",
     },
+    credentials,
   });
 
   if (!planResult.ok) {
@@ -388,7 +395,8 @@ async function upsertOrgMandatePaymentMethod(
 
 export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitCheckoutInput): Promise<OrgAutoDebitCheckoutResult> {
   const { targetPackageId, billingCycle } = input;
-  const providerEnvironment = getRazorpayEnvironment();
+  const platformCredentials = await resolvePlatformRazorpayCredentials();
+  const providerEnvironment = platformCredentials?.environment ?? getRazorpayEnvironment();
 
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -470,7 +478,7 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
   }
 
   const totalAmountPaise = subtotalPaise + taxPaise;
-  const planResult = await ensureProviderPlan(admin, pricing, pkg.name);
+  const planResult = await ensureProviderPlan(admin, pricing, pkg.name, platformCredentials);
   if (!planResult.ok) {
     return { success: false, error: planResult.error };
   }
@@ -490,7 +498,7 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
         billing_period: billingCycle,
         source: "org_autodebit",
       },
-    });
+    }, platformCredentials);
     if (!customerResult.ok) {
       return { success: false, error: customerResult.message };
     }
@@ -507,7 +515,7 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
       billing_period: billingCycle,
       source: "org_autodebit",
     },
-  });
+  }, platformCredentials);
 
   if (!subscriptionResult.ok) {
     return { success: false, error: subscriptionResult.message };
@@ -586,7 +594,7 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
 
   return {
     success: true,
-    razorpayKeyId: getRazorpayKeyId(),
+    razorpayKeyId: getRazorpayKeyId(platformCredentials),
     razorpaySubscriptionId: subscriptionResult.data.id,
     razorpayCustomerId: providerCustomerId,
     amountPaise: totalAmountPaise,
@@ -618,11 +626,13 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
     return { success: false, error: "Database connection failed." };
   }
 
+  const platformCredentials = await resolvePlatformRazorpayCredentials();
+
   const sigOk = verifyRazorpaySubscriptionSignature({
     subscriptionId: input.razorpay_subscription_id,
     paymentId: input.razorpay_payment_id,
     signature: input.razorpay_signature,
-  });
+  }, platformCredentials);
   if (!sigOk) {
     return { success: false, error: "Subscription signature verification failed." };
   }
@@ -641,7 +651,7 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
     return { success: false, error: "Pending subscription not found." };
   }
 
-  const providerSub = await fetchRazorpaySubscription(input.razorpay_subscription_id);
+  const providerSub = await fetchRazorpaySubscription(input.razorpay_subscription_id, platformCredentials);
   if (!providerSub.ok) {
     return { success: false, error: providerSub.message };
   }
@@ -662,14 +672,14 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
     mandateStatus: providerStatus,
     paymentType: "emandate",
     displayName: "Razorpay auto-debit",
-    providerEnvironment: getRazorpayEnvironment(),
+    providerEnvironment: platformCredentials?.environment ?? getRazorpayEnvironment(),
   });
 
   await admin.from("organization_subscriptions").update({
     status: providerStatus === "active" ? "active" : dbSub.status,
     auto_renew: true,
     provider: "razorpay",
-    provider_environment: getRazorpayEnvironment(),
+    provider_environment: platformCredentials?.environment ?? getRazorpayEnvironment(),
     provider_subscription_id: input.razorpay_subscription_id,
     provider_plan_id: providerSub.data.plan_id || dbSub.provider_plan_id,
     provider_customer_id: providerSub.data.customer_id || dbSub.provider_customer_id,
@@ -700,7 +710,7 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
     },
     metadata: {
       source: "checkout_callback",
-      providerEnvironment: getRazorpayEnvironment(),
+      providerEnvironment: platformCredentials?.environment ?? getRazorpayEnvironment(),
     },
     reason: "Razorpay subscription authorization completed.",
     created_at: new Date().toISOString(),
@@ -751,7 +761,8 @@ export async function handleOrgSubscriptionActivatedEvent(input: {
     : null;
 
   if (!nextBillingDateFromPayload) {
-    const providerSub = await fetchRazorpaySubscription(input.providerSubscriptionId);
+    const platformCredentials = await resolvePlatformRazorpayCredentials();
+    const providerSub = await fetchRazorpaySubscription(input.providerSubscriptionId, platformCredentials);
     if (providerSub.ok && providerSub.data.current_end) {
       nextBillingDateFromPayload = new Date(providerSub.data.current_end * 1000).toISOString();
     }

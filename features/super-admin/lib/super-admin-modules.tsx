@@ -14,6 +14,7 @@ import {
   Palette,
   Settings,
   ShieldCheck,
+  Shield,
   UsersRound,
   Eye,
   Siren
@@ -88,6 +89,17 @@ export const superAdminModules = [
     iconKey: "receipt",
     responsibilities: ["View all SaaS billing records", "Track failed subscription payments", "Review invoices and refund workflows", "Monitor MRR, ARR, and plan-level revenue"],
     safeguards: ["Refund actions require privileged confirmation", "Payment webhooks remain server-verified", "Financial exports are logged"]
+  },
+  {
+    slug: "payment-gateways",
+    href: "/super-admin/payment-gateways",
+    label: "Payment Gateways",
+    title: "Platform Payment Gateway Settings",
+    description: "Configure the platform payment provider used for organization plan billing. Member membership billing remains organization-scoped and separate.",
+    icon: <Shield className="size-5" />,
+    iconKey: "shield",
+    responsibilities: ["Set the org-plan billing gateway", "Configure live and test Razorpay credentials", "Optionally store PayU credentials for future platform billing", "Keep platform billing separate from gym/member gateway settings"],
+    safeguards: ["Only Super Admin can access platform gateway settings", "Member billing settings are not modified here", "Configuration changes are audited"]
   },
   {
     slug: "users",
