@@ -41,11 +41,6 @@ function extractRazorpayErrorMessage(err: unknown, fallback: string): string {
     return err.trim() || fallback;
   }
 
-  if (err instanceof Error) {
-    const message = err.message.trim();
-    if (message) return message;
-  }
-
   if (err && typeof err === "object") {
     const candidate = err as Record<string, unknown>;
     const nestedError = candidate.error && typeof candidate.error === "object"
@@ -80,6 +75,11 @@ function extractRazorpayErrorMessage(err: unknown, fallback: string): string {
     if (pieces.length > 0) {
       return pieces[0];
     }
+  }
+
+  if (err instanceof Error) {
+    const message = err.message.trim();
+    if (message) return message;
   }
 
   return fallback;
