@@ -3,8 +3,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { generateInvoicePaymentLink, regenerateInvoicePaymentLink, sendPaymentLinkByEmail } from "@/features/billing/services/payment-link-service";
 import { cancelRazorpayPaymentLink } from "@/features/billing/razorpay/razorpay-service";
+import { resolveRazorpayCredentialsForGym } from "@/features/billing/razorpay/razorpay-provider-config";
 
-async function getAuthAndInvoice(request: Request) {
+async function getAuthAndInvoice() {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
@@ -27,7 +28,7 @@ async function getAuthAndInvoice(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const ctx = await getAuthAndInvoice(request);
+  const ctx = await getAuthAndInvoice();
   if (ctx.error) return ctx.error;
   const { admin, profile } = ctx;
 
@@ -71,7 +72,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No payment link to revoke" }, { status: 400 });
     }
 
-    const cancelResult = await cancelRazorpayPaymentLink(invoice.razorpay_order_id);
+    const credentials = await resolveRazorpayCredentialsForGym(invoice.gym_id ?? profile.gym_id ?? "");
+    const cancelResult = await cancelRazorpayPaymentLink(invoice.razorpay_order_id, credentials);
     if (!cancelResult.ok) {
       return NextResponse.json({ error: cancelResult.message }, { status: 500 });
     }
@@ -99,6 +101,7 @@ export async function POST(request: Request) {
   }
 
   const linkInput = {
+    gymId: invoice.gym_id ?? profile.gym_id ?? "",
     organizationId: invoice.organization_id ?? profile.organization_id ?? "",
     invoiceId: invoice.id,
     memberName: member.full_name,
@@ -130,7 +133,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const ctx = await getAuthAndInvoice(request);
+  const ctx = await getAuthAndInvoice();
   if (ctx.error) return ctx.error;
   const { admin, profile } = ctx;
 

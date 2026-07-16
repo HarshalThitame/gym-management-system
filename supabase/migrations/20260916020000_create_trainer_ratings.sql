@@ -1,7 +1,7 @@
 -- Phase 1.4: Trainer Ratings table for Trainer Performance Report
 -- Enables avg rating aggregation per trainer
 
-create table public.trainer_ratings (
+create table if not exists public.trainer_ratings (
   id uuid default gen_random_uuid() primary key,
   trainer_id uuid not null references public.trainers(id) on delete cascade,
   gym_id uuid references public.gyms(id) on delete set null,
@@ -22,6 +22,7 @@ create index if not exists trainer_ratings_gym_idx on public.trainer_ratings (gy
 alter table public.trainer_ratings enable row level security;
 
 -- Policies
+drop policy if exists "Organization owners can view ratings for their org" on public.trainer_ratings;
 create policy "Organization owners can view ratings for their org"
   on public.trainer_ratings for select
   using (
@@ -31,6 +32,7 @@ create policy "Organization owners can view ratings for their org"
     )
   );
 
+drop policy if exists "Organization owners can insert ratings" on public.trainer_ratings;
 create policy "Organization owners can insert ratings"
   on public.trainer_ratings for insert
   with check (
@@ -40,6 +42,7 @@ create policy "Organization owners can insert ratings"
     )
   );
 
+drop policy if exists "Organization owners can update ratings" on public.trainer_ratings;
 create policy "Organization owners can update ratings"
   on public.trainer_ratings for update
   using (
@@ -49,6 +52,7 @@ create policy "Organization owners can update ratings"
     )
   );
 
+drop policy if exists "Organization owners can delete ratings" on public.trainer_ratings;
 create policy "Organization owners can delete ratings"
   on public.trainer_ratings for delete
   using (
@@ -59,6 +63,7 @@ create policy "Organization owners can delete ratings"
   );
 
 -- Service role bypass (already default for service_role, explicit for clarity)
+drop policy if exists "Service role full access" on public.trainer_ratings;
 create policy "Service role full access"
   on public.trainer_ratings for all
   to service_role

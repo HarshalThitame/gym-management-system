@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { billingLogger } from "@/features/billing/lib/logger";
-import { getProviderForGym, clearProviderCache } from "@/features/billing/providers/provider-registry";
+import { getProviderForGym } from "@/features/billing/providers/provider-registry";
+import type { IPaymentProvider } from "@/features/billing/providers/provider-types";
 import { handleMemberPaymentCaptured, handleMemberPaymentFailed } from "@/features/billing/services/member-webhook-handler";
 import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
-import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
-
-const WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000;
-const SUPPORTED_PROVIDERS = ["razorpay", "payu"] as const;
+import { getRazorpayProvider } from "@/features/billing/razorpay/razorpay-provider-adapter";
 
 type ProviderEventRow = {
   id?: string;
@@ -16,7 +14,7 @@ type ProviderEventRow = {
   subscription_id?: string | null;
 };
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function handlePaymentWebhook(request: Request): Promise<NextResponse> {
   const startTime = Date.now();
 
   try {
@@ -26,8 +24,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     const providerFromQuery = url.searchParams.get("provider") || "";
     const providerHeader = request.headers.get("x-payment-provider") || "";
 
-    const contentType = request.headers.get("content-type") || "";
-    const isRazorpayWebhook = providerFromQuery === "razorpay" || providerHeader === "razorpay" || contentType.includes("json");
     const isPayuWebhook = providerFromQuery === "payu" || providerHeader === "payu";
 
     // Detect provider
@@ -88,11 +84,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "Missing event ID" }, { status: 400 });
     }
 
-    // Verify signature using the registry
-    const providerResult = await getProviderForGym("", provider);
+    const adminDb = getSupabaseAdminClient();
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
+    }
+
+    const providerResult = await resolveWebhookProvider({
+      adminDb,
+      provider,
+      eventName,
+      parsedPayload,
+    });
     if (!providerResult.ok) {
-      billingLogger.error("webhook.payment", "Provider not available for webhook verification", { provider });
-      return NextResponse.json({ error: "Provider configuration error" }, { status: 500 });
+      billingLogger.error("webhook.payment", "Provider not available for webhook verification", { provider, reason: providerResult.message });
+      return NextResponse.json({ error: providerResult.message }, { status: 500 });
     }
 
     const isValid = await providerResult.provider.verifyWebhookSignature({ rawBody, signature });
@@ -102,11 +107,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // Deduplication
-    const adminDb = getSupabaseAdminClient();
-    if (!adminDb) {
-      return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
-    }
-
     const { data: existingEvents } = await adminDb
       .from("payment_provider_events")
       .select("id, status")
@@ -126,7 +126,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       .from("payment_provider_events")
       .insert({
         provider,
-        provider_environment: provider,
+        provider_environment: providerResult.provider.getEnvironment(),
         event_id: eventId,
         event_type: eventName,
         payload: parsedPayload,
@@ -187,7 +187,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             const subscriptionResult = await finalizeSubscriptionPayment({
               providerOrderId: razorpayOrderId,
               providerPaymentId: razorpayPaymentId,
-              providerEnvironment: getRazorpayEnvironment(),
+              providerEnvironment: providerResult.provider.getEnvironment(),
               eventId,
             });
 
@@ -322,4 +322,112 @@ export async function POST(request: Request): Promise<NextResponse> {
     billingLogger.error("webhook.payment", "Fatal error", { error: message });
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  return handlePaymentWebhook(request);
+}
+
+type WebhookProviderResult =
+  | { ok: true; provider: IPaymentProvider; gymId: string | null }
+  | { ok: false; message: string };
+
+async function resolveWebhookProvider(input: {
+  adminDb: ReturnType<typeof getSupabaseAdminClient>;
+  provider: "razorpay" | "payu";
+  eventName: string;
+  parsedPayload: Record<string, unknown>;
+}): Promise<WebhookProviderResult> {
+  const { adminDb, provider, eventName, parsedPayload } = input;
+  const payloadEntity = parsedPayload.entity as Record<string, unknown> | undefined;
+  const payload = payloadEntity?.payload as Record<string, unknown> | undefined;
+  const paymentEntity = (payload?.payment as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+  const orderEntity = (payload?.order as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+  const subscriptionEntity = (payload?.subscription as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+
+  const subscriptionId = (subscriptionEntity?.id as string) || (paymentEntity?.subscription_id as string) || "";
+  if (provider === "razorpay" && subscriptionId) {
+    const { data: orgSubscription } = await adminDb
+      .from("organization_subscriptions")
+      .select("id")
+      .eq("provider_subscription_id", subscriptionId)
+      .maybeSingle() as never as {
+      data: { id: string } | null;
+      error: { message: string } | null;
+    };
+
+    if (orgSubscription) {
+      return {
+        ok: true,
+        provider: getRazorpayProvider(undefined, false),
+        gymId: null,
+      };
+    }
+  }
+
+  const gymId = await resolveGymIdFromWebhook(adminDb, {
+    paymentEntity,
+    orderEntity,
+  });
+
+  if (!gymId) {
+    if (provider === "razorpay" && eventName.startsWith("subscription.")) {
+      return {
+        ok: true,
+        provider: getRazorpayProvider(undefined, false),
+        gymId: null,
+      };
+    }
+
+    return { ok: false, message: "Unable to resolve the gym for this payment webhook." };
+  }
+
+  const providerResult = await getProviderForGym(gymId, provider);
+  if (!providerResult.ok) {
+    return { ok: false, message: providerResult.message };
+  }
+
+  return {
+    ok: true,
+    provider: providerResult.provider,
+    gymId,
+  };
+}
+
+async function resolveGymIdFromWebhook(
+  adminDb: ReturnType<typeof getSupabaseAdminClient>,
+  input: {
+    paymentEntity: Record<string, unknown> | undefined;
+    orderEntity: Record<string, unknown> | undefined;
+  },
+): Promise<string | null> {
+  const notes = (input.orderEntity?.notes as Record<string, unknown> | undefined) ?? (input.paymentEntity?.notes as Record<string, unknown> | undefined) ?? null;
+  const noteGymId = notes && typeof notes.gym_id === "string" ? notes.gym_id : null;
+  if (noteGymId) {
+    return noteGymId;
+  }
+
+  const paymentOrderId = (input.paymentEntity?.order_id as string) || (input.orderEntity?.id as string) || "";
+  const paymentId = (input.paymentEntity?.id as string) || "";
+
+  if (paymentOrderId || paymentId) {
+    const { data: payment } = await adminDb
+      .from("payments")
+      .select("gym_id")
+      .or(paymentOrderId && paymentId
+        ? `provider_order_id.eq.${paymentOrderId},provider_payment_id.eq.${paymentId}`
+        : paymentOrderId
+          ? `provider_order_id.eq.${paymentOrderId}`
+          : `provider_payment_id.eq.${paymentId}`)
+      .maybeSingle() as never as {
+      data: { gym_id: string | null } | null;
+      error: { message: string } | null;
+    };
+
+    if (payment?.gym_id) {
+      return payment.gym_id;
+    }
+  }
+
+  return null;
 }

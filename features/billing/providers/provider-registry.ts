@@ -3,8 +3,8 @@ import "server-only";
 import type { IPaymentProvider, PaymentProviderName } from "./provider-types";
 import { getRazorpayProvider } from "@/features/billing/razorpay/razorpay-provider-adapter";
 import { getPayuProvider } from "@/features/billing/payu/payu-service";
+import { hasRazorpayProviderCredentials } from "@/features/billing/razorpay/razorpay-provider-config";
 import { getGymProviderConfig } from "./provider-config-service";
-import { billingLogger } from "@/features/billing/lib/logger";
 
 const providerCache = new Map<string, IPaymentProvider>();
 
@@ -29,18 +29,20 @@ export async function getProviderForGym(gymId: string, providerName?: PaymentPro
   }
 
   if (!configResult.ok) {
-    if (providerName) {
-      billingLogger.warn("getProviderForGym", `No DB config found for ${providerName}, falling back to env defaults`, { gymId });
-      return getEnvFallbackProvider(providerName);
-    }
     return { ok: false, message: configResult.message };
   }
 
   const { config, provider: resolvedName, testMode } = configResult.config;
+  if (!configResult.config.isActive) {
+    return { ok: false, message: `Payment provider ${resolvedName} is disabled for gym ${gymId || "unknown"}.` };
+  }
 
   let provider: IPaymentProvider;
   switch (resolvedName) {
     case "razorpay":
+      if (!hasRazorpayProviderCredentials(config)) {
+        return { ok: false, message: `Razorpay configuration for gym ${gymId || "unknown"} is incomplete.` };
+      }
       provider = getRazorpayProvider(config, testMode);
       break;
     case "payu":
@@ -57,32 +59,6 @@ export async function getProviderForGym(gymId: string, providerName?: PaymentPro
 async function getGymDefaultProvider(gymId: string) {
   const { getGymDefaultProvider: fetchDefault } = await import("./provider-config-service");
   return fetchDefault(gymId);
-}
-
-function getEnvFallbackProvider(providerName: PaymentProviderName): Promise<{
-  ok: true;
-  provider: IPaymentProvider;
-  providerName: PaymentProviderName;
-} | {
-  ok: false;
-  message: string;
-}> {
-  switch (providerName) {
-    case "razorpay":
-      return Promise.resolve({
-        ok: true,
-        provider: getRazorpayProvider({}, false),
-        providerName: "razorpay",
-      });
-    case "payu":
-      return Promise.resolve({
-        ok: true,
-        provider: getPayuProvider({}, false),
-        providerName: "payu",
-      });
-    default:
-      return Promise.resolve({ ok: false, message: `Unsupported provider: ${providerName}` });
-  }
 }
 
 export function clearProviderCache(): void {

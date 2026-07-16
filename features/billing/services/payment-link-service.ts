@@ -1,9 +1,11 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createRazorpayPaymentLink, cancelRazorpayPaymentLink } from "@/features/billing/razorpay/razorpay-service";
+import { resolveRazorpayCredentialsForGym } from "@/features/billing/razorpay/razorpay-provider-config";
 import { sendEmail } from "@/services/email/resend";
 import { billingLogger } from "@/features/billing/lib/logger";
 
 export type GeneratePaymentLinkInput = {
+  gymId: string;
   organizationId: string;
   invoiceId: string;
   memberName: string;
@@ -26,6 +28,9 @@ export async function generateInvoicePaymentLink(input: GeneratePaymentLinkInput
   const admin = getSupabaseAdminClient();
   if (!admin) return { ok: false, message: "Supabase admin client not configured" };
 
+  const credentials = await resolveRazorpayCredentialsForGym(input.gymId);
+  if (!credentials) return { ok: false, message: "Razorpay is not configured for this gym" };
+
   const result = await createRazorpayPaymentLink({
     amountInRupees: input.amount,
     currency: "INR",
@@ -39,7 +44,7 @@ export async function generateInvoicePaymentLink(input: GeneratePaymentLinkInput
       invoice_id: input.invoiceId,
       source: "payment_link",
     },
-  });
+  }, credentials);
 
   if (!result.ok) {
     billingLogger.error("generateInvoicePaymentLink", "Failed to create payment link", { invoiceId: input.invoiceId, error: result.message });
@@ -60,7 +65,10 @@ export async function regenerateInvoicePaymentLink(input: GeneratePaymentLinkInp
   const admin = getSupabaseAdminClient();
   if (!admin) return { ok: false, message: "Supabase admin client not configured" };
 
-  const cancelResult = await cancelRazorpayPaymentLink(oldLinkId);
+  const credentials = await resolveRazorpayCredentialsForGym(input.gymId);
+  if (!credentials) return { ok: false, message: "Razorpay is not configured for this gym" };
+
+  const cancelResult = await cancelRazorpayPaymentLink(oldLinkId, credentials);
   if (!cancelResult.ok) {
     billingLogger.warn("regenerateInvoicePaymentLink", "Failed to cancel old link, proceeding with new", { oldLinkId, error: cancelResult.message });
   }

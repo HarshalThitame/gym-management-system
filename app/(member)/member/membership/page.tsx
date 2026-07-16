@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { PaymentCheckoutButton } from "@/features/billing/components/payment-checkout-button";
 import { AutoRenewToggle } from "@/features/billing/components/auto-renew-toggle";
@@ -83,12 +84,25 @@ export default async function MemberMembershipPage() {
                 <MemberField label="Payment Status" value={membership.payment_status.replace(/_/g, " ")} />
               </div>
             ) : (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm font-semibold text-slate">No active membership record is connected yet.</div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="member-info">Membership unavailable</Badge>
+                  <Badge variant="neutral">Protected area</Badge>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate">
+                  No active membership record is connected to this account yet. Once your gym assigns a plan, it will appear here with payment actions.
+                </p>
+              </div>
             )}
             {pendingPayment ? (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
-                <p className="text-sm font-bold text-amber-300">Pending online payment</p>
-                <p className="mt-1 text-xs text-slate">Complete this payment to settle your current membership invoice.</p>
+              <div className="rounded-3xl border border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-slate-950/70 to-slate-900/80 p-5 shadow-[0_20px_60px_-30px_rgba(245,158,11,0.35)]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="warning">Pending online payment</Badge>
+                  <Badge variant="neutral">Action required</Badge>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate">
+                  Complete this payment to settle your current membership invoice and keep your account in good standing.
+                </p>
                 <div className="mt-4">
                   <PaymentCheckoutButton
                     amount={pendingPayment.amount}

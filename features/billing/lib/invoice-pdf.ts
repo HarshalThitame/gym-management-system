@@ -1,6 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { InvoiceBundle } from "@/types/billing";
-import { formatCurrency } from "./money";
 
 export async function generateInvoicePdf(bundle: InvoiceBundle) {
   const pdf = await PDFDocument.create();
@@ -33,7 +32,7 @@ export async function generateInvoicePdf(bundle: InvoiceBundle) {
   for (const item of bundle.items) {
     page.drawText(item.description.slice(0, 54), { x: 60, y, size: 10, font: regular, color: dark });
     page.drawText(String(item.quantity), { x: 335, y, size: 10, font: regular, color: dark });
-    page.drawText(formatCurrency(item.total_amount ?? 0, bundle.invoice.currency), { x: 455, y, size: 10, font: regular, color: dark });
+    page.drawText(formatPdfCurrency(item.total_amount ?? 0, bundle.invoice.currency), { x: 455, y, size: 10, font: regular, color: dark });
     y -= 22;
   }
 
@@ -78,5 +77,15 @@ function drawAmountLine(
   y: number
 ) {
   page.drawText(label, { x: 360, y, size: 11, font, color: rgb(0.067, 0.071, 0.078) });
-  page.drawText(formatCurrency(amount, currency), { x: 455, y, size: 11, font, color: rgb(0.067, 0.071, 0.078) });
+  page.drawText(formatPdfCurrency(amount, currency), { x: 455, y, size: 11, font, color: rgb(0.067, 0.071, 0.078) });
+}
+
+function formatPdfCurrency(amount: number | null | undefined, currency = "INR") {
+  const safeAmount = amount ?? 0;
+  const value = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+    useGrouping: true,
+  }).format(safeAmount / 100);
+
+  return `${currency} ${value}`;
 }

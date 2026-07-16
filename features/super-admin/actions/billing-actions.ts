@@ -9,6 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
 import { isMfaFreshEnough } from "@/features/super-admin/lib/organization-governance";
 import { getCriticalSuperAdminEmail } from "@/features/super-admin/lib/super-admin-governance-config";
+import { createRefund } from "@/features/billing/services/provider-payment-service";
 
 const superAdminRoles = ["super_admin"] as const;
 const criticalMfaCookie = "super_admin_mfa_verified_at";
@@ -123,37 +124,45 @@ export async function processRefundAction(input: ProcessRefundInput): Promise<Au
     const db = getSupabaseAdminClient() as any;
     if (!db) return { status: "error", message: "Database connection failed." };
 
-    const refundId = `REF-${Date.now().toString(36).toUpperCase()}`;
+    let refundId = `REF-${Date.now().toString(36).toUpperCase()}`;
 
-    const { error: refundError } = await db.from("refunds").insert({
-      id: refundId,
-      organization_id: input.organizationId,
-      invoice_id: input.invoiceId || null,
-      payment_id: input.paymentId || null,
-      amount: input.amount,
-      currency: "INR",
-      reason: input.reason,
-      notes: input.notes || null,
-      status: "processed",
-      processed_by: auth.context.userId,
-      processed_at: new Date().toISOString(),
-    });
-
-    if (refundError) return { status: "error", message: "Failed to create refund record." };
-
-    // Trigger Razorpay refund if payment ID provided
     if (input.paymentId) {
       try {
-        const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        await fetch(`${origin}/api/billing/razorpay/refunds`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-super-admin-internal": "true" },
-          body: JSON.stringify({ paymentId: input.paymentId, amount: input.amount, reason: input.reason }),
+        const refundResult = await createRefund(auth.context, {
+          paymentId: input.paymentId,
+          amount: input.amount,
+          reason: input.reason,
+          notes: input.notes,
         });
+
+        if (!refundResult.ok) {
+          return { status: "error", message: refundResult.message };
+        }
+        refundId = refundResult.data.refundId;
       } catch {
         // Razorpay refund is best-effort; don't fail the whole operation
       }
-      await db.from("payments").update({ status: "refunded" }).eq("id", input.paymentId);
+    } else {
+      const { error: refundError } = await db.from("refunds").insert({
+        id: refundId,
+        organization_id: input.organizationId,
+        invoice_id: input.invoiceId || null,
+        payment_id: null,
+        amount: input.amount,
+        currency: "INR",
+        reason: input.reason,
+        notes: input.notes || null,
+        status: "processed",
+        processed_by: auth.context.userId,
+        processed_at: new Date().toISOString(),
+        metadata: {
+          notes: input.notes || null,
+          reason: input.reason,
+          payment_id: null,
+        },
+      });
+
+      if (refundError) return { status: "error", message: "Failed to create refund record." };
     }
 
     await writeAuditLog({

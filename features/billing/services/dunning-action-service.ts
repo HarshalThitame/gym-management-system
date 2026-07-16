@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createRazorpayOrder, createRazorpayPaymentLink } from "@/features/billing/razorpay/razorpay-service";
+import { resolveRazorpayCredentialsForGym } from "@/features/billing/razorpay/razorpay-provider-config";
 import { sendEmail } from "@/services/email/resend";
 import { billingLogger } from "@/features/billing/lib/logger";
 
@@ -53,13 +54,22 @@ export async function adminRetryDunningInvoice(invoiceId: string): Promise<Dunni
   if (!member) return { ok: false, message: "Member not found" };
 
   const amount = invoice.total_amount ?? invoice.amount_due;
+  const gymId = invoice.gym_id;
+  if (!gymId) {
+    return { ok: false, message: "Gym is missing for this invoice" };
+  }
+
+  const credentials = await resolveRazorpayCredentialsForGym(gymId);
+  if (!credentials) {
+    return { ok: false, message: "Razorpay is not configured for this gym" };
+  }
 
   const orderResult = await createRazorpayOrder({
     amountInRupees: amount / 100,
     currency: "INR",
     receipt: `MEM-DUN-${invoiceId.slice(0, 8)}-${Date.now()}`,
     notes: { invoice_id: invoiceId, member_id: invoice.member_id, type: "admin_dunning_retry" },
-  });
+  }, credentials);
 
   if (!orderResult.ok) {
     billingLogger.error("adminRetryDunningInvoice", "Failed to create Razorpay order", { invoiceId, error: orderResult.message });
@@ -90,7 +100,7 @@ export async function adminRetryDunningInvoice(invoiceId: string): Promise<Dunni
       member_id: invoice.member_id,
       source: "dunning_retry",
     },
-  });
+  }, credentials);
 
   let paymentUrl: string | undefined;
   if (linkResult.ok) {

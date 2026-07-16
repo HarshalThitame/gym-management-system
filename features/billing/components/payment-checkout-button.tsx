@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ArrowRight, BadgeCheck, CreditCard, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/features/billing/lib/money";
 
 type RazorpayCheckoutData = {
@@ -171,16 +174,86 @@ export function PaymentCheckoutButton({
   }
 
   return (
-    <div className="space-y-2">
-      <Button
-        disabled={status === "loading" || status === "verifying"}
-        onClick={handleCheckout}
-        size="sm"
-        variant="accent"
-      >
-        {status === "loading" ? "Preparing..." : status === "verifying" ? "Verifying..." : label}
-      </Button>
-      {message ? <p className="text-xs font-semibold text-muted-foreground" role="status">{message}</p> : null}
+    <Card variant="glass-dark" className="overflow-hidden border-white/10 bg-slate-950/80 text-white shadow-[0_24px_80px_-32px_rgba(15,23,42,0.55)]">
+      <div className="h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500" />
+      <CardContent className="space-y-4 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="member-info" className="gap-1.5 border-white/15 text-white">
+                <ShieldCheck className="size-3.5" />
+                Secure checkout
+              </Badge>
+              <Badge variant="member-gradient" className="gap-1.5 border-white/15 text-white">
+                <Sparkles className="size-3.5" />
+                Gym gateway
+              </Badge>
+            </div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-white/55">Online payment</p>
+            <h3 className="text-2xl font-black tracking-tight">{formatCurrency(amount)}</h3>
+            <p className="max-w-xl text-sm leading-6 text-white/70">
+              Your payment will open in the gateway configured by your gym or organization. Card data is handled directly by the provider.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-right backdrop-blur">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/50">Current state</p>
+            <p className="mt-1 text-sm font-bold capitalize text-white">
+              {status === "idle" ? "Ready" : status === "loading" ? "Preparing" : status === "verifying" ? "Verifying" : status}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:grid-cols-2">
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300">
+              <CreditCard className="size-4" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">One-click checkout</p>
+              <p className="text-xs leading-5 text-white/60">Open the provider modal, complete payment, and return here automatically.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
+              <BadgeCheck className="size-4" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">Verified completion</p>
+              <p className="text-xs leading-5 text-white/60">We verify the signature server-side before marking your invoice paid.</p>
+            </div>
+          </div>
+        </div>
+
+        <Button
+          disabled={status === "loading" || status === "verifying"}
+          onClick={handleCheckout}
+          size="lg"
+          variant="accent"
+          className="w-full justify-between rounded-2xl px-5 py-6 text-base font-black shadow-[0_16px_30px_rgba(59,130,246,0.25)]"
+        >
+          <span className="flex items-center gap-2">
+            {status === "loading" ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+            {status === "loading" ? "Preparing secure checkout" : status === "verifying" ? "Verifying payment" : label}
+          </span>
+          <ArrowRight className="size-4" />
+        </Button>
+
+        {message ? (
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${
+              status === "error"
+                ? "border-rose-500/20 bg-rose-500/10 text-rose-100"
+                : "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+            }`}
+            role="status"
+          >
+            {message}
+          </div>
+        ) : (
+          <p className="text-xs leading-5 text-white/50">
+            Payments are routed through the correct provider for your gym. If the gateway is unavailable, refresh and try again.
+          </p>
+        )}
 
       {payuForm ? (
         <form ref={formRef} method="POST" action={payuForm.action} className="hidden">
@@ -189,7 +262,8 @@ export function PaymentCheckoutButton({
           ))}
         </form>
       ) : null}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 

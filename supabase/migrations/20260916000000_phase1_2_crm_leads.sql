@@ -35,6 +35,7 @@ create index if not exists leads_organization_id_idx on public.leads (organizati
 create index if not exists leads_gym_id_idx on public.leads (gym_id);
 
 -- 5. RLS: authenticated org users can read/write leads in their org
+drop policy if exists "org members can read org leads" on public.leads;
 create policy "org members can read org leads"
   on public.leads
   for select
@@ -49,12 +50,14 @@ create policy "org members can read org leads"
     )
   );
 
+drop policy if exists "org members can insert org leads" on public.leads;
 create policy "org members can insert org leads"
   on public.leads
   for insert
   to authenticated
   with check (true);
 
+drop policy if exists "org members can update org leads" on public.leads;
 create policy "org members can update org leads"
   on public.leads
   for update
@@ -70,6 +73,7 @@ create policy "org members can update org leads"
   )
   with check (true);
 
+drop policy if exists "org members can delete org leads" on public.leads;
 create policy "org members can delete org leads"
   on public.leads
   for delete

@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createRazorpayOrder } from "@/features/billing/razorpay/razorpay-service";
+import { resolveRazorpayCredentialsForGym } from "@/features/billing/razorpay/razorpay-provider-config";
 import { sendEmail } from "@/services/email/resend";
 import { billingLogger } from "@/features/billing/lib/logger";
 
@@ -162,6 +163,12 @@ async function processSingleAutoRenewal(
     return false;
   }
 
+  const credentials = await resolveRazorpayCredentialsForGym(membership.gym_id);
+  if (!credentials) {
+    billingLogger.error("processSingleAutoRenewal", "Razorpay is not configured for this gym", { gymId: membership.gym_id });
+    return false;
+  }
+
   const receipt = `AUTO-${membership.gym_id.slice(0, 8)}-${Date.now()}`;
   const orderResult = await createRazorpayOrder({
     amountInRupees: totalAmount,
@@ -174,9 +181,9 @@ async function processSingleAutoRenewal(
       invoice_id: invoice.id,
       gym_id: membership.gym_id,
     },
-  });
+  }, credentials);
 
-  if (!orderResult || !orderResult.id) {
+  if (!orderResult.ok) {
     billingLogger.error("processSingleAutoRenewal", "Failed to create Razorpay order", { membershipId: membership.id });
     await admin.from("invoices").update({ status: "cancelled" } as never).eq("id", invoice.id);
     return false;
@@ -198,7 +205,7 @@ async function processSingleAutoRenewal(
       currency: plan.currency || "INR",
       discount_amount: 0,
       tax_amount: 0,
-      provider_order_id: orderResult.id,
+      provider_order_id: orderResult.data.id,
       metadata: { autoRenewal: true, planName: plan.name } as never,
     } as never);
 
@@ -208,7 +215,7 @@ async function processSingleAutoRenewal(
     return false;
   }
 
-  await admin.from("invoices").update({ razorpay_order_id: orderResult.id } as never).eq("id", invoice.id);
+  await admin.from("invoices").update({ razorpay_order_id: orderResult.data.id } as never).eq("id", invoice.id);
 
   await admin.from("memberships").update({ last_renewed_by_cron_at: now.toISOString() } as never).eq("id", membership.id);
 
@@ -235,7 +242,7 @@ async function processSingleAutoRenewal(
   billingLogger.info("processSingleAutoRenewal", "Auto-renewal invoice created", {
     membershipId: membership.id,
     invoiceId: invoice.id,
-    orderId: orderResult.id,
+    orderId: orderResult.data.id,
     amount: totalAmount,
   });
 

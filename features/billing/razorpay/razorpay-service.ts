@@ -3,6 +3,7 @@ import "server-only";
 import crypto from "node:crypto";
 import Razorpay from "razorpay";
 import { getRazorpayConfig, getRazorpayPublicKeyId } from "./razorpay-config";
+import type { RazorpayProviderCredentials } from "./razorpay-provider-config";
 import type {
   CreateRazorpayOrderInput,
   CreateRazorpayOrderResult,
@@ -22,6 +23,74 @@ function getClient(): Razorpay {
     key_secret: config.keySecret,
   });
   return razorpayClient;
+}
+
+function getClientForCredentials(credentials?: RazorpayProviderCredentials | null): Razorpay {
+  if (!credentials) {
+    return getClient();
+  }
+
+  return new Razorpay({
+    key_id: credentials.keyId,
+    key_secret: credentials.keySecret,
+  });
+}
+
+function extractRazorpayErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "string") {
+    return err.trim() || fallback;
+  }
+
+  if (err instanceof Error) {
+    const message = err.message.trim();
+    if (message) return message;
+  }
+
+  if (err && typeof err === "object") {
+    const candidate = err as Record<string, unknown>;
+    const nestedError = candidate.error && typeof candidate.error === "object"
+      ? candidate.error as Record<string, unknown>
+      : null;
+    const response = candidate.response && typeof candidate.response === "object"
+      ? candidate.response as Record<string, unknown>
+      : null;
+    const responseBody = response?.body && typeof response.body === "object"
+      ? response.body as Record<string, unknown>
+      : null;
+    const responseBodyError = responseBody?.error && typeof responseBody.error === "object"
+      ? responseBody.error as Record<string, unknown>
+      : null;
+
+    const pieces = [
+      responseBodyError?.description,
+      responseBodyError?.message,
+      nestedError?.description,
+      nestedError?.message,
+      candidate.description,
+      candidate.message,
+      candidate.code,
+      responseBodyError?.code,
+      nestedError?.code,
+    ]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .map((value) => value.trim());
+
+    if (pieces.length > 0) {
+      return pieces[0];
+    }
+  }
+
+  return fallback;
+}
+
+function sanitizeRazorpayPlanName(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64);
 }
 
 /**
@@ -54,6 +123,7 @@ export function normalizePaiseToRupees(amountInPaise: number): number {
  */
 export async function createRazorpayOrder(
   input: CreateRazorpayOrderInput,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; data: CreateRazorpayOrderResult } | { ok: false; message: string }> {
   const { amountInRupees, currency = "INR", receipt, notes } = input;
 
@@ -68,7 +138,7 @@ export async function createRazorpayOrder(
   }
 
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const orderPayload: {
       amount: number;
       currency: string;
@@ -175,9 +245,10 @@ export type CreatePaymentLinkResult = {
  */
 export async function createRazorpayPaymentLink(
   input: CreatePaymentLinkInput,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; data: CreatePaymentLinkResult } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const amountInPaise = normalizeRazorpayAmountToPaise(input.amountInRupees);
     const payload: Record<string, unknown> = {
       amount: amountInPaise,
@@ -226,9 +297,10 @@ export type PaymentLinkInfo = {
 
 export async function fetchRazorpayPaymentLink(
   linkId: string,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; data: PaymentLinkInfo } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const link = await client.paymentLink.fetch(linkId);
     return {
       ok: true,
@@ -252,9 +324,10 @@ export async function fetchRazorpayPaymentLink(
  */
 export async function cancelRazorpayPaymentLink(
   linkId: string,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; data: { id: string; status: string } } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const link = await client.paymentLink.cancel(linkId);
     return {
       ok: true,
@@ -273,9 +346,10 @@ export async function createRazorpayRefund(
   paymentId: string,
   amount: number,
   notes: Record<string, string>,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; refund: Record<string, unknown> } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const refund = await client.payments.refund(paymentId, { amount, notes });
     return { ok: true, refund: refund as never as Record<string, unknown> };
   } catch (err) {
@@ -289,9 +363,10 @@ export async function createRazorpayRefund(
  */
 export async function fetchRazorpayPayment(
   paymentId: string,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; payment: Record<string, unknown> } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const payment = await client.payments.fetch(paymentId);
     return { ok: true, payment: payment as never as Record<string, unknown> };
   } catch (err) {
@@ -307,9 +382,10 @@ export async function fetchRazorpayPayment(
 export async function fetchRazorpayCapturedPayments(
   fromDate: Date,
   toDate: Date,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; data: RazorpayPaymentRecord[] } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const allPayments: RazorpayPaymentRecord[] = [];
     let skip = 0;
     const count = 100;
@@ -350,9 +426,10 @@ export async function createRazorpayCustomer(input: {
   email: string;
   contact?: string;
   notes?: Record<string, string>;
+  credentials?: RazorpayProviderCredentials | null;
 }): Promise<{ ok: true; data: RazorpayCustomerData } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(input.credentials);
     const customer = await client.customers.create({
       name: input.name,
       email: input.email,
@@ -361,16 +438,17 @@ export async function createRazorpayCustomer(input: {
     } as never) as never as RazorpayCustomerData;
     return { ok: true, data: customer };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay customer creation failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay customer creation failed");
     return { ok: false, message };
   }
 }
 
 export async function fetchRazorpayCustomer(
   customerId: string,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; data: RazorpayCustomerData } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const customer = await client.customers.fetch(customerId) as never as RazorpayCustomerData;
     return { ok: true, data: customer };
   } catch (err) {
@@ -393,9 +471,10 @@ export async function createRazorpayPlan(input: {
   currency?: string;
   name: string;
   notes?: Record<string, string>;
+  credentials?: RazorpayProviderCredentials | null;
 }): Promise<{ ok: true; data: RazorpayPlanData } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(input.credentials);
     const period = input.period === "half_yearly"
       ? "monthly"
       : input.period === "annual"
@@ -406,20 +485,40 @@ export async function createRazorpayPlan(input: {
       : input.period === "annual"
         ? 1
         : input.interval ?? 1;
+    const amountInPaise = normalizeRazorpayAmountToPaise(input.amount);
+    const safeName = sanitizeRazorpayPlanName(input.name);
+
+    if (!safeName) {
+      return { ok: false, message: "Razorpay plan name cannot be empty." };
+    }
+    if (amountInPaise < 100) {
+      return { ok: false, message: "Razorpay plans require a minimum amount of INR 1.00." };
+    }
 
     const plan = await client.plans.create({
       period,
       interval,
       item: {
-        name: input.name,
-        amount: normalizeRazorpayAmountToPaise(input.amount),
+        name: safeName,
+        amount: amountInPaise,
         currency: input.currency || "INR",
       },
-      notes: input.notes || {},
+      notes: Object.fromEntries(
+        Object.entries(input.notes || {}).map(([key, value]) => [
+          key.replace(/[\u0000-\u001F\u007F]/g, " ").slice(0, 40),
+          String(value)
+            .normalize("NFKD")
+            .replace(/[^\x20-\x7E]/g, " ")
+            .replace(/[\u0000-\u001F\u007F]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 256),
+        ]),
+      ),
     } as never) as never as RazorpayPlanData;
     return { ok: true, data: plan };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay plan creation failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay plan creation failed");
     return { ok: false, message };
   }
 }
@@ -442,9 +541,10 @@ export async function createRazorpaySubscription(input: {
   customerId: string;
   totalCount?: number;
   notes?: Record<string, string>;
+  credentials?: RazorpayProviderCredentials | null;
 }): Promise<{ ok: true; data: RazorpaySubscriptionData } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(input.credentials);
     const subscription = await client.subscriptions.create({
       plan_id: input.planId,
       customer_id: input.customerId,
@@ -453,16 +553,17 @@ export async function createRazorpaySubscription(input: {
     } as never) as never as RazorpaySubscriptionData;
     return { ok: true, data: subscription };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay subscription creation failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay subscription creation failed");
     return { ok: false, message };
   }
 }
 
 export async function fetchRazorpaySubscription(
   subscriptionId: string,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; data: RazorpaySubscriptionData } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     const subscription = await client.subscriptions.fetch(subscriptionId) as never as RazorpaySubscriptionData;
     return { ok: true, data: subscription };
   } catch (err) {
@@ -473,9 +574,10 @@ export async function fetchRazorpaySubscription(
 
 export async function cancelRazorpaySubscription(
   subscriptionId: string,
+  credentials?: RazorpayProviderCredentials | null,
 ): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
   try {
-    const client = getClient();
+    const client = getClientForCredentials(credentials);
     await client.subscriptions.cancel(subscriptionId);
     return { ok: true, message: "Subscription cancelled" };
   } catch (err) {
@@ -489,9 +591,10 @@ export function verifyRazorpaySubscriptionSignature(input: {
   paymentId: string;
   signature: string;
   secret?: string;
+  credentials?: RazorpayProviderCredentials | null;
 }): boolean {
   try {
-    const config = getRazorpayConfig();
+    const config = input.credentials ?? getRazorpayConfig();
     const secret = input.secret ?? config.keySecret;
     if (!secret) return false;
     const expected = crypto
@@ -510,7 +613,10 @@ export function verifyRazorpaySubscriptionSignature(input: {
 /**
  * Backward-compatible alias for getRazorpayPublicKeyId.
  */
-export function getRazorpayKeyId(): string {
+export function getRazorpayKeyId(credentials?: RazorpayProviderCredentials | null): string {
+  if (credentials?.keyId) {
+    return credentials.keyId;
+  }
   return getRazorpayPublicKeyId();
 }
 
@@ -523,9 +629,10 @@ export function verifyRazorpayCheckoutSignature(input: {
   paymentId: string;
   signature: string;
   secret?: string;
+  credentials?: RazorpayProviderCredentials | null;
 }): boolean {
   try {
-    const config = getRazorpayConfig();
+    const config = input.credentials ?? getRazorpayConfig();
     const secret = input.secret ?? config.keySecret;
     if (!secret) return false;
     const expected = crypto
@@ -547,6 +654,7 @@ export function verifyRazorpayCheckoutSignature(input: {
  */
 export function verifyRazorpayWebhookSignature(
   input: VerifyRazorpayWebhookSignatureInput,
+  credentials?: RazorpayProviderCredentials | null,
 ): VerifyRazorpayWebhookSignatureResult {
   const { rawBody, signature } = input;
 
@@ -555,9 +663,14 @@ export function verifyRazorpayWebhookSignature(
   }
 
   try {
-    const config = getRazorpayConfig();
+    const config = credentials ?? getRazorpayConfig();
+    const webhookSecret = config.webhookSecret;
+    if (!webhookSecret) {
+      return { isValid: false, error: "Webhook secret is not configured." };
+    }
+
     const expected = crypto
-      .createHmac("sha256", config.webhookSecret)
+      .createHmac("sha256", webhookSecret)
       .update(rawBody)
       .digest("hex");
 

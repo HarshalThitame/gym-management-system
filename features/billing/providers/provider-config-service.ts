@@ -63,6 +63,7 @@ export async function getGymDefaultProvider(gymId: string): Promise<ProviderConf
     .select("*")
     .eq("gym_id", gymId)
     .eq("is_active", true)
+    .order("is_default", { ascending: false })
     .order("priority", { ascending: true })
     .limit(1)
     .maybeSingle() as never as {

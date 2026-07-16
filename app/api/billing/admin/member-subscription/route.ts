@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { cancelRazorpaySubscription } from "@/features/billing/razorpay/razorpay-service";
+import { resolveRazorpayCredentialsForGym } from "@/features/billing/razorpay/razorpay-provider-config";
 import { billingLogger } from "@/features/billing/lib/logger";
 
 export async function POST(request: Request) {
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
 
   // Cancel Razorpay subscription if exists
   if (body.subscriptionId) {
+    const credentials = await resolveRazorpayCredentialsForGym(profile.gym_id);
+    if (!credentials) {
+      return NextResponse.json({ error: "Razorpay is not configured for this gym" }, { status: 503 });
+    }
     const { data: dbSub } = await admin
       .from("member_subscriptions")
       .select("provider_subscription_id")
@@ -62,7 +67,7 @@ export async function POST(request: Request) {
     };
 
     if (dbSub?.provider_subscription_id) {
-      await cancelRazorpaySubscription(dbSub.provider_subscription_id);
+      await cancelRazorpaySubscription(dbSub.provider_subscription_id, credentials);
     }
 
     await admin.from("member_subscriptions").update({

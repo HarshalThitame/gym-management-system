@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getAutoBillingStatus, createSubscription, savePaymentMethod, cancelSubscription } from "@/features/billing/services/member-subscription-service";
+import { getAutoBillingStatus, savePaymentMethod, cancelSubscription } from "@/features/billing/services/member-subscription-service";
 import { createRazorpayCustomer, createRazorpayPlan, createRazorpaySubscription, cancelRazorpaySubscription, getRazorpayKeyId } from "@/features/billing/razorpay/razorpay-service";
+import { resolveRazorpayCredentialsForGym } from "@/features/billing/razorpay/razorpay-provider-config";
 import { billingLogger } from "@/features/billing/lib/logger";
 
 export async function GET(request: Request) {
@@ -74,6 +75,10 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "disable") {
+    const credentials = await resolveRazorpayCredentialsForGym(membership.gym_id);
+    if (!credentials) {
+      return NextResponse.json({ error: "Razorpay is not configured for this gym" }, { status: 503 });
+    }
     const { data: activeSubs } = await admin
       .from("member_subscriptions")
       .select("id, provider_subscription_id")
@@ -85,7 +90,7 @@ export async function POST(request: Request) {
 
     for (const sub of activeSubs ?? []) {
       if (sub.provider_subscription_id) {
-        await cancelRazorpaySubscription(sub.provider_subscription_id);
+        await cancelRazorpaySubscription(sub.provider_subscription_id, credentials);
       }
       await cancelSubscription(sub.id, user.id);
     }
@@ -99,6 +104,11 @@ export async function POST(request: Request) {
   if (body.action === "setup") {
     if (!body.billingPeriod || !body.amount) {
       return NextResponse.json({ error: "billingPeriod and amount required" }, { status: 400 });
+    }
+
+    const credentials = await resolveRazorpayCredentialsForGym(membership.gym_id);
+    if (!credentials) {
+      return NextResponse.json({ error: "Razorpay is not configured for this gym" }, { status: 503 });
     }
 
     const { data: profile } = await admin
@@ -130,6 +140,7 @@ export async function POST(request: Request) {
       email: profile.email || `${user.id}@member.gym`,
       contact: profile.phone,
       notes: { member_id: user.id, gym_id: membership.gym_id },
+      credentials,
     });
 
     if (!customerResult.ok) {
@@ -141,6 +152,7 @@ export async function POST(request: Request) {
       amount: body.amount,
       name: `${planName} - ${body.billingPeriod}`,
       notes: { plan_id: membership.membership_plan_id, gym_id: membership.gym_id },
+      credentials,
     });
 
     if (!planResult.ok) {
@@ -156,6 +168,7 @@ export async function POST(request: Request) {
         membership_id: body.membershipId,
         gym_id: membership.gym_id,
       },
+      credentials,
     });
 
     if (!subResult.ok) {
@@ -191,7 +204,7 @@ export async function POST(request: Request) {
       ok: true,
       subscriptionId: subResult.data.id,
       providerSubscriptionId: subResult.data.id,
-      keyId: getRazorpayKeyId(),
+      keyId: getRazorpayKeyId(credentials),
       customerId: customerResult.data.id,
     });
   }

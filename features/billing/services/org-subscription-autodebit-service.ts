@@ -182,6 +182,13 @@ async function ensureProviderPlan(admin: ReturnType<typeof getSupabaseAdminClien
   });
 
   if (!planResult.ok) {
+    billingLogger.error("org-autodebit", "Razorpay plan creation failed", {
+      packageId: pricing.package_id,
+      billingPeriod: period,
+      amountPaise: pricing.price,
+      currency: pricing.currency || "INR",
+      error: planResult.error,
+    });
     return { ok: false, error: planResult.message };
   }
 

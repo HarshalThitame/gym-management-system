@@ -5,12 +5,22 @@ import { writeAuditLog } from "@/lib/audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireApiRole } from "@/lib/auth/api-guards";
 import type { AuthActionState } from "@/features/auth/actions/action-state";
+import { createRazorpayPlan } from "@/features/billing/razorpay/razorpay-service";
+import { billingLogger } from "@/features/billing/lib/logger";
 import { z } from "zod";
 import { FEATURE_KEYS } from "@/features/entitlement";
 import { syncSubscriptionArtifactsForOrganization } from "../services/subscription-entitlement-sync";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SbClient = any;
+
+type PackagePricingRow = {
+  id: string;
+  billing_period: "monthly" | "annual" | string;
+  price: number;
+  currency: string;
+  provider_plan_id: string | null;
+};
 
 const packageSchema = z.object({
   id: z.string().uuid().optional(),
@@ -145,6 +155,60 @@ function readCheckbox(formData: FormData, fieldName: string) {
   return formData.get(fieldName) === "on" || formData.get(fieldName) === "true";
 }
 
+function sanitizePlanLabel(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64);
+}
+
+async function ensurePricingPlan(
+  sb: SbClient,
+  packageId: string,
+  packageName: string,
+  pricing: PackagePricingRow,
+  previousPricing?: PackagePricingRow | null,
+): Promise<{ ok: true; planId: string } | { ok: false; message: string }> {
+  const needsProvision = !pricing.provider_plan_id
+    || !previousPricing
+    || previousPricing.price !== pricing.price
+    || previousPricing.currency !== pricing.currency;
+  if (!needsProvision && pricing.provider_plan_id) {
+    return { ok: true, planId: pricing.provider_plan_id };
+  }
+
+  const period = pricing.billing_period === "annual" ? "annual" : "monthly";
+  const planResult = await createRazorpayPlan({
+    period,
+    amount: pricing.price / 100,
+    currency: pricing.currency || "INR",
+    name: `${sanitizePlanLabel(packageName)} - ${period}`,
+    notes: {
+      package_id: packageId,
+      billing_period: period,
+      source: "super_admin_package_management",
+    },
+  });
+
+  if (!planResult.ok) {
+    return { ok: false, message: planResult.message };
+  }
+
+  const { error } = await sb
+    .from("package_pricing")
+    .update({ provider_plan_id: planResult.data.id } as never)
+    .eq("id", pricing.id);
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  return { ok: true, planId: planResult.data.id };
+}
+
 export async function savePackageAction(_prev: AuthActionState, formData: FormData): Promise<AuthActionState> {
   void _prev;
   const auth = await requireApiRole(["super_admin"]);
@@ -272,6 +336,14 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
     // Save pricing to package_pricing table (monthly + annual + other periods)
     const priceMonthly = parsed.data.priceMonthly;
     const priceAnnual = parsed.data.priceAnnual;
+    const existingPricingRowsResult = await sb
+      .from("package_pricing")
+      .select("id, billing_period, price, currency, provider_plan_id")
+      .eq("package_id", packageId)
+      .in("billing_period", ["monthly", "annual"]);
+    const existingPricingRows = (existingPricingRowsResult.data ?? []) as PackagePricingRow[];
+    const existingPricingByPeriod = new Map(existingPricingRows.map((row) => [row.billing_period, row]));
+
     const pricingPeriods: Array<{ billing_period: string; price: number }> = [
       { billing_period: "monthly", price: priceMonthly },
       { billing_period: "annual", price: priceAnnual },
@@ -288,6 +360,27 @@ export async function savePackageAction(_prev: AuthActionState, formData: FormDa
         { package_id: packageId, billing_period: pp.billing_period, price: pp.price, currency: "INR" },
         { onConflict: "package_id, billing_period" }
       );
+    }
+
+    const currentPricingRowsResult = await sb
+      .from("package_pricing")
+      .select("id, billing_period, price, currency, provider_plan_id")
+      .eq("package_id", packageId)
+      .in("billing_period", ["monthly", "annual"]);
+    const currentPricingRows = (currentPricingRowsResult.data ?? []) as PackagePricingRow[];
+
+    for (const currentRow of currentPricingRows) {
+      const previousRow = existingPricingByPeriod.get(currentRow.billing_period) ?? null;
+      const provisionResult = await ensurePricingPlan(sb, packageId, parsed.data.name, currentRow, previousRow);
+      if (!provisionResult.ok) {
+        billingLogger.error("package-management", "Failed to provision Razorpay plan", {
+          packageId,
+          billingPeriod: currentRow.billing_period,
+          pricePaise: currentRow.price,
+          error: provisionResult.message,
+        });
+        return { status: "error", message: `Package saved, but Razorpay plan provisioning failed for ${currentRow.billing_period}: ${provisionResult.message}` };
+      }
     }
 
     // Save pricing labels to package metadata

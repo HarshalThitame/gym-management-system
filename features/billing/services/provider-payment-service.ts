@@ -5,17 +5,12 @@ import type { Database } from "@/types/database";
 import type { AuthContext } from "@/types/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { writeAuditLog } from "@/lib/audit";
 import { billingLogger } from "@/features/billing/lib/logger";
 import { getProviderForGym } from "@/features/billing/providers/provider-registry";
 import type { IPaymentProvider, PaymentProviderName } from "@/features/billing/providers/provider-types";
-import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
-import { handleMemberPaymentCaptured, handleMemberPaymentFailed } from "@/features/billing/services/member-webhook-handler";
-import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
 
 type AppSupabase = SupabaseClient<Database>;
 type PaymentRow = Database["public"]["Tables"]["payments"]["Row"];
-type InvoiceRow = Database["public"]["Tables"]["invoices"]["Row"];
 type RefundRow = Database["public"]["Tables"]["refunds"]["Row"];
 
 type Result<TData> = { ok: true; data: TData } | { ok: false; status: number; code: string; message: string };
@@ -204,7 +199,7 @@ export async function verifyPayment(
 
 export async function createRefund(
   context: AuthContext,
-  input: { paymentId: string; amount: number; reason: string },
+  input: { paymentId: string; amount: number; reason: string; notes?: string | null },
 ): Promise<Result<{ refundId: string; providerRefundId: string | null; status: string }>> {
   const supabase = await createSupabaseServerClient();
   const { data: payment, error } = await supabase
@@ -231,7 +226,11 @@ export async function createRefund(
   const refundResult = await provider.createRefund({
     paymentId: payment.provider_payment_id || input.paymentId,
     amountInPaise: input.amount,
-    notes: { payment_id: payment.id, reason: input.reason.slice(0, 200) },
+    notes: {
+      payment_id: payment.id,
+      reason: input.reason.slice(0, 200),
+      notes: (input.notes ?? "").slice(0, 200),
+    },
   });
 
   if (!refundResult.ok) {
@@ -255,6 +254,12 @@ export async function createRefund(
       currency: payment.currency,
       status: refundStatus,
       reason: input.reason,
+      metadata: {
+        reason: input.reason,
+        notes: input.notes ?? null,
+        payment_id: payment.id,
+        provider_refund_id: refundResult.data.id,
+      } as never,
       provider_refund_id: refundResult.data.id,
       approved_by: context.userId,
       requested_by: context.userId,

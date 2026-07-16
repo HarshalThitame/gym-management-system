@@ -13,6 +13,7 @@ import type {
 } from "../providers/provider-types";
 
 import { getRazorpayConfig } from "./razorpay-config";
+import { normalizeRazorpayProviderConfig } from "./razorpay-provider-config";
 import {
   createRazorpayOrder,
   createRazorpayPaymentLink,
@@ -32,30 +33,53 @@ const CAPABILITIES: PaymentProviderCapability[] = [
   "saved_cards",
 ];
 
-export function getRazorpayProvider(_config: Record<string, string>, _testMode: boolean): IPaymentProvider {
+export function getRazorpayProvider(config: Record<string, string> | undefined, testMode: boolean): IPaymentProvider {
+  const normalized = normalizeRazorpayProviderConfig(config, testMode);
+  const hasExplicitConfig = config !== undefined && Object.keys(config).length > 0;
+
+  function resolveCredentials() {
+    if (normalized) {
+      return normalized;
+    }
+    return null;
+  }
+
   return {
     name: "razorpay",
     label: "Razorpay",
     capabilities: CAPABILITIES,
 
     async createOrder(input: CreateOrderInput) {
-      return createRazorpayOrder(input);
+      if (hasExplicitConfig && !resolveCredentials()) {
+        return { ok: false, message: "Razorpay configuration is incomplete for this gym." };
+      }
+      return createRazorpayOrder(input, resolveCredentials());
     },
 
     async verifyPayment(input: VerifyPaymentInput) {
+      if (hasExplicitConfig && !resolveCredentials()) {
+        return { isValid: false, error: "Razorpay configuration is incomplete for this gym." };
+      }
       return verifyRazorpayCheckoutSignature({
         razorpayOrderId: input.providerOrderId,
         razorpayPaymentId: input.providerPaymentId,
         razorpaySignature: input.providerSignature,
+        credentials: resolveCredentials(),
       });
     },
 
     async createPaymentLink(input: CreatePaymentLinkInput) {
-      return createRazorpayPaymentLink(input);
+      if (hasExplicitConfig && !resolveCredentials()) {
+        return { ok: false, message: "Razorpay configuration is incomplete for this gym." };
+      }
+      return createRazorpayPaymentLink(input, resolveCredentials());
     },
 
     async createRefund(input: CreateRefundInput) {
-      const result = await createRazorpayRefund(input.paymentId, input.amountInPaise, input.notes ?? {});
+      if (hasExplicitConfig && !resolveCredentials()) {
+        return { ok: false, message: "Razorpay configuration is incomplete for this gym." };
+      }
+      const result = await createRazorpayRefund(input.paymentId, input.amountInPaise, input.notes ?? {}, resolveCredentials());
       if (!result.ok) return { ok: false, message: result.message };
       const r = result.refund as Record<string, unknown>;
       return {
@@ -71,19 +95,32 @@ export function getRazorpayProvider(_config: Record<string, string>, _testMode: 
     },
 
     async verifyWebhookSignature(input: VerifyWebhookInput): Promise<boolean> {
-      const result = verifyRazorpayWebhookSignature(input);
+      if (hasExplicitConfig && !resolveCredentials()) {
+        return false;
+      }
+      const result = verifyRazorpayWebhookSignature(input, resolveCredentials());
       return result.isValid;
     },
 
     getHealth(): PaymentProviderHealth {
       try {
-        const cfg = getRazorpayConfig();
+        if (hasExplicitConfig && !normalized) {
+          return {
+            configured: false,
+            environment: null,
+            hasKeyId: false,
+            hasKeySecret: false,
+            hasWebhookSecret: false,
+          };
+        }
+
+        const cfg = normalized ?? getRazorpayConfig();
         return {
-          configured: !!(cfg.keyId && cfg.keySecret && cfg.webhookSecret),
+          configured: !!(cfg.keyId && cfg.keySecret && (!hasExplicitConfig || cfg.webhookSecret)),
           environment: cfg.environment,
           hasKeyId: !!cfg.keyId,
           hasKeySecret: !!cfg.keySecret,
-          hasWebhookSecret: !!cfg.webhookSecret,
+          hasWebhookSecret: !!cfg.webhookSecret || !hasExplicitConfig,
         };
       } catch {
         return {
@@ -97,11 +134,17 @@ export function getRazorpayProvider(_config: Record<string, string>, _testMode: 
     },
 
     getPublicKey(): string {
-      return getRazorpayKeyId();
+      if (hasExplicitConfig && !normalized) {
+        return "";
+      }
+      return getRazorpayKeyId(resolveCredentials());
     },
 
     getEnvironment(): ProviderEnvironment {
-      return getRazorpayConfig().environment;
+      if (hasExplicitConfig && !normalized) {
+        return "test";
+      }
+      return resolveCredentials()?.environment ?? getRazorpayConfig().environment;
     },
   };
 }

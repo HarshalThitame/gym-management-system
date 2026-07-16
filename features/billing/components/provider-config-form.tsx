@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Eye, EyeOff, Loader2, Save } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2, Save, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { showToast } from "@/components/ui/toast";
 import type { PaymentProviderName } from "@/features/billing/providers/provider-types";
 
@@ -98,42 +99,56 @@ export function ProviderConfigForm({
   }
 
   return (
-    <div className="space-y-4">
-      {configFields.map((field) => (
-        <div key={field.key}>
-          <label
-            htmlFor={`${provider}-${field.key}`}
-            className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground"
-          >
-            {field.label}
-            {field.required && <span className="ml-1 text-red-500">*</span>}
-          </label>
-          <div className="relative mt-1">
-            <input
-              id={`${provider}-${field.key}`}
-              type={field.type === "password" && !showSecrets[field.key] ? "password" : "text"}
-              value={config[field.key] ?? ""}
-              onChange={(e) => updateConfig(field.key, e.target.value)}
-              placeholder={field.placeholder}
-              className="h-11 w-full rounded-md border border-border bg-surface pr-10 pl-3 text-sm"
-              autoComplete="off"
-            />
-            {field.type === "password" && (
-              <button
-                type="button"
-                onClick={() => toggleSecret(field.key)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                tabIndex={-1}
-              >
-                {showSecrets[field.key] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={active ? "success" : "neutral"} className="gap-1.5">
+          <ShieldCheck className="size-3.5" />
+          {active ? "Connected" : "Disconnected"}
+        </Badge>
+        <Badge variant={isDefault ? "success" : "neutral"} className="gap-1.5">
+          <Sparkles className="size-3.5" />
+          {isDefault ? "Default gateway" : "Secondary gateway"}
+        </Badge>
+        <Badge variant={testMode ? "warning" : "success"}>{testMode ? "Test mode" : "Live mode"}</Badge>
+      </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm">
+      <div className="grid gap-4">
+        {configFields.map((field) => (
+          <div key={field.key} className="space-y-1.5">
+            <label
+              htmlFor={`${provider}-${field.key}`}
+              className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground"
+            >
+              {field.label}
+              {field.required && <span className="ml-1 text-rose-500">*</span>}
+            </label>
+            <div className="relative">
+              <input
+                id={`${provider}-${field.key}`}
+                type={field.type === "password" && !showSecrets[field.key] ? "password" : "text"}
+                value={config[field.key] ?? ""}
+                onChange={(e) => updateConfig(field.key, e.target.value)}
+                placeholder={field.placeholder}
+                className="h-12 w-full rounded-2xl border border-border/70 bg-surface/90 px-4 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                autoComplete="off"
+              />
+              {field.type === "password" && (
+                <button
+                  type="button"
+                  onClick={() => toggleSecret(field.key)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showSecrets[field.key] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4 sm:grid-cols-3">
+        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
           <input
             type="checkbox"
             checked={active}
@@ -143,7 +158,7 @@ export function ProviderConfigForm({
           Active
         </label>
 
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
           <input
             type="checkbox"
             checked={isDefault}
@@ -153,7 +168,7 @@ export function ProviderConfigForm({
           Default provider
         </label>
 
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
           <input
             type="checkbox"
             checked={testMode}
@@ -164,12 +179,15 @@ export function ProviderConfigForm({
         </label>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-5 text-muted-foreground">
+          Credentials are stored encrypted in the billing config table. Changes apply to new checkout sessions after save.
+        </p>
         <Button
           onClick={handleSave}
           variant="primary"
           disabled={saving || !isFormValid()}
-          className="gap-2"
+          className="gap-2 rounded-xl px-5"
         >
           {saving ? (
             <Loader2 className="size-4 animate-spin" />

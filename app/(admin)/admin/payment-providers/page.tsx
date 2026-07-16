@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { CreditCard, Settings, Shield } from "lucide-react";
+import { Activity, CreditCard, RefreshCw, Settings, Shield, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
 import { createMetadata } from "@/lib/seo/metadata";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireOrganizationFeatureAccess } from "@/features/entitlement";
 import { ProviderConfigForm } from "@/features/billing/components/provider-config-form";
 import { listGymProviders } from "@/features/billing/providers/provider-config-service";
@@ -30,17 +30,85 @@ export default async function AdminPaymentProvidersPage() {
 
   const razorpayConfig = existingProviders.find((p) => p.provider === "razorpay");
   const payuConfig = existingProviders.find((p) => p.provider === "payu");
+  const activeProviders = existingProviders.filter((p) => p.isActive);
+  const defaultProvider = existingProviders.find((p) => p.isDefault)?.provider ?? "none";
+  const liveProviders = existingProviders.filter((p) => !p.testMode).length;
 
   return (
-    <div className="space-y-6">
-      <section>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Billing Configuration</p>
-        <h2 className="mt-2 text-3xl font-black">Payment Gateways</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Configure Razorpay and PayU payment gateways. Keys and secrets are encrypted at rest in the database. 
-          The default provider is used for checkout and auto-billing flows.
-        </p>
+    <div className="space-y-8">
+      <section className="overflow-hidden rounded-[2rem] border border-border/60 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-[0_24px_80px_-32px_rgba(15,23,42,0.55)]">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-4">
+            <Badge variant="member-info" className="w-fit gap-1.5 border-white/20 text-white">
+              <Sparkles className="size-3.5" />
+              Enterprise billing controls
+            </Badge>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Billing Configuration</p>
+              <h2 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Payment Gateways</h2>
+              <p className="mt-4 max-w-3xl text-sm leading-6 text-white/72">
+                Configure per-gym payment gateways for memberships, refunds, and checkout flows. Credentials are encrypted at rest and routed through the gym-aware payment provider layer.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/55">Active gateways</p>
+              <p className="mt-2 text-3xl font-black">{activeProviders.length}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/55">Default provider</p>
+              <p className="mt-2 text-2xl font-black capitalize">{defaultProvider}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/55">Live mode</p>
+              <p className="mt-2 text-3xl font-black">{liveProviders}</p>
+            </div>
+          </div>
+        </div>
       </section>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card variant="elevated" className="border-border/70">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600">
+              <CreditCard className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Runtime</p>
+              <p className="mt-1 text-lg font-black">Gym-aware checkout</p>
+              <p className="text-sm text-muted-foreground">Each gym can route to its own provider credentials.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="elevated" className="border-border/70">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600">
+              <Activity className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">State</p>
+              <p className="mt-1 text-lg font-black">Live status visible</p>
+              <p className="text-sm text-muted-foreground">Admins can see active, default, and test/live modes quickly.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="elevated" className="border-border/70">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+              <RefreshCw className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">Operations</p>
+              <p className="mt-1 text-lg font-black">Reconfigurable</p>
+              <p className="text-sm text-muted-foreground">Save, validate, and switch providers without code changes.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>

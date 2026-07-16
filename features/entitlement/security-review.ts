@@ -88,9 +88,6 @@ SECURITY HARDENING STATUS
 
 🔒 DEPRECATED/UNSAFE CODE:
 
-- `features/subscription/razorpay-order-action.ts` → throws deprecation error
-- `features/subscription/razorpay-verify-action.ts` → throws deprecation error
-- `app/api/billing/razorpay/webhook/route.ts` → returns 410 Gone
 - Old `OrgFeatureFlags` (camelCase) → kept for UI display only, security uses
   canonical `FeatureKey` (snake_case) from `features/entitlement`
 */

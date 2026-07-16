@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createRazorpayOrder } from "@/features/billing/razorpay/razorpay-service";
+import { resolveRazorpayCredentialsForGym } from "@/features/billing/razorpay/razorpay-provider-config";
 import { sendEmail } from "@/services/email/resend";
 import { billingLogger } from "@/features/billing/lib/logger";
 
@@ -35,13 +36,6 @@ type MemberRow = {
   full_name: string;
   email: string | null;
   gym_id: string | null;
-};
-
-type MembershipRow = {
-  id: string;
-  status: string;
-  end_date: string;
-  membership_plan_id: string;
 };
 
 const MAX_RETRY_ATTEMPTS = 3;
@@ -92,6 +86,18 @@ export async function runMemberPaymentRetry(): Promise<RetryResult> {
         continue;
       }
 
+      const gymId = member.gym_id || invoice.gym_id;
+      if (!gymId) {
+        await skipInvoice(admin, invoice.id, "Missing gym configuration");
+        continue;
+      }
+
+      const credentials = await resolveRazorpayCredentialsForGym(gymId);
+      if (!credentials) {
+        await skipInvoice(admin, invoice.id, "Razorpay is not configured for this gym");
+        continue;
+      }
+
       const nextAttempt = (invoice.dunning_attempts || 0) + 1;
 
       const orderResult = await createRazorpayOrder({
@@ -105,9 +111,9 @@ export async function runMemberPaymentRetry(): Promise<RetryResult> {
           membership_id: invoice.membership_id ?? undefined,
           attempt: nextAttempt,
         },
-      });
+      }, credentials);
 
-      if (!orderResult || !orderResult.id) {
+      if (!orderResult.ok) {
         if (nextAttempt >= MAX_RETRY_ATTEMPTS) {
           await suspendMembership(admin, invoice, member, "Dunning exhausted");
           result.suspended++;
@@ -119,7 +125,7 @@ export async function runMemberPaymentRetry(): Promise<RetryResult> {
       }
 
       await admin.from("invoices").update({
-        razorpay_order_id: orderResult.id,
+        razorpay_order_id: orderResult.data.id,
         dunning_status: "retry_scheduled",
         dunning_attempts: nextAttempt,
         dunning_last_attempt_at: now.toISOString(),
@@ -148,7 +154,7 @@ export async function runMemberPaymentRetry(): Promise<RetryResult> {
       billingLogger.info("runMemberPaymentRetry", "Payment retry order created", {
         invoiceId: invoice.id,
         attempt: nextAttempt,
-        orderId: orderResult.id,
+        orderId: orderResult.data.id,
       });
     } catch (err) {
       result.errors.push(`Invoice ${invoice.id}: ${err instanceof Error ? err.message : "Unknown"}`);
