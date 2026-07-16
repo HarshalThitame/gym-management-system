@@ -62,6 +62,8 @@ function extractRazorpayErrorMessage(err: unknown, fallback: string): string {
       : null;
 
     const pieces = [
+      typeof candidate.statusCode === "number" ? `Razorpay ${candidate.statusCode}` : null,
+      typeof candidate.error === "string" ? candidate.error : null,
       responseBodyError?.description,
       responseBodyError?.message,
       nestedError?.description,
