@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { createMetadata } from "@/lib/seo/metadata";
 import { requireRole } from "@/lib/auth/guards";
 import { ProviderConfigForm } from "@/features/billing/components/provider-config-form";
+import { PaymentGatewayTestButton } from "@/features/billing/components/payment-gateway-test-button";
 import { maskRazorpayKey } from "@/features/billing/razorpay/razorpay-config";
 import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
 import { listPlatformProviders } from "@/features/billing/services/platform-provider-config-service";
@@ -179,6 +180,9 @@ export default async function SuperAdminPaymentGatewaysPage() {
                 { key: "webhook_secret", label: "Webhook Secret", type: "password", required: true, placeholder: "Enter webhook secret" },
               ]}
             />
+            <div className="mt-5">
+              <PaymentGatewayTestButton provider="razorpay" label="Test integration" />
+            </div>
           </CardContent>
         </Card>
 
@@ -210,6 +214,13 @@ export default async function SuperAdminPaymentGatewaysPage() {
                 { key: "auth_header", label: "Auth Header (optional)", type: "password", required: false, placeholder: "Base64(key:salt) if different" },
               ]}
             />
+            <div className="mt-5">
+              <PaymentGatewayTestButton
+                provider="payu"
+                label="Validate config"
+                helperText="Checks whether the saved platform PayU credentials are complete. PayU is not yet used by the org-plan runtime."
+              />
+            </div>
           </CardContent>
         </Card>
       </div>
