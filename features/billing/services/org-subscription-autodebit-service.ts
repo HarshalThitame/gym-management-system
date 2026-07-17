@@ -173,6 +173,21 @@ async function ensureProviderPlan(
     return { ok: true, planId: pricing.provider_plan_id };
   }
 
+  if (credentials) {
+    const authCheck = await preflightRazorpayCredentials(credentials);
+    if (!authCheck.ok) {
+      billingLogger.error("org-autodebit", "Razorpay credentials preflight failed before plan creation", {
+        packageId: pricing.package_id,
+        billingPeriod: pricing.billing_period,
+        amountPaise: pricing.price,
+        currency: pricing.currency || "INR",
+        error: authCheck.message,
+        status: authCheck.status,
+      });
+      return { ok: false, error: authCheck.message };
+    }
+  }
+
   const period = pricing.billing_period;
   const planResult = await createRazorpayPlan({
     period,
@@ -193,7 +208,7 @@ async function ensureProviderPlan(
       billingPeriod: period,
       amountPaise: pricing.price,
       currency: pricing.currency || "INR",
-      error: planResult.error,
+      error: planResult.message,
     });
     return { ok: false, error: planResult.message };
   }
