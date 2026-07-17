@@ -128,6 +128,7 @@ export function RazorpayCheckout({
 
   const isActive = currentSubscriptionStatus === "active" || currentSubscriptionStatus === "trial";
   const isCancelledWithTime = currentSubscriptionStatus === "cancelled" && currentSubscriptionExpiresAt && new Date(currentSubscriptionExpiresAt) > new Date();
+  const requiresRazorpayScript = selectedProvider === "razorpay";
 
   const remainingDays = isCancelledWithTime
     ? Math.ceil((new Date(currentSubscriptionExpiresAt!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -368,13 +369,13 @@ export function RazorpayCheckout({
         />
       )}
 
-      {selectedProvider === "razorpay" && scriptStatus === "loading" && (
+      {requiresRazorpayScript && scriptStatus === "loading" && (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-background p-4 text-sm">
           <Loader2 className="size-4 animate-spin" /> Loading payment gateway...
         </div>
       )}
 
-      {selectedProvider === "razorpay" && scriptStatus === "error" && (
+      {requiresRazorpayScript && scriptStatus === "error" && (
         <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <AlertTriangle className="size-5 shrink-0" />
           <div><p className="font-bold">Payment gateway failed to load</p><p className="text-xs mt-1">Please refresh the page or try again later.</p></div>
@@ -682,7 +683,7 @@ export function RazorpayCheckout({
               size="lg"
               className="w-full gap-2"
               onClick={handlePay}
-              disabled={isLoading || isActive || paymentState === "waiting_for_webhook" || paymentState === "payment_confirmed" || paymentState === "payment_callback_received" || scriptStatus !== "loaded"}
+              disabled={isLoading || isActive || paymentState === "waiting_for_webhook" || paymentState === "payment_confirmed" || paymentState === "payment_callback_received" || (requiresRazorpayScript && scriptStatus !== "loaded")}
               type="button"
             >
               {isActive ? <Lock className="size-5" /> : isLoading ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />}
