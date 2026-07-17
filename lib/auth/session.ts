@@ -17,6 +17,13 @@ const anonymousContext: AuthContext = {
   isActive: false
 };
 
+type ClaimsData = {
+  claims?: {
+    sub?: string;
+    email?: string;
+  };
+};
+
 export const getAuthContext: () => Promise<AuthContext> = cache(async () => {
   noStore();
 
@@ -24,8 +31,23 @@ export const getAuthContext: () => Promise<AuthContext> = cache(async () => {
     return anonymousContext;
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  let supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  try {
+    supabase = await createSupabaseServerClient();
+  } catch {
+    return anonymousContext;
+  }
+
+  let claimsData: ClaimsData | null | undefined;
+  let claimsError: { message?: string; code?: string } | null | undefined;
+  try {
+    ({ data: claimsData, error: claimsError } = await supabase.auth.getClaims());
+  } catch (error) {
+    if (isRecoverableAuthSessionError(error)) {
+      return anonymousContext;
+    }
+    throw error;
+  }
 
   const userId = claimsData?.claims?.sub;
 
@@ -71,6 +93,21 @@ export const getAuthContext: () => Promise<AuthContext> = cache(async () => {
     isActive
   };
 });
+
+function isRecoverableAuthSessionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  const status = typeof candidate.status === "number" ? candidate.status : null;
+  const message = typeof candidate.message === "string" ? candidate.message : "";
+
+  return code === "refresh_token_not_found"
+    || code === "bad_jwt"
+    || (status === 400 && /refresh token|jwt/i.test(message));
+}
 
 function toAuthProfile(profile: Omit<AuthProfile, "status"> & { status: string }): AuthProfile {
   return {

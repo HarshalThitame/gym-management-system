@@ -8,6 +8,7 @@ import { requireOrganizationOwner } from "@/features/organization-owner/lib/acce
 import { calculateTax } from "@/features/billing/services/tax-service";
 import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
 import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
+import { getPayuApiBaseUrl } from "@/features/billing/payu/payu-config";
 import {
   createRazorpayCustomer,
   createRazorpayPlan,
