@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
-import { acknowledgeRazorpayCheckoutResultAction } from "@/features/billing/actions/razorpay-actions";
+import { acknowledgeRazorpayCheckoutResultAction } from "@/features/billing/services/payment-acknowledgement";
 import { toggleAutoRenewAction, cancelSubscriptionAction, reactivateSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
 import { RazorpayCheckout } from "@/features/organization-owner/components/razorpay-checkout";
 import { OrderSummaryDialog } from "@/features/organization-owner/components/order-summary-dialog";
