@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getRazorpayConfig } from "./razorpay-config";
+import { resolveStandardCheckoutCredentials } from "./standard-checkout-env";
 import { normalizeRazorpayProviderConfig, type RazorpayProviderCredentials } from "./razorpay-provider-config";
 import { getPlatformProviderConfig } from "@/features/billing/services/platform-provider-config-service";
 
@@ -14,7 +14,14 @@ export async function resolvePlatformRazorpayCredentials(): Promise<RazorpayProv
   }
 
   try {
-    return normalizeRazorpayProviderConfig(getRazorpayConfig());
+    const standardCredentials = resolveStandardCheckoutCredentials();
+    return {
+      keyId: standardCredentials.keyId,
+      keySecret: standardCredentials.keySecret,
+      environment: standardCredentials.environment,
+      isTestMode: standardCredentials.environment !== "live",
+      webhookSecret: undefined,
+    };
   } catch {
     return null;
   }
