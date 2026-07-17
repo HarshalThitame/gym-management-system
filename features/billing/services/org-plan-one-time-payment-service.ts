@@ -11,6 +11,7 @@ import {
   createRazorpayOrder,
   fetchRazorpayPayment,
   getRazorpayKeyId,
+  preflightRazorpayCredentials,
   verifyRazorpayPaymentSignature,
 } from "@/features/billing/razorpay/razorpay-service";
 import { syncSubscriptionArtifactsForOrganization } from "@/features/super-admin/services/subscription-entitlement-sync";
@@ -275,6 +276,19 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
   const contact = await getContactDetails(supabase, organization);
   const platformCredentials = await resolvePlatformRazorpayCredentials();
   const providerEnvironment = platformCredentials?.environment ?? getRazorpayEnvironment();
+
+  if (platformCredentials) {
+    const authCheck = await preflightRazorpayCredentials(platformCredentials);
+    if (!authCheck.ok) {
+      billingLogger.error("org-plan-one-time", "Razorpay auth preflight failed", {
+        organizationId: organization.id,
+        packageId: pkg.id,
+        billingCycle: input.billingCycle,
+        error: authCheck.message,
+      });
+      return { success: false, error: authCheck.message };
+    }
+  }
 
   const orderResult = await createRazorpayOrder({
     amountInRupees: toRupees(totalAmountPaise),

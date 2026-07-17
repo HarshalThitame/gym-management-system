@@ -239,7 +239,7 @@ export async function createRazorpayOrder(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay order creation failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay order creation failed");
     return { ok: false, message };
   }
 }
@@ -354,7 +354,7 @@ export async function createRazorpayPaymentLink(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay payment link creation failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay payment link creation failed");
     return { ok: false, message };
   }
 }
@@ -385,7 +385,7 @@ export async function fetchRazorpayPaymentLink(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to fetch payment link";
+    const message = extractRazorpayErrorMessage(err, "Failed to fetch payment link");
     return { ok: false, message };
   }
 }
@@ -409,7 +409,7 @@ export async function cancelRazorpayPaymentLink(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to cancel payment link";
+    const message = extractRazorpayErrorMessage(err, "Failed to cancel payment link");
     return { ok: false, message };
   }
 }
@@ -425,7 +425,7 @@ export async function createRazorpayRefund(
     const refund = await client.payments.refund(paymentId, { amount, notes });
     return { ok: true, refund: refund as never as Record<string, unknown> };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay refund failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay refund failed");
     return { ok: false, message };
   }
 }
@@ -442,7 +442,7 @@ export async function fetchRazorpayPayment(
     const payment = await client.payments.fetch(paymentId);
     return { ok: true, payment: payment as never as Record<string, unknown> };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay payment fetch failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay payment fetch failed");
     return { ok: false, message };
   }
 }
@@ -481,7 +481,7 @@ export async function fetchRazorpayCapturedPayments(
 
     return { ok: true, data: captured };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay payments fetch failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay payments fetch failed");
     return { ok: false, message };
   }
 }
@@ -524,7 +524,7 @@ export async function fetchRazorpayCustomer(
     const customer = await client.customers.fetch(customerId) as never as RazorpayCustomerData;
     return { ok: true, data: customer };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay customer fetch failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay customer fetch failed");
     return { ok: false, message };
   }
 }
@@ -639,7 +639,7 @@ export async function fetchRazorpaySubscription(
     const subscription = await client.subscriptions.fetch(subscriptionId) as never as RazorpaySubscriptionData;
     return { ok: true, data: subscription };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay subscription fetch failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay subscription fetch failed");
     return { ok: false, message };
   }
 }
@@ -653,7 +653,7 @@ export async function cancelRazorpaySubscription(
     await client.subscriptions.cancel(subscriptionId);
     return { ok: true, message: "Subscription cancelled" };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Razorpay subscription cancellation failed";
+    const message = extractRazorpayErrorMessage(err, "Razorpay subscription cancellation failed");
     return { ok: false, message };
   }
 }
