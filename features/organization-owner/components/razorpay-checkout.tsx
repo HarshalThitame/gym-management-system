@@ -40,6 +40,8 @@ type RazorpayCheckoutProps = {
   currentSubscriptionStatus?: string | null;
   currentSubscriptionExpiresAt?: string | null;
   currentPackageName?: string | null;
+  initialSelectedPackageId?: string | null;
+  initialBillingCycle?: "monthly" | "annual";
 };
 
 type PayuCheckoutData = {
@@ -68,8 +70,10 @@ export function RazorpayCheckout({
   currentSubscriptionStatus,
   currentSubscriptionExpiresAt,
   currentPackageName,
+  initialSelectedPackageId,
+  initialBillingCycle,
 }: RazorpayCheckoutProps) {
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(initialBillingCycle ?? "monthly");
   const [selectedProvider, setSelectedProvider] = useState<PaymentProviderName>(availableProviders[0] ?? "razorpay");
   const scriptStatus = useRazorpayScript(selectedProvider === "razorpay");
   const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
@@ -109,6 +113,18 @@ export function RazorpayCheckout({
       setSelectedProvider(availableProviders[0] ?? "razorpay");
     }
   }, [availableProviders, selectedProvider]);
+
+  useEffect(() => {
+    if (initialSelectedPackageId) {
+      setSelectedPkgId(initialSelectedPackageId);
+    }
+  }, [initialSelectedPackageId]);
+
+  useEffect(() => {
+    if (initialBillingCycle) {
+      setBillingCycle(initialBillingCycle);
+    }
+  }, [initialBillingCycle]);
 
   const isActive = currentSubscriptionStatus === "active" || currentSubscriptionStatus === "trial";
   const isCancelledWithTime = currentSubscriptionStatus === "cancelled" && currentSubscriptionExpiresAt && new Date(currentSubscriptionExpiresAt) > new Date();
