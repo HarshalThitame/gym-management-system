@@ -239,7 +239,7 @@ function buildPayuSubscriptionDetails(input: {
   return `{billingAmount: ${input.amountInRupees.toFixed(2)},billingCurrency: INR,billingCycle: ${input.billingCycle === "annual" ? "YEARLY" : "MONTHLY"},billingInterval: 1,paymentStartDate: ${input.startDate.toISOString().slice(0, 10)},paymentEndDate: ${input.endDate.toISOString().slice(0, 10)}}`;
 }
 
-function buildPayuSubscriptionHash(input: {
+async function buildPayuSubscriptionHash(input: {
   merchantKey: string;
   merchantSalt: string;
   txnid: string;
@@ -255,7 +255,8 @@ function buildPayuSubscriptionHash(input: {
   siDetails: string;
 }) {
   const hashString = `${input.merchantKey}|${input.txnid}|${input.amount}|${input.productinfo}|${input.firstname}|${input.email}|${input.udf1}|${input.udf2}|${input.udf3}|${input.udf4}|${input.udf5}||||||${input.siDetails}|${input.merchantSalt}`;
-  return crypto.createHash("sha512").update(hashString).digest("hex").toLowerCase();
+  const digest = await globalThis.crypto.subtle.digest("SHA-512", new TextEncoder().encode(hashString));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function createPayuOrgSubscriptionCheckout(input: {
@@ -275,7 +276,7 @@ async function createPayuOrgSubscriptionCheckout(input: {
     return { success: false, error: "PayU is not configured for platform billing." };
   }
 
-  const txnid = `ORG-PAYU-${input.organization.id}-${input.pkg.id}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+  const txnid = `ORG-PAYU-${input.organization.id}-${input.pkg.id}-${Date.now()}-${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 6)}`;
   const now = new Date();
   const periodDays = getDaysForBillingPeriod(input.billingCycle);
   const endDate = new Date(now);
@@ -288,7 +289,7 @@ async function createPayuOrgSubscriptionCheckout(input: {
     startDate: now,
     endDate,
   });
-  const hash = buildPayuSubscriptionHash({
+  const hash = await buildPayuSubscriptionHash({
     merchantKey: platformCredentials.merchantKey,
     merchantSalt: platformCredentials.merchantSalt,
     txnid,
