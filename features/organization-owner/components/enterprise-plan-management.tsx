@@ -24,6 +24,7 @@ import type { PackageWithMeta, SubscriptionWithPackage, UsageHistoryPoint, OrgUs
 import { FeatureCard, FeatureCategorySection, LimitBar } from "@/components/ui/feature-card";
 import { FEATURE_CATEGORIES } from "@/features/subscription/feature-definitions";
 import { cn } from "@/lib/utils";
+import type { PaymentProviderName } from "@/features/billing/providers/provider-types";
 
 type CheckoutDataSuccess = {
   success: true;
@@ -54,6 +55,7 @@ type EnterprisePlanManagementProps = {
   invoices?: any[];
   events?: any[];
   payments?: any[];
+  subscriptionProviders?: Array<{ provider: PaymentProviderName }>;
 };
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -68,7 +70,7 @@ const CATEGORY_ICONS: Record<string, any> = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], events = [], payments = [] }: EnterprisePlanManagementProps) {
+export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], events = [], payments = [], subscriptionProviders = [] }: EnterprisePlanManagementProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "pay" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
@@ -607,6 +609,7 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
             organizationId={organizationId}
             organizationName={organizationName}
             customerEmail={customerEmail}
+            availableProviders={subscriptionProviders.map((provider) => provider.provider)}
             allPackages={allPackages}
             currentPackageId={currentPkg?.id ?? null}
             currentSubscriptionId={currentSubscription?.id ?? null}

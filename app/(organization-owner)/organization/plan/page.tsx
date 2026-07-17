@@ -9,6 +9,7 @@ import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getActivePackagesAction, getOrgSubscriptionAction, getUsageHistoryAction, getOrgUsageAction } from "@/features/organization-owner/actions/plan-data-actions";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import type { RoleName } from "@/types/auth";
+import { listPlatformProviders } from "@/features/billing/services/platform-provider-config-service";
 
 export const revalidate = 120;
 
@@ -32,6 +33,10 @@ async function PlanContent() {
     getUsageHistoryAction(),
     getOrgUsageAction(),
   ]);
+  const platformProvidersResult = await listPlatformProviders();
+  const subscriptionProviders = platformProvidersResult.ok
+    ? platformProvidersResult.providers.filter((provider) => provider.isActive && (provider.provider === "razorpay" || provider.provider === "payu"))
+    : [];
 
   // Get org name, billing email, invoices, subscription events
   const supabase = await createSupabaseServerClient();
@@ -67,6 +72,7 @@ async function PlanContent() {
         currentSubscription={currentSubscription}
         usageHistory={usageHistory}
         orgUsage={orgUsage}
+        subscriptionProviders={subscriptionProviders}
         organizationName={organizationName}
         customerEmail={customerEmail}
         invoices={orgInvoices}

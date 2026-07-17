@@ -15,6 +15,9 @@ import {
   getRazorpayKeyId,
   verifyRazorpaySubscriptionSignature,
 } from "@/features/billing/razorpay/razorpay-service";
+import { resolvePlatformPayuCredentials } from "@/features/billing/payu/platform-payu-config";
+import { getPayuApiBaseUrl } from "@/features/billing/payu/payu-config";
+import { getPlatformDefaultProvider } from "@/features/billing/services/platform-provider-config-service";
 import { recordSubscriptionEvent } from "@/features/super-admin/services/subscription-events-service";
 import { syncSubscriptionArtifactsForOrganization } from "@/features/super-admin/services/subscription-entitlement-sync";
 import { billingLogger } from "@/features/billing/lib/logger";
@@ -32,14 +35,34 @@ export type OrgAutoDebitCheckoutInput = {
   targetPackageId: string;
   billingCycle: "monthly" | "annual";
   startMode?: "now" | "later";
+  provider?: "razorpay" | "payu";
 };
 
 export type OrgAutoDebitCheckoutResult =
   | {
       success: true;
+      provider: "razorpay";
       razorpayKeyId: string;
       razorpaySubscriptionId: string;
       razorpayCustomerId: string;
+      amountPaise: number;
+      subtotalPaise: number;
+      taxPaise: number;
+      currency: string;
+      subscriptionId: string;
+      packageDisplayName: string;
+      organizationDisplayName: string;
+      billingCycle: string;
+      isTestMode: boolean;
+      environmentLabel: string;
+    }
+  | {
+      success: true;
+      provider: "payu";
+      payuCheckoutForm: {
+        action: string;
+        fields: Record<string, string>;
+      };
       amountPaise: number;
       subtotalPaise: number;
       taxPaise: number;
@@ -207,6 +230,175 @@ async function ensureProviderPlan(
   return { ok: true, planId: planResult.data.id };
 }
 
+function buildPayuSubscriptionDetails(input: {
+  amountInRupees: number;
+  billingCycle: "monthly" | "annual";
+  startDate: Date;
+  endDate: Date;
+}) {
+  return `{billingAmount: ${input.amountInRupees.toFixed(2)},billingCurrency: INR,billingCycle: ${input.billingCycle === "annual" ? "YEARLY" : "MONTHLY"},billingInterval: 1,paymentStartDate: ${input.startDate.toISOString().slice(0, 10)},paymentEndDate: ${input.endDate.toISOString().slice(0, 10)}}`;
+}
+
+function buildPayuSubscriptionHash(input: {
+  merchantKey: string;
+  merchantSalt: string;
+  txnid: string;
+  amount: string;
+  productinfo: string;
+  firstname: string;
+  email: string;
+  udf1: string;
+  udf2: string;
+  udf3: string;
+  udf4: string;
+  udf5: string;
+  siDetails: string;
+}) {
+  const hashString = `${input.merchantKey}|${input.txnid}|${input.amount}|${input.productinfo}|${input.firstname}|${input.email}|${input.udf1}|${input.udf2}|${input.udf3}|${input.udf4}|${input.udf5}||||||${input.siDetails}|${input.merchantSalt}`;
+  return crypto.createHash("sha512").update(hashString).digest("hex").toLowerCase();
+}
+
+async function createPayuOrgSubscriptionCheckout(input: {
+  admin: ReturnType<typeof getSupabaseAdminClient>;
+  organization: OrgRow;
+  pkg: PackageRow;
+  pricing: PricingRow;
+  contact: { name: string; email: string; phone: string };
+  billingCycle: "monthly" | "annual";
+  subtotalPaise: number;
+  taxPaise: number;
+  totalAmountPaise: number;
+  currentSubscription: OrgSubscriptionRow | null;
+}): Promise<OrgAutoDebitCheckoutResult> {
+  const platformCredentials = await resolvePlatformPayuCredentials();
+  if (!platformCredentials) {
+    return { success: false, error: "PayU is not configured for platform billing." };
+  }
+
+  const txnid = `ORG-PAYU-${input.organization.id}-${input.pkg.id}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+  const now = new Date();
+  const periodDays = getDaysForBillingPeriod(input.billingCycle);
+  const endDate = new Date(now);
+  endDate.setDate(endDate.getDate() + periodDays);
+  const amountInRupees = toRupees(input.totalAmountPaise);
+  const productinfo = `${input.pkg.name} - ${input.billingCycle === "annual" ? "Annual" : "Monthly"} auto-debit`;
+  const siDetails = buildPayuSubscriptionDetails({
+    amountInRupees,
+    billingCycle: input.billingCycle,
+    startDate: now,
+    endDate,
+  });
+  const hash = buildPayuSubscriptionHash({
+    merchantKey: platformCredentials.merchantKey,
+    merchantSalt: platformCredentials.merchantSalt,
+    txnid,
+    amount: amountInRupees.toFixed(2),
+    productinfo,
+    firstname: input.contact.name || input.organization.name || "Organization",
+    email: input.contact.email || input.organization.billing_email || `${input.organization.id}@org.local`,
+    udf1: "organization_plan",
+    udf2: input.organization.id,
+    udf3: input.pkg.id,
+    udf4: input.billingCycle,
+    udf5: input.currentSubscription?.id ?? "",
+    siDetails,
+  });
+  const baseUrl = getPayuApiBaseUrl(platformCredentials.environment);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const callbackUrl = `${appUrl}/api/billing/payu/org-plan/return`;
+
+  const pendingUpsert = {
+    organization_id: input.organization.id,
+    package_id: input.pkg.id,
+    status: "pending",
+    billing_engine: "subscription",
+    billing_period: input.billingCycle,
+    started_at: now.toISOString(),
+    expires_at: endDate.toISOString(),
+    next_billing_date: endDate.toISOString(),
+    auto_renew: true,
+    provider: "payu",
+    provider_environment: platformCredentials.environment,
+    provider_subscription_id: txnid,
+    provider_plan_id: `payu-plan:${input.pkg.id}:${input.billingCycle}`,
+    provider_customer_id: input.organization.id,
+    provider_payment_method_id: null,
+    provider_mandate_id: null,
+    latest_invoice_id: input.currentSubscription?.latest_invoice_id ?? null,
+    latest_payment_id: input.currentSubscription?.latest_payment_id ?? null,
+    updated_at: now.toISOString(),
+  };
+
+  await input.admin
+    .from("organization_subscriptions")
+    .upsert(pendingUpsert, { onConflict: "organization_id" })
+    .select("*")
+    .maybeSingle();
+
+  await input.admin.from("subscription_events").insert({
+    organization_id: input.organization.id,
+    event_type: "subscription_checkout_created",
+    new_state: {
+      provider: "payu",
+      providerSubscriptionId: txnid,
+      amount: input.totalAmountPaise,
+      billingCycle: input.billingCycle,
+      status: "pending",
+    },
+    metadata: {
+      source: "org_autodebit",
+      providerEnvironment: platformCredentials.environment,
+      packageId: input.pkg.id,
+    },
+    reason: `PayU subscription consent checkout created for ${input.pkg.name} (${input.billingCycle})`,
+    created_at: now.toISOString(),
+  } as never);
+
+  billingLogger.info("org-autodebit", "PayU checkout created", {
+    organizationId: input.organization.id,
+    packageId: input.pkg.id,
+    billingCycle: input.billingCycle,
+  });
+
+  return {
+    success: true,
+    provider: "payu",
+    payuCheckoutForm: {
+      action: `${baseUrl}/_payment`,
+      fields: {
+        key: platformCredentials.merchantKey,
+        txnid,
+        amount: amountInRupees.toFixed(2),
+        productinfo,
+        firstname: input.contact.name || input.organization.name || "Organization",
+        email: input.contact.email || input.organization.billing_email || `${input.organization.id}@org.local`,
+        phone: input.contact.phone || "",
+        surl: callbackUrl,
+        furl: callbackUrl,
+        hash,
+        service_provider: "payu_paisa",
+        si: "4",
+        si_details: siDetails,
+        udf1: "organization_plan",
+        udf2: input.organization.id,
+        udf3: input.pkg.id,
+        udf4: input.billingCycle,
+        udf5: input.currentSubscription?.id ?? "",
+      },
+    },
+    amountPaise: input.totalAmountPaise,
+    subtotalPaise: input.subtotalPaise,
+    taxPaise: input.taxPaise,
+    currency: "INR",
+    subscriptionId: txnid,
+    packageDisplayName: input.pkg.name,
+    organizationDisplayName: input.organization.name ?? "",
+    billingCycle: input.billingCycle,
+    isTestMode: platformCredentials.isTestMode,
+    environmentLabel: platformCredentials.environment === "test" ? "Test Mode" : "Live Mode",
+  };
+}
+
 async function resolveOrgContact(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, organization: OrgRow) {
   const { data: profile } = await supabase
     .from("profiles")
@@ -301,6 +493,7 @@ async function upsertOrgMandatePaymentMethod(
   admin: ReturnType<typeof getSupabaseAdminClient>,
   organizationId: string,
   input: {
+    provider: "razorpay" | "payu";
     providerCustomerId?: string | null;
     providerPaymentMethodId: string;
     providerMandateId?: string | null;
@@ -354,7 +547,7 @@ async function upsertOrgMandatePaymentMethod(
 
   const payload = {
     organization_id: organizationId,
-    provider: "razorpay",
+    provider: input.provider,
     provider_customer_id: input.providerCustomerId ?? targetRow?.provider_customer_id ?? null,
     provider_payment_method_id: providerPaymentMethodId,
     provider_mandate_id: input.providerMandateId ?? targetRow?.provider_mandate_id ?? null,
@@ -395,8 +588,6 @@ async function upsertOrgMandatePaymentMethod(
 
 export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitCheckoutInput): Promise<OrgAutoDebitCheckoutResult> {
   const { targetPackageId, billingCycle } = input;
-  const platformCredentials = await resolvePlatformRazorpayCredentials();
-  const providerEnvironment = platformCredentials?.environment ?? getRazorpayEnvironment();
 
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -478,12 +669,34 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
   }
 
   const totalAmountPaise = subtotalPaise + taxPaise;
+  const contact = await resolveOrgContact(supabase, organization);
+  const defaultProviderResult = await getPlatformDefaultProvider();
+  const selectedProvider: "razorpay" | "payu" = input.provider
+    ?? (defaultProviderResult.ok && (defaultProviderResult.config.provider === "payu" || defaultProviderResult.config.provider === "razorpay")
+      ? defaultProviderResult.config.provider
+      : "razorpay");
+
+  if (selectedProvider === "payu") {
+    return createPayuOrgSubscriptionCheckout({
+      admin,
+      organization,
+      pkg,
+      pricing,
+      contact,
+      billingCycle,
+      subtotalPaise,
+      taxPaise,
+      totalAmountPaise,
+      currentSubscription,
+    });
+  }
+
+  const platformCredentials = await resolvePlatformRazorpayCredentials();
+  const providerEnvironment = platformCredentials?.environment ?? getRazorpayEnvironment();
   const planResult = await ensureProviderPlan(admin, pricing, pkg.name, platformCredentials);
   if (!planResult.ok) {
     return { success: false, error: planResult.error };
   }
-
-  const contact = await resolveOrgContact(supabase, organization);
 
   const defaultPaymentMethod = await getDefaultOrgPaymentMethod(admin, organization.id);
   let providerCustomerId = defaultPaymentMethod?.provider_customer_id ?? null;
@@ -594,6 +807,7 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
 
   return {
     success: true,
+    provider: "razorpay",
     razorpayKeyId: getRazorpayKeyId(platformCredentials),
     razorpaySubscriptionId: subscriptionResult.data.id,
     razorpayCustomerId: providerCustomerId,
@@ -666,6 +880,7 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
   const providerPaymentMethodKey = providerMandateId || `subscription:${input.razorpay_subscription_id}`;
 
   const orgPaymentMethodId = await upsertOrgMandatePaymentMethod(admin, ctx.organizationId, {
+    provider: "razorpay",
     providerCustomerId: providerSub.data.customer_id || dbSub.provider_customer_id,
     providerPaymentMethodId: providerPaymentMethodKey,
     providerMandateId,
@@ -731,6 +946,376 @@ export async function acknowledgeOrgAutoDebitCheckoutAction(
     paymentId: input.razorpay_payment_id,
     warning: providerStatus === "active" ? undefined : "Authorization completed. Awaiting provider confirmation.",
   };
+}
+
+export async function finalizePayuOrgSubscriptionCheckoutAction(input: {
+  rawBody: string;
+}): Promise<{ success: true; subscriptionId: string } | { success: false; error: string }> {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const ctx = await requireOrganizationOwner("/organization/plan");
+
+  const admin = getSupabaseAdminClient();
+  if (!admin) {
+    return { success: false, error: "Database connection failed." };
+  }
+
+  const payload = Object.fromEntries(new URLSearchParams(input.rawBody).entries()) as Record<string, string>;
+  const platformCredentials = await resolvePlatformPayuCredentials();
+  if (!platformCredentials) {
+    return { success: false, error: "PayU is not configured for platform billing." };
+  }
+
+  const status = (payload.status || "").toLowerCase();
+  const udf1 = payload.udf1 || "";
+  const udf2 = payload.udf2 || ctx.organizationId;
+  const udf3 = payload.udf3 || "";
+  const udf4 = payload.udf4 || "monthly";
+  const subscriptionTxnId = payload.txnid || "";
+  const paymentId = payload.mihpayid || "";
+
+  const expectedHash = crypto.createHash("sha512")
+    .update(`${platformCredentials.merchantSalt}|${status}|${payload.udf1 || ""}|${payload.udf2 || ""}|${payload.udf3 || ""}|${payload.udf4 || ""}|${payload.udf5 || ""}|${payload.udf6 || ""}|${payload.udf7 || ""}|${payload.udf8 || ""}|${payload.udf9 || ""}|${payload.udf10 || ""}|${payload.key || platformCredentials.merchantKey}`)
+    .digest("hex")
+    .toLowerCase();
+  if ((payload.hash || "").toLowerCase() !== expectedHash) {
+    return { success: false, error: "PayU signature verification failed." };
+  }
+
+  if (udf1 !== "organization_plan") {
+    return { success: false, error: "Unsupported PayU payload." };
+  }
+
+  if (!subscriptionTxnId || !paymentId) {
+    return { success: false, error: "Missing PayU transaction identifiers." };
+  }
+
+  const { data: existingSub } = await admin
+    .from("organization_subscriptions")
+    .select("*")
+    .eq("organization_id", udf2)
+    .or(`provider_subscription_id.eq.${subscriptionTxnId},latest_payment_id.eq.${paymentId}`)
+    .maybeSingle() as never as {
+    data: OrgSubscriptionRow | null;
+    error: { message: string } | null;
+  };
+
+  if (!existingSub) {
+    return { success: false, error: "Pending PayU subscription not found." };
+  }
+
+  if (status !== "success" && status !== "captured" && status !== "completed") {
+    await admin.from("organization_subscriptions").update({
+      status: "pending",
+      provider: "payu",
+      provider_subscription_id: subscriptionTxnId,
+      provider_payment_method_id: paymentId,
+      updated_at: new Date().toISOString(),
+    } as never).eq("id", existingSub.id);
+    return { success: false, error: `PayU subscription returned ${status || "failed"}.` };
+  }
+
+  const billingCycle = (udf4 === "annual" ? "annual" : "monthly") as "monthly" | "annual";
+  const pricing = await resolvePricingRow(admin, existingSub.package_id, billingCycle);
+  if (!pricing) {
+    return { success: false, error: "Missing pricing row for PayU subscription." };
+  }
+  const packageDetails = await getPackageDetails(admin, existingSub.package_id);
+  const organization = await getOrganizationDetails(admin, existingSub.organization_id);
+  const providerEnvironment = platformCredentials.isTestMode ? "test" : "live";
+  const expectedAmount = existingSub.price_override ?? pricing.price;
+  const now = new Date();
+  const periodDays = getDaysForBillingPeriod(billingCycle);
+  const periodEnd = new Date(now);
+  periodEnd.setDate(periodEnd.getDate() + periodDays);
+
+  const orgPaymentMethodId = await upsertOrgMandatePaymentMethod(admin, existingSub.organization_id, {
+    provider: "payu",
+    providerCustomerId: existingSub.provider_customer_id || existingSub.organization_id,
+    providerPaymentMethodId: paymentId,
+    providerMandateId: paymentId,
+    mandateStatus: "active",
+    paymentType: "card",
+    displayName: "PayU subscription mandate",
+    providerEnvironment,
+  });
+
+  const invoiceNumber = `ORG-SUB-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`;
+  const { data: invoice, error: invoiceError } = await admin
+    .from("org_subscription_invoices")
+    .insert({
+      organization_id: existingSub.organization_id,
+      subscription_id: existingSub.id,
+      package_id: existingSub.package_id,
+      payment_method_id: orgPaymentMethodId,
+      provider: "payu",
+      provider_environment: providerEnvironment,
+      provider_subscription_id: subscriptionTxnId,
+      invoice_number: invoiceNumber,
+      status: "paid",
+      currency: pricing.currency || "INR",
+      subtotal_amount: expectedAmount,
+      discount_amount: 0,
+      tax_amount: 0,
+      total_amount: expectedAmount,
+      amount_paid: expectedAmount,
+      billing_period_start: now.toISOString().slice(0, 10),
+      billing_period_end: periodEnd.toISOString().slice(0, 10),
+      billing_cycle: billingCycle,
+      issued_at: now.toISOString(),
+      paid_at: now.toISOString(),
+      due_at: now.toISOString(),
+      idempotency_key: `payu_${existingSub.id}_${paymentId}`,
+      razorpay_payment_id: null,
+    } as never)
+    .select("*")
+    .maybeSingle() as never as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
+
+  if (invoiceError || !invoice) {
+    return { success: false, error: invoiceError?.message ?? "Failed to create PayU invoice." };
+  }
+
+  const paymentNumber = `ORG-SUB-PAY-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`;
+  const { data: payment, error: paymentError } = await admin
+    .from("org_subscription_payments")
+    .insert({
+      organization_id: existingSub.organization_id,
+      subscription_id: existingSub.id,
+      invoice_id: invoice.id,
+      payment_number: paymentNumber,
+      status: "paid",
+      provider: "payu",
+      provider_environment: providerEnvironment,
+      provider_subscription_id: subscriptionTxnId,
+      provider_order_id: payload.txnid,
+      provider_payment_id: paymentId,
+      amount: expectedAmount,
+      currency: pricing.currency || "INR",
+      payment_method_id: orgPaymentMethodId,
+      provider_signature_verified: true,
+      paid_at: now.toISOString(),
+      idempotency_key: `payu_${existingSub.id}_${paymentId}`,
+    } as never)
+    .select("*")
+    .maybeSingle() as never as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
+
+  if (paymentError || !payment) {
+    return { success: false, error: paymentError?.message ?? "Failed to create PayU payment." };
+  }
+
+  await admin.from("organization_subscriptions").update({
+    status: "active",
+    last_billing_date: now.toISOString(),
+    next_billing_date: periodEnd.toISOString(),
+    expires_at: periodEnd.toISOString(),
+    latest_invoice_id: invoice.id,
+    latest_payment_id: payment.id,
+    provider: "payu",
+    provider_environment: providerEnvironment,
+    provider_subscription_id: subscriptionTxnId,
+    provider_plan_id: existingSub.provider_plan_id || `payu-plan:${existingSub.package_id}:${billingCycle}`,
+    provider_customer_id: existingSub.provider_customer_id || udf2,
+    provider_payment_method_id: paymentId,
+    provider_mandate_id: paymentId,
+    auto_renew: true,
+    updated_at: now.toISOString(),
+  } as never).eq("id", existingSub.id);
+
+  await admin.from("subscription_events").insert({
+    organization_id: existingSub.organization_id,
+    subscription_id: existingSub.id,
+    event_type: "subscription_activated",
+    new_state: {
+      provider: "payu",
+      providerSubscriptionId: subscriptionTxnId,
+      providerPaymentId: paymentId,
+      invoiceId: invoice.id,
+      paymentId: payment.id,
+      billingCycle,
+    },
+    metadata: {
+      source: "payu_callback",
+      providerEnvironment,
+      packageId: existingSub.package_id,
+    },
+    reason: `PayU subscription consent completed for ${packageDetails?.name ?? "plan"}.`,
+    created_at: now.toISOString(),
+  } as never);
+
+  if (organization?.billing_email || organization?.owner_user_id) {
+    await syncSubscriptionArtifactsForOrganization(
+      existingSub.organization_id,
+      "PayU subscription consent completed.",
+    );
+  }
+
+  billingLogger.info("org-autodebit", "PayU subscription consent finalized", {
+    subscriptionId: existingSub.id,
+    providerSubscriptionId: subscriptionTxnId,
+    udf3,
+  });
+
+  return { success: true, subscriptionId: existingSub.id };
+}
+
+export async function handlePayuOrgSubscriptionWebhookEvent(input: {
+  notificationType: string;
+  eventId: string;
+  payload: Record<string, unknown>;
+}): Promise<{ handled: boolean; error?: string }> {
+  const admin = getSupabaseAdminClient();
+  if (!admin) return { handled: false, error: "Database connection failed." };
+
+  const customParameter = input.payload.customParameter && typeof input.payload.customParameter === "object"
+    ? input.payload.customParameter as Record<string, unknown>
+    : {};
+  const udf2 = typeof customParameter.organizationId === "string"
+    ? customParameter.organizationId
+    : typeof input.payload.udf2 === "string"
+      ? input.payload.udf2
+      : null;
+  const orgSubscriptionId = typeof customParameter.organizationSubscriptionId === "string"
+    ? customParameter.organizationSubscriptionId
+    : typeof input.payload.subscriptionId === "string"
+      ? input.payload.subscriptionId
+      : typeof input.payload.planId === "string"
+        ? input.payload.planId
+        : typeof input.payload.txnid === "string"
+          ? input.payload.txnid
+          : null;
+
+  if (!orgSubscriptionId) {
+    return { handled: false, error: "Unable to resolve PayU organization subscription." };
+  }
+
+  let resolvedSubscription: OrgSubscriptionRow | null = null;
+  if (udf2) {
+    const { data: subscription } = await admin
+      .from("organization_subscriptions")
+      .select("*")
+      .eq("organization_id", udf2)
+      .eq("provider_subscription_id", orgSubscriptionId)
+      .maybeSingle() as never as {
+      data: OrgSubscriptionRow | null;
+      error: { message: string } | null;
+    };
+    resolvedSubscription = subscription;
+  }
+
+  if (!resolvedSubscription) {
+    const { data: fallbackSubscription } = await admin
+      .from("organization_subscriptions")
+      .select("*")
+      .eq("provider_subscription_id", orgSubscriptionId)
+      .eq("provider", "payu")
+      .order("started_at", { ascending: false })
+      .maybeSingle() as never as {
+      data: OrgSubscriptionRow | null;
+      error: { message: string } | null;
+    };
+    resolvedSubscription = fallbackSubscription;
+  }
+
+  if (!resolvedSubscription && udf2) {
+    const { data: latestPayuSubscription } = await admin
+      .from("organization_subscriptions")
+      .select("*")
+      .eq("organization_id", udf2)
+      .eq("provider", "payu")
+      .order("started_at", { ascending: false })
+      .maybeSingle() as never as {
+      data: OrgSubscriptionRow | null;
+      error: { message: string } | null;
+    };
+    resolvedSubscription = latestPayuSubscription;
+  }
+
+  if (!resolvedSubscription) {
+    return { handled: false, error: "No matching organization subscription found." };
+  }
+
+  const now = new Date().toISOString();
+  const providerEnvironment = typeof input.payload.environment === "string"
+    ? input.payload.environment
+    : resolvedSubscription.provider_environment ?? "test";
+
+  if (input.notificationType === "SUBSCRIPTION_CANCELLED_HTTP") {
+    await admin.from("organization_subscriptions").update({
+      status: "cancelled",
+      auto_renew: false,
+      provider: "payu",
+      provider_environment: providerEnvironment,
+      updated_at: now,
+    } as never).eq("id", resolvedSubscription.id);
+  } else if (input.notificationType === "SUBSCRIPTION_ENABLED_HTTP" || input.notificationType === "SUBSCRIPTION_DEFINED_HTTP") {
+    await admin.from("organization_subscriptions").update({
+      status: "active",
+      auto_renew: true,
+      provider: "payu",
+      provider_environment: providerEnvironment,
+      provider_subscription_id: orgSubscriptionId,
+      updated_at: now,
+    } as never).eq("id", resolvedSubscription.id);
+  } else if (input.notificationType === "SUBSCRIPTION_COMPLETED_HTTP") {
+    await admin.from("organization_subscriptions").update({
+      status: "active",
+      auto_renew: true,
+      provider: "payu",
+      provider_environment: providerEnvironment,
+      updated_at: now,
+    } as never).eq("id", resolvedSubscription.id);
+  } else if (input.notificationType === "INVOICE_PAID_HTTP") {
+    await admin.from("subscription_events").insert({
+      organization_id: resolvedSubscription.organization_id,
+      subscription_id: resolvedSubscription.id,
+      event_type: "subscription_charged",
+      new_state: {
+        providerSubscriptionId: orgSubscriptionId,
+        notificationType: input.notificationType,
+      },
+      metadata: {
+        source: "payu_webhook",
+        eventId: input.eventId,
+        providerEnvironment,
+      },
+      reason: "PayU invoice paid webhook received.",
+      created_at: now,
+    } as never);
+  } else if (input.notificationType === "INVOICE_FAILED_HTTP") {
+    await admin.from("subscription_events").insert({
+      organization_id: resolvedSubscription.organization_id,
+      subscription_id: resolvedSubscription.id,
+      event_type: "payment_failed",
+      new_state: {
+        providerSubscriptionId: orgSubscriptionId,
+        notificationType: input.notificationType,
+      },
+      metadata: {
+        source: "payu_webhook",
+        eventId: input.eventId,
+        providerEnvironment,
+      },
+      reason: "PayU invoice failed webhook received.",
+      created_at: now,
+    } as never);
+  }
+
+  await syncSubscriptionArtifactsForOrganization(
+    resolvedSubscription.organization_id,
+    "PayU subscription webhook processed.",
+  );
+
+  return { handled: true };
 }
 
 export async function handleOrgSubscriptionActivatedEvent(input: {
@@ -951,6 +1536,7 @@ export async function handleOrgSubscriptionChargedEvent(input: {
     : subscription.provider_mandate_id;
   const providerPaymentMethodKey = providerMandateId || `subscription:${input.providerSubscriptionId}`;
   const orgPaymentMethodId = await upsertOrgMandatePaymentMethod(admin, subscription.organization_id, {
+      provider: "razorpay",
       providerCustomerId: subscription.provider_customer_id,
       providerPaymentMethodId: providerPaymentMethodKey,
       providerMandateId,

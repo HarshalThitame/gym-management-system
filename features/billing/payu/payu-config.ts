@@ -13,7 +13,7 @@ function resolveEnvVar(keys: { test: string; live: string; legacy: string }, env
 }
 
 export function getPayuConfig(overrides?: Partial<PayuConfig>): PayuConfig {
-  const rawEnv = process.env.PAYU_ENV || "test";
+  const rawEnv = overrides?.environment || process.env.PAYU_ENV || "test";
   const environment: PayuEnvironment = rawEnv === "live" ? "live" : "test";
   const isTestMode = environment === "test";
 

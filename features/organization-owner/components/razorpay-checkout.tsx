@@ -12,6 +12,7 @@ import { acknowledgeRazorpayCheckoutResultAction, getSubscriptionPaymentStatusAc
 import { SubscriptionDecisionModal } from "./subscription-decision-modal";
 import { useRefreshEntitlements } from "@/features/organization-owner/entitlements";
 import type { CheckoutOrderState } from "@/features/billing/razorpay/razorpay-checkout-types";
+import type { PaymentProviderName } from "@/features/billing/providers/provider-types";
 
 type PackageInfo = {
   id: string;
@@ -32,6 +33,7 @@ type RazorpayCheckoutProps = {
   organizationName: string;
   customerEmail: string;
   customerContact?: string;
+  availableProviders?: PaymentProviderName[];
   allPackages: PackageInfo[];
   currentPackageId?: string | null;
   currentSubscriptionId?: string | null;
@@ -40,18 +42,36 @@ type RazorpayCheckoutProps = {
   currentPackageName?: string | null;
 };
 
+type PayuCheckoutData = {
+  provider: "payu";
+  checkoutForm: {
+    action: string;
+    fields: Record<string, string>;
+  };
+  amountPaise: number;
+  currency: string;
+  packageDisplayName: string;
+  organizationDisplayName: string;
+  billingCycle: string;
+  isTestMode: boolean;
+  environmentLabel: string;
+  subscriptionId: string;
+};
+
 export function RazorpayCheckout({
   organizationName,
   customerEmail,
   customerContact,
+  availableProviders = ["razorpay"],
   allPackages,
   currentPackageId,
   currentSubscriptionStatus,
   currentSubscriptionExpiresAt,
   currentPackageName,
 }: RazorpayCheckoutProps) {
-  const scriptStatus = useRazorpayScript();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProviderName>(availableProviders[0] ?? "razorpay");
+  const scriptStatus = useRazorpayScript(selectedProvider === "razorpay");
   const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<CheckoutOrderState>("idle");
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -60,11 +80,13 @@ export function RazorpayCheckout({
     paymentId?: string;
   } | null>(null);
   const [orderResult, setOrderResult] = useState<{
+    provider: PaymentProviderName;
     subscriptionId: string;
     customerId: string;
     amountPaise: number;
     currency: string;
-    keyId: string;
+    keyId?: string;
+    checkoutForm?: PayuCheckoutData["checkoutForm"];
     isTestMode: boolean;
     environmentLabel: string;
   } | null>(null);
@@ -73,6 +95,7 @@ export function RazorpayCheckout({
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshEntitlements = useRefreshEntitlements();
+  const canChooseProvider = availableProviders.length > 1;
 
   useEffect(() => {
     return () => {
@@ -80,6 +103,12 @@ export function RazorpayCheckout({
       if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!availableProviders.includes(selectedProvider)) {
+      setSelectedProvider(availableProviders[0] ?? "razorpay");
+    }
+  }, [availableProviders, selectedProvider]);
 
   const isActive = currentSubscriptionStatus === "active" || currentSubscriptionStatus === "trial";
   const isCancelledWithTime = currentSubscriptionStatus === "cancelled" && currentSubscriptionExpiresAt && new Date(currentSubscriptionExpiresAt) > new Date();
@@ -128,12 +157,6 @@ export function RazorpayCheckout({
   const executePayment = useCallback(async (startMode: "now" | "later") => {
     if (!selectedPkgId) return;
 
-    const Razorpay = (window as RazorpayWindow).Razorpay;
-    if (scriptStatus !== "loaded" || !Razorpay) {
-      showToast("Razorpay is not loaded. Please refresh and try again.", "error");
-      return;
-    }
-
     setPaymentState("creating_order");
     setPaymentError(null);
     setPaymentDetails(null);
@@ -152,6 +175,41 @@ export function RazorpayCheckout({
       return;
     }
 
+    if (result.provider === "payu") {
+      setOrderResult({
+        provider: "payu",
+        subscriptionId: result.subscriptionId,
+        customerId: "",
+        amountPaise: result.amountPaise,
+        currency: result.currency,
+        checkoutForm: result.payuCheckoutForm,
+        isTestMode: result.isTestMode,
+        environmentLabel: result.environmentLabel,
+      });
+      setPaymentState("checkout_open");
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = result.payuCheckoutForm.action;
+      form.style.display = "none";
+      Object.entries(result.payuCheckoutForm.fields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      return;
+    }
+
+    const Razorpay = (window as RazorpayWindow).Razorpay;
+    if (scriptStatus !== "loaded" || !Razorpay) {
+      showToast("Razorpay is not loaded. Please refresh and try again.", "error");
+      return;
+    }
+
     if (!result.razorpaySubscriptionId || !result.subscriptionId) {
       const message = "Failed to create subscription checkout.";
       showToast(message, "error");
@@ -161,6 +219,7 @@ export function RazorpayCheckout({
     }
 
     setOrderResult({
+      provider: "razorpay",
       subscriptionId: result.razorpaySubscriptionId,
       customerId: result.razorpayCustomerId ?? "",
       amountPaise: result.amountPaise,
@@ -293,13 +352,13 @@ export function RazorpayCheckout({
         />
       )}
 
-      {scriptStatus === "loading" && (
+      {selectedProvider === "razorpay" && scriptStatus === "loading" && (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-background p-4 text-sm">
           <Loader2 className="size-4 animate-spin" /> Loading payment gateway...
         </div>
       )}
 
-      {scriptStatus === "error" && (
+      {selectedProvider === "razorpay" && scriptStatus === "error" && (
         <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <AlertTriangle className="size-5 shrink-0" />
           <div><p className="font-bold">Payment gateway failed to load</p><p className="text-xs mt-1">Please refresh the page or try again later.</p></div>
@@ -327,10 +386,33 @@ export function RazorpayCheckout({
         <Shield className="size-4" />
         <span>
           {orderResult
-            ? <><strong>{orderResult.environmentLabel}:</strong> {orderResult.isTestMode ? "No real charges will be made." : "Live Razorpay auto-debit is enabled."}</>
-            : "Razorpay subscription mode will be confirmed before authorization opens."}
+            ? <><strong>{orderResult.environmentLabel}:</strong> {orderResult.isTestMode ? "No real charges will be made." : `${selectedProvider === "payu" ? "PayU" : "Razorpay"} auto-debit is enabled.`}</>
+            : `${selectedProvider === "payu" ? "PayU" : "Razorpay"} subscription mode will be confirmed before authorization opens.`}
         </span>
       </div>
+
+      {canChooseProvider && (
+        <div className="space-y-2">
+          <span className="text-sm font-semibold">Gateway:</span>
+          <div className="flex flex-wrap gap-2">
+            {availableProviders.map((provider) => (
+              <button
+                key={provider}
+                type="button"
+                onClick={() => setSelectedProvider(provider)}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm font-bold transition",
+                  selectedProvider === provider
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {provider === "payu" ? "PayU" : "Razorpay"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <span className="text-sm font-semibold">Billing:</span>
@@ -460,7 +542,7 @@ export function RazorpayCheckout({
                       <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
                       <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p>
                       {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
-                      {orderResult?.subscriptionId ? <p>Razorpay Subscription ID: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
+                      {orderResult?.subscriptionId ? <p>{selectedProvider === "payu" ? "PayU Subscription ID" : "Razorpay Subscription ID"}: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
@@ -536,7 +618,7 @@ export function RazorpayCheckout({
                       <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
                       <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p>
                       {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
-                      {orderResult?.subscriptionId ? <p>Razorpay Subscription ID: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
+                      {orderResult?.subscriptionId ? <p>{selectedProvider === "payu" ? "PayU Subscription ID" : "Razorpay Subscription ID"}: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
@@ -588,11 +670,11 @@ export function RazorpayCheckout({
               type="button"
             >
               {isActive ? <Lock className="size-5" /> : isLoading ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />}
-              {isActive ? "Plan Active" : isLoading ? "Creating Subscription..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Authorize ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via Razorpay`}
+              {isActive ? "Plan Active" : isLoading ? "Creating Subscription..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Authorize ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via ${selectedProvider === "payu" ? "PayU" : "Razorpay"}`}
             </Button>
 
             <p className="text-center text-[11px] text-muted-foreground">
-              Secured by Razorpay · Test mode — no real charges
+              Secured by {selectedProvider === "payu" ? "PayU" : "Razorpay"} · Test mode — no real charges
             </p>
           </CardContent>
         </Card>

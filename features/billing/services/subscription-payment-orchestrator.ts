@@ -13,4 +13,3 @@ export async function createSecureSubscriptionCheckoutOrderAction(
 ): Promise<SecureCheckoutIntentResult> {
   return createOrgAutoDebitCheckoutAction(input);
 }
-

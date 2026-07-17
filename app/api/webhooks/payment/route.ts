@@ -5,8 +5,11 @@ import { getProviderForGym } from "@/features/billing/providers/provider-registr
 import type { IPaymentProvider } from "@/features/billing/providers/provider-types";
 import { handleMemberPaymentCaptured, handleMemberPaymentFailed } from "@/features/billing/services/member-webhook-handler";
 import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
+import { handlePayuOrgSubscriptionWebhookEvent } from "@/features/billing/services/org-subscription-autodebit-service";
 import { getRazorpayProvider } from "@/features/billing/razorpay/razorpay-provider-adapter";
 import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
+import { getPayuProvider } from "@/features/billing/payu/payu-service";
+import { resolvePlatformPayuCredentials } from "@/features/billing/payu/platform-payu-config";
 
 type ProviderEventRow = {
   id?: string;
@@ -151,8 +154,19 @@ export async function handlePaymentWebhook(request: Request): Promise<NextRespon
         const providerPaymentId = payuPayload.mihpayid || payuPayload.payuMoneyId || "";
         const providerOrderId = payuPayload.txnid || "";
         const payuStatus = payuPayload.status || "";
+        const notificationType = payuPayload.notificationType || "";
 
-        if (payuStatus === "success" || payuStatus === "completed") {
+        if (notificationType.startsWith("SUBSCRIPTION_") || notificationType.startsWith("INVOICE_")) {
+          const webhookResult = await handlePayuOrgSubscriptionWebhookEvent({
+            notificationType,
+            eventId,
+            payload: parsedPayload,
+          });
+          if (!webhookResult.handled) {
+            processingStatus = "failed";
+            processingError = webhookResult.error || "PayU subscription webhook handling failed";
+          }
+        } else if (payuStatus === "success" || payuStatus === "completed") {
           if (!providerOrderId || !providerPaymentId) {
             processingStatus = "ignored";
             processingError = "Missing transaction details";
@@ -380,6 +394,24 @@ async function resolveWebhookProvider(input: {
         provider: getRazorpayProvider(platformCredentials?.config, platformCredentials?.isTestMode ?? false),
         gymId: null,
       };
+    }
+
+    if (provider === "payu") {
+      const platformCredentials = await resolvePlatformPayuCredentials();
+      if (platformCredentials) {
+        return {
+          ok: true,
+          provider: getPayuProvider(
+            {
+              merchant_key: platformCredentials.merchantKey,
+              merchant_salt: platformCredentials.merchantSalt,
+              auth_header: platformCredentials.authHeader,
+            },
+            platformCredentials.isTestMode,
+          ),
+          gymId: null,
+        };
+      }
     }
 
     return { ok: false, message: "Unable to resolve the gym for this payment webhook." };
