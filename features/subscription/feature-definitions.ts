@@ -47,7 +47,7 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     features: [
       { key: "memberManagement", label: "Membership plan builder", description: "Create unlimited monthly, quarterly, annual, day-pass, and custom plans", featureCode: "member_management", limitKey: "membership_plan_types", limitLabel: "Unlimited on Enterprise" },
       { key: "paymentTracking", label: "Cash, UPI & online payments", description: "All payment modes with auto-reconciliation dashboard", featureCode: "payment_tracking" },
-      { key: "onlinePaymentLinks", label: "Online payment link", description: "Generate Razorpay/PayU one-time links", featureCode: "online_payment_links" },
+      { key: "onlinePaymentLinks", label: "Online payment link", description: "Generate Razorpay one-time links", featureCode: "online_payment_links" },
       { key: "renewalReminders", label: "Renewal reminders", description: "Auto reminder before expiry via SMS/WhatsApp", featureCode: "renewal_reminders" },
       { key: "billingInvoices", label: "GST invoices & PDF receipts", description: "Full GST-compliant invoice, auto-generated, delivered via email and WhatsApp", featureCode: "billing_invoices" },
       { key: "autoBilling", label: "Auto-billing & recurring charges", description: "NACH mandate or card-on-file auto-debit", featureCode: "auto_billing", isNewInGrowth: true },
@@ -162,7 +162,7 @@ export const FEATURE_CATEGORIES: FeatureCategory[] = [
     description: "Third-party integrations, API, SSO, and infrastructure",
     icon: "Zap",
     features: [
-      { key: "razorpayPayuIntegration", label: "Razorpay/PayU integration", description: "Full gateway, auto-billing, refunds, webhooks", featureCode: "razorpay_payu_integration", isNewInGrowth: true },
+      { key: "razorpayIntegration", label: "Razorpay integration", description: "Full gateway, auto-billing, refunds, webhooks", featureCode: "razorpay_integration", isNewInGrowth: true },
       { key: "whatsappBusinessApi", label: "WhatsApp Business API", description: "Official WABA integration", featureCode: "whatsapp_business_api", isNewInGrowth: true },
       { key: "googleCalendarSync", label: "Google Calendar sync", description: "Class schedule syncs to Google Calendar", featureCode: "google_calendar_sync", isNewInGrowth: true },
       { key: "restApiAccess", label: "REST API access", description: "Full API for custom integrations", featureCode: "rest_api_access", isNewInEnterprise: true },

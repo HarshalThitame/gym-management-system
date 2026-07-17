@@ -136,7 +136,7 @@ export async function validateFeatureKeyIntegrity(): Promise<IntegrityResult> {
     onlinePaymentLinks: "online_payment_links", renewalReminders: "renewal_reminders",
     autoBilling: "auto_billing", discountPromoCodes: "discount_promo_codes",
     corporateBulkMemberships: "corporate_bulk_memberships", paymentFailureHandling: "payment_failure_handling",
-    partialPaymentDues: "partial_payment_dues", razorpayPayuIntegration: "razorpay_payu_integration",
+    partialPaymentDues: "partial_payment_dues", razorpayIntegration: "razorpay_integration",
     multiGstinSupport: "multi_gstin_support",
     branchRevenueSplit: "branch_revenue_split", basicReports: "basic_reports",
     advancedReportsEnabled: "advanced_reports", customDashboards: "custom_dashboards",

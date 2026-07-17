@@ -44,22 +44,6 @@ type RazorpayCheckoutProps = {
   initialBillingCycle?: "monthly" | "annual";
 };
 
-type PayuCheckoutData = {
-  provider: "payu";
-  checkoutForm: {
-    action: string;
-    fields: Record<string, string>;
-  };
-  amountPaise: number;
-  currency: string;
-  packageDisplayName: string;
-  organizationDisplayName: string;
-  billingCycle: string;
-  isTestMode: boolean;
-  environmentLabel: string;
-  subscriptionId: string;
-};
-
 export function RazorpayCheckout({
   organizationName,
   customerEmail,
@@ -90,7 +74,6 @@ export function RazorpayCheckout({
     amountPaise: number;
     currency: string;
     keyId?: string;
-    checkoutForm?: PayuCheckoutData["checkoutForm"];
     isTestMode: boolean;
     environmentLabel: string;
   } | null>(null);
@@ -189,35 +172,6 @@ export function RazorpayCheckout({
       showToast(result.error, "error");
       setPaymentError(result.error);
       setPaymentState("payment_failed");
-      return;
-    }
-
-    if (result.provider === "payu") {
-      setOrderResult({
-        provider: "payu",
-        subscriptionId: result.subscriptionId,
-        customerId: "",
-        amountPaise: result.amountPaise,
-        currency: result.currency,
-        checkoutForm: result.payuCheckoutForm,
-        isTestMode: result.isTestMode,
-        environmentLabel: result.environmentLabel,
-      });
-      setPaymentState("checkout_open");
-
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = result.payuCheckoutForm.action;
-      form.style.display = "none";
-      Object.entries(result.payuCheckoutForm.fields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = value;
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
       return;
     }
 
@@ -403,8 +357,8 @@ export function RazorpayCheckout({
         <Shield className="size-4" />
         <span>
           {orderResult
-            ? <><strong>{orderResult.environmentLabel}:</strong> {orderResult.isTestMode ? "No real charges will be made." : `${selectedProvider === "payu" ? "PayU" : "Razorpay"} auto-debit is enabled.`}</>
-            : `${selectedProvider === "payu" ? "PayU" : "Razorpay"} subscription mode will be confirmed before authorization opens.`}
+            ? <><strong>{orderResult.environmentLabel}:</strong> {orderResult.isTestMode ? "No real charges will be made." : "Razorpay auto-debit is enabled."}</>
+            : "Razorpay subscription mode will be confirmed before authorization opens."}
         </span>
       </div>
 
@@ -424,7 +378,7 @@ export function RazorpayCheckout({
                     : "border-border bg-surface text-muted-foreground hover:text-foreground",
                 )}
               >
-                {provider === "payu" ? "PayU" : "Razorpay"}
+                Razorpay
               </button>
             ))}
           </div>
@@ -559,7 +513,7 @@ export function RazorpayCheckout({
                       <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
                       <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p>
                       {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
-                      {orderResult?.subscriptionId ? <p>{selectedProvider === "payu" ? "PayU Subscription ID" : "Razorpay Subscription ID"}: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
+                      {orderResult?.subscriptionId ? <p>Razorpay Subscription ID: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
@@ -635,7 +589,7 @@ export function RazorpayCheckout({
                       <p>Billing: <span className="font-semibold capitalize">{billingCycle}</span></p>
                       <p>Subscription ID: <span className="font-mono">{paymentDetails.subscriptionId}</span></p>
                       {paymentDetails.paymentId ? <p>Payment ID: <span className="font-mono">{paymentDetails.paymentId}</span></p> : null}
-                      {orderResult?.subscriptionId ? <p>{selectedProvider === "payu" ? "PayU Subscription ID" : "Razorpay Subscription ID"}: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
+                      {orderResult?.subscriptionId ? <p>Razorpay Subscription ID: <span className="font-mono">{orderResult.subscriptionId}</span></p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="primary" size="sm" type="button" onClick={() => window.location.assign("/organization/plan")}>
@@ -687,11 +641,11 @@ export function RazorpayCheckout({
               type="button"
             >
               {isActive ? <Lock className="size-5" /> : isLoading ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />}
-              {isActive ? "Plan Active" : isLoading ? "Creating Subscription..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Authorize ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via ${selectedProvider === "payu" ? "PayU" : "Razorpay"}`}
+              {isActive ? "Plan Active" : isLoading ? "Creating Subscription..." : paymentState === "waiting_for_webhook" ? "Awaiting Confirmation" : paymentState === "payment_confirmed" ? "Active" : `Authorize ₹${Intl.NumberFormat("en-IN").format(Math.round(price / 100))} via Razorpay`}
             </Button>
 
             <p className="text-center text-[11px] text-muted-foreground">
-              Secured by {selectedProvider === "payu" ? "PayU" : "Razorpay"} · Test mode — no real charges
+              Secured by Razorpay · Test mode — no real charges
             </p>
           </CardContent>
         </Card>

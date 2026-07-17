@@ -16,17 +16,7 @@ type RazorpayCheckoutData = {
   currency: string;
 };
 
-type PayuCheckoutData = {
-  provider: "payu";
-  paymentId: string;
-  orderId: string;
-  checkoutForm: {
-    action: string;
-    fields: Record<string, string>;
-  };
-};
-
-type CheckoutData = RazorpayCheckoutData | PayuCheckoutData;
+type CheckoutData = RazorpayCheckoutData;
 
 type ApiResponse<TData> =
   | { ok: true; data: TData }
@@ -80,19 +70,11 @@ export function PaymentCheckoutButton({
 }: PaymentCheckoutButtonProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "verifying" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
-  const [payuForm, setPayuForm] = useState<{ action: string; fields: Record<string, string> } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    if (payuForm && formRef.current) {
-      formRef.current.submit();
-    }
-  }, [payuForm]);
 
   async function handleCheckout() {
     setStatus("loading");
     setMessage(null);
-    setPayuForm(null);
 
     const orderResponse = await fetch("/api/billing/payments/checkout", {
       method: "POST",
@@ -113,11 +95,6 @@ export function PaymentCheckoutButton({
     }
 
     const data = payload.data;
-
-    if (data.provider === "payu") {
-      setPayuForm(data.checkoutForm);
-      return;
-    }
 
     const scriptReady = await loadRazorpayScript();
     if (!scriptReady || !window.Razorpay) {
@@ -255,13 +232,7 @@ export function PaymentCheckoutButton({
           </p>
         )}
 
-      {payuForm ? (
-        <form ref={formRef} method="POST" action={payuForm.action} className="hidden">
-          {Object.entries(payuForm.fields).map(([key, value]) => (
-            <input key={key} type="hidden" name={key} value={value} />
-          ))}
-        </form>
-      ) : null}
+      <form ref={formRef} method="POST" action="#" className="hidden" />
       </CardContent>
     </Card>
   );

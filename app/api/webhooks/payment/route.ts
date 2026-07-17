@@ -5,11 +5,8 @@ import { getProviderForGym } from "@/features/billing/providers/provider-registr
 import type { IPaymentProvider } from "@/features/billing/providers/provider-types";
 import { handleMemberPaymentCaptured, handleMemberPaymentFailed } from "@/features/billing/services/member-webhook-handler";
 import { finalizeSubscriptionPayment } from "@/features/billing/services/finalize-subscription-payment";
-import { handlePayuOrgSubscriptionWebhookEvent } from "@/features/billing/services/org-subscription-autodebit-service";
 import { getRazorpayProvider } from "@/features/billing/razorpay/razorpay-provider-adapter";
 import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
-import { getPayuProvider } from "@/features/billing/payu/payu-service";
-import { resolvePlatformPayuCredentials } from "@/features/billing/payu/platform-payu-config";
 
 type ProviderEventRow = {
   id?: string;
@@ -23,66 +20,28 @@ export async function handlePaymentWebhook(request: Request): Promise<NextRespon
 
   try {
     const rawBody = await request.text();
-    const url = new URL(request.url);
-
-    const providerFromQuery = url.searchParams.get("provider") || "";
-    const providerHeader = request.headers.get("x-payment-provider") || "";
-
-    const isPayuWebhook = providerFromQuery === "payu" || providerHeader === "payu";
 
     // Detect provider
-    let provider: "razorpay" | "payu";
-    let signature: string;
-    let parsedPayload: Record<string, unknown>;
-    let eventId: string;
-    let eventName: string;
+    const provider = "razorpay" as const;
+    const signature = request.headers.get("x-razorpay-signature") || "";
 
-    if (isPayuWebhook) {
-      provider = "payu";
-      // PayU sends form-encoded POST data
-      const formData: Record<string, string> = {};
-      try {
-        const params = new URLSearchParams(rawBody);
-        for (const [key, value] of params) {
-          formData[key] = value;
-        }
-      } catch {
-        // try JSON
-      }
-
-      try {
-        parsedPayload = Object.keys(formData).length > 0
-          ? formData as unknown as Record<string, unknown>
-          : JSON.parse(rawBody);
-      } catch {
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-
-      signature = (parsedPayload.hash as string) || "";
-      eventId = (parsedPayload.mihpayid as string) || (parsedPayload.txnid as string) || `payu_${Date.now()}`;
-      eventName = (parsedPayload.status as string) === "success" ? "payment.captured" : "payment.failed";
-    } else {
-      provider = "razorpay";
-      signature = request.headers.get("x-razorpay-signature") || "";
-
-      if (!signature) {
-        return NextResponse.json({ error: "Missing webhook signature" }, { status: 400 });
-      }
-
-      try {
-        parsedPayload = JSON.parse(rawBody);
-      } catch {
-        return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
-      }
-
-      const entity = parsedPayload.entity as Record<string, unknown> | undefined;
-      if (!entity) {
-        return NextResponse.json({ error: "Invalid webhook event structure" }, { status: 400 });
-      }
-
-      eventId = (entity.id as string) || "";
-      eventName = (entity.event as string) || "unknown";
+    if (!signature) {
+      return NextResponse.json({ error: "Missing webhook signature" }, { status: 400 });
     }
+
+    try {
+      parsedPayload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    }
+
+    const entity = parsedPayload.entity as Record<string, unknown> | undefined;
+    if (!entity) {
+      return NextResponse.json({ error: "Invalid webhook event structure" }, { status: 400 });
+    }
+
+    const eventId = (entity.id as string) || "";
+    const eventName = (entity.event as string) || "unknown";
 
     if (!eventId) {
       return NextResponse.json({ error: "Missing event ID" }, { status: 400 });
@@ -149,158 +108,122 @@ export async function handlePaymentWebhook(request: Request): Promise<NextRespon
     let processingError: string | null = null;
 
     try {
-      if (provider === "payu") {
-        const payuPayload = parsedPayload as Record<string, string>;
-        const providerPaymentId = payuPayload.mihpayid || payuPayload.payuMoneyId || "";
-        const providerOrderId = payuPayload.txnid || "";
-        const payuStatus = payuPayload.status || "";
-        const notificationType = payuPayload.notificationType || "";
+      const entity = parsedPayload.entity as Record<string, unknown> | undefined;
+      const payloadEntity = entity?.payload as Record<string, unknown> | undefined;
+      const paymentEntity = (payloadEntity?.payment as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+      const orderEntity = (payloadEntity?.order as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+      const razorpayPaymentId = (paymentEntity?.id as string) || "";
+      const razorpayOrderId = (paymentEntity?.order_id as string) || (orderEntity?.id as string) || "";
 
-        if (notificationType.startsWith("SUBSCRIPTION_") || notificationType.startsWith("INVOICE_")) {
-          const webhookResult = await handlePayuOrgSubscriptionWebhookEvent({
-            notificationType,
+      switch (eventName) {
+        case "payment.captured": {
+          if (!razorpayOrderId || !razorpayPaymentId) {
+            processingStatus = "ignored";
+            processingError = "Missing order or payment ID";
+            break;
+          }
+
+          const subscriptionResult = await finalizeSubscriptionPayment({
+            providerOrderId: razorpayOrderId,
+            providerPaymentId: razorpayPaymentId,
+            providerEnvironment: providerResult.provider.getEnvironment(),
             eventId,
-            payload: parsedPayload,
           });
-          if (!webhookResult.handled) {
-            processingStatus = "failed";
-            processingError = webhookResult.error || "PayU subscription webhook handling failed";
-          }
-        } else if (payuStatus === "success" || payuStatus === "completed") {
-          if (!providerOrderId || !providerPaymentId) {
-            processingStatus = "ignored";
-            processingError = "Missing transaction details";
-          } else {
-            const memberResult = await handleMemberPaymentCaptured(providerOrderId, providerPaymentId);
+
+          if (!subscriptionResult.success) {
+            const memberResult = await handleMemberPaymentCaptured(razorpayOrderId, razorpayPaymentId);
             if (!memberResult.handled) {
-              processingError = memberResult.error || "Payment processing failed";
+              processingError = subscriptionResult.error || "Payment finalization failed";
               processingStatus = "failed";
             }
           }
-        } else {
-          const failureReason = payuPayload.error_Message || payuPayload.unmappedstatus || "PayU payment failed";
-          if (providerPaymentId) {
-            await handleMemberPaymentFailed(providerOrderId, providerPaymentId, failureReason);
-          }
+          break;
         }
-      } else {
-        const entity = parsedPayload.entity as Record<string, unknown> | undefined;
-        const payloadEntity = entity?.payload as Record<string, unknown> | undefined;
-        const paymentEntity = (payloadEntity?.payment as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
-        const orderEntity = (payloadEntity?.order as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
-        const razorpayPaymentId = (paymentEntity?.id as string) || "";
-        const razorpayOrderId = (paymentEntity?.order_id as string) || (orderEntity?.id as string) || "";
 
-        switch (eventName) {
-          case "payment.captured": {
-            if (!razorpayOrderId || !razorpayPaymentId) {
-              processingStatus = "ignored";
-              processingError = "Missing order or payment ID";
-              break;
-            }
+        case "payment.failed": {
+          const failureReason = (paymentEntity?.error_description as string) || (paymentEntity?.status as string) || "Unknown";
+          if (razorpayPaymentId) {
+            const { data: pmts } = await adminDb
+              .from("org_subscription_payments")
+              .select("id, invoice_id, organization_id")
+              .or(`provider_payment_id.eq.${razorpayPaymentId},provider_order_id.eq.${razorpayOrderId}`) as never as {
+              data: Array<{ id: string; invoice_id: string | null; organization_id: string | null }> | null;
+              error: unknown;
+            };
 
-            const subscriptionResult = await finalizeSubscriptionPayment({
-              providerOrderId: razorpayOrderId,
-              providerPaymentId: razorpayPaymentId,
-              providerEnvironment: providerResult.provider.getEnvironment(),
-              eventId,
-            });
+            const pmt = (pmts ?? [])[0];
+            if (pmt) {
+              await adminDb.from("org_subscription_payments").update({
+                status: "failed",
+                failure_reason: failureReason,
+              } as never).eq("id", pmt.id);
 
-            if (!subscriptionResult.success) {
-              const memberResult = await handleMemberPaymentCaptured(razorpayOrderId, razorpayPaymentId);
-              if (!memberResult.handled) {
-                processingError = subscriptionResult.error || "Payment finalization failed";
-                processingStatus = "failed";
+              if (pmt.invoice_id) {
+                await adminDb.from("org_subscription_invoices").update({
+                  status: "draft",
+                } as never).eq("id", pmt.invoice_id);
               }
+
+              await adminDb.from("subscription_events").insert({
+                organization_id: pmt.organization_id || null,
+                event_type: "payment_failed",
+                new_state: { razorpayPaymentId, razorpayOrderId, reason: failureReason },
+                metadata: { source: "webhook" },
+                reason: `Webhook: payment failed - ${failureReason}`,
+                created_at: new Date().toISOString(),
+              } as never);
+            } else {
+              await handleMemberPaymentFailed(razorpayOrderId, razorpayPaymentId, failureReason);
             }
-            break;
           }
+          break;
+        }
 
-          case "payment.failed": {
-            const failureReason = (paymentEntity?.error_description as string) || (paymentEntity?.status as string) || "Unknown";
-            if (razorpayPaymentId) {
-              const { data: pmts } = await adminDb
-                .from("org_subscription_payments")
-                .select("id, invoice_id, organization_id")
-                .or(`provider_payment_id.eq.${razorpayPaymentId},provider_order_id.eq.${razorpayOrderId}`) as never as {
-                data: Array<{ id: string; invoice_id: string | null; organization_id: string | null }> | null;
-                error: unknown;
-              };
+        case "subscription.charged": {
+          const subEntity = (payloadEntity?.subscription as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+          const razorpaySubscriptionId = (subEntity?.id as string) || "";
+          const subPaymentId = (paymentEntity?.id as string) || "";
 
-              const pmt = (pmts ?? [])[0];
-              if (pmt) {
-                await adminDb.from("org_subscription_payments").update({
-                  status: "failed",
-                  failure_reason: failureReason,
-                } as never).eq("id", pmt.id);
-
-                if (pmt.invoice_id) {
-                  await adminDb.from("org_subscription_invoices").update({
-                    status: "draft",
-                  } as never).eq("id", pmt.invoice_id);
-                }
-
-                await adminDb.from("subscription_events").insert({
-                  organization_id: pmt.organization_id || null,
-                  event_type: "payment_failed",
-                  new_state: { razorpayPaymentId, razorpayOrderId, reason: failureReason },
-                  metadata: { source: "webhook" },
-                  reason: `Webhook: payment failed - ${failureReason}`,
-                  created_at: new Date().toISOString(),
-                } as never);
-              } else {
-                await handleMemberPaymentFailed(razorpayOrderId, razorpayPaymentId, failureReason);
-              }
-            }
-            break;
-          }
-
-          case "subscription.charged": {
-            const subEntity = (payloadEntity?.subscription as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
-            const razorpaySubscriptionId = (subEntity?.id as string) || "";
-            const subPaymentId = (paymentEntity?.id as string) || "";
-
-            if (!razorpaySubscriptionId || !subPaymentId || !razorpayOrderId) {
-              processingStatus = "ignored";
-              processingError = "Missing subscription/payment/order ID";
-              break;
-            }
-
-            const { handleSubscriptionCharged } = await import("@/features/billing/services/member-webhook-handler");
-            const subResult = await handleSubscriptionCharged(razorpaySubscriptionId, subPaymentId, razorpayOrderId);
-            if (!subResult.handled) {
-              processingStatus = "failed";
-              processingError = subResult.error || "Subscription charge processing failed";
-            }
-            break;
-          }
-
-          case "subscription.charged.failed": {
-            const failedSubEntity = (payloadEntity?.subscription as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
-            const failedSubId = (failedSubEntity?.id as string) || "";
-            const failureDesc = (payloadEntity?.error as Record<string, unknown> | undefined)?.description as string || "Subscription charge failed";
-
-            if (!failedSubId) {
-              processingStatus = "ignored";
-              processingError = "Missing subscription ID";
-              break;
-            }
-
-            const { handleSubscriptionChargeFailed } = await import("@/features/billing/services/member-webhook-handler");
-            await handleSubscriptionChargeFailed(failedSubId, failureDesc);
-            break;
-          }
-
-          case "order.paid": {
+          if (!razorpaySubscriptionId || !subPaymentId || !razorpayOrderId) {
             processingStatus = "ignored";
-            processingError = "Order paid but awaiting payment.captured";
+            processingError = "Missing subscription/payment/order ID";
             break;
           }
 
-          default: {
+          const { handleSubscriptionCharged } = await import("@/features/billing/services/member-webhook-handler");
+          const subResult = await handleSubscriptionCharged(razorpaySubscriptionId, subPaymentId, razorpayOrderId);
+          if (!subResult.handled) {
+            processingStatus = "failed";
+            processingError = subResult.error || "Subscription charge processing failed";
+          }
+          break;
+        }
+
+        case "subscription.charged.failed": {
+          const failedSubEntity = (payloadEntity?.subscription as Record<string, unknown> | undefined)?.entity as Record<string, unknown> | undefined;
+          const failedSubId = (failedSubEntity?.id as string) || "";
+          const failureDesc = (payloadEntity?.error as Record<string, unknown> | undefined)?.description as string || "Subscription charge failed";
+
+          if (!failedSubId) {
             processingStatus = "ignored";
+            processingError = "Missing subscription ID";
             break;
           }
+
+          const { handleSubscriptionChargeFailed } = await import("@/features/billing/services/member-webhook-handler");
+          await handleSubscriptionChargeFailed(failedSubId, failureDesc);
+          break;
+        }
+
+        case "order.paid": {
+          processingStatus = "ignored";
+          processingError = "Order paid but awaiting payment.captured";
+          break;
+        }
+
+        default: {
+          processingStatus = "ignored";
+          break;
         }
       }
     } catch (err) {
@@ -349,7 +272,7 @@ type WebhookProviderResult =
 
 async function resolveWebhookProvider(input: {
   adminDb: ReturnType<typeof getSupabaseAdminClient>;
-  provider: "razorpay" | "payu";
+  provider: "razorpay";
   eventName: string;
   parsedPayload: Record<string, unknown>;
 }): Promise<WebhookProviderResult> {
@@ -394,24 +317,6 @@ async function resolveWebhookProvider(input: {
         provider: getRazorpayProvider(platformCredentials?.config, platformCredentials?.isTestMode ?? false),
         gymId: null,
       };
-    }
-
-    if (provider === "payu") {
-      const platformCredentials = await resolvePlatformPayuCredentials();
-      if (platformCredentials) {
-        return {
-          ok: true,
-          provider: getPayuProvider(
-            {
-              merchant_key: platformCredentials.merchantKey,
-              merchant_salt: platformCredentials.merchantSalt,
-              auth_header: platformCredentials.authHeader,
-            },
-            platformCredentials.isTestMode,
-          ),
-          gymId: null,
-        };
-      }
     }
 
     return { ok: false, message: "Unable to resolve the gym for this payment webhook." };

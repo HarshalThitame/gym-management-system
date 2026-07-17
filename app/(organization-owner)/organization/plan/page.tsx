@@ -35,7 +35,7 @@ async function PlanContent() {
   ]);
   const platformProvidersResult = await listPlatformProviders();
   const subscriptionProviders = platformProvidersResult.ok
-    ? platformProvidersResult.providers.filter((provider) => provider.isActive && (provider.provider === "razorpay" || provider.provider === "payu"))
+    ? platformProvidersResult.providers.filter((provider) => provider.isActive && provider.provider === "razorpay")
     : [];
 
   // Get org name, billing email, invoices, subscription events

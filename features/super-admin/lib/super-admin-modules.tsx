@@ -98,7 +98,7 @@ export const superAdminModules = [
     description: "Configure the platform payment provider used for organization plan billing. Member membership billing remains organization-scoped and separate.",
     icon: <Shield className="size-5" />,
     iconKey: "shield",
-    responsibilities: ["Set the org-plan billing gateway", "Configure live and test Razorpay credentials", "Optionally store PayU credentials for future platform billing", "Keep platform billing separate from gym/member gateway settings"],
+    responsibilities: ["Set the org-plan billing gateway", "Configure live and test Razorpay credentials", "Keep platform billing separate from gym/member gateway settings"],
     safeguards: ["Only Super Admin can access platform gateway settings", "Member billing settings are not modified here", "Configuration changes are audited"]
   },
   {

@@ -108,7 +108,7 @@ const FEATURE_FIELD_MAP: Record<string, string> = {
   member_progress_tracking: "memberProgressTracking",
   payment_failure_handling: "paymentFailureHandling",
   partial_payment_dues: "partialPaymentDues",
-  razorpay_payu_integration: "razorpayPayuIntegration",
+  razorpay_integration: "razorpayIntegration",
   class_attendance_tracking: "classAttendanceTracking",
   payroll_export: "payrollExport",
   role_based_permissions: "roleBasedPermissions",

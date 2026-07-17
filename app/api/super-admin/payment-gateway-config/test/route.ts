@@ -8,7 +8,7 @@ import { getRazorpayConfig, maskRazorpayKey } from "@/features/billing/razorpay/
 import { normalizeRazorpayProviderConfig } from "@/features/billing/razorpay/razorpay-provider-config";
 import { preflightRazorpayCredentials } from "@/features/billing/razorpay/razorpay-service";
 
-const ALLOWED_PROVIDERS: PaymentProviderName[] = ["razorpay", "payu"];
+const ALLOWED_PROVIDERS: PaymentProviderName[] = ["razorpay"];
 
 type TestResult = {
   ok: boolean;
@@ -27,16 +27,6 @@ function getMissingRazorpayFields(config: Record<string, string>): string[] {
   if (!hasAny(["keyId", "key_id", "public_key_id", "publicKeyId"])) missing.push("key_id");
   if (!hasAny(["keySecret", "key_secret", "secret", "secret_key"])) missing.push("key_secret");
   if (!hasAny(["webhookSecret", "webhook_secret"])) missing.push("webhook_secret");
-
-  return missing;
-}
-
-function getMissingPayuFields(config: Record<string, string>): string[] {
-  const missing: string[] = [];
-
-  if (!(typeof config.merchant_key === "string" && config.merchant_key.trim().length > 0)) missing.push("merchant_key");
-  if (!(typeof config.merchant_salt === "string" && config.merchant_salt.trim().length > 0)) missing.push("merchant_salt");
-  if (!(typeof config.auth_header === "string" && config.auth_header.trim().length > 0)) missing.push("auth_header");
 
   return missing;
 }
@@ -158,44 +148,15 @@ export async function POST(request: Request) {
     return NextResponse.json(response, { status: health.configured ? 200 : 422 });
   }
 
-  const platformResult = await getPlatformProviderConfig("payu");
-  if (!platformResult.ok || !platformResult.config.isActive) {
-    const response: TestResult = {
+  return NextResponse.json(
+    {
       ok: false,
       provider,
       runtimeSource: "not configured",
-      message: "PayU platform configuration is not active yet.",
+      message: "Only Razorpay is supported for platform payment gateway testing.",
       health: null,
-      missingFields: ["merchant_key", "merchant_salt", "auth_header"],
-    };
-    return NextResponse.json(response, { status: 422 });
-  }
-
-  const missingFields = getMissingPayuFields(platformResult.config.config);
-  const health: PaymentProviderHealth = {
-    configured: missingFields.length === 0,
-    environment: platformResult.config.testMode ? "test" : "live",
-    hasKeyId: !missingFields.includes("merchant_key"),
-    hasKeySecret: !missingFields.includes("merchant_salt"),
-    hasWebhookSecret: !missingFields.includes("auth_header"),
-  };
-
-  const response: TestResult = {
-    ok: health.configured,
-    provider,
-    runtimeSource: "platform table",
-    message: health.configured
-      ? `PayU configuration is complete in ${health.environment} mode.`
-      : `PayU configuration is incomplete: ${missingFields.join(", ")}.`,
-    health,
-    missingFields,
-  };
-
-  billingLogger.info("payment-gateway-test", "Platform PayU test completed", {
-    actorId: auth.context.userId,
-    configured: health.configured,
-    environment: health.environment,
-  });
-
-  return NextResponse.json(response, { status: health.configured ? 200 : 422 });
+      missingFields: [],
+    } satisfies TestResult,
+    { status: 400 },
+  );
 }

@@ -81,7 +81,7 @@ export function ProviderConfigForm({
       }
 
       setSaved(true);
-      showToast(successLabel ?? `${provider === "razorpay" ? "Razorpay" : "PayU"} configuration saved`, "success");
+      showToast(successLabel ?? "Razorpay configuration saved", "success");
       router.refresh();
       setTimeout(() => setSaved(false), 2000);
     } catch {

@@ -83,7 +83,7 @@ const adminPortalGates = [
   defineGate({ href: "/admin/payment-failures", label: "Payment Failures", icon: portalIcon("alert-triangle"), iconKey: "alert-triangle", featureKey: "payment_failure_handling", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/payment-tracking", label: "Payment Tracking", icon: portalIcon("bar-chart"), iconKey: "bar-chart", featureKey: "payment_tracking", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/auto-billing", label: "Auto-Billing", icon: portalIcon("refresh-ccw"), iconKey: "refresh-ccw", featureKey: "auto_billing", visibilityMode: "hidden_if_locked", match: "exact" }),
-  defineGate({ href: "/admin/payment-providers", label: "Payment Gateways", icon: portalIcon("shield"), iconKey: "shield", featureKey: "razorpay_payu_integration", visibilityMode: "hidden_if_locked", match: "exact" }),
+  defineGate({ href: "/admin/payment-providers", label: "Payment Gateways", icon: portalIcon("shield"), iconKey: "shield", featureKey: "razorpay_integration", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/corporate-accounts", label: "Corporate", icon: portalIcon("briefcase"), iconKey: "briefcase", featureKey: "corporate_bulk_memberships", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/partial-payments", label: "Partial Payments", icon: portalIcon("clock"), iconKey: "clock", featureKey: "partial_payment_dues", visibilityMode: "hidden_if_locked", match: "exact" }),
   defineGate({ href: "/admin/revenue-split", label: "Revenue Split", icon: portalIcon("trending-up"), iconKey: "trending-up", featureKey: "branch_revenue_split", visibilityMode: "hidden_if_locked", match: "exact" }),

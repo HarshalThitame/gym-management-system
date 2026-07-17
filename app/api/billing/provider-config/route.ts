@@ -6,7 +6,7 @@ import { clearProviderCache } from "@/features/billing/providers/provider-regist
 import { billingLogger } from "@/features/billing/lib/logger";
 import type { PaymentProviderName } from "@/features/billing/providers/provider-types";
 
-const ALLOWED_PROVIDERS: PaymentProviderName[] = ["razorpay", "payu"];
+const ALLOWED_PROVIDERS: PaymentProviderName[] = ["razorpay"];
 
 export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();

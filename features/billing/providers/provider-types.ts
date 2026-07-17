@@ -1,6 +1,6 @@
 export type ProviderEnvironment = "test" | "live";
 
-export type PaymentProviderName = "razorpay" | "payu";
+export type PaymentProviderName = "razorpay";
 
 export type CreateOrderInput = {
   amountInRupees: number;

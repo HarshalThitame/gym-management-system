@@ -2,7 +2,6 @@ import "server-only";
 
 import type { IPaymentProvider, PaymentProviderName } from "./provider-types";
 import { getRazorpayProvider } from "@/features/billing/razorpay/razorpay-provider-adapter";
-import { getPayuProvider } from "@/features/billing/payu/payu-service";
 import { hasRazorpayProviderCredentials } from "@/features/billing/razorpay/razorpay-provider-config";
 import { getGymProviderConfig } from "./provider-config-service";
 
@@ -44,9 +43,6 @@ export async function getProviderForGym(gymId: string, providerName?: PaymentPro
         return { ok: false, message: `Razorpay configuration for gym ${gymId || "unknown"} is incomplete.` };
       }
       provider = getRazorpayProvider(config, testMode);
-      break;
-    case "payu":
-      provider = getPayuProvider(config, testMode);
       break;
     default:
       return { ok: false, message: `Unsupported provider: ${resolvedName}` };

@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import crypto from "node:crypto";
 import { CreateRazorpayOrderSchema } from "@/features/billing/schemas/payment";
 import { createPaymentOrder } from "@/features/billing/services/provider-payment-service";
 import { requireApiAuth } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getPayuApiBaseUrl, getPayuConfig } from "@/features/billing/payu/payu-config";
 
 export async function POST(request: Request) {
   const auth = await requireApiAuth({ unauthenticatedMessage: "Sign in before creating a payment order." });
@@ -26,61 +24,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: { code: result.code, message: result.message } }, { status: result.status });
   }
 
-  const { provider, keyId, paymentId, orderId, amount, currency } = result.data;
-  const requestOrigin = new URL(request.url).origin;
-
-  if (provider === "payu") {
-    try {
-      const config = getPayuConfig();
-      const baseUrl = getPayuApiBaseUrl(config.environment);
-
-      const amountInRupees = (amount / 100).toFixed(2);
-      const productinfo = "Membership payment";
-      const firstname = body?.payerName || "Member";
-      const email = body?.payerEmail || "member@example.com";
-      const phone = body?.payerPhone || "9999999999";
-
-      const hashString = `${config.merchantKey}|${orderId}|${amountInRupees}|${productinfo}|${firstname}|${email}|||||||||||${config.merchantSalt}`;
-      const hash = crypto.createHash("sha512").update(hashString).digest("hex");
-
-      return NextResponse.json({
-        ok: true,
-        data: {
-          provider: "payu" as const,
-          paymentId,
-          orderId,
-          checkoutForm: {
-            action: `${baseUrl}/_payment`,
-            fields: {
-              key: config.merchantKey,
-              txnid: orderId,
-              amount: amountInRupees,
-              productinfo,
-              firstname,
-              email,
-              phone,
-              surl: `${requestOrigin}/member/payments?payment_success=1`,
-              furl: `${requestOrigin}/member/payments?payment_success=1`,
-              hash,
-              service_provider: "payu_paisa",
-            },
-          },
-        },
-      });
-    } catch {
-      return NextResponse.json({ ok: false, error: { code: "PAYU_CONFIG_ERROR", message: "PayU configuration error." } }, { status: 500 });
-    }
-  }
-
   return NextResponse.json({
     ok: true,
-    data: {
-      provider: "razorpay" as const,
-      keyId,
-      paymentId,
-      orderId,
-      amount,
-      currency,
-    },
+    data: result.data,
   });
 }

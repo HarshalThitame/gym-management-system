@@ -138,7 +138,7 @@ export const FEATURE_KEYS = [
   "corporate_bulk_memberships",
   "payment_failure_handling",
   "partial_payment_dues",
-  "razorpay_payu_integration",
+  "razorpay_integration",
   "multi_gstin_support",
   "branch_revenue_split",
   // communication

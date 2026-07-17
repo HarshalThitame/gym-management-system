@@ -4,7 +4,7 @@ import { billingLogger } from "@/features/billing/lib/logger";
 import type { PaymentProviderName } from "@/features/billing/providers/provider-types";
 import { getPlatformDefaultProvider, listPlatformProviders, upsertPlatformProviderConfig } from "@/features/billing/services/platform-provider-config-service";
 
-const ALLOWED_PROVIDERS: PaymentProviderName[] = ["razorpay", "payu"];
+const ALLOWED_PROVIDERS: PaymentProviderName[] = ["razorpay"];
 
 export async function GET() {
   const auth = await requireApiRole(["super_admin"], { skipSubscriptionCheck: true });

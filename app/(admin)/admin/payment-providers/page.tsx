@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Activity, CreditCard, RefreshCw, Settings, Shield, Sparkles } from "lucide-react";
+import { Activity, CreditCard, RefreshCw, Settings, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { requireGymAdminScope } from "@/features/admin/lib/access";
@@ -10,7 +10,7 @@ import { listGymProviders } from "@/features/billing/providers/provider-config-s
 
 export const metadata: Metadata = createMetadata({
   title: "Payment Gateway Configuration",
-  description: "Configure Razorpay and PayU payment gateways for your gym.",
+  description: "Configure the Razorpay payment gateway for your gym.",
   path: "/admin/payment-providers",
 });
 
@@ -21,7 +21,7 @@ export default async function AdminPaymentProvidersPage() {
 
   await requireOrganizationFeatureAccess({
     organizationId,
-    featureKey: "razorpay_payu_integration",
+    featureKey: "razorpay_integration",
     actionName: "admin.payment-providers.read",
   });
 
@@ -29,7 +29,6 @@ export default async function AdminPaymentProvidersPage() {
   const existingProviders = result.ok ? result.providers : [];
 
   const razorpayConfig = existingProviders.find((p) => p.provider === "razorpay");
-  const payuConfig = existingProviders.find((p) => p.provider === "payu");
   const activeProviders = existingProviders.filter((p) => p.isActive);
   const defaultProvider = existingProviders.find((p) => p.isDefault)?.provider ?? "none";
   const liveProviders = existingProviders.filter((p) => !p.testMode).length;
@@ -110,7 +109,7 @@ export default async function AdminPaymentProvidersPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-1">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -141,37 +140,6 @@ export default async function AdminPaymentProvidersPage() {
             />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-amber-100">
-                <Shield className="size-5 text-amber-700" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black">PayU</h3>
-                <p className="text-sm text-muted-foreground">
-                  {payuConfig?.isActive ? "Active" : "Not configured"}
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ProviderConfigForm
-              provider="payu"
-              initialConfig={payuConfig?.config ?? {}}
-              isActive={payuConfig?.isActive ?? false}
-              isDefault={payuConfig?.isDefault ?? false}
-              priority={payuConfig?.priority ?? 2}
-              testMode={payuConfig?.testMode ?? true}
-              configFields={[
-                { key: "merchant_key", label: "Merchant Key", type: "text", required: true, placeholder: "Enter PayU merchant key" },
-                { key: "merchant_salt", label: "Merchant Salt", type: "password", required: true, placeholder: "Enter PayU merchant salt" },
-                { key: "auth_header", label: "Auth Header (optional)", type: "password", required: false, placeholder: "Base64(key:salt) if different" },
-              ]}
-            />
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -185,12 +153,8 @@ export default async function AdminPaymentProvidersPage() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            <strong>Razorpay</strong> supports orders, payment links, refunds, webhooks, reconciliation, subscriptions, and saved cards. 
+            <strong>Razorpay</strong> supports orders, payment links, refunds, webhooks, reconciliation, subscriptions, and saved cards.
             It is the primary recommended gateway for auto-billing and payment links.
-          </p>
-          <p>
-            <strong>PayU</strong> supports orders, refunds, and webhooks. PayU does not support server-generated payment links 
-            (use Razorpay for that). PayU is a good secondary gateway for regional customers.
           </p>
           <p>
             <strong>Default provider</strong> is used for checkout flows. Set the provider with <em>priority=0</em> and 

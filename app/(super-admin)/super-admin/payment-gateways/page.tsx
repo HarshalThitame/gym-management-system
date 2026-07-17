@@ -27,7 +27,6 @@ export default async function SuperAdminPaymentGatewaysPage() {
   const result = await listPlatformProviders();
   const providers = result.ok ? result.providers : [];
   const razorpayConfig = providers.find((p) => p.provider === "razorpay");
-  const payuConfig = providers.find((p) => p.provider === "payu");
   const activeProviders = providers.filter((p) => p.isActive);
   const defaultProvider = providers.find((p) => p.isDefault)?.provider ?? "none";
   const liveProviders = providers.filter((p) => !p.testMode).length;
@@ -265,7 +264,7 @@ export default async function SuperAdminPaymentGatewaysPage() {
         defaultReceipt={`org-standard-${new Date().toISOString().slice(0, 10)}`}
       />
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-1">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -299,44 +298,6 @@ export default async function SuperAdminPaymentGatewaysPage() {
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-amber-100">
-                <Shield className="size-5 text-amber-700" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black">PayU</h3>
-                <p className="text-sm text-muted-foreground">{payuConfig?.isActive ? "Configured" : "Optional"}</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ProviderConfigForm
-              provider="payu"
-              initialConfig={payuConfig?.config ?? {}}
-              isActive={payuConfig?.isActive ?? false}
-              isDefault={payuConfig?.isDefault ?? false}
-              priority={payuConfig?.priority ?? 1}
-              testMode={payuConfig?.testMode ?? true}
-              saveEndpoint="/api/super-admin/payment-gateway-config"
-              successLabel="Platform PayU configuration saved"
-              configFields={[
-                { key: "merchant_key", label: "Merchant Key", type: "text", required: true, placeholder: "Enter PayU merchant key" },
-                { key: "merchant_salt", label: "Merchant Salt", type: "password", required: true, placeholder: "Enter PayU merchant salt" },
-                { key: "auth_header", label: "Auth Header (optional)", type: "password", required: false, placeholder: "Base64(key:salt) if different" },
-              ]}
-            />
-            <div className="mt-5">
-              <PaymentGatewayTestButton
-                provider="payu"
-                label="Validate config"
-                helperText="Checks whether the saved platform PayU credentials are complete. PayU is not yet used by the org-plan runtime."
-              />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -351,9 +312,6 @@ export default async function SuperAdminPaymentGatewaysPage() {
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
             <strong>Razorpay</strong> is the live provider used by the org-plan checkout flow, subscription provisioning, and payment retries.
-          </p>
-          <p>
-            <strong>PayU</strong> can be stored here for future platform-billing expansion, but it does not power organization-plan checkout yet.
           </p>
           <p>
             <strong>Member memberships</strong> continue to use gym-scoped gateway settings under the admin payment-providers screen.

@@ -78,7 +78,7 @@ export interface OrgFeatureFlags {
   corporateBulkMemberships: boolean;
   paymentFailureHandling: boolean;
   partialPaymentDues: boolean;
-  razorpayPayuIntegration: boolean;
+  razorpayIntegration: boolean;
   multiGstinSupport: boolean;
   branchRevenueSplit: boolean;
 

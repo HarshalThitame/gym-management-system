@@ -65,7 +65,7 @@ const FEATURE_IMPLEMENTATION_MAP: Record<string, FeatureImplInfo> = {
   corporate_bulk_memberships:      { hasSidebar: true,  sidebarModule: "corporate-accounts", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   payment_failure_handling:        { hasSidebar: true,  sidebarModule: "payment-failures", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   partial_payment_dues:            { hasSidebar: true,  sidebarModule: "partial-payments", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
-  razorpay_payu_integration:       { hasSidebar: true,  sidebarModule: "payment-providers", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
+  razorpay_integration:            { hasSidebar: true,  sidebarModule: "payment-providers", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   multi_gstin_support:             { hasSidebar: true,  sidebarModule: "tax-settings", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
   branch_revenue_split:            { hasSidebar: true,  sidebarModule: "revenue-split", hasRoute: true,  hasActions: true,  hasUI: true,  status: "FULLY_IMPLEMENTED", gapSeverity: "N/A" },
 
@@ -209,7 +209,7 @@ function findCategoryForFeature(featureCode: string): string {
     corporate_bulk_memberships: "Billing & Payments",
     payment_failure_handling: "Billing & Payments",
     partial_payment_dues: "Billing & Payments",
-    razorpay_payu_integration: "Billing & Payments",
+    razorpay_integration: "Billing & Payments",
     multi_gstin_support: "Billing & Payments",
     branch_revenue_split: "Billing & Payments",
     // communication
