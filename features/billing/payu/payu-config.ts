@@ -29,8 +29,8 @@ export function getPayuConfig(overrides?: Partial<PayuConfig>): PayuConfig {
 
 export function getPayuApiBaseUrl(environment: PayuEnvironment): string {
   return environment === "test"
-    ? "https://test.payumoney.com"
-    : "https://www.payumoney.com";
+    ? "https://test.payu.in"
+    : "https://secure.payu.in";
 }
 
 export function getPayuEnvironment(): PayuEnvironment {
