@@ -10,37 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
-import { acknowledgeRazorpayCheckoutResultAction } from "@/features/billing/services/payment-acknowledgement";
 import { toggleAutoRenewAction, cancelSubscriptionAction, reactivateSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
-import { RazorpayCheckout } from "@/features/organization-owner/components/razorpay-checkout";
-import { OrderSummaryDialog } from "@/features/organization-owner/components/order-summary-dialog";
-import { PaymentSuccessDialog } from "@/features/organization-owner/components/payment-success-dialog";
+import { OrganizationPlanOneTimeCheckout } from "@/features/organization-owner/components/organization-plan-one-time-checkout";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import type { PackageWithMeta, SubscriptionWithPackage, UsageHistoryPoint, OrgUsageData } from "@/features/organization-owner/actions/plan-data-actions";
 import { FeatureCard, FeatureCategorySection, LimitBar } from "@/components/ui/feature-card";
 import { FEATURE_CATEGORIES } from "@/features/subscription/feature-definitions";
 import { cn } from "@/lib/utils";
-import type { PaymentProviderName } from "@/features/billing/providers/provider-types";
-
-type CheckoutDataSuccess = {
-  success: true;
-  razorpayKeyId: string;
-  razorpaySubscriptionId: string;
-  razorpayCustomerId: string;
-  amountPaise: number;
-  subtotalPaise: number;
-  taxPaise: number;
-  currency: string;
-  subscriptionId: string;
-  packageDisplayName: string;
-  organizationDisplayName: string;
-  billingCycle: string;
-  isTestMode: boolean;
-  environmentLabel: string;
-};
 
 type EnterprisePlanManagementProps = {
-  organizationId: string;
   planContext: OrgPlanContext;
   allPackages: PackageWithMeta[];
   currentSubscription: SubscriptionWithPackage | null;
@@ -50,7 +28,6 @@ type EnterprisePlanManagementProps = {
   customerEmail?: string;
   invoices?: any[];
   payments?: any[];
-  subscriptionProviders?: Array<{ provider: PaymentProviderName }>;
 };
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -65,7 +42,7 @@ const CATEGORY_ICONS: Record<string, any> = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function EnterprisePlanManagement({ organizationId, planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], payments = [], subscriptionProviders = [] }: EnterprisePlanManagementProps) {
+export function EnterprisePlanManagement({ planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], payments = [] }: EnterprisePlanManagementProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "pay" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
@@ -85,31 +62,6 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
       showToast(reactivateState.message ?? "Subscription reactivated.", "success");
     }
   }, [reactivateState.status, reactivateState.message]);
-
-  const [payDialogState, setPayDialogState] = useState<{
-    showOrderSummary: boolean;
-    showSuccess: boolean;
-    checkoutData: CheckoutDataSuccess | null;
-    successDetails: {
-      paymentId: string;
-      subscriptionId: string;
-      amountPaise: number;
-      currency: string;
-      packageName: string;
-      billingCycle: string;
-      timestamp: string;
-      isTestMode: boolean;
-    } | null;
-    processingOrder: boolean;
-    processingPayment: boolean;
-  }>({
-    showOrderSummary: false,
-    showSuccess: false,
-    checkoutData: null,
-    successDetails: null,
-    processingOrder: false,
-    processingPayment: false,
-  });
 
   const isActive = planContext.status === "active";
   const isTrialing = planContext.isTrialing;
@@ -142,82 +94,10 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
 
   const isYearly = billingCycle === "yearly";
 
-  const handlePaymentSuccessClose = useCallback(() => {
-    window.location.reload();
-  }, []);
-
   const handleComparePlanPay = useCallback((targetPackageId: string) => {
     setPendingCheckoutPackageId(targetPackageId);
     setActiveTab("pay");
   }, []);
-
-  const handleProceedToPayFromSummary = useCallback(() => {
-    const Razorpay = (window as any).Razorpay;
-    if (!Razorpay) {
-      showToast("Razorpay is not loaded. Please refresh.", "error");
-      return;
-    }
-    const data = payDialogState.checkoutData;
-    if (!data) return;
-
-    setPayDialogState((prev) => ({ ...prev, processingPayment: true }));
-
-    const serverBillingCycle = isYearly ? "annual" : "monthly";
-    const options = {
-      key: data.razorpayKeyId,
-      amount: data.amountPaise,
-      currency: data.currency,
-      subscription_id: data.razorpaySubscriptionId,
-      name: organizationName || "Gym Management",
-      description: `${data.packageDisplayName} — ${serverBillingCycle === "annual" ? "Annual auto-debit" : "Monthly auto-debit"}`,
-      prefill: { name: organizationName, email: customerEmail },
-      theme: { color: "#6366f1" },
-      modal: {
-        ondismiss: () => {
-          setPayDialogState((prev) => ({ ...prev, processingPayment: false }));
-          showToast("Payment cancelled.", "info");
-        },
-        confirm_close: true,
-      },
-      handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
-        const ackResult = await acknowledgeRazorpayCheckoutResultAction({
-          razorpay_subscription_id: response.razorpay_subscription_id,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_signature: response.razorpay_signature,
-        });
-        if (ackResult.success) {
-          const newDetails = {
-            paymentId: response.razorpay_payment_id,
-            subscriptionId: ackResult.subscriptionId ?? response.razorpay_subscription_id,
-            amountPaise: data.amountPaise,
-            currency: data.currency,
-            packageName: data.packageDisplayName,
-            billingCycle: serverBillingCycle,
-            timestamp: new Date().toISOString(),
-            isTestMode: data.isTestMode,
-          };
-          setPayDialogState({
-            showOrderSummary: false,
-            showSuccess: true,
-            checkoutData: null,
-            successDetails: newDetails,
-            processingOrder: false,
-            processingPayment: false,
-          });
-        } else {
-          showToast(ackResult.error || "Payment verification failed.", "error");
-          setPayDialogState((prev) => ({ ...prev, processingPayment: false }));
-        }
-      },
-    };
-    try {
-      const rzp = new Razorpay(options);
-      rzp.open();
-    } catch {
-      showToast("Failed to open Razorpay checkout.", "error");
-      setPayDialogState((prev) => ({ ...prev, processingPayment: false }));
-    }
-  }, [customerEmail, isYearly, organizationName, payDialogState.checkoutData]);
 
   const handleToggleAutoRenew = useCallback(() => {
     if (!canManageSubscription || hasPendingCancel || autoRenew === null) return;
@@ -557,19 +437,14 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
       {/* ═══ TAB: PAY ═══ */}
       {activeTab === "pay" && (
         <div className="space-y-6">
-          <RazorpayCheckout
-            organizationId={organizationId}
+          <OrganizationPlanOneTimeCheckout
             organizationName={organizationName}
             customerEmail={customerEmail}
-            availableProviders={subscriptionProviders.map((provider) => provider.provider)}
             allPackages={allPackages}
-            currentPackageId={currentPkg?.id ?? null}
-            currentSubscriptionId={currentSubscription?.id ?? null}
             currentSubscriptionStatus={currentSubscription?.status ?? null}
-            currentSubscriptionExpiresAt={currentSubscription?.expires_at ?? null}
-            currentPackageName={currentPkg?.name ?? null}
             initialSelectedPackageId={pendingCheckoutPackageId ?? undefined}
             initialBillingCycle={billingCycle === "yearly" ? "annual" : "monthly"}
+            customerContact={customerEmail}
           />
         </div>
       )}
@@ -891,18 +766,6 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
         </div>
       )}
 
-      <OrderSummaryDialog
-        open={payDialogState.showOrderSummary}
-        onClose={() => setPayDialogState((prev) => ({ ...prev, showOrderSummary: false }))}
-        checkoutData={payDialogState.checkoutData as CheckoutDataSuccess}
-        onProceedToPay={handleProceedToPayFromSummary}
-        processing={payDialogState.processingPayment}
-      />
-      <PaymentSuccessDialog
-        open={payDialogState.showSuccess}
-        details={payDialogState.successDetails}
-        onClose={handlePaymentSuccessClose}
-      />
     </div>
   );
 }
