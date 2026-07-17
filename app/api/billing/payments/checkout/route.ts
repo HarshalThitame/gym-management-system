@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { CreateRazorpayOrderSchema } from "@/features/billing/schemas/payment";
 import { createPaymentOrder } from "@/features/billing/services/provider-payment-service";
-import { getApiTenantOrganizationId, requireApiAuth } from "@/lib/auth/api-guards";
+import { requireApiAuth } from "@/lib/auth/api-guards";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getPayuConfig, getPayuApiBaseUrl } from "@/features/billing/payu/payu-config";
+import { getPayuConfig } from "@/features/billing/payu/payu-config";
 
 export async function POST(request: Request) {
   const auth = await requireApiAuth({ unauthenticatedMessage: "Sign in before creating a payment order." });
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   if (provider === "payu") {
     try {
       const config = getPayuConfig();
-      const baseUrl = getPayuApiBaseUrl(config.environment);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
       const amountInRupees = (amount / 100).toFixed(2);
       const productinfo = "Membership payment";
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
           paymentId,
           orderId,
           checkoutForm: {
-            action: `${baseUrl}/_payment`,
+            action: `${appUrl}/api/billing/payu/relay`,
             fields: {
               key: config.merchantKey,
               txnid: orderId,

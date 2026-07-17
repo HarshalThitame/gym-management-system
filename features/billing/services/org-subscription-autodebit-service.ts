@@ -16,7 +16,6 @@ import {
   verifyRazorpaySubscriptionSignature,
 } from "@/features/billing/razorpay/razorpay-service";
 import { resolvePlatformPayuCredentials } from "@/features/billing/payu/platform-payu-config";
-import { getPayuApiBaseUrl } from "@/features/billing/payu/payu-config";
 import { getPlatformDefaultProvider } from "@/features/billing/services/platform-provider-config-service";
 import { recordSubscriptionEvent } from "@/features/super-admin/services/subscription-events-service";
 import { syncSubscriptionArtifactsForOrganization } from "@/features/super-admin/services/subscription-entitlement-sync";
@@ -304,9 +303,9 @@ async function createPayuOrgSubscriptionCheckout(input: {
     udf5: input.currentSubscription?.id ?? "",
     siDetails,
   });
-  const baseUrl = getPayuApiBaseUrl(platformCredentials.environment);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const callbackUrl = `${appUrl}/api/billing/payu/org-plan/return`;
+  const relayUrl = `${appUrl}/api/billing/payu/relay`;
 
   const pendingUpsert = {
     organization_id: input.organization.id,
@@ -365,7 +364,7 @@ async function createPayuOrgSubscriptionCheckout(input: {
     success: true,
     provider: "payu",
     payuCheckoutForm: {
-      action: `${baseUrl}/_payment`,
+      action: relayUrl,
       fields: {
         key: platformCredentials.merchantKey,
         txnid,
