@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
@@ -275,6 +276,8 @@ async function createPayuOrgSubscriptionCheckout(input: {
     return { success: false, error: "PayU is not configured for platform billing." };
   }
 
+  const requestHeaders = await headers();
+  const requestOrigin = getRequestOrigin(requestHeaders);
   const txnid = `ORG-PAYU-${input.organization.id}-${input.pkg.id}-${Date.now()}-${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 6)}`;
   const now = new Date();
   const periodDays = getDaysForBillingPeriod(input.billingCycle);
@@ -303,9 +306,8 @@ async function createPayuOrgSubscriptionCheckout(input: {
     udf5: input.currentSubscription?.id ?? "",
     siDetails,
   });
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const callbackUrl = `${appUrl}/api/billing/payu/org-plan/return`;
-  const relayUrl = `${appUrl}/api/billing/payu/relay`;
+  const callbackUrl = `${requestOrigin}/api/billing/payu/org-plan/return`;
+  const relayUrl = "/api/billing/payu/relay";
 
   const pendingUpsert = {
     organization_id: input.organization.id,
@@ -397,6 +399,15 @@ async function createPayuOrgSubscriptionCheckout(input: {
     isTestMode: platformCredentials.isTestMode,
     environmentLabel: platformCredentials.environment === "test" ? "Test Mode" : "Live Mode",
   };
+}
+
+function getRequestOrigin(requestHeaders: Headers) {
+  const proto = requestHeaders.get("x-forwarded-proto") || "https";
+  const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host");
+  if (host) {
+    return `${proto}://${host}`;
+  }
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }
 
 async function resolveOrgContact(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, organization: OrgRow) {

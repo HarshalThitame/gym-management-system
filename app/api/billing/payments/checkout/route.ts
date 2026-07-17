@@ -27,11 +27,11 @@ export async function POST(request: Request) {
   }
 
   const { provider, keyId, paymentId, orderId, amount, currency } = result.data;
+  const requestOrigin = new URL(request.url).origin;
 
   if (provider === "payu") {
     try {
       const config = getPayuConfig();
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
       const amountInRupees = (amount / 100).toFixed(2);
       const productinfo = "Membership payment";
@@ -42,8 +42,6 @@ export async function POST(request: Request) {
       const hashString = `${config.merchantKey}|${orderId}|${amountInRupees}|${productinfo}|${firstname}|${email}|||||||||||${config.merchantSalt}`;
       const hash = crypto.createHash("sha512").update(hashString).digest("hex");
 
-      const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/member/payments?payment_success=1`;
-
       return NextResponse.json({
         ok: true,
         data: {
@@ -51,7 +49,7 @@ export async function POST(request: Request) {
           paymentId,
           orderId,
           checkoutForm: {
-            action: `${appUrl}/api/billing/payu/relay`,
+            action: "/api/billing/payu/relay",
             fields: {
               key: config.merchantKey,
               txnid: orderId,
@@ -60,8 +58,8 @@ export async function POST(request: Request) {
               firstname,
               email,
               phone,
-              surl: callbackUrl,
-              furl: callbackUrl,
+              surl: `${requestOrigin}/member/payments?payment_success=1`,
+              furl: `${requestOrigin}/member/payments?payment_success=1`,
               hash,
               service_provider: "payu_paisa",
             },
