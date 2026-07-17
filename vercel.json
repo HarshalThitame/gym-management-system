@@ -31,7 +31,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.razorpay.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://*.razorpay.com https://api.resend.com; frame-src https://*.razorpay.com; worker-src 'self' blob:; upgrade-insecure-requests; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.razorpay.com; style-src 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'"
+          "value": "default-src 'self'; base-uri 'self'; form-action 'self' https://test.payumoney.com https://www.payumoney.com; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.razorpay.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ws: wss: https://*.supabase.co wss://*.supabase.co https://*.razorpay.com https://api.resend.com; frame-src https://*.razorpay.com; worker-src 'self' blob:; upgrade-insecure-requests; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.razorpay.com; style-src 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'"
         }
       ]
     }

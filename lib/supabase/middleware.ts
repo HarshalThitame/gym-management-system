@@ -313,7 +313,7 @@ function baseContentSecurityPolicy(upgradeInsecureRequests: boolean) {
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",
-    "form-action 'self'",
+    "form-action 'self' https://test.payumoney.com https://www.payumoney.com",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co",
