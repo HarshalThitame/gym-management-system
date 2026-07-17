@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { initialAuthActionState } from "@/features/auth/actions/action-state";
+import { acknowledgeRazorpayCheckoutResultAction } from "@/features/billing/actions/razorpay-actions";
 import { toggleAutoRenewAction, cancelSubscriptionAction, reactivateSubscriptionAction } from "@/features/organization-owner/actions/plan-actions";
 import { RazorpayCheckout } from "@/features/organization-owner/components/razorpay-checkout";
 import { OrderSummaryDialog } from "@/features/organization-owner/components/order-summary-dialog";
@@ -149,6 +150,74 @@ export function EnterprisePlanManagement({ organizationId, planContext, allPacka
     setPendingCheckoutPackageId(targetPackageId);
     setActiveTab("pay");
   }, []);
+
+  const handleProceedToPayFromSummary = useCallback(() => {
+    const Razorpay = (window as any).Razorpay;
+    if (!Razorpay) {
+      showToast("Razorpay is not loaded. Please refresh.", "error");
+      return;
+    }
+    const data = payDialogState.checkoutData;
+    if (!data) return;
+
+    setPayDialogState((prev) => ({ ...prev, processingPayment: true }));
+
+    const serverBillingCycle = isYearly ? "annual" : "monthly";
+    const options = {
+      key: data.razorpayKeyId,
+      amount: data.amountPaise,
+      currency: data.currency,
+      subscription_id: data.razorpaySubscriptionId,
+      name: organizationName || "Gym Management",
+      description: `${data.packageDisplayName} — ${serverBillingCycle === "annual" ? "Annual auto-debit" : "Monthly auto-debit"}`,
+      prefill: { name: organizationName, email: customerEmail },
+      theme: { color: "#6366f1" },
+      modal: {
+        ondismiss: () => {
+          setPayDialogState((prev) => ({ ...prev, processingPayment: false }));
+          showToast("Payment cancelled.", "info");
+        },
+        confirm_close: true,
+      },
+      handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
+        const ackResult = await acknowledgeRazorpayCheckoutResultAction({
+          razorpay_subscription_id: response.razorpay_subscription_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature: response.razorpay_signature,
+        });
+        if (ackResult.success) {
+          const newDetails = {
+            paymentId: response.razorpay_payment_id,
+            subscriptionId: ackResult.subscriptionId ?? response.razorpay_subscription_id,
+            amountPaise: data.amountPaise,
+            currency: data.currency,
+            packageName: data.packageDisplayName,
+            billingCycle: serverBillingCycle,
+            timestamp: new Date().toISOString(),
+            isTestMode: data.isTestMode,
+          };
+          setPayDialogState({
+            showOrderSummary: false,
+            showSuccess: true,
+            checkoutData: null,
+            successDetails: newDetails,
+            processingOrder: false,
+            processingPayment: false,
+          });
+        } else {
+          showToast(ackResult.error || "Payment verification failed.", "error");
+          setPayDialogState((prev) => ({ ...prev, processingPayment: false }));
+        }
+      },
+    };
+    try {
+      const rzp = new Razorpay(options);
+      rzp.open();
+    } catch {
+      showToast("Failed to open Razorpay checkout.", "error");
+      setPayDialogState((prev) => ({ ...prev, processingPayment: false }));
+    }
+  }, [customerEmail, isYearly, organizationName, payDialogState.checkoutData]);
 
   const handleToggleAutoRenew = useCallback(() => {
     if (!canManageSubscription || hasPendingCancel || autoRenew === null) return;
