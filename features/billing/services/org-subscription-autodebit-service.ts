@@ -307,7 +307,7 @@ async function createPayuOrgSubscriptionCheckout(input: {
     siDetails,
   });
   const callbackUrl = `${requestOrigin}/api/billing/payu/org-plan/return`;
-  const relayUrl = "/api/billing/payu/relay";
+  const checkoutUrl = `${getPayuApiBaseUrl(platformCredentials.environment)}/_payment`;
 
   const pendingUpsert = {
     organization_id: input.organization.id,
@@ -366,7 +366,7 @@ async function createPayuOrgSubscriptionCheckout(input: {
     success: true,
     provider: "payu",
     payuCheckoutForm: {
-      action: relayUrl,
+      action: checkoutUrl,
       fields: {
         key: platformCredentials.merchantKey,
         txnid,

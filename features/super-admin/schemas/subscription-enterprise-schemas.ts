@@ -2,14 +2,18 @@ import { z } from "zod";
 
 export const upgradePlanSchema = z.object({
   subscriptionId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   newPackageId: z.string().uuid(),
   reason: z.string().trim().max(500).optional(),
+  stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
 });
 
 export const downgradePlanSchema = z.object({
   subscriptionId: z.string().uuid(),
+  organizationId: z.string().uuid(),
   newPackageId: z.string().uuid(),
   reason: z.string().trim().max(500).optional(),
+  stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
 });
 
 export const cancelSubscriptionSchema = z.object({
@@ -26,6 +30,13 @@ export const cancelSubscriptionSchema = z.object({
 });
 
 export const reactivateSubscriptionSchema = z.object({
+  subscriptionId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export const renewSubscriptionSchema = z.object({
   subscriptionId: z.string().uuid(),
   organizationId: z.string().uuid(),
   stepUpEmail: z.string().trim().email("Enter your Super Admin email for step-up confirmation."),
@@ -91,6 +102,7 @@ export type UpgradePlanInput = z.infer<typeof upgradePlanSchema>;
 export type DowngradePlanInput = z.infer<typeof downgradePlanSchema>;
 export type CancelSubscriptionInput = z.infer<typeof cancelSubscriptionSchema>;
 export type ReactivateSubscriptionInput = z.infer<typeof reactivateSubscriptionSchema>;
+export type RenewSubscriptionInput = z.infer<typeof renewSubscriptionSchema>;
 export type ExtendTrialInput = z.infer<typeof extendTrialSchema>;
 export type ConvertTrialInput = z.infer<typeof convertTrialSchema>;
 export type AssignAddonInput = z.infer<typeof assignAddonSchema>;

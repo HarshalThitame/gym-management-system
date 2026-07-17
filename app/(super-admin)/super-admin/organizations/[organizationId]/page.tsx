@@ -134,7 +134,7 @@ export default async function SuperAdminOrganizationDetailPage({ params, searchP
       {activeTab === "users" ? <UsersTab data={data} /> : null}
       {activeTab === "usage" ? <OrgUsageTab record={data.record} usageSnapshots={data.usageSnapshots} /> : null}
       {activeTab === "gyms" ? <GymsTab data={data} /> : null}
-      {activeTab === "billing" ? <OrgBillingTab data={data} /> : null}
+      {activeTab === "billing" ? <OrgBillingTab criticalSuperAdminEmail={criticalSuperAdminEmail} data={data} /> : null}
       {activeTab === "audit" ? <AuditTab data={data} /> : null}
       {activeTab === "security" ? <SecurityTab data={data} /> : null}
       {activeTab === "domains" ? <DomainsTab data={data} /> : null}
@@ -733,20 +733,6 @@ function emptyBusinessProfile() {
 
 function stringValue(value: Json | undefined) {
   return typeof value === "string" ? value : "";
-}
-
-function limitLabel(value: number | null) {
-  if (value === null) {
-    return "Not configured";
-  }
-  return value === -1 ? "Unlimited" : formatCompactNumber(value);
-}
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return "No date";
-  }
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value));
 }
 
 function formatDateTime(value: string) {

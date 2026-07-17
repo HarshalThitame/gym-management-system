@@ -76,6 +76,15 @@ export type OrganizationSubscriptionDetails = {
   startedAt: string | null;
   expiresAt: string | null;
   trialEndsAt: string | null;
+  billingPeriod: string | null;
+  billingEngine: string | null;
+  providerSubscriptionId: string | null;
+  latestInvoiceId: string | null;
+  latestPaymentId: string | null;
+  nextBillingDate: string | null;
+  dunningAttempts: number | null;
+  dunningStatus: string | null;
+  dunningNextRetry: string | null;
   maxMembers: number | null;
   maxBranches: number | null;
   enabledFeatures: number;
@@ -231,6 +240,10 @@ export type OrganizationDetailData = {
   approvalRequests: OrganizationApprovalRequest[];
   auditTimeline: OrganizationAuditTimelineItem[];
   recentPayments: PaymentRow[];
+  paymentAttempts: Database["public"]["Tables"]["payment_attempts"]["Row"][];
+  subscriptionInvoices: Database["public"]["Tables"]["org_subscription_invoices"]["Row"][];
+  subscriptionPayments: Database["public"]["Tables"]["org_subscription_payments"]["Row"][];
+  billingGatewayHealth: OrganizationBillingGatewayHealth;
   usageSnapshots: UsageSnapshotRow[];
   gymAdminMap: Record<string, { assigned: boolean; adminName: string | null; adminStatus: string | null }>;
   auditFilters: OrganizationDetailAuditFilters;
@@ -250,6 +263,24 @@ type PaymentRow = Pick<Database["public"]["Tables"]["payments"]["Row"], "id" | "
 type AuditLogRow = Pick<Database["public"]["Tables"]["audit_logs"]["Row"], "id" | "actor_id" | "action" | "entity_type" | "entity_id" | "metadata" | "ip_address" | "user_agent" | "created_at">;
 type BranchUserRow = Database["public"]["Tables"]["branch_users"]["Row"];
 type SecurityEventRow = Database["public"]["Tables"]["security_events"]["Row"];
+export type OrganizationBillingGatewayHealth = {
+  provider: string | null;
+  providerEnvironment: string | null;
+  status: "healthy" | "watch" | "risk" | "unknown";
+  source: "live_org_data" | "unknown";
+  lastEventAt: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  failedEvents7d: number;
+  webhookBacklog: number;
+  retryBacklog: number;
+  latestFailureMessage: string | null;
+  retryLimit: number;
+  retryCooldownMinutes: number;
+  retryReadyAt: string | null;
+  retryCooldownRemainingMinutes: number | null;
+  retryBlocked: boolean;
+};
 
 type SupabaseQueryError = {
   message: string;
@@ -330,7 +361,7 @@ const defaultFilters: OrganizationManagementFilters = {
   pageSize: 12
 };
 
-const ORGANIZATION_SUBSCRIPTION_SELECT = "id, organization_id, package_id, status, started_at, expires_at, trial_ends_at";
+const ORGANIZATION_SUBSCRIPTION_SELECT = "id, organization_id, package_id, status, started_at, expires_at, trial_ends_at, billing_period, billing_engine, provider_subscription_id, latest_invoice_id, latest_payment_id, next_billing_date, dunning_attempts, dunning_status, dunning_next_retry";
 
 const defaultApprovalInboxFilters: OrganizationApprovalInboxFilters = {
   query: "",
@@ -522,6 +553,74 @@ export async function getOrganizationDetailData(
     .order("snapshot_date", { ascending: false })
     .limit(12);
 
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [subscriptionInvoicesResult, subscriptionPaymentsResult, paymentProviderEventsResult] = await Promise.all([
+    supabase
+      .from("org_subscription_invoices")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    supabase
+      .from("org_subscription_payments")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    supabase
+      .from("payment_provider_events")
+      .select("id, event_id, event_type, status, error_message, processed_at, created_at, provider, provider_environment, invoice_id, subscription_id")
+      .eq("organization_id", organizationId)
+      .gte("created_at", sevenDaysAgo)
+      .order("created_at", { ascending: false })
+      .limit(24)
+  ]);
+  const { data: paymentAttempts, error: paymentAttemptsError } = await supabase
+    .from("payment_attempts")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  for (const result of [subscriptionInvoicesResult, subscriptionPaymentsResult]) {
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+  }
+
+  if (paymentAttemptsError) {
+    throw new Error(paymentAttemptsError.message);
+  }
+  if (paymentProviderEventsResult.error) {
+    throw new Error(paymentProviderEventsResult.error.message);
+  }
+
+  const paymentProviderEvents = paymentProviderEventsResult.data ?? [];
+  const latestProviderEvent = paymentProviderEvents[0] ?? null;
+  const failedProviderEvents = paymentProviderEvents.filter((event) => event.status === "failed");
+  const successfulProviderEvents = paymentProviderEvents.filter((event) => event.status === "processed" || event.status === "success");
+  const latestSuccessfulProviderEvent = successfulProviderEvents[0] ?? null;
+  const latestFailedProviderEvent = failedProviderEvents[0] ?? null;
+  const retryBacklog = (paymentAttempts ?? []).filter((attempt) => attempt.status === "failed" || attempt.status === "retrying" || attempt.status === "processing" || attempt.status === "created").length;
+  const subscriptionPayments = subscriptionPaymentsResult.data ?? [];
+  const webhookBacklog = subscriptionPayments.filter((payment) => payment.status === "awaiting_webhook" || payment.status === "processing").length;
+  const latestFailureMessage = latestFailedProviderEvent?.error_message ?? (paymentAttempts ?? []).find((attempt) => attempt.status === "failed")?.error_description ?? subscriptionPayments.find((payment) => payment.status === "failed")?.failure_reason ?? null;
+  const retryLimit = 3;
+  const retryCooldownMinutes = 15;
+  const retryCooldownRemainingMinutes = latestProviderEvent?.created_at
+    ? Math.max(0, Math.ceil((new Date(latestProviderEvent.created_at).getTime() + retryCooldownMinutes * 60 * 1000 - Date.now()) / (60 * 1000)))
+    : null;
+  const retryReadyAt = latestProviderEvent?.created_at
+    ? new Date(new Date(latestProviderEvent.created_at).getTime() + retryCooldownMinutes * 60 * 1000).toISOString()
+    : null;
+  const retryBlocked = retryBacklog >= retryLimit || Boolean(retryCooldownRemainingMinutes && retryCooldownRemainingMinutes > 0);
+  const gatewayStatus: OrganizationBillingGatewayHealth["status"] =
+    failedProviderEvents.length > 0 || retryBlocked
+      ? "watch"
+      : latestProviderEvent
+        ? "healthy"
+        : "unknown";
+
   return {
     record,
     packages,
@@ -534,6 +633,27 @@ export async function getOrganizationDetailData(
     approvalRequests: record.approvalRequests,
     auditTimeline: record.auditTimeline,
     recentPayments,
+    paymentAttempts: paymentAttempts ?? [],
+    subscriptionInvoices: subscriptionInvoicesResult.data ?? [],
+    subscriptionPayments,
+    billingGatewayHealth: {
+      provider: latestProviderEvent?.provider ?? latestSuccessfulProviderEvent?.provider ?? latestFailedProviderEvent?.provider ?? null,
+      providerEnvironment: latestProviderEvent?.provider_environment ?? latestSuccessfulProviderEvent?.provider_environment ?? latestFailedProviderEvent?.provider_environment ?? null,
+      status: gatewayStatus,
+      source: "live_org_data",
+      lastEventAt: latestProviderEvent?.created_at ?? null,
+      lastSuccessAt: latestSuccessfulProviderEvent?.created_at ?? null,
+      lastFailureAt: latestFailedProviderEvent?.created_at ?? null,
+      failedEvents7d: failedProviderEvents.length,
+      webhookBacklog,
+      retryBacklog,
+      latestFailureMessage,
+      retryLimit,
+      retryCooldownMinutes,
+      retryReadyAt,
+      retryCooldownRemainingMinutes,
+      retryBlocked,
+    },
     usageSnapshots: usageSnapshotsData ?? [],
     gymAdminMap: Object.fromEntries(gymAdminMap),
     auditFilters: filters,
@@ -1451,6 +1571,15 @@ function toSubscriptionDetails(subscription: OrganizationSubscriptionSummaryRow 
     startedAt: normalized?.startedAt ?? null,
     expiresAt: normalized?.expiresAt ?? null,
     trialEndsAt: normalized?.trialEndsAt ?? null,
+    billingPeriod: (subscription as { billing_period?: string | null } | null)?.billing_period ?? null,
+    billingEngine: (subscription as { billing_engine?: string | null } | null)?.billing_engine ?? null,
+    providerSubscriptionId: (subscription as { provider_subscription_id?: string | null } | null)?.provider_subscription_id ?? null,
+    latestInvoiceId: (subscription as { latest_invoice_id?: string | null } | null)?.latest_invoice_id ?? null,
+    latestPaymentId: (subscription as { latest_payment_id?: string | null } | null)?.latest_payment_id ?? null,
+    nextBillingDate: (subscription as { next_billing_date?: string | null } | null)?.next_billing_date ?? null,
+    dunningAttempts: (subscription as { dunning_attempts?: number | null } | null)?.dunning_attempts ?? null,
+    dunningStatus: (subscription as { dunning_status?: string | null } | null)?.dunning_status ?? null,
+    dunningNextRetry: (subscription as { dunning_next_retry?: string | null } | null)?.dunning_next_retry ?? null,
     maxMembers: packageRow?.max_members ?? null,
     maxBranches: packageRow?.max_branches ?? null,
     enabledFeatures: packageRow ? [
