@@ -75,7 +75,7 @@ export type OrgUsageData = {
 };
 
 export async function getActivePackagesAction(): Promise<PackageWithMeta[]> {
-  const ctx = await requireOrganizationOwner("/organization/plan");
+  await requireOrganizationOwner("/organization/plan");
   const supabase = await createSupabaseServerClient();
 
   // Get packages with their features and limits
@@ -157,6 +157,7 @@ export async function getOrgSubscriptionAction(): Promise<SubscriptionWithPackag
     .from("organization_subscriptions")
     .select("*, package:packages(*)")
     .eq("organization_id", ctx.organizationId)
+    .in("status", ["active", "trial"])
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle()

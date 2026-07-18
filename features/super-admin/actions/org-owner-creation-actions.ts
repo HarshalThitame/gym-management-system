@@ -94,17 +94,6 @@ export async function createOrgOwnerAction(_previousState: AuthActionState, form
     return fieldError("orgSlug", "An organization with this slug already exists.");
   }
 
-  const { data: pkg, error: pkgError } = await supabase
-    .from("packages")
-    .select("id, name")
-    .eq("slug", parsed.data.packageTier)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (pkgError || !pkg) {
-    return { status: "error", message: `Package tier "${parsed.data.packageTier}" not found.` };
-  }
-
   const adminClient = supabase as AuthAdminClient;
   const authResult = await adminClient.auth.admin.createUser({
     email: parsed.data.email.toLowerCase().trim(),
@@ -152,7 +141,7 @@ export async function createOrgOwnerAction(_previousState: AuthActionState, form
     owner_user_id: authUserId,
     created_by: context.userId,
     status: "active",
-    organization_type: parsed.data.packageTier,
+    organization_type: "single_gym",
     billing_email: parsed.data.email.toLowerCase().trim(),
     settings: {
       timezone: parsed.data.timezone ?? "Asia/Kolkata",
@@ -201,40 +190,6 @@ export async function createOrgOwnerAction(_previousState: AuthActionState, form
     entityType: "user_role",
     entityId: authUserId,
     metadata: { role: "org_owner", organizationId: org.id }
-  });
-
-  const trialEndsAt = parsed.data.trialDays > 0
-    ? new Date(Date.now() + parsed.data.trialDays * 24 * 60 * 60 * 1000).toISOString()
-    : null;
-
-  const { error: subError } = await supabase.from("organization_subscriptions").insert({
-    organization_id: org.id,
-    package_id: pkg.id,
-    status: parsed.data.trialDays > 0 ? "trialing" : "active",
-    started_at: new Date().toISOString(),
-    trial_ends_at: trialEndsAt,
-    billing_period: parsed.data.billingPeriod,
-    assigned_by: context.userId,
-    auto_renew: true
-  });
-
-  if (subError) {
-    console.error("[org-owner-creation] Subscription creation failed.", subError.message);
-  }
-
-  await writeAuditLog({
-    actorId: context.userId,
-    action: "org_owner.subscription_created",
-    entityType: "organization_subscription",
-    entityId: org.id,
-    metadata: {
-      packageTier: parsed.data.packageTier,
-      packageId: pkg.id,
-      trialDays: parsed.data.trialDays,
-      billingPeriod: parsed.data.billingPeriod,
-      trialEndsAt,
-      reason: parsed.data.reason || null
-    }
   });
 
   revalidateOrgOwnerPaths();
