@@ -5,8 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireOrganizationOwner } from "@/features/organization-owner/lib/access";
 import { calculateTax } from "@/features/billing/services/tax-service";
-import { getRazorpayEnvironment } from "@/features/billing/razorpay/razorpay-config";
-import { resolvePlatformRazorpayCredentials } from "@/features/billing/razorpay/platform-razorpay-config";
+import { resolveStandardCheckoutCredentials } from "@/features/billing/razorpay/standard-checkout-env";
 import {
   createRazorpayOrder,
   fetchRazorpayPayment,
@@ -190,6 +189,17 @@ function buildInvoiceNumber(prefix: string): string {
 
 function buildPaymentNumber(prefix: string): string {
   return `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+}
+
+function loadOrgPlanRazorpayCredentials():
+  | { ok: true; credentials: ReturnType<typeof resolveStandardCheckoutCredentials> }
+  | { ok: false; error: string } {
+  try {
+    return { ok: true, credentials: resolveStandardCheckoutCredentials() };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Razorpay credentials are not configured.";
+    return { ok: false, error: message };
+  }
 }
 
 function buildOrgPlanOneTimeInvoiceIdempotencyKey(
@@ -589,8 +599,17 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
 
   const totalAmountPaise = subtotalPaise + taxPaise;
   const contact = await getContactDetails(supabase, organization);
-  const platformCredentials = await resolvePlatformRazorpayCredentials();
-  const providerEnvironment = platformCredentials?.environment ?? getRazorpayEnvironment();
+  const razorpayCredentials = loadOrgPlanRazorpayCredentials();
+  if (!razorpayCredentials.ok) {
+    billingLogger.error("org-plan-one-time", "Razorpay credentials unavailable", {
+      organizationId: organization.id,
+      packageId: pkg.id,
+      billingCycle: input.billingCycle,
+      error: razorpayCredentials.error,
+    });
+    return { success: false, error: razorpayCredentials.error };
+  }
+  const providerEnvironment = razorpayCredentials.credentials.environment;
 
   const existingDraft = await loadOrgPlanOneTimeCheckoutDraft(admin, organization.id);
   if (existingDraft) {
@@ -609,7 +628,7 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
       return {
         success: true,
         provider: "razorpay",
-        razorpayKeyId: getRazorpayKeyId(platformCredentials),
+        razorpayKeyId: getRazorpayKeyId(razorpayCredentials.credentials),
         razorpayOrderId: existingDraft.orderId,
         amountPaise: existingDraft.amountPaise,
         subtotalPaise: existingDraft.invoice.subtotal_amount,
@@ -635,17 +654,15 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
     }
   }
 
-  if (platformCredentials) {
-    const authCheck = await preflightRazorpayCredentials(platformCredentials);
-    if (!authCheck.ok) {
-      billingLogger.error("org-plan-one-time", "Razorpay auth preflight failed", {
-        organizationId: organization.id,
-        packageId: pkg.id,
-        billingCycle: input.billingCycle,
-        error: authCheck.message,
-      });
-      return { success: false, error: authCheck.message };
-    }
+  const authCheck = await preflightRazorpayCredentials(razorpayCredentials.credentials);
+  if (!authCheck.ok) {
+    billingLogger.error("org-plan-one-time", "Razorpay auth preflight failed", {
+      organizationId: organization.id,
+      packageId: pkg.id,
+      billingCycle: input.billingCycle,
+      error: authCheck.message,
+    });
+    return { success: false, error: authCheck.message };
   }
 
   const orderResult = await createRazorpayOrder({
@@ -663,7 +680,7 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
       customer_name: contact.name,
       customer_email: contact.email,
     },
-  }, platformCredentials);
+  }, razorpayCredentials.credentials);
 
   if (!orderResult.ok) {
     billingLogger.error("org-plan-one-time", "Razorpay order creation failed", {
@@ -833,7 +850,7 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
   return {
     success: true,
     provider: "razorpay",
-    razorpayKeyId: getRazorpayKeyId(platformCredentials),
+    razorpayKeyId: getRazorpayKeyId(razorpayCredentials.credentials),
     razorpayOrderId: orderId,
     amountPaise: totalAmountPaise,
     subtotalPaise,
@@ -928,12 +945,15 @@ export async function finalizeOrgPlanOneTimePaymentAction(input: OrgPlanOneTimeF
     return { success: false, error: "Database connection failed." };
   }
 
-  const platformCredentials = await resolvePlatformRazorpayCredentials();
+  const razorpayCredentials = loadOrgPlanRazorpayCredentials();
+  if (!razorpayCredentials.ok) {
+    return { success: false, error: razorpayCredentials.error };
+  }
   const isValid = verifyRazorpayPaymentSignature({
     razorpayOrderId: input.razorpayOrderId,
     razorpayPaymentId: input.razorpayPaymentId,
     razorpaySignature: input.razorpaySignature,
-    credentials: platformCredentials,
+    credentials: razorpayCredentials.credentials,
   });
 
   if (!isValid) {
@@ -976,7 +996,7 @@ export async function finalizeOrgPlanOneTimePaymentAction(input: OrgPlanOneTimeF
     return { success: false, error: "This payment was cancelled explicitly." };
   }
 
-  const razorpayPayment = await fetchRazorpayPayment(input.razorpayPaymentId, platformCredentials);
+  const razorpayPayment = await fetchRazorpayPayment(input.razorpayPaymentId, razorpayCredentials.credentials);
   if (!razorpayPayment.ok) {
     return { success: false, error: razorpayPayment.message };
   }
@@ -1020,7 +1040,7 @@ export async function finalizeOrgPlanOneTimePaymentAction(input: OrgPlanOneTimeF
     next_billing_date: endAt.toISOString(),
     auto_renew: false,
     provider: "razorpay",
-    provider_environment: platformCredentials?.environment ?? getRazorpayEnvironment(),
+    provider_environment: razorpayCredentials.credentials.environment,
     provider_subscription_id: null,
     provider_plan_id: null,
     provider_customer_id: null,
@@ -1050,7 +1070,7 @@ export async function finalizeOrgPlanOneTimePaymentAction(input: OrgPlanOneTimeF
     },
     metadata: {
       source: "checkout_callback",
-      providerEnvironment: platformCredentials?.environment ?? getRazorpayEnvironment(),
+      providerEnvironment: razorpayCredentials.credentials.environment,
     },
     reason: `Razorpay one-time plan payment captured for ${packageDetails?.name ?? "plan"}.`,
     created_at: now.toISOString(),
