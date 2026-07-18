@@ -543,7 +543,7 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
   const upsertPayload = {
     organization_id: organization.id,
     package_id: pkg.id,
-    status: "pending",
+    status: "pending_activation",
     billing_engine: "subscription",
     billing_period: billingCycle,
     started_at: new Date().toISOString(),
@@ -585,7 +585,7 @@ export async function createOrgAutoDebitCheckoutAction(input: OrgAutoDebitChecko
       providerCustomerId,
       amount: totalAmountPaise,
       billingCycle,
-      status: "pending",
+      status: "pending_activation",
     },
     metadata: {
       source: "org_autodebit",

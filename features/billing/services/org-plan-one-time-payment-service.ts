@@ -328,7 +328,7 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
       .insert({
         organization_id: organization.id,
         package_id: pkg.id,
-        status: "pending",
+        status: "pending_activation",
         billing_period: input.billingCycle,
         billing_engine: "invoice",
         started_at: startAt.toISOString(),
