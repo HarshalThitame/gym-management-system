@@ -894,7 +894,6 @@ export async function handleOrgSubscriptionChargedEvent(input: {
       subtotal_amount: expectedAmount,
       discount_amount: 0,
       tax_amount: 0,
-      total_amount: expectedAmount,
       amount_paid: expectedAmount,
       billing_period_start: now.toISOString().slice(0, 10),
       billing_period_end: periodEnd.toISOString().slice(0, 10),

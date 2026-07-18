@@ -231,7 +231,6 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
           subtotal_amount: price,
           discount_amount: 0,
           tax_amount: 0,
-          total_amount: price,
           billing_period_start: periodStart.toISOString().slice(0, 10),
           billing_period_end: periodEnd.toISOString().slice(0, 10),
           billing_cycle: billingPeriod,

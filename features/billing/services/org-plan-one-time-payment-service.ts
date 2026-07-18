@@ -375,7 +375,6 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
       subtotal_amount: subtotalPaise,
       discount_amount: 0,
       tax_amount: taxPaise,
-      total_amount: totalAmountPaise,
       amount_paid: 0,
       billing_period_start: startAt.toISOString().slice(0, 10),
       billing_period_end: endAt.toISOString().slice(0, 10),
