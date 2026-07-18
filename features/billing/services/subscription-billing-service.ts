@@ -185,42 +185,16 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
 
       const daysUntilNextBilling = BILLING_PERIOD_MAP[billingPeriod] ?? 30;
 
-      // Idempotency — skip if invoice already exists for this sub + billing period window
-      const idempotencyKey = `renew_${sub.organization_id}_${sub.package_id}_${billingPeriod}_${now.toISOString().slice(0, 10)}`;
-      const { data: existingInvoices } = await db
-        .from("org_subscription_invoices")
-        .select("id, status, razorpay_order_id")
-        .eq("organization_id", sub.organization_id as string)
-        .eq("idempotency_key", idempotencyKey)
-        .limit(1) as unknown as { data: Array<Record<string, unknown>> | null; error: { message: string } | null };
-
-      if (existingInvoices && existingInvoices.length > 0) {
-        const existingInvoice = existingInvoices[0] as Record<string, unknown>;
-        const existingOrderId = existingInvoice.razorpay_order_id as string | null;
-        // If the existing invoice has no Razorpay order, it's a stuck draft
-        // from a previous failed run (order creation failed after invoice was
-        // created). Clean it up so the next attempt can create a fresh one.
-        if (!existingOrderId) {
-          await (supabase as any)
-            .from("org_subscription_invoices")
-            .delete()
-            .eq("id", existingInvoice.id as string);
-          result.errors.push(`Cleaned up stuck invoice ${existingInvoice.id} for sub ${sub.id} — retrying.`);
-        } else {
-          result.errors.push(`Duplicate invoice blocked for sub ${sub.id}: invoice ${existingInvoice.id} already exists with key ${idempotencyKey}`);
-          continue;
-        }
-      }
-
-      const invoiceNumber = `SUB-INV-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`;
       const periodStart = new Date(now);
       const periodEnd = new Date(now);
       periodEnd.setDate(periodEnd.getDate() + daysUntilNextBilling);
       const defaultPaymentMethodId = defaultPaymentMethodByOrg.get(sub.organization_id as string) ?? null;
 
+      const invoiceNumber = `SUB-INV-${now.getFullYear()}-${String(sub.id).slice(0, 8).toUpperCase()}-${billingPeriod.toUpperCase()}-${periodStart.toISOString().slice(0, 10).replaceAll("-", "")}`;
+      const invoiceIdempotencyKey = `renew_${sub.organization_id}_${sub.package_id}_${billingPeriod}_${periodStart.toISOString().slice(0, 10)}_${periodEnd.toISOString().slice(0, 10)}`;
       const { data: invoice, error: invoiceError } = await (supabase as any)
         .from("org_subscription_invoices")
-        .insert({
+        .upsert({
           organization_id: sub.organization_id,
           subscription_id: sub.id,
           package_id: sub.package_id,
@@ -236,13 +210,17 @@ export async function runSubscriptionBilling(): Promise<BillingResult> {
           billing_cycle: billingPeriod,
           issued_at: now.toISOString(),
           due_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          idempotency_key: idempotencyKey,
-        })
+          idempotency_key: invoiceIdempotencyKey,
+        }, { onConflict: "idempotency_key" })
         .select("*")
         .single();
 
       if (invoiceError || !invoice) {
         result.errors.push(`Failed to create invoice for sub ${sub.id}: ${invoiceError?.message ?? "unknown error"}`);
+        continue;
+      }
+      if ((invoice as Record<string, unknown>).razorpay_order_id) {
+        result.errors.push(`Duplicate invoice reused for sub ${sub.id}: invoice ${(invoice as Record<string, unknown>).id as string} already exists with key ${invoiceIdempotencyKey}`);
         continue;
       }
       result.invoiceGenerated++;

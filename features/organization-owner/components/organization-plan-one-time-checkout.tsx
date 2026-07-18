@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { showToast, ToastContainer } from "@/components/ui/toast";
 import { useRazorpayScript } from "@/features/billing/razorpay/use-razorpay-script";
 import {
+  cancelOrgPlanOneTimeCheckoutIntentAction,
   createOrgPlanOneTimeCheckoutIntentAction,
   finalizeOrgPlanOneTimePaymentIntentAction,
+  type OrgPlanOneTimeCheckoutState,
 } from "@/features/organization-owner/actions/plan-one-time-actions";
 import { formatCurrency } from "@/features/billing/lib/money";
 
@@ -32,6 +35,7 @@ type OrganizationPlanOneTimeCheckoutProps = {
   currentSubscriptionStatus?: string | null;
   initialSelectedPackageId?: string | null;
   initialBillingCycle?: "monthly" | "annual";
+  initialCheckoutState?: OrgPlanOneTimeCheckoutState | null;
 };
 
 type CheckoutResponse = {
@@ -65,7 +69,9 @@ export function OrganizationPlanOneTimeCheckout({
   currentSubscriptionStatus,
   initialSelectedPackageId,
   initialBillingCycle,
+  initialCheckoutState,
 }: OrganizationPlanOneTimeCheckoutProps) {
+  const router = useRouter();
   const [selectedPkgId, setSelectedPkgId] = useState<string | null>(initialSelectedPackageId ?? null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(initialBillingCycle ?? "monthly");
   const [status, setStatus] = useState<"idle" | "preparing" | "opened" | "verifying" | "finalizing" | "success" | "error">("idle");
@@ -73,6 +79,7 @@ export function OrganizationPlanOneTimeCheckout({
   const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null);
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [lastSuccess, setLastSuccess] = useState<{ paymentRecordId: string; invoiceId: string; subscriptionId: string; timestamp: string } | null>(null);
+  const [checkoutState, setCheckoutState] = useState<OrgPlanOneTimeCheckoutState | null>(initialCheckoutState ?? null);
   const scriptStatus = useRazorpayScript(true);
 
   useEffect(() => {
@@ -86,6 +93,17 @@ export function OrganizationPlanOneTimeCheckout({
       setBillingCycle(initialBillingCycle);
     }
   }, [initialBillingCycle]);
+
+  useEffect(() => {
+    setCheckoutState(initialCheckoutState ?? null);
+  }, [initialCheckoutState]);
+
+  useEffect(() => {
+    if (checkoutState?.draft) {
+      setSelectedPkgId(checkoutState.draft.subscription.package_id);
+      setBillingCycle(checkoutState.draft.billingCycle);
+    }
+  }, [checkoutState]);
 
   const activePackages = useMemo(() => allPackages.filter((pkg) => pkg.is_active), [allPackages]);
   const selectedPkg = useMemo(() => {
@@ -116,6 +134,10 @@ export function OrganizationPlanOneTimeCheckout({
       setMessage(response.error);
       showToast(response.error, "error");
       return null;
+    }
+
+    if ("checkoutState" in response) {
+      setCheckoutState(response.checkoutState);
     }
 
     return response;
@@ -161,8 +183,8 @@ export function OrganizationPlanOneTimeCheckout({
         confirm_close: true,
         ondismiss: () => {
           setStatus("idle");
-          setMessage("Payment cancelled.");
-          showToast("Payment cancelled.", "info");
+          setMessage("Payment closed. You can resume within 30 minutes or cancel explicitly.");
+          showToast("Payment closed. Resume within 30 minutes.", "info");
         },
       },
       handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
@@ -213,6 +235,7 @@ export function OrganizationPlanOneTimeCheckout({
         setStatus("success");
         setMessage("One-time payment completed and plan updated.");
         showToast("One-time payment completed.", "success");
+        router.refresh();
       },
     });
 
@@ -224,7 +247,34 @@ export function OrganizationPlanOneTimeCheckout({
     });
 
     checkout.open();
-  }, [createCheckout, customerContact, customerEmail, organizationName, scriptStatus]);
+  }, [createCheckout, customerContact, customerEmail, organizationName, router, scriptStatus]);
+
+  const handleCancelCheckout = useCallback(async () => {
+    if (!checkoutState?.draft || checkoutState.status !== "pending") {
+      return;
+    }
+
+    setStatus("preparing");
+    const result = await cancelOrgPlanOneTimeCheckoutIntentAction();
+    if (!result.success) {
+      setStatus("error");
+      setMessage(result.error);
+      showToast(result.error, "error");
+      return;
+    }
+
+    setCheckoutState(result.checkoutState);
+    setStatus("idle");
+    setMessage("Payment cancelled explicitly.");
+    showToast("Payment cancelled explicitly.", "info");
+    router.refresh();
+  }, [checkoutState, router]);
+
+  const pendingMinutesLeft = useMemo(() => {
+    if (!checkoutState?.draft) return null;
+    const expiresAt = new Date(checkoutState.draft.expiresAt).getTime();
+    return Math.max(0, Math.ceil((expiresAt - Date.now()) / 60000));
+  }, [checkoutState]);
 
   return (
     <div className="space-y-6">
@@ -359,6 +409,47 @@ export function OrganizationPlanOneTimeCheckout({
             </div>
           ) : null}
 
+          {checkoutState?.draft && checkoutState.status === "pending" ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-bold">Pending payment found</p>
+                  <p className="mt-1 text-xs text-blue-800">
+                    Resume checkout for {checkoutState.draft.package?.name ?? "your selected plan"}.
+                    {pendingMinutesLeft !== null ? ` Expires in ${pendingMinutesLeft} minute${pendingMinutesLeft === 1 ? "" : "s"}.` : ""}
+                  </p>
+                  <p className="mt-1 text-[11px] text-blue-700">
+                    Refreshing the page will not cancel this payment.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button className="gap-2" onClick={openCheckout} type="button" variant="accent">
+                    <ShieldCheck className="size-4" />
+                    Resume checkout
+                  </Button>
+                  <Button className="gap-2" onClick={handleCancelCheckout} type="button" variant="outline">
+                    <AlertTriangle className="size-4" />
+                    Cancel payment
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : checkoutState?.status === "expired" ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-bold">Previous payment expired</p>
+              <p className="mt-1 text-xs text-amber-800">
+                The pending checkout aged out after 30 minutes. Start a fresh payment to continue.
+              </p>
+            </div>
+          ) : checkoutState?.status === "cancelled" ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+              <p className="font-bold">Payment cancelled</p>
+              <p className="mt-1 text-xs text-slate-600">
+                The checkout was cancelled explicitly and will not resume.
+              </p>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-3">
             <Button
               className="gap-2"
@@ -378,7 +469,9 @@ export function OrganizationPlanOneTimeCheckout({
                   ? "Verifying payment"
                   : status === "finalizing"
                     ? "Finalizing plan"
-                    : "Pay once with Razorpay"}
+                    : checkoutState?.status === "pending"
+                      ? "Resume Razorpay checkout"
+                      : "Pay once with Razorpay"}
             </Button>
             <span className="text-xs text-muted-foreground">
               {checkoutData

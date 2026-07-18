@@ -73,6 +73,68 @@ type PaymentRow = {
   id: string;
 };
 
+export const ORG_PLAN_ONE_TIME_CHECKOUT_TTL_MS = 30 * 60 * 1000;
+
+export function getOrgPlanOneTimeCheckoutExpiresAt(createdAt: string | Date, ttlMs: number = ORG_PLAN_ONE_TIME_CHECKOUT_TTL_MS): Date {
+  const startedAt = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  return new Date(startedAt.getTime() + ttlMs);
+}
+
+export function isOrgPlanOneTimeCheckoutExpired(
+  createdAt: string | Date,
+  now: Date = new Date(),
+  ttlMs: number = ORG_PLAN_ONE_TIME_CHECKOUT_TTL_MS,
+): boolean {
+  return now.getTime() >= getOrgPlanOneTimeCheckoutExpiresAt(createdAt, ttlMs).getTime();
+}
+
+type OrgPlanOneTimeCheckoutDraft = {
+  subscription: OrgSubscriptionRow;
+  invoice: {
+    id: string;
+    invoice_number: string;
+    status: string;
+    billing_cycle: string | null;
+    created_at: string;
+    failure_reason: string | null;
+    dunning_status: string | null;
+    dunning_last_failure_reason: string | null;
+    razorpay_order_id: string | null;
+    provider_environment: string | null;
+    total_amount: number | null;
+    subtotal_amount: number;
+    tax_amount: number;
+    currency: string;
+  };
+  payment: {
+    id: string;
+    status: string;
+    created_at: string;
+    provider_order_id: string | null;
+    provider_payment_id: string | null;
+    failure_reason: string | null;
+    amount: number;
+    currency: string;
+  };
+  package: PackageRow | null;
+  billingCycle: "monthly" | "annual";
+  amountPaise: number;
+  currency: string;
+  orderId: string;
+  createdAt: string;
+  expiresAt: string;
+  isExpired: boolean;
+  isCancelled: boolean;
+  isFinalized: boolean;
+};
+
+export type OrgPlanOneTimeCheckoutState = {
+  hasDraft: boolean;
+  draft: OrgPlanOneTimeCheckoutDraft | null;
+  status: "none" | "pending" | "expired" | "cancelled";
+  message: string | null;
+};
+
 export type OrgPlanOneTimeCheckoutInput = {
   targetPackageId: string;
   billingCycle: "monthly" | "annual";
@@ -96,6 +158,7 @@ export type OrgPlanOneTimeCheckoutResult =
       billingCycle: string;
       isTestMode: boolean;
       environmentLabel: string;
+      checkoutState: OrgPlanOneTimeCheckoutState;
     }
   | {
       success: false;
@@ -122,7 +185,7 @@ export type OrgPlanOneTimeFinalizeResult =
   | {
       success: false;
       error: string;
-    };
+  };
 
 function getDaysForBillingPeriod(period: string | null | undefined): number {
   return period === "annual" ? 365 : 30;
@@ -138,6 +201,269 @@ function buildInvoiceNumber(prefix: string): string {
 
 function buildPaymentNumber(prefix: string): string {
   return `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+}
+
+function buildOrgPlanOneTimeInvoiceIdempotencyKey(
+  subscriptionId: string,
+  billingCycle: "monthly" | "annual",
+  billingPeriodStart: string,
+  billingPeriodEnd: string,
+): string {
+  return `org_plan_invoice:${subscriptionId}:${billingCycle}:${billingPeriodStart}:${billingPeriodEnd}`;
+}
+
+function buildOrgPlanOneTimePaymentIdempotencyKey(
+  subscriptionId: string,
+  billingCycle: "monthly" | "annual",
+  billingPeriodStart: string,
+  billingPeriodEnd: string,
+): string {
+  return `org_plan_payment:${subscriptionId}:${billingCycle}:${billingPeriodStart}:${billingPeriodEnd}`;
+}
+
+async function loadOrgPlanOneTimeCheckoutDraft(admin: ReturnType<typeof getSupabaseAdminClient>, organizationId: string): Promise<OrgPlanOneTimeCheckoutDraft | null> {
+  const { data: subscriptions } = await admin
+    .from("organization_subscriptions")
+    .select("id, organization_id, package_id, status, billing_period, billing_engine, auto_renew, started_at, expires_at, next_billing_date, latest_invoice_id, latest_payment_id, provider_subscription_id, provider_plan_id, provider_customer_id, provider_mandate_id, provider_payment_method_id, cancelled_at, cancellation_reason, cancellation_category, updated_at")
+    .eq("organization_id", organizationId)
+    .eq("billing_engine", "invoice")
+    .order("updated_at", { ascending: false })
+    .limit(10) as never as {
+    data: Array<OrgSubscriptionRow & { updated_at?: string | null }> | null;
+    error: { message: string } | null;
+  };
+
+  for (const subscription of subscriptions ?? []) {
+    if (!subscription.latest_invoice_id || !subscription.latest_payment_id) continue;
+    const draft = await loadOrgPlanOneTimeCheckoutDraftForSubscription(admin, subscription);
+    if (draft) return draft;
+  }
+
+  const { data: recentInvoices } = await admin
+    .from("org_subscription_invoices")
+    .select("id, organization_id, subscription_id, package_id, invoice_number, status, billing_cycle, created_at, failure_reason, dunning_status, dunning_last_failure_reason, razorpay_order_id, provider_environment, total_amount, subtotal_amount, tax_amount, currency")
+    .eq("organization_id", organizationId)
+    .eq("provider", "razorpay")
+    .order("created_at", { ascending: false })
+    .limit(20) as never as {
+    data: Array<OrgPlanOneTimeCheckoutDraft["invoice"] & { subscription_id: string | null; package_id: string | null }> | null;
+    error: { message: string } | null;
+  };
+
+  for (const invoice of recentInvoices ?? []) {
+    if (!invoice.subscription_id || !invoice.package_id) continue;
+    const { data: subscription } = await admin
+      .from("organization_subscriptions")
+      .select("id, organization_id, package_id, status, billing_period, billing_engine, auto_renew, started_at, expires_at, next_billing_date, latest_invoice_id, latest_payment_id, provider_subscription_id, provider_plan_id, provider_customer_id, provider_mandate_id, provider_payment_method_id, cancelled_at, cancellation_reason, cancellation_category, updated_at")
+      .eq("id", invoice.subscription_id)
+      .maybeSingle() as never as {
+      data: (OrgSubscriptionRow & { updated_at?: string | null }) | null;
+      error: { message: string } | null;
+    };
+
+    if (!subscription) continue;
+    const draft = await loadOrgPlanOneTimeCheckoutDraftForSubscription(admin, subscription, invoice);
+    if (draft) return draft;
+  }
+
+  return null;
+}
+
+async function loadOrgPlanOneTimeCheckoutDraftForSubscription(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  subscription: OrgSubscriptionRow & { updated_at?: string | null },
+  invoiceOverride?: OrgPlanOneTimeCheckoutDraft["invoice"] & { subscription_id?: string | null; package_id?: string | null },
+): Promise<OrgPlanOneTimeCheckoutDraft | null> {
+  const paymentQuery = invoiceOverride
+    ? admin
+        .from("org_subscription_payments")
+        .select("id, status, created_at, provider_order_id, provider_payment_id, failure_reason, amount, currency")
+        .eq("invoice_id", invoiceOverride.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : admin
+        .from("org_subscription_payments")
+        .select("id, status, created_at, provider_order_id, provider_payment_id, failure_reason, amount, currency")
+        .eq("id", subscription.latest_payment_id ?? "")
+        .maybeSingle();
+
+  const [invoiceRes, paymentRes, packageRes] = await Promise.all([
+    invoiceOverride
+      ? Promise.resolve({ data: invoiceOverride, error: null })
+      : admin
+          .from("org_subscription_invoices")
+          .select("id, invoice_number, status, billing_cycle, created_at, failure_reason, dunning_status, dunning_last_failure_reason, razorpay_order_id, provider_environment, total_amount, subtotal_amount, tax_amount, currency")
+          .eq("id", subscription.latest_invoice_id ?? "")
+          .maybeSingle(),
+    paymentQuery,
+    admin
+      .from("packages")
+      .select("id, name, is_active")
+      .eq("id", subscription.package_id)
+      .maybeSingle(),
+  ]);
+
+  const invoice = (invoiceRes.data as OrgPlanOneTimeCheckoutDraft["invoice"] | null) ?? null;
+  const payment = (paymentRes.data as OrgPlanOneTimeCheckoutDraft["payment"] | null) ?? null;
+  const pkg = packageRes.data as PackageRow | null;
+  if (!invoice) return null;
+
+  const paymentRow = payment ?? null;
+  const orderId = paymentRow?.provider_order_id ?? invoice.razorpay_order_id ?? "";
+  if (!orderId) return null;
+
+  const paymentCreatedAt = paymentRow?.created_at ?? invoice.created_at ?? subscription.updated_at ?? new Date().toISOString();
+  const createdAt = paymentCreatedAt;
+  const expiresAt = getOrgPlanOneTimeCheckoutExpiresAt(createdAt).toISOString();
+  const now = new Date();
+  const failureText = `${paymentRow?.failure_reason ?? ""} ${invoice.failure_reason ?? ""} ${invoice.dunning_last_failure_reason ?? ""}`.toLowerCase();
+  const isCancelled = paymentRow?.status === "cancelled" || invoice.status === "cancelled" || subscription.status === "cancelled";
+  const isFinalized = paymentRow?.status === "paid" || invoice.status === "paid";
+  const isExpired = !isCancelled && !isFinalized && (isOrgPlanOneTimeCheckoutExpired(createdAt, now) || failureText.includes("expired"));
+  const isPending = !paymentRow || ["created", "processing", "signature_acknowledged"].includes(paymentRow.status);
+
+  if (isFinalized || (isCancelled === false && !isExpired && !isPending)) {
+    return null;
+  }
+
+  return {
+    subscription,
+    invoice,
+    payment: paymentRow ?? {
+      id: invoice.id,
+      status: "created",
+      created_at: invoice.created_at,
+      provider_order_id: invoice.razorpay_order_id,
+      provider_payment_id: null,
+      failure_reason: invoice.failure_reason,
+      amount: invoice.total_amount ?? invoice.subtotal_amount + invoice.tax_amount,
+      currency: invoice.currency,
+    },
+    package: pkg,
+    billingCycle: (invoice.billing_cycle ?? subscription.billing_period ?? "monthly") as "monthly" | "annual",
+    amountPaise: paymentRow?.amount ?? invoice.total_amount ?? invoice.subtotal_amount + invoice.tax_amount,
+    currency: paymentRow?.currency || invoice.currency || "INR",
+    orderId,
+    createdAt,
+    expiresAt,
+    isExpired,
+    isCancelled,
+    isFinalized,
+  };
+}
+
+function snapshotStateFromDraft(draft: OrgPlanOneTimeCheckoutDraft | null): OrgPlanOneTimeCheckoutState {
+  if (!draft) {
+    return { hasDraft: false, draft: null, status: "none", message: null };
+  }
+
+  if (draft.isCancelled) {
+    return { hasDraft: true, draft, status: "cancelled", message: "Payment was cancelled explicitly." };
+  }
+
+  if (draft.isExpired) {
+    return { hasDraft: true, draft, status: "expired", message: "Pending payment expired after 30 minutes." };
+  }
+
+  return { hasDraft: true, draft, status: "pending", message: "Pending payment is available to resume." };
+}
+
+async function markOrgPlanOneTimeCheckoutExpired(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  draft: OrgPlanOneTimeCheckoutDraft,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const reason = "Pending payment expired after 30 minutes.";
+  const subscriptionPatch: Record<string, unknown> = {
+    updated_at: now,
+    latest_invoice_id: draft.subscription.latest_invoice_id,
+    latest_payment_id: draft.subscription.latest_payment_id,
+  };
+
+  if (draft.subscription.status === "pending_activation" || draft.subscription.status === "payment_pending") {
+    subscriptionPatch.status = "payment_failed";
+  }
+
+  await Promise.all([
+    admin.from("org_subscription_payments").update({
+      status: "failed",
+      failure_reason: reason,
+      updated_at: now,
+    } as never).eq("id", draft.payment.id),
+    admin.from("org_subscription_invoices").update({
+      failure_reason: reason,
+      dunning_status: "payment_failed",
+      dunning_last_failure_reason: reason,
+      dunning_next_retry_at: null,
+      updated_at: now,
+    } as never).eq("id", draft.invoice.id),
+    admin.from("organization_subscriptions").update(subscriptionPatch as never).eq("id", draft.subscription.id),
+    admin.from("subscription_events").insert({
+      organization_id: draft.subscription.organization_id,
+      subscription_id: draft.subscription.id,
+      event_type: "one_time_payment_expired",
+      new_state: {
+        invoiceId: draft.invoice.id,
+        paymentRecordId: draft.payment.id,
+        razorpayOrderId: draft.orderId,
+        expiresAt: draft.expiresAt,
+      },
+      metadata: { source: "checkout_ttl" },
+      reason,
+      created_at: now,
+    } as never),
+  ]);
+}
+
+async function markOrgPlanOneTimeCheckoutCancelled(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  draft: OrgPlanOneTimeCheckoutDraft,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const reason = "Cancelled by organization owner.";
+  const subscriptionPatch: Record<string, unknown> = {
+    updated_at: now,
+    latest_invoice_id: draft.subscription.latest_invoice_id,
+    latest_payment_id: draft.subscription.latest_payment_id,
+  };
+
+  if (draft.subscription.status === "pending_activation" || draft.subscription.status === "payment_pending") {
+    subscriptionPatch.status = "cancelled";
+    subscriptionPatch.cancelled_at = now;
+    subscriptionPatch.cancellation_reason = reason;
+    subscriptionPatch.cancellation_category = "user_initiated";
+  }
+
+  await Promise.all([
+    admin.from("org_subscription_payments").update({
+      status: "cancelled",
+      failure_reason: reason,
+      updated_at: now,
+    } as never).eq("id", draft.payment.id),
+    admin.from("org_subscription_invoices").update({
+      status: "cancelled",
+      failure_reason: reason,
+      dunning_status: "waived",
+      dunning_last_failure_reason: reason,
+      dunning_next_retry_at: null,
+      updated_at: now,
+    } as never).eq("id", draft.invoice.id),
+    admin.from("organization_subscriptions").update(subscriptionPatch as never).eq("id", draft.subscription.id),
+    admin.from("subscription_events").insert({
+      organization_id: draft.subscription.organization_id,
+      subscription_id: draft.subscription.id,
+      event_type: "one_time_payment_cancelled",
+      new_state: {
+        invoiceId: draft.invoice.id,
+        paymentRecordId: draft.payment.id,
+        razorpayOrderId: draft.orderId,
+      },
+      metadata: { source: "checkout_cancel" },
+      reason,
+      created_at: now,
+    } as never),
+  ]);
 }
 
 function getNextBillingWindow(
@@ -277,6 +603,49 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
   const platformCredentials = await resolvePlatformRazorpayCredentials();
   const providerEnvironment = platformCredentials?.environment ?? getRazorpayEnvironment();
 
+  const existingDraft = await loadOrgPlanOneTimeCheckoutDraft(admin, organization.id);
+  if (existingDraft) {
+    if (existingDraft.isCancelled) {
+      // Explictly cancelled transactions are terminal; continue to create a fresh checkout.
+    } else if (!existingDraft.isExpired && existingDraft.subscription.package_id === input.targetPackageId && existingDraft.billingCycle === input.billingCycle) {
+      billingLogger.info("org-plan-one-time", "Reusing pending checkout", {
+        organizationId: organization.id,
+        packageId: input.targetPackageId,
+        billingCycle: input.billingCycle,
+        orderId: existingDraft.orderId,
+        invoiceId: existingDraft.invoice.id,
+        paymentId: existingDraft.payment.id,
+      });
+
+      return {
+        success: true,
+        provider: "razorpay",
+        razorpayKeyId: getRazorpayKeyId(platformCredentials),
+        razorpayOrderId: existingDraft.orderId,
+        amountPaise: existingDraft.amountPaise,
+        subtotalPaise: existingDraft.invoice.subtotal_amount,
+        taxPaise: existingDraft.invoice.tax_amount,
+        currency: existingDraft.currency,
+        invoiceId: existingDraft.invoice.id,
+        paymentRecordId: existingDraft.payment.id,
+        subscriptionId: existingDraft.subscription.id,
+        packageDisplayName: existingDraft.package?.name ?? pkg.name,
+        organizationDisplayName: organization.name ?? "",
+        billingCycle: existingDraft.billingCycle,
+        isTestMode: providerEnvironment === "test",
+        environmentLabel: providerEnvironment === "test" ? "Test Mode" : "Live Mode",
+        checkoutState: snapshotStateFromDraft(existingDraft),
+      };
+    } else if (existingDraft.isExpired) {
+      await markOrgPlanOneTimeCheckoutExpired(admin, existingDraft);
+    } else {
+      return {
+        success: false,
+        error: "You already have a pending payment for another plan. Resume or cancel it first.",
+      };
+    }
+  }
+
   if (platformCredentials) {
     const authCheck = await preflightRazorpayCredentials(platformCredentials);
     if (!authCheck.ok) {
@@ -361,7 +730,7 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
 
   const { data: invoice, error: invoiceError } = await admin
     .from("org_subscription_invoices")
-    .insert({
+    .upsert({
       organization_id: organization.id,
       subscription_id: subscriptionId,
       package_id: pkg.id,
@@ -382,8 +751,15 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
       issued_at: new Date().toISOString(),
       due_at: new Date().toISOString(),
       razorpay_order_id: orderId,
-      idempotency_key: `org_plan_${organization.id}_${orderId}`,
-    } as never)
+      idempotency_key: buildOrgPlanOneTimeInvoiceIdempotencyKey(
+        subscriptionId,
+        input.billingCycle,
+        startAt.toISOString().slice(0, 10),
+        endAt.toISOString().slice(0, 10),
+      ),
+    } as never, {
+      onConflict: "subscription_id,billing_period_start,billing_period_end",
+    })
     .select("id")
     .maybeSingle() as never as {
     data: InvoiceRow | null;
@@ -396,7 +772,7 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
 
   const { data: payment, error: paymentError } = await admin
     .from("org_subscription_payments")
-    .insert({
+    .upsert({
       organization_id: organization.id,
       subscription_id: subscriptionId,
       invoice_id: invoice.id,
@@ -410,8 +786,15 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
       currency,
       payment_method_id: null,
       provider_signature_verified: false,
-      idempotency_key: `org_plan_${organization.id}_${orderId}`,
-    } as never)
+      idempotency_key: buildOrgPlanOneTimePaymentIdempotencyKey(
+        subscriptionId,
+        input.billingCycle,
+        startAt.toISOString().slice(0, 10),
+        endAt.toISOString().slice(0, 10),
+      ),
+    } as never, {
+      onConflict: "idempotency_key",
+    })
     .select("id")
     .maybeSingle() as never as {
     data: PaymentRow | null;
@@ -457,6 +840,7 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
     paymentId: payment.id,
   });
 
+  const checkoutCreatedAt = new Date().toISOString();
   return {
     success: true,
     provider: "razorpay",
@@ -474,6 +858,71 @@ export async function createOrgPlanOneTimeCheckoutAction(input: OrgPlanOneTimeCh
     billingCycle: input.billingCycle,
     isTestMode: providerEnvironment === "test",
     environmentLabel: providerEnvironment === "test" ? "Test Mode" : "Live Mode",
+    checkoutState: {
+      hasDraft: true,
+      draft: {
+        subscription: {
+          id: subscriptionId,
+          organization_id: organization.id,
+          package_id: pkg.id,
+          status: currentSubscription?.status ?? "pending_activation",
+          billing_period: input.billingCycle,
+          billing_engine: "invoice",
+          auto_renew: false,
+          started_at: currentSubscription?.started_at ?? checkoutCreatedAt,
+          expires_at: currentSubscription?.expires_at ?? endAt.toISOString(),
+          next_billing_date: currentSubscription?.next_billing_date ?? endAt.toISOString(),
+          latest_invoice_id: invoice.id,
+          latest_payment_id: payment.id,
+          provider_subscription_id: null,
+          provider_plan_id: null,
+          provider_customer_id: null,
+          provider_mandate_id: null,
+          provider_payment_method_id: null,
+          cancelled_at: currentSubscription?.cancelled_at ?? null,
+          cancellation_reason: currentSubscription?.cancellation_reason ?? null,
+          cancellation_category: currentSubscription?.cancellation_category ?? null,
+        },
+        invoice: {
+          id: invoice.id,
+          invoice_number: invoiceNumber,
+          status: "issued",
+          billing_cycle: input.billingCycle,
+          created_at: checkoutCreatedAt,
+          failure_reason: null,
+          dunning_status: null,
+          dunning_last_failure_reason: null,
+          razorpay_order_id: orderId,
+          provider_environment: providerEnvironment,
+          total_amount: totalAmountPaise,
+          subtotal_amount: subtotalPaise,
+          tax_amount: taxPaise,
+          currency,
+        },
+        payment: {
+          id: payment.id,
+          status: "processing",
+          created_at: checkoutCreatedAt,
+          provider_order_id: orderId,
+          provider_payment_id: null,
+          failure_reason: null,
+          amount: totalAmountPaise,
+          currency,
+        },
+        package: { id: pkg.id, name: pkg.name, is_active: pkg.is_active },
+        billingCycle: input.billingCycle,
+        amountPaise: totalAmountPaise,
+        currency,
+        orderId,
+        createdAt: checkoutCreatedAt,
+        expiresAt: getOrgPlanOneTimeCheckoutExpiresAt(checkoutCreatedAt).toISOString(),
+        isExpired: false,
+        isCancelled: false,
+        isFinalized: false,
+      },
+      status: "pending",
+      message: "Pending payment is available to resume.",
+    },
   };
 }
 
@@ -532,6 +981,10 @@ export async function finalizeOrgPlanOneTimePaymentAction(input: OrgPlanOneTimeF
 
   if (!payment) {
     return { success: false, error: "Payment record not found." };
+  }
+
+  if (invoice.status === "cancelled" || payment.status === "cancelled") {
+    return { success: false, error: "This payment was cancelled explicitly." };
   }
 
   const razorpayPayment = await fetchRazorpayPayment(input.razorpayPaymentId, platformCredentials);
@@ -650,4 +1103,84 @@ export async function finalizeOrgPlanOneTimePaymentAction(input: OrgPlanOneTimeF
     paymentRecordId: payment.id,
     subscriptionId: invoice.subscription_id,
   };
+}
+
+export async function getOrgPlanOneTimeCheckoutStateAction(): Promise<OrgPlanOneTimeCheckoutState> {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { hasDraft: false, draft: null, status: "none", message: null };
+  }
+
+  const ctx = await requireOrganizationOwner("/organization/plan");
+  const admin = getSupabaseAdminClient();
+  if (!admin) {
+    return { hasDraft: false, draft: null, status: "none", message: "Database connection failed." };
+  }
+
+  const draft = await loadOrgPlanOneTimeCheckoutDraft(admin, ctx.organizationId);
+  if (!draft) {
+    return { hasDraft: false, draft: null, status: "none", message: null };
+  }
+
+  if (draft.isExpired) {
+    await markOrgPlanOneTimeCheckoutExpired(admin, draft);
+    return snapshotStateFromDraft({ ...draft, isExpired: true });
+  }
+
+  return snapshotStateFromDraft(draft);
+}
+
+export async function cancelOrgPlanOneTimeCheckoutAction(): Promise<
+  { success: true; checkoutState: OrgPlanOneTimeCheckoutState }
+  | { success: false; error: string }
+> {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const ctx = await requireOrganizationOwner("/organization/plan");
+  const admin = getSupabaseAdminClient();
+  if (!admin) {
+    return { success: false, error: "Database connection failed." };
+  }
+
+  const draft = await loadOrgPlanOneTimeCheckoutDraft(admin, ctx.organizationId);
+  if (!draft) {
+    return { success: false, error: "No pending payment found to cancel." };
+  }
+
+  if (draft.isCancelled) {
+    return { success: false, error: "This payment was already cancelled." };
+  }
+
+  if (draft.isExpired) {
+    return { success: false, error: "This payment already expired." };
+  }
+
+  await markOrgPlanOneTimeCheckoutCancelled(admin, draft);
+
+  await writeAuditLog({
+    actorId: ctx.userId,
+    action: "organization_owner.one_time_plan_payment_cancelled",
+    entityType: "organization_subscription",
+    entityId: draft.subscription.id,
+    metadata: {
+      invoiceId: draft.invoice.id,
+      paymentId: draft.payment.id,
+      razorpayOrderId: draft.orderId,
+    } as never,
+  });
+
+  billingLogger.info("org-plan-one-time", "Checkout cancelled", {
+    organizationId: ctx.organizationId,
+    subscriptionId: draft.subscription.id,
+    invoiceId: draft.invoice.id,
+    paymentId: draft.payment.id,
+    orderId: draft.orderId,
+  });
+
+  return { success: true, checkoutState: snapshotStateFromDraft({ ...draft, isCancelled: true }) };
 }

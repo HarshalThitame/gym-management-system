@@ -7,6 +7,7 @@ import { createMetadata } from "@/lib/seo/metadata";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrgPlanContext } from "@/lib/tenant/plan-context";
 import { getActivePackagesAction, getOrgSubscriptionAction, getUsageHistoryAction, getOrgUsageAction } from "@/features/organization-owner/actions/plan-data-actions";
+import { getOrgPlanOneTimeCheckoutStateIntentAction } from "@/features/organization-owner/actions/plan-one-time-actions";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import type { RoleName } from "@/types/auth";
 
@@ -25,12 +26,13 @@ async function PlanContent() {
   const organizationId = ctx.organizationId ?? null;
   if (!organizationId) redirect("/unauthorized?reason=organization_scope");
 
-  const [planContext, allPackages, currentSubscription, usageHistory, orgUsage] = await Promise.all([
+  const [planContext, allPackages, currentSubscription, usageHistory, orgUsage, pendingCheckout] = await Promise.all([
     getOrgPlanContext(organizationId),
     getActivePackagesAction(),
     getOrgSubscriptionAction(),
     getUsageHistoryAction(),
     getOrgUsageAction(),
+    getOrgPlanOneTimeCheckoutStateIntentAction(),
   ]);
 
   // Get org name, billing email, invoices, subscription events
@@ -71,6 +73,7 @@ async function PlanContent() {
         invoices={orgInvoices}
         events={orgEvents}
         payments={orgPayments}
+        pendingCheckout={pendingCheckout}
       />
     </div>
   );

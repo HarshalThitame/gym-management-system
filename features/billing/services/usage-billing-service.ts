@@ -183,8 +183,10 @@ export async function generateOverageInvoice(subscriptionId: string): Promise<{ 
   if (!overage.hasOverage) return { ok: false, message: "No overage charges to invoice." };
 
   const year = new Date().getFullYear();
-  const ts = String(Date.now()).slice(-6);
-  const invoiceNumber = `OVG-INV-${year}-${ts}`;
+  const billingPeriodStart = new Date().toISOString().slice(0, 10);
+  const billingPeriodEnd = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const invoiceNumber = `OVG-INV-${year}-${subscriptionId.slice(0, 8).toUpperCase()}-${billingPeriodStart.replaceAll("-", "")}`;
+  const idempotencyKey = `overage_invoice:${subscriptionId}:${billingPeriodStart}:${billingPeriodEnd}`;
 
   const invoicePayload: Record<string, unknown> = {
     organization_id: sub.organization_id as string,
@@ -195,14 +197,15 @@ export async function generateOverageInvoice(subscriptionId: string): Promise<{ 
     subtotal_amount: overage.totalCharge,
     discount_amount: 0,
     tax_amount: 0,
-    billing_period_start: new Date().toISOString().slice(0, 10),
-    billing_period_end: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    billing_period_start: billingPeriodStart,
+    billing_period_end: billingPeriodEnd,
     issued_at: new Date().toISOString(),
     due_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+    idempotency_key: idempotencyKey,
     notes: `Overage charges: ${overage.details.join("; ")}`,
   };
 
-  const { data: invoice } = await db.from("org_subscription_invoices").insert(invoicePayload);
+  const { data: invoice } = await db.from("org_subscription_invoices").upsert(invoicePayload, { onConflict: "idempotency_key" });
   if (!invoice) return { ok: false, message: "Failed to create overage invoice." };
 
   return { ok: true, message: `Overage invoice ${invoiceNumber} created for ₹${(overage.totalCharge / 100).toFixed(2)}.`, invoiceId: invoice.id as string };

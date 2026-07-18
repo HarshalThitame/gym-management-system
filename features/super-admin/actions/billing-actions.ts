@@ -60,15 +60,18 @@ export async function generateInvoiceAction(input: GenerateInvoiceInput): Promis
     const db = getSupabaseAdminClient() as any;
     if (!db) return { status: "error", message: "Database connection failed." };
 
-    const invoiceNumber = `INV-MAN-${Date.now().toString(36).toUpperCase()}-${input.organizationId.slice(0, 4).toUpperCase()}`;
     const now = new Date().toISOString();
     const dueAt = input.dueDate || new Date(Date.now() + 30 * 86400000).toISOString();
+    const billingPeriodStart = now.slice(0, 10);
+    const billingPeriodEnd = dueAt.slice(0, 10);
+    const subscriptionPart = (input.subscriptionId ?? "GEN").slice(0, 8).toUpperCase();
+    const invoiceNumberStable = `INV-MAN-${input.organizationId.slice(0, 4).toUpperCase()}-${subscriptionPart}-${String(input.amount)}-${billingPeriodStart.replaceAll("-", "")}`;
+    const idempotencyKey = `manual_invoice:${input.organizationId}:${input.subscriptionId ?? "none"}:${input.invoiceType}:${input.amount}:${billingPeriodStart}:${billingPeriodEnd}`;
 
-    const { data: invoice, error } = await db.from("org_subscription_invoices").insert({
+    const { data: invoice, error } = await db.from("org_subscription_invoices").upsert({
       organization_id: input.organizationId,
       subscription_id: input.subscriptionId || null,
-      invoice_number: invoiceNumber,
-      total_amount: input.amount,
+      invoice_number: invoiceNumberStable,
       subtotal_amount: input.amount,
       currency: input.currency || "INR",
       status: "issued",
@@ -76,7 +79,15 @@ export async function generateInvoiceAction(input: GenerateInvoiceInput): Promis
       issued_at: now,
       due_at: dueAt,
       provider_environment: "test",
-      billing_cycle: input.invoiceType === "subscription" ? "recurring" : "one_time",
+      billing_cycle: "monthly",
+      billing_period_start: billingPeriodStart,
+      billing_period_end: billingPeriodEnd,
+      discount_amount: 0,
+      tax_amount: 0,
+      amount_paid: 0,
+      idempotency_key: idempotencyKey,
+    } as never, {
+      onConflict: "idempotency_key",
     }).select("id").maybeSingle();
 
     if (error || !invoice) return { status: "error", message: "Failed to create invoice." };

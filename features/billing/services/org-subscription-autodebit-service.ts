@@ -877,10 +877,10 @@ export async function handleOrgSubscriptionChargedEvent(input: {
     return { handled: true };
   }
 
-  const invoiceNumber = `ORG-SUB-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`;
+  const invoiceNumber = `ORG-SUB-${now.getFullYear()}-${String(subscription.id).slice(0, 8).toUpperCase()}-${String(input.providerPaymentId).slice(-8).toUpperCase()}`;
   const { data: invoice, error: invoiceError } = await admin
     .from("org_subscription_invoices")
-    .insert({
+    .upsert({
       organization_id: subscription.organization_id,
       subscription_id: subscription.id,
       package_id: subscription.package_id,
@@ -903,7 +903,7 @@ export async function handleOrgSubscriptionChargedEvent(input: {
       due_at: now.toISOString(),
       idempotency_key: idempotencyKey,
       razorpay_payment_id: input.providerPaymentId,
-    } as never)
+    } as never, { onConflict: "idempotency_key" })
     .select("*")
     .maybeSingle() as never as {
     data: { id: string } | null;
@@ -917,7 +917,7 @@ export async function handleOrgSubscriptionChargedEvent(input: {
   const paymentNumber = `ORG-SUB-PAY-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`;
   const { data: payment, error: paymentError } = await admin
     .from("org_subscription_payments")
-    .insert({
+    .upsert({
       organization_id: subscription.organization_id,
       subscription_id: subscription.id,
       invoice_id: invoice.id,
@@ -934,7 +934,7 @@ export async function handleOrgSubscriptionChargedEvent(input: {
       provider_signature_verified: true,
       paid_at: now.toISOString(),
       idempotency_key: idempotencyKey,
-    } as never)
+    } as never, { onConflict: "idempotency_key" })
     .select("*")
     .maybeSingle() as never as {
     data: { id: string } | null;

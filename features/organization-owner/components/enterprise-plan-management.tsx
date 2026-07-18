@@ -14,6 +14,7 @@ import { toggleAutoRenewAction, cancelSubscriptionAction, reactivateSubscription
 import { OrganizationPlanOneTimeCheckout } from "@/features/organization-owner/components/organization-plan-one-time-checkout";
 import type { OrgPlanContext } from "@/lib/tenant/plan-context";
 import type { PackageWithMeta, SubscriptionWithPackage, UsageHistoryPoint, OrgUsageData } from "@/features/organization-owner/actions/plan-data-actions";
+import type { OrgPlanOneTimeCheckoutState } from "@/features/organization-owner/actions/plan-one-time-actions";
 import { FeatureCard, FeatureCategorySection, LimitBar } from "@/components/ui/feature-card";
 import { FEATURE_CATEGORIES } from "@/features/subscription/feature-definitions";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ type EnterprisePlanManagementProps = {
   customerEmail?: string;
   invoices?: any[];
   payments?: any[];
+  pendingCheckout?: OrgPlanOneTimeCheckoutState | null;
 };
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -42,7 +44,7 @@ const CATEGORY_ICONS: Record<string, any> = {
 
 const selectClass = "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-export function EnterprisePlanManagement({ planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], payments = [] }: EnterprisePlanManagementProps) {
+export function EnterprisePlanManagement({ planContext, allPackages, currentSubscription, usageHistory, orgUsage, organizationName = "", customerEmail = "", invoices = [], payments = [], pendingCheckout = null }: EnterprisePlanManagementProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "compare" | "usage" | "pay" | "billing" | "features" | "timeline">("overview");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [showCancel, setShowCancel] = useState(false);
@@ -442,9 +444,10 @@ export function EnterprisePlanManagement({ planContext, allPackages, currentSubs
             customerEmail={customerEmail}
             allPackages={allPackages}
             currentSubscriptionStatus={currentSubscription?.status ?? null}
-            initialSelectedPackageId={pendingCheckoutPackageId ?? undefined}
-            initialBillingCycle={billingCycle === "yearly" ? "annual" : "monthly"}
+            initialSelectedPackageId={pendingCheckout?.draft?.subscription.package_id ?? pendingCheckoutPackageId ?? undefined}
+            initialBillingCycle={(pendingCheckout?.draft?.billingCycle ?? (billingCycle === "yearly" ? "annual" : "monthly"))}
             customerContact={customerEmail}
+            initialCheckoutState={pendingCheckout}
           />
         </div>
       )}
