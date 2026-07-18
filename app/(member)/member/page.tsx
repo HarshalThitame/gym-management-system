@@ -10,7 +10,7 @@ import { getMemberAchievements } from "@/features/member/services/achievement-se
 import { LoyaltyWidget, LeaderboardWidget } from "@/features/member/components/loyalty-widgets";
 import { AchievementWall, AchievementStats } from "@/features/member/components/achievement-wall";
 import { requireMemberPortalAccess } from "@/features/member/lib/access";
-import { getOrganizationEntitlements } from "@/features/entitlement/entitlement-repository";
+import { getOrganizationEntitlements } from "@/features/entitlement";
 import { WelcomeBanner } from "@/features/member/components/welcome-banner";
 import { DashboardSection, DashboardStatRow } from "@/features/member/components/dashboard-sections";
 import { createMetadata } from "@/lib/seo/metadata";

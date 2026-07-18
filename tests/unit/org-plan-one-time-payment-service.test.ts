@@ -3,7 +3,7 @@ import {
   getOrgPlanOneTimeCheckoutExpiresAt,
   isOrgPlanOneTimeCheckoutExpired,
   ORG_PLAN_ONE_TIME_CHECKOUT_TTL_MS,
-} from "@/features/billing/services/org-plan-one-time-payment-service";
+} from "@/features/billing/services/org-plan-one-time-payment-utils";
 
 describe("org plan one-time checkout TTL", () => {
   it("expires pending checkouts after 30 minutes", () => {
