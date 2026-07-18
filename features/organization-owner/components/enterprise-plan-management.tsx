@@ -253,8 +253,8 @@ export function EnterprisePlanManagement({ planContext, allPackages, currentSubs
                       </span>
                     )}
                   </div>
-                  <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Renewal</p><p className="mt-1 text-sm font-bold">{planContext.expiresAt ? planContext.expiresAt.toLocaleDateString("en-IN") : "No expiry"}</p></div>
-                  <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Billing Engine</p><p className="mt-1 text-sm font-bold">{billingEngine === "subscription" ? "Auto-debit" : "Invoice renewal"}</p></div>
+                  <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Renewal</p><p className="mt-1 text-sm font-bold">{planContext.expiresAt ? planContext.expiresAt.toLocaleDateString("en-IN") : "No plan"}</p></div>
+                  <div><p className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">Billing Engine</p><p className="mt-1 text-sm font-bold">{billingEngine === "subscription" ? "Auto-debit" : currentSubscription ? "Invoice renewal" : "Not available"}</p></div>
                 </div>
                 {billingEngine === "subscription" ? (
                   <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">

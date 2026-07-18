@@ -40,7 +40,7 @@ const safeDefaultFlags: OrgFeatureFlags = {
   multiBranchStaffAssignment: false, hrDocumentStorage: false,
   billingInvoices: false, receipts: false, paymentTracking: false, onlinePaymentLinks: false,
   renewalReminders: false, autoBilling: false, discountPromoCodes: false, corporateBulkMemberships: false,
-  paymentFailureHandling: false, partialPaymentDues: false, razorpayPayuIntegration: false,
+  paymentFailureHandling: false, partialPaymentDues: false, razorpayIntegration: false,
   multiGstinSupport: false, branchRevenueSplit: false,
   basicReports: false, advancedReportsEnabled: false, customDashboards: false, customDashboardsKpis: false,
   trainerPerformanceReport: false, classOccupancyReport: false, leadConversionReport: false,
@@ -209,6 +209,28 @@ describe("feature resolver", () => {
     await expect(getOrgPlanContext("org_1")).resolves.toMatchObject({
       packageName: "Growth",
       status: "trial",
+      isTrialing: false,
+    });
+  });
+
+  it("getOrgPlanContext keeps pending activation as no renewal date", async () => {
+    getOrganizationEntitlementsMock.mockResolvedValue(entitlementSnapshot({
+      packageName: "No Plan",
+      packageId: null,
+      subscriptionId: "sub_pending",
+      subscriptionStatus: "pending_activation",
+      endDate: "2026-08-17T00:00:00Z",
+      isActive: false,
+      isScheduled: true,
+      activeFeatureKeys: [],
+      limits: {},
+    }));
+
+    await expect(getOrgPlanContext("org_1")).resolves.toMatchObject({
+      packageName: "No Plan",
+      status: "pending_activation",
+      expiresAt: null,
+      trialEndsAt: null,
       isTrialing: false,
     });
   });

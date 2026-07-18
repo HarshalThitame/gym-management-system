@@ -69,7 +69,8 @@ function mapPlanContext(
   features: OrgFeatureFlags,
 ): OrgPlanContext {
   const status = snapshot.subscriptionStatus;
-  const expiresAt = readDate(snapshot.endDate);
+  const isEffective = status === "active" || status === "trial";
+  const expiresAt = isEffective ? readDate(snapshot.endDate) : null;
   const trialEndsAt = status === "trial" ? readDate(snapshot.endDate) : null;
   const packageSlug = normalizePackageTier(snapshot.packageName) ?? normalizePackageTier(snapshot.packageId) ?? "";
 
